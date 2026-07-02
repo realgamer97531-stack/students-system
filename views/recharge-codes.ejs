@@ -1,0 +1,48 @@
+<%- include('partials/header') %>
+
+<h3 class="mb-4">🎫 أكواد الشحن</h3>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">توليد أكواد جديدة</h6>
+    <form action="/admin/recharge-codes/generate" method="POST" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small">قيمة الكود (ج)</label>
+        <input type="number" name="amount" class="form-control" placeholder="مثال: 200" required min="1">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">عدد الأكواد</label>
+        <input type="number" name="count" class="form-control" placeholder="مثال: 50" required min="1" max="500">
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">⚡ Generate + تحميل Excel</button>
+      </div>
+    </form>
+    <p class="text-muted small mt-2">⚠️ بمجرد الضغط على Generate، هيتم إنشاء الأكواد وتحميل ملف Excel فوراً.</p>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h6 class="mb-3">آخر 100 كود تم إنشاؤهم</h6>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead class="table-light">
+          <tr><th>الكود</th><th>القيمة</th><th>الحالة</th><th>تاريخ الإنشاء</th></tr>
+        </thead>
+        <tbody>
+          <% codes.forEach(c => { %>
+            <tr>
+              <td><code><%= c.code %></code></td>
+              <td><%= c.amount %> ج</td>
+              <td><span class="badge <%= c.is_used ? 'bg-secondary' : 'bg-success' %>"><%= c.is_used ? 'مستخدم' : 'متاح' %></span></td>
+              <td class="small text-muted"><%= new Date(c.createdAt).toLocaleString('ar-EG') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

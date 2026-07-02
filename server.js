@@ -14,6 +14,8 @@ const PERMISSIONS_LIST = require('./permissions');
 const cron = require('node-cron');
 const { exec } = require('child_process');
 const compression = require('compression');
+const RechargeCode = require('./models/RechargeCode');
+const crypto = require('crypto');
 
 // استدعاء الجداول
 const Center = require('./models/Center');
@@ -2374,6 +2376,75 @@ if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
 //     console.error('❌ فشل الاتصال بقاعدة البيانات:', error.message);
 //   }
 // }
+// ===== نظام أكواد الشحن =====
+
+// صفحة إدارة الأكواد (أدمن بس)
+app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
+  const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
+  res.render('recharge-codes', { codes });
+});
+
+// توليد أكواد جديدة
+app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
+  try {
+    const { amount, count } = req.body;
+    if (!amount || !count || count > 500) return res.status(400).send('❌ بيانات غير صحيحة');
+
+    const generated = [];
+    for (let i = 0; i < parseInt(count); i++) {
+      const code = crypto.randomBytes(6).toString('hex').toUpperCase(); // كود 12 حرف
+      await RechargeCode.create({ code, amount: parseFloat(amount) });
+      generated.push({ code, amount });
+    }
+
+    // تصدير Excel
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('أكواد الشحن');
+    sheet.columns = [
+      { header: 'الكود', key: 'code', width: 20 },
+      { header: 'القيمة (ج)', key: 'amount', width: 15 },
+    ];
+    generated.forEach(c => sheet.addRow(c));
+    sheet.getRow(1).font = { bold: true };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=recharge_codes_${Date.now()}.xlsx`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+// API استخدام كود الشحن (من البوابة)
+app.post('/api/portal/recharge', verifyPortalToken('student'), async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.json({ success: false, message: 'ادخل الكود الأول' });
+
+    const rechargeCode = await RechargeCode.findOne({ where: { code: code.trim().toUpperCase(), is_used: false } });
+    if (!rechargeCode) return res.json({ success: false, message: '❌ الكود غير صحيح أو تم استخدامه من قبل' });
+
+    const student = await Student.findByPk(req.portalStudentId);
+    student.balance += rechargeCode.amount;
+    await student.save();
+
+    await BalanceTransaction.create({
+      StudentId: student.id,
+      amount: rechargeCode.amount,
+      reason: `شحن رصيد بكود (${rechargeCode.code})`,
+    });
+
+    // مسح الكود بعد الاستخدام
+    await RechargeCode.destroy({ where: { id: rechargeCode.id } });
+
+    res.json({ success: true, message: `✅ تم شحن ${rechargeCode.amount} ج بنجاح!`, newBalance: student.balance });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
+  }
+});
 
 
 async function startServer() {
