@@ -2380,8 +2380,13 @@ if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
 
 // صفحة إدارة الأكواد (أدمن بس)
 app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
-  const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
-  res.render('recharge-codes', { codes });
+  try {
+    const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
+    res.render('recharge-codes', { codes });
+  } catch (error) {
+    console.error('Failed to load recharge codes page:', error);
+    res.status(500).send('حصلت مشكلة أثناء تحميل صفحة أكواد الشحن: ' + error.message);
+  }
 });
 
 // توليد أكواد جديدة
@@ -2453,6 +2458,8 @@ async function startServer() {
     console.log('✅ تم الاتصال بقاعدة البيانات بنجاح');
     // IMPORTANT: منع sync المؤقتًا لتجنب Duplicate keys أثناء تشغيل السيرفر
     // await sequelize.sync();
+    await RechargeCode.sync();
+    console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
 
     if (process.env.NODE_ENV === 'production') {
