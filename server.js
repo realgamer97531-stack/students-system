@@ -2361,8 +2361,9 @@ async function startServer() {
   try {
     await sequelize.authenticate();
     console.log('✅ تم الاتصال بقاعدة البيانات بنجاح');
-    await sequelize.sync();
-    console.log('✅ تم تجهيز الجداول بنجاح');
+    // IMPORTANT: منع sync المؤقتًا لتجنب Duplicate keys أثناء تشغيل السيرفر
+    // await sequelize.sync();
+    console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
 
     if (process.env.NODE_ENV === 'production') {
       // على Render: HTTP عادي (Render بيعمل HTTPS تلقائياً)
