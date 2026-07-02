@@ -2309,7 +2309,7 @@ app.get('/admin/closing', requireClosingAuth, async (req, res) => {
 });
 
 // نسخة احتياطية تلقائية كل يوم الساعة 3 الفجر
-cron.schedule('0 3 * * *', () => {
+if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
   console.log('⏳ جاري عمل نسخة احتياطية تلقائية...');
   exec('node backup.js', (error, stdout) => {
     if (error) console.error('❌ فشل:', error.message);
@@ -2393,4 +2393,8 @@ async function startServer() {
   }
 }
 
-startServer();
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  startServer();
+}
