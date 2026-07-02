@@ -45,6 +45,14 @@ const PORT = process.env.PORT || 3000;
 const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
 app.use(cors()); // يسمح لأي موقع يتواصل مع الـ API بتاعنا
 app.use(compression());
+app.use(cors({
+  origin: [
+    'https://studyisfunny.online', 
+    'https://students-system-studyisfunny-g622.vercel.app'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true 
+}));
 
 // Middleware عشان السيرفر يقدر يقرا بيانات الفورمز
 app.use(express.urlencoded({ extended: true }));
