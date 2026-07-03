@@ -1,0 +1,43 @@
+<%- include('partials/header') %>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="mb-4">🧾 مراجعة عمليات التحقق من التحويلات</h5>
+
+    <% if (records.length === 0) { %>
+      <p class="text-muted small">لا توجد عمليات تحقق ناجحة مسجلة بعد</p>
+    <% } %>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>صورة الإيصال</th>
+            <th>كود الطالب</th>
+            <th>المبلغ المضاف</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% records.forEach(r => { %>
+            <tr>
+              <td>
+                <% if (r.imagePath) { %>
+                  <a href="<%= r.imagePath %>" target="_blank">
+                    <img src="<%= r.imagePath %>" alt="إيصال التحويل"
+                      style="max-height:70px; border-radius:6px; border:1px solid #E2E4F3;">
+                  </a>
+                <% } else { %>
+                  <span class="text-muted small">لا توجد صورة</span>
+                <% } %>
+              </td>
+              <td><%= r.Student ? r.Student.student_code : '-' %></td>
+              <td class="text-success fw-bold"><%= r.amount %> ج</td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

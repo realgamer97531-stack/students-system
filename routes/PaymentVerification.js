@@ -11,7 +11,7 @@ const ALLOWED_RECIPIENT_NUMBERS = ['01000733148', '01010796944'];
 // اسم المستلم المتوقع (تحقق تنبيهي وليس رافضًا)
 const RECIPIENT_NAME_HINTS = ['shady', 'شادي'];
 
-// حفظ صور الإيصالات على القرص
+// حفظ صور الإيصالات على القرص، بنفس أسلوب رفع الفيديوهات الموجود عندكم بالفعل
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, '..', 'public', 'uploads', 'payment-proofs');
@@ -28,7 +28,7 @@ function normalizeNumber(n) {
   return (n || '').toString().replace(/[^0-9]/g, '');
 }
 
-// استدعاء Gemini API الأصلي والمجاني تماماً والمستقر من جوجل
+// استدعاء Gemini لاستخراج بيانات العملية من الصورة
 async function extractFromImage(base64, mediaType) {
   const systemPrompt = `أنت نظام استخراج بيانات من صور تحويلات مالية إلكترونية مصرية (InstaPay, Vodafone Cash, Fawry, Orange Cash, إلخ).
 اقرأ الصورة المرفقة واستخرج البيانات بدقة شديدة. أجب بصيغة JSON فقط بدون أي نص إضافي أو علامات كود، بالمفاتيح التالية بالضبط:
@@ -47,27 +47,27 @@ async function extractFromImage(base64, mediaType) {
 }
 لو أي حقل غير واضح في الصورة اجعله null. لا تخترع بيانات غير موجودة في الصورة، ولا تفترض نجاح العملية إلا لو ظاهر بوضوح.`;
 
-  // نقوم بتمرير المفتاح في الرابط مباشرة كـ key= لمنع أي خطأ في الـ Headers
-  const apiKey = process.env.GEMINI_API_KEY;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: systemPrompt + '\n\nاستخرج بيانات هذه العملية بصيغة JSON فقط.' },
-          { inline_data: { mime_type: mediaType, data: base64 } },
-        ],
-      }],
-      generationConfig: {
-        responseMimeType: 'application/json',
+  const response = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY,
       },
-    }),
-  });
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: systemPrompt + '\n\nاستخرج بيانات هذه العملية بصيغة JSON فقط.' },
+            { inline_data: { mime_type: mediaType, data: base64 } },
+          ],
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      }),
+    }
+  );
 
   if (!response.ok) {
     const errText = await response.text();
@@ -77,8 +77,8 @@ async function extractFromImage(base64, mediaType) {
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('AI response had no text content: ' + JSON.stringify(data));
-  
-  return JSON.parse(text.trim());
+  const clean = text.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 }
 
 // deps: { Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize }
@@ -114,7 +114,7 @@ module.exports = function (app, deps) {
 
       const reference = ex.transaction_reference.toString().trim();
 
-      // فحص مبدئي سريع
+      // فحص مبدئي سريع (الفحص الحاسم فعليًا بيحصل جوه الـ transaction تحت)
       const existing = await PaymentVerification.findOne({ where: { transactionReference: reference } });
       if (existing) {
         return res.json({ success: false, message: 'رقم العملية هذا مسجل بالفعل، لا يمكن استخدام نفس التحويل مرتين' });
@@ -131,6 +131,8 @@ module.exports = function (app, deps) {
       if (!student) return res.status(404).json({ success: false, message: 'الطالب غير موجود' });
 
       // ===== الحفظ والإضافة داخل Transaction واحدة =====
+      // الاعتماد الحقيقي على منع السباق هو الـ unique constraint في قاعدة البيانات نفسها
+      // (لو حصل تضارب، create هترمي خطأ SequelizeUniqueConstraintError ونمسكه تحت)
       const newBalance = await sequelize.transaction(async (t) => {
         await PaymentVerification.create({
           StudentId: student.id,
@@ -167,12 +169,14 @@ module.exports = function (app, deps) {
       });
 
     } catch (error) {
+      // تكرار رقم العملية (سواء من الفحص المبدئي أو من الـ unique constraint وقت التزامن)
       if (error.name === 'SequelizeUniqueConstraintError') {
         return res.json({ success: false, message: 'رقم العملية هذا مسجل بالفعل، لا يمكن استخدام نفس التحويل مرتين' });
       }
 
       console.error('verify-transfer error:', error);
 
+      // تسجيل المحاولة الفاشلة (لو قدرنا نستخرج بيانات جزئية) عشان تبقى متاحة للمراجعة اليدوية
       try {
         if (ex) {
           await PaymentVerification.create({
