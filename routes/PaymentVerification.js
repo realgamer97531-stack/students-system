@@ -58,7 +58,7 @@ async function extractFromImage(base64, mediaType) {
         'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, // مفتاح Groq المجاني
       },
       body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview', // الموديل المجاني المتاح للرؤية وقراءة الصور على Groq
+        model: 'llama-3.2-90b-vision-preview', // الموديل المجاني المتاح للرؤية وقراءة الصور على Groq
         messages: [
           { role: 'system', content: systemPrompt },
           {
