@@ -28,7 +28,7 @@ function normalizeNumber(n) {
   return (n || '').toString().replace(/[^0-9]/g, '');
 }
 
-// استدعاء Claude لاستخراج بيانات العملية من الصورة
+// استدعاء Gemini لاستخراج بيانات العملية من الصورة
 async function extractFromImage(base64, mediaType) {
   const systemPrompt = `أنت نظام استخراج بيانات من صور تحويلات مالية إلكترونية مصرية (InstaPay, Vodafone Cash, Fawry, Orange Cash, إلخ).
 اقرأ الصورة المرفقة واستخرج البيانات بدقة شديدة. أجب بصيغة JSON فقط بدون أي نص إضافي أو علامات كود، بالمفاتيح التالية بالضبط:
@@ -47,36 +47,37 @@ async function extractFromImage(base64, mediaType) {
 }
 لو أي حقل غير واضح في الصورة اجعله null. لا تخترع بيانات غير موجودة في الصورة، ولا تفترض نجاح العملية إلا لو ظاهر بوضوح.`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-          { type: 'text', text: 'استخرج بيانات هذه العملية بصيغة JSON فقط.' },
-        ],
-      }],
-    }),
-  });
+  const response = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: systemPrompt + '\n\nاستخرج بيانات هذه العملية بصيغة JSON فقط.' },
+            { inline_data: { mime_type: mediaType, data: base64 } },
+          ],
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      }),
+    }
+  );
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error('Anthropic API error: ' + errText);
+    throw new Error('Gemini API error: ' + errText);
   }
 
   const data = await response.json();
-  const textBlock = (data.content || []).find(c => c.type === 'text');
-  if (!textBlock) throw new Error('AI response had no text block');
-  const clean = textBlock.text.replace(/```json|```/g, '').trim();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('AI response had no text content: ' + JSON.stringify(data));
+  const clean = text.replace(/```json|```/g, '').trim();
   return JSON.parse(clean);
 }
 
@@ -198,4 +199,3 @@ module.exports = function (app, deps) {
     }
   });
 };
-//write anything
