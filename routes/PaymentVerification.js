@@ -63,7 +63,7 @@ async function extractFromImage(base64, mediaType) {
       },
       body: JSON.stringify({
         // قمنا باختيار موديل gemini-2.5-flash كخيار ممتاز وسريع واقتصادي، يمكنك تغييره لأي موديل آخر يدعم الصور
-        model: 'google/gemini-2.5-flash:free', 
+        model: 'qwen/qwen-2-vl-7b-instruct:free', 
         messages: [
           { role: 'system', content: systemPrompt },
           {
