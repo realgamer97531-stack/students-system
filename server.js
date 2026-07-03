@@ -1689,6 +1689,8 @@ app.post('/api/portal/parent-login', async (req, res) => {
   }
 });
 
+const PaymentVerification = require('./models/PaymentVerification');
+
 // Middleware يتأكد من الـ Token الموجود في الهيدر، ويحدد نوع الحساب المطلوب
 function verifyPortalToken(requiredType) {
   return (req, res, next) => {
@@ -1709,6 +1711,10 @@ function verifyPortalToken(requiredType) {
     }
   };
 }
+
+require('./routes/PaymentVerification')(app, {
+  Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize,
+});
 
 // جلب بيانات الطالب الكاملة (بيستخدمها الطالب وولي الأمر مع بعض)
 async function buildStudentData(studentId) {
@@ -2459,6 +2465,7 @@ async function startServer() {
     // IMPORTANT: منع sync المؤقتًا لتجنب Duplicate keys أثناء تشغيل السيرفر
     // await sequelize.sync();
     await RechargeCode.sync();
+    await PaymentVerification.sync();
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
 
