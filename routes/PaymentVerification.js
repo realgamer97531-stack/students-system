@@ -28,7 +28,7 @@ function normalizeNumber(n) {
   return (n || '').toString().replace(/[^0-9]/g, '');
 }
 
-// استدعاء Groq API لاستخراج بيانات العملية من الصورة مجاناً وبسرعة فائقة
+// استدعاء Gemini API الأصلي والمجاني تماماً والمستقر من جوجل
 async function extractFromImage(base64, mediaType) {
   const systemPrompt = `أنت نظام استخراج بيانات من صور تحويلات مالية إلكترونية مصرية (InstaPay, Vodafone Cash, Fawry, Orange Cash, إلخ).
 اقرأ الصورة المرفقة واستخرج البيانات بدقة شديدة. أجب بصيغة JSON فقط بدون أي نص إضافي أو علامات كود، بالمفاتيح التالية بالضبط:
@@ -47,40 +47,35 @@ async function extractFromImage(base64, mediaType) {
 }
 لو أي حقل غير واضح في الصورة اجعله null. لا تخترع بيانات غير موجودة في الصورة، ولا تفترض نجاح العملية إلا لو ظاهر بوضوح.`;
 
-  const imageUrl = `data:${mediaType};base64,${base64}`;
-
   const response = await fetch(
-    'https://api.groq.com/openai/v1/chat/completions',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, // مفتاح Groq المجاني
+        'x-goog-api-key': process.env.GEMINI_API_KEY, // المفتاح المجاني من Google AI Studio
       },
       body: JSON.stringify({
-        model: 'llama-3.2-90b-vision-instruct', // الموديل المجاني المتاح للرؤية وقراءة الصور على Groq
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'استخرج بيانات هذه العملية بصيغة JSON فقط.' },
-              { type: 'image_url', image_url: { url: imageUrl } }
-            ]
-          }
-        ],
-        response_format: { type: 'json_object' } // إجبار الموديل على إرجاع JSON صريح ونظيف
+        contents: [{
+          parts: [
+            { text: systemPrompt + '\n\nاستخرج بيانات هذه العملية بصيغة JSON فقط.' },
+            { inline_data: { mime_type: mediaType, data: base64 } },
+          ],
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json', // إجبار جوجل على إرجاع JSON نظيف بدون علامات كود
+        },
       }),
     }
   );
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error('Groq API error: ' + errText);
+    throw new Error('Gemini API error: ' + errText);
   }
 
   const data = await response.json();
-  const text = data?.choices?.[0]?.message?.content;
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('AI response had no text content: ' + JSON.stringify(data));
   
   return JSON.parse(text.trim());
