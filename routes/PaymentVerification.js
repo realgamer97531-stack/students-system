@@ -28,7 +28,7 @@ function normalizeNumber(n) {
   return (n || '').toString().replace(/[^0-9]/g, '');
 }
 
-// استدعاء OpenRouter لاستخراج بيانات العملية من الصورة
+// استدعاء Groq API لاستخراج بيانات العملية من الصورة مجاناً وبسرعة فائقة
 async function extractFromImage(base64, mediaType) {
   const systemPrompt = `أنت نظام استخراج بيانات من صور تحويلات مالية إلكترونية مصرية (InstaPay, Vodafone Cash, Fawry, Orange Cash, إلخ).
 اقرأ الصورة المرفقة واستخرج البيانات بدقة شديدة. أجب بصيغة JSON فقط بدون أي نص إضافي أو علامات كود، بالمفاتيح التالية بالضبط:
@@ -47,23 +47,18 @@ async function extractFromImage(base64, mediaType) {
 }
 لو أي حقل غير واضح في الصورة اجعله null. لا تخترع بيانات غير موجودة في الصورة، ولا تفترض نجاح العملية إلا لو ظاهر بوضوح.`;
 
-  // تحضير رابط الصورة ليتناسب مع صيغة الـ Data URL المطلوبة في رؤية الكمبيوتر (Vision APIs)
   const imageUrl = `data:${mediaType};base64,${base64}`;
 
   const response = await fetch(
-    'https://openrouter.ai/api/v1/chat/completions',
+    'https://api.groq.com/openai/v1/chat/completions',
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        // اختياري لـ OpenRouter لإظهار اسم تطبيقك في لوحة التحكم لديهم
-        'HTTP-Referer': 'https://your-domain.com', 
-        'X-Title': 'Payment Verification System',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, // مفتاح Groq المجاني
       },
       body: JSON.stringify({
-        // قمنا باختيار موديل gemini-2.5-flash كخيار ممتاز وسريع واقتصادي، يمكنك تغييره لأي موديل آخر يدعم الصور
-        model: 'qwen/qwen-2-vl-7b-instruct:free', 
+        model: 'llama-3.2-11b-vision-preview', // الموديل المجاني المتاح للرؤية وقراءة الصور على Groq
         messages: [
           { role: 'system', content: systemPrompt },
           {
@@ -74,22 +69,20 @@ async function extractFromImage(base64, mediaType) {
             ]
           }
         ],
-        // إجبار الموديل على إرجاع JSON نظيف ومباشر
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' } // إجبار الموديل على إرجاع JSON صريح ونظيف
       }),
     }
   );
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error('OpenRouter API error: ' + errText);
+    throw new Error('Groq API error: ' + errText);
   }
 
   const data = await response.json();
   const text = data?.choices?.[0]?.message?.content;
   if (!text) throw new Error('AI response had no text content: ' + JSON.stringify(data));
   
-  // بما أننا حددنا response_format JSON، فالنص سيعود كـ JSON نظيف بدون وسم ```json
   return JSON.parse(text.trim());
 }
 
