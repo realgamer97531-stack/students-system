@@ -11,7 +11,7 @@ const ALLOWED_RECIPIENT_NUMBERS = ['01000733148', '01010796944'];
 // اسم المستلم المتوقع (تحقق تنبيهي وليس رافضًا)
 const RECIPIENT_NAME_HINTS = ['shady', 'شادي'];
 
-// حفظ صور الإيصالات على القرص، بنفس أسلوب رفع الفيديوهات الموجود عندكم بالفعل
+// حفظ صور الإيصالات على القرص
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, '..', 'public', 'uploads', 'payment-proofs');
@@ -28,7 +28,7 @@ function normalizeNumber(n) {
   return (n || '').toString().replace(/[^0-9]/g, '');
 }
 
-// استدعاء Gemini لاستخراج بيانات العملية من الصورة
+// استدعاء OpenRouter لاستخراج بيانات العملية من الصورة
 async function extractFromImage(base64, mediaType) {
   const systemPrompt = `أنت نظام استخراج بيانات من صور تحويلات مالية إلكترونية مصرية (InstaPay, Vodafone Cash, Fawry, Orange Cash, إلخ).
 اقرأ الصورة المرفقة واستخرج البيانات بدقة شديدة. أجب بصيغة JSON فقط بدون أي نص إضافي أو علامات كود، بالمفاتيح التالية بالضبط:
@@ -47,38 +47,50 @@ async function extractFromImage(base64, mediaType) {
 }
 لو أي حقل غير واضح في الصورة اجعله null. لا تخترع بيانات غير موجودة في الصورة، ولا تفترض نجاح العملية إلا لو ظاهر بوضوح.`;
 
+  // تحضير رابط الصورة ليتناسب مع صيغة الـ Data URL المطلوبة في رؤية الكمبيوتر (Vision APIs)
+  const imageUrl = `data:${mediaType};base64,${base64}`;
+
   const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+    'https://openrouter.ai/api/v1/chat/completions',
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': process.env.GEMINI_API_KEY,
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        // اختياري لـ OpenRouter لإظهار اسم تطبيقك في لوحة التحكم لديهم
+        'HTTP-Referer': 'https://your-domain.com', 
+        'X-Title': 'Payment Verification System',
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: systemPrompt + '\n\nاستخرج بيانات هذه العملية بصيغة JSON فقط.' },
-            { inline_data: { mime_type: mediaType, data: base64 } },
-          ],
-        }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
+        // قمنا باختيار موديل gemini-2.5-flash كخيار ممتاز وسريع واقتصادي، يمكنك تغييره لأي موديل آخر يدعم الصور
+        model: 'google/gemini-2.5-flash', 
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'استخرج بيانات هذه العملية بصيغة JSON فقط.' },
+              { type: 'image_url', image_url: { url: imageUrl } }
+            ]
+          }
+        ],
+        // إجبار الموديل على إرجاع JSON نظيف ومباشر
+        response_format: { type: 'json_object' }
       }),
     }
   );
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error('Gemini API error: ' + errText);
+    throw new Error('OpenRouter API error: ' + errText);
   }
 
   const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = data?.choices?.[0]?.message?.content;
   if (!text) throw new Error('AI response had no text content: ' + JSON.stringify(data));
-  const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  
+  // بما أننا حددنا response_format JSON، فالنص سيعود كـ JSON نظيف بدون وسم ```json
+  return JSON.parse(text.trim());
 }
 
 // deps: { Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize }
@@ -114,7 +126,7 @@ module.exports = function (app, deps) {
 
       const reference = ex.transaction_reference.toString().trim();
 
-      // فحص مبدئي سريع (الفحص الحاسم فعليًا بيحصل جوه الـ transaction تحت)
+      // فحص مبدئي سريع
       const existing = await PaymentVerification.findOne({ where: { transactionReference: reference } });
       if (existing) {
         return res.json({ success: false, message: 'رقم العملية هذا مسجل بالفعل، لا يمكن استخدام نفس التحويل مرتين' });
@@ -131,8 +143,6 @@ module.exports = function (app, deps) {
       if (!student) return res.status(404).json({ success: false, message: 'الطالب غير موجود' });
 
       // ===== الحفظ والإضافة داخل Transaction واحدة =====
-      // الاعتماد الحقيقي على منع السباق هو الـ unique constraint في قاعدة البيانات نفسها
-      // (لو حصل تضارب، create هترمي خطأ SequelizeUniqueConstraintError ونمسكه تحت)
       const newBalance = await sequelize.transaction(async (t) => {
         await PaymentVerification.create({
           StudentId: student.id,
@@ -169,14 +179,12 @@ module.exports = function (app, deps) {
       });
 
     } catch (error) {
-      // تكرار رقم العملية (سواء من الفحص المبدئي أو من الـ unique constraint وقت التزامن)
       if (error.name === 'SequelizeUniqueConstraintError') {
         return res.json({ success: false, message: 'رقم العملية هذا مسجل بالفعل، لا يمكن استخدام نفس التحويل مرتين' });
       }
 
       console.error('verify-transfer error:', error);
 
-      // تسجيل المحاولة الفاشلة (لو قدرنا نستخرج بيانات جزئية) عشان تبقى متاحة للمراجعة اليدوية
       try {
         if (ex) {
           await PaymentVerification.create({
