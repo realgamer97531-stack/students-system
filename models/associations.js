@@ -14,9 +14,9 @@ const VideoPart = require('./VideoPart');
 const WatchProgress = require('./WatchProgress');
 const VideoAccessGrant = require('./VideoAccessGrant');
 const Warning = require('./Warning');
+const PaymentVerification = require('./PaymentVerification');
 Student.hasMany(PaymentVerification, { foreignKey: 'StudentId' });
 PaymentVerification.belongsTo(Student, { foreignKey: 'StudentId' });
-const PaymentVerification = require('./PaymentVerification');
 
 function setupAssociations() {
   Center.hasMany(Student);
