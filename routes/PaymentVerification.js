@@ -71,27 +71,27 @@ async function extractFromImage(base64, mediaType) {
 }
 لو أي حقل غير واضح في الصورة اجعله null. لا تخترع بيانات غير موجودة في الصورة، ولا تفترض نجاح العملية إلا لو ظاهر بوضوح.`;
 
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': process.env.GEMINI_API_KEY,
+  // نقوم بتمرير المفتاح في الرابط مباشرة كـ key= لمنع أي خطأ في الـ Headers
+  const apiKey = process.env.GEMINI_API_KEY;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: systemPrompt + '\n\nاستخرج بيانات هذه العملية بصيغة JSON فقط.' },
+          { inline_data: { mime_type: mediaType, data: base64 } },
+        ],
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
       },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: systemPrompt + '\n\nاستخرج بيانات هذه العملية بصيغة JSON فقط.' },
-            { inline_data: { mime_type: mediaType, data: base64 } },
-          ],
-        }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
-      }),
-    }
-  );
+    }),
+  });
 
   if (!response.ok) {
     const errText = await response.text();
@@ -101,8 +101,8 @@ async function extractFromImage(base64, mediaType) {
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('AI response had no text content: ' + JSON.stringify(data));
-  const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  
+  return JSON.parse(text.trim());
 }
 
 // deps: { Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize }
