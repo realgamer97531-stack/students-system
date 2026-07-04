@@ -1786,7 +1786,13 @@ async function buildStudentData(studentId) {
 
   const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
 
-    const ownSessionByLesson = {};
+  const transactions = await BalanceTransaction.findAll({
+    where: { StudentId: student.id },
+    order: [['createdAt', 'DESC']],
+    limit: 30,
+  });
+
+  const ownSessionByLesson = {};
   ownSessions.forEach(s => { ownSessionByLesson[s.lesson_number] = s; });
 
   // حساب إحصائيات الامتحانات مرة واحدة لكل الحصص
@@ -1870,12 +1876,6 @@ async function buildStudentData(studentId) {
   const warnings = await Warning.findAll({
     where: { StudentId: student.id },
     order: [['createdAt', 'ASC']],
-  });
-
-  const transactions = await BalanceTransaction.findAll({
-    where: { StudentId: student.id },
-    order: [['createdAt', 'DESC']],
-    limit: 30,
   });
 
   return {
