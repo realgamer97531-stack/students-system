@@ -1579,7 +1579,7 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
     const allExamResults = await ExamResult.findAll({
   include: [{ 
     model: Exam, 
-    attributes: ['id', 'max_score', 'status'],
+    attributes: ['id', 'max_score'],
     include: [{ 
       model: Session, 
       attributes: ['lesson_number', 'SubjectId']
