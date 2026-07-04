@@ -15,6 +15,8 @@
             <th>صورة الإيصال</th>
             <th>كود الطالب</th>
             <th>المبلغ المضاف</th>
+            <th>تاريخ التحويل</th>
+            <th>ساعة التحويل</th>
           </tr>
         </thead>
         <tbody>
@@ -32,6 +34,8 @@
               </td>
               <td><%= r.Student ? r.Student.student_code : '-' %></td>
               <td class="text-success fw-bold"><%= r.amount %> ج</td>
+              <td class="text-muted small"><%= r.transactionDate || '-' %></td>
+              <td class="text-muted small"><%= r.transactionTime || '-' %></td>
             </tr>
           <% }) %>
         </tbody>
