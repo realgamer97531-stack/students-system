@@ -17,6 +17,7 @@
             <th>المبلغ المضاف</th>
             <th>تاريخ التحويل</th>
             <th>ساعة التحويل</th>
+            <th>واتساب</th>
           </tr>
         </thead>
         <tbody>
@@ -36,6 +37,29 @@
               <td class="text-success fw-bold"><%= r.amount %> ج</td>
               <td class="text-muted small"><%= r.transactionDate || '-' %></td>
               <td class="text-muted small"><%= r.transactionTime || '-' %></td>
+              <%
+let phone = '';
+
+if (r.Student && r.Student.phone) {
+    phone = r.Student.phone.replace(/\D/g, '');
+
+    if (phone.startsWith('0')) {
+        phone = '20' + phone.substring(1);
+    }
+}
+%>
+
+<td>
+    <% if (phone) { %>
+        <a href="https://wa.me/<%= phone %>"
+           target="_blank"
+           class="btn btn-success btn-sm">
+            <i class="bi bi-whatsapp"></i> واتساب
+        </a>
+    <% } else { %>
+        <span class="text-muted">لا يوجد رقم</span>
+    <% } %>
+</td>
             </tr>
           <% }) %>
         </tbody>
