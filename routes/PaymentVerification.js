@@ -1,4 +1,5 @@
 const multer = require('multer');
+const crypto = require('crypto');
 
 // ===== الإعدادات =====
 
@@ -8,8 +9,7 @@ const ALLOWED_RECIPIENT_NUMBERS = ['01000733148', '01010796944'];
 // اسم المستلم المتوقع (تحقق تنبيهي وليس رافضًا)
 const RECIPIENT_NAME_HINTS = ['shady', 'شادي'];
 
-// الصورة بتتخزن في الذاكرة المؤقتة (RAM) بس أثناء الطلب، ومفيش أي كتابة على قرص السيرفر إطلاقًا.
-// بعد رفعها لـ Cloudinary بننساها فورًا.
+// الصورة بتتخزن في الذاكرة المؤقتة (RAM) بس أثناء الطلب، ومفيش أي كتابة على قرص السيرفر إطلاقًا
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 }, // حد أقصى 8 ميجا للصورة
@@ -25,11 +25,9 @@ async function uploadToCloudinary(base64, mediaType) {
   const apiKey = process.env.CLOUDINARY_API_KEY;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-  const crypto = require('crypto');
   const timestamp = Math.floor(Date.now() / 1000);
   const folder = 'payment-proofs';
 
-  // توليد التوقيع المطلوب من Cloudinary لرفع آمن (Signed Upload)
   const paramsToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
   const signature = crypto.createHash('sha1').update(paramsToSign).digest('hex');
 
@@ -51,7 +49,7 @@ async function uploadToCloudinary(base64, mediaType) {
   }
 
   const data = await response.json();
-  return data.secure_url; // اللينك الدائم للصورة
+  return data.secure_url;
 }
 
 // استدعاء Gemini لاستخراج بيانات العملية من الصورة
@@ -178,7 +176,7 @@ module.exports = function (app, deps) {
       const student = await Student.findByPk(req.portalStudentId);
       if (!student) return res.status(404).json({ success: false, message: 'الطالب غير موجود' });
 
-      // رفع الصورة لـ Cloudinary قبل الحفظ (لو فشل الرفع، نوقف العملية كلها ونرجع خطأ بدل ما نضيف رصيد من غير إثبات محفوظ)
+      // رفع الصورة لـ Cloudinary قبل الحفظ (لو فشل الرفع، نوقف العملية كلها بدل ما نضيف رصيد من غير إثبات محفوظ)
       const imageUrl = await uploadToCloudinary(base64, mediaType);
 
       const newBalance = await sequelize.transaction(async (t) => {
