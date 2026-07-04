@@ -1764,26 +1764,10 @@ async function buildStudentData(studentId) {
 
   const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
 
-  const ownSessionByLesson = {};
+    const ownSessionByLesson = {};
   ownSessions.forEach(s => { ownSessionByLesson[s.lesson_number] = s; });
 
-  const sessions = lessonNumbers.map(async lessonNumber => {
-    const ownSession = ownSessionByLesson[lessonNumber];
-    const att = attendanceByLesson[lessonNumber];
-    const hw = homeworkByLesson[lessonNumber];
-    const exam = examByLesson[lessonNumber];
-
-    let attendanceStatus, attendedCenterName = null;
-    if (att) {
-      attendanceStatus = 'attended';
-      attendedCenterName = att.Session.Center.name;
-    } else if (ownSession && ownSession.status === 'cancelled') {
-      attendanceStatus = 'cancelled';
-    } else {
-      attendanceStatus = 'absent';
-    }
-
-    // إحصائيات الامتحانات
+  // حساب إحصائيات الامتحانات مرة واحدة لكل الحصص
   const examStatsMap = {};
   for (const lessonNum of lessonNumbers) {
     const att = attendanceByLesson[lessonNum];
@@ -1799,6 +1783,22 @@ async function buildStudentData(studentId) {
       avg: (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1),
     };
   }
+
+  const sessions = lessonNumbers.map(lessonNumber => {
+    const ownSession = ownSessionByLesson[lessonNumber];
+    const att = attendanceByLesson[lessonNumber];
+    const hw = homeworkByLesson[lessonNumber];
+    const exam = examByLesson[lessonNumber];
+
+    let attendanceStatus, attendedCenterName = null;
+    if (att) {
+      attendanceStatus = 'attended';
+      attendedCenterName = att.Session.Center.name;
+    } else if (ownSession && ownSession.status === 'cancelled') {
+      attendanceStatus = 'cancelled';
+    } else {
+      attendanceStatus = 'absent';
+    }
 
     return {
       lessonNumber,
