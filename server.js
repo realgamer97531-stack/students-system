@@ -524,6 +524,28 @@ app.post('/students/:id/balance', async (req, res) => {
   }
 });
 
+app.post('/students/:id/points', requireAdmin, async (req, res) => {
+  try {
+    const { amount, reason, type } = req.body;
+    const student = await Student.findByPk(req.params.id);
+    const signedAmount = type === 'deduct' ? -Math.abs(parseInt(amount)) : Math.abs(parseInt(amount));
+
+    await Student.increment('points', { by: signedAmount, where: { id: req.params.id } });
+
+    await BalanceTransaction.create({
+      StudentId: student.id,
+      amount: signedAmount,
+      reason: `نقاط: ${reason || (type === 'deduct' ? 'خصم يدوي' : 'إضافة يدوية')}`,
+      UserId: req.session.userId,
+    });
+
+    res.redirect('/students/' + req.params.id);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
 app.post('/students', async (req, res) => {
   try {
     const { name, phone, parent_phone, price_per_session, balance, booklet_status, center_id, subject_id } = req.body;
@@ -1817,6 +1839,11 @@ async function buildStudentData(studentId) {
       examStats: examStatsMap[lessonNumber] || null,
       examUser: exam ? (exam.User ? exam.User.name : null) : null,
       examTime: exam ? exam.createdAt : null,
+      points: student.points || 0,
+      pointsHistory: transactions
+      .filter(t => t.reason && t.reason.startsWith('نقاط:'))
+      .slice(0, 20)
+      .map(t => ({ reason: t.reason.replace('نقاط: ', ''), amount: t.amount, time: t.createdAt })),
     };
   });
 
@@ -1870,6 +1897,8 @@ async function buildStudentData(studentId) {
       amount: t.amount,
       reason: t.reason,
       time: t.createdAt,
+      points: student.points || 0,
+
     })),
   };
 }

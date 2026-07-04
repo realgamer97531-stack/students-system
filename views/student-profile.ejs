@@ -136,6 +136,43 @@
         </form>
       </div>
     </div>
+    <div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h6 class="mb-3">⭐ النقاط: <span class="text-warning"><%= student.points || 0 %> نقطة</span></h6>
+    <p class="small text-muted mb-2">
+      نظام النقاط: حضور +2 | واجب كامل +3 | درجة امتحان = نفس عدد النقاط | مشاهدة فيديو +1
+    </p>
+    <form action="/students/<%= student.id %>/points" method="POST" class="row g-2">
+      <div class="col-md-3">
+        <input type="number" name="amount" class="form-control form-control-sm" placeholder="عدد النقاط" required min="1">
+      </div>
+      <div class="col-md-3">
+        <select name="type" class="form-select form-select-sm">
+          <option value="add">إضافة نقاط</option>
+          <option value="deduct">خصم نقاط</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب (اختياري)">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-sm btn-warning w-100">تنفيذ</button>
+      </div>
+    </form>
+    <hr class="my-2">
+    <p class="small text-muted mb-1">سجل النقاط (آخر 10):</p>
+    <ul class="list-group list-group-flush">
+      <% transactions.filter(t => t.reason && t.reason.startsWith('نقاط:')).slice(0, 10).forEach(t => { %>
+        <li class="list-group-item d-flex justify-content-between small px-0">
+          <span><%= t.reason.replace('نقاط: ', '') %></span>
+          <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %>">
+            <%= t.amount >= 0 ? '+' : '' %><%= t.amount %>
+          </span>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+</div>
 
     <!-- سجل تعديلات الرصيد -->
     <div class="card shadow-sm mt-3">
