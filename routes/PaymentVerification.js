@@ -1,7 +1,4 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 
 // ===== الإعدادات =====
 
@@ -11,21 +8,50 @@ const ALLOWED_RECIPIENT_NUMBERS = ['01000733148', '01010796944'];
 // اسم المستلم المتوقع (تحقق تنبيهي وليس رافضًا)
 const RECIPIENT_NAME_HINTS = ['shady', 'شادي'];
 
-// حفظ صور الإيصالات على القرص، بنفس أسلوب رفع الفيديوهات الموجود عندكم بالفعل
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '..', 'public', 'uploads', 'payment-proofs');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}_${crypto.randomBytes(4).toString('hex')}${path.extname(file.originalname) || '.jpg'}`);
-  },
+// الصورة بتتخزن في الذاكرة المؤقتة (RAM) بس أثناء الطلب، ومفيش أي كتابة على قرص السيرفر إطلاقًا.
+// بعد رفعها لـ Cloudinary بننساها فورًا.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // حد أقصى 8 ميجا للصورة
 });
-const upload = multer({ storage, limits: { fileSize: 8 * 1024 * 1024 } }); // حد أقصى 8 ميجا للصورة
 
 function normalizeNumber(n) {
   return (n || '').toString().replace(/[^0-9]/g, '');
+}
+
+// رفع الصورة إلى Cloudinary (تخزين خارجي دائم، مش على قرص السيرفر)
+async function uploadToCloudinary(base64, mediaType) {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  const crypto = require('crypto');
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = 'payment-proofs';
+
+  // توليد التوقيع المطلوب من Cloudinary لرفع آمن (Signed Upload)
+  const paramsToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+  const signature = crypto.createHash('sha1').update(paramsToSign).digest('hex');
+
+  const form = new URLSearchParams();
+  form.append('file', `data:${mediaType};base64,${base64}`);
+  form.append('api_key', apiKey);
+  form.append('timestamp', timestamp);
+  form.append('folder', folder);
+  form.append('signature', signature);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error('Cloudinary upload error: ' + errText);
+  }
+
+  const data = await response.json();
+  return data.secure_url; // اللينك الدائم للصورة
 }
 
 // استدعاء Gemini لاستخراج بيانات العملية من الصورة
@@ -85,16 +111,39 @@ async function extractFromImage(base64, mediaType) {
 module.exports = function (app, deps) {
   const { Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize } = deps;
 
+  // ===== صفحة مراجعة منفصلة: بس بتعرض عمليات التحقق الناجحة (قراءة فقط) =====
+  app.get('/admin/payment-verifications', async (req, res) => {
+    try {
+      if (!req.session || req.session.userRole !== 'admin') {
+        return res.status(403).send('⛔ هذه الصفحة للأدمن فقط');
+      }
+
+      const records = await PaymentVerification.findAll({
+        where: { status: 'approved' },
+        include: [Student],
+        order: [['createdAt', 'DESC']],
+        limit: 300,
+      });
+
+      res.render('payment-verifications', { records });
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+    }
+  });
+
   app.post('/api/portal/verify-transfer', verifyPortalToken('student'), upload.single('receipt'), async (req, res) => {
     let ex = null;
+    let base64 = null;
+    let mediaType = null;
 
     try {
       if (!req.file) {
         return res.json({ success: false, message: 'لم يتم إرفاق صورة التحويل' });
       }
 
-      const base64 = fs.readFileSync(req.file.path).toString('base64');
-      const mediaType = req.file.mimetype || 'image/jpeg';
+      base64 = req.file.buffer.toString('base64'); // من الذاكرة مباشرة، من غير أي كتابة على القرص
+      mediaType = req.file.mimetype || 'image/jpeg';
 
       ex = await extractFromImage(base64, mediaType);
 
@@ -114,7 +163,6 @@ module.exports = function (app, deps) {
 
       const reference = ex.transaction_reference.toString().trim();
 
-      // فحص مبدئي سريع (الفحص الحاسم فعليًا بيحصل جوه الـ transaction تحت)
       const existing = await PaymentVerification.findOne({ where: { transactionReference: reference } });
       if (existing) {
         return res.json({ success: false, message: 'رقم العملية هذا مسجل بالفعل، لا يمكن استخدام نفس التحويل مرتين' });
@@ -130,9 +178,9 @@ module.exports = function (app, deps) {
       const student = await Student.findByPk(req.portalStudentId);
       if (!student) return res.status(404).json({ success: false, message: 'الطالب غير موجود' });
 
-      // ===== الحفظ والإضافة داخل Transaction واحدة =====
-      // الاعتماد الحقيقي على منع السباق هو الـ unique constraint في قاعدة البيانات نفسها
-      // (لو حصل تضارب، create هترمي خطأ SequelizeUniqueConstraintError ونمسكه تحت)
+      // رفع الصورة لـ Cloudinary قبل الحفظ (لو فشل الرفع، نوقف العملية كلها ونرجع خطأ بدل ما نضيف رصيد من غير إثبات محفوظ)
+      const imageUrl = await uploadToCloudinary(base64, mediaType);
+
       const newBalance = await sequelize.transaction(async (t) => {
         await PaymentVerification.create({
           StudentId: student.id,
@@ -145,7 +193,7 @@ module.exports = function (app, deps) {
           transactionReference: reference,
           paymentMethod: ex.payment_method || null,
           status: 'approved',
-          imagePath: `/uploads/payment-proofs/${path.basename(req.file.path)}`,
+          imagePath: imageUrl,
           aiRawResponse: JSON.stringify(ex),
         }, { transaction: t });
 
@@ -169,14 +217,12 @@ module.exports = function (app, deps) {
       });
 
     } catch (error) {
-      // تكرار رقم العملية (سواء من الفحص المبدئي أو من الـ unique constraint وقت التزامن)
       if (error.name === 'SequelizeUniqueConstraintError') {
         return res.json({ success: false, message: 'رقم العملية هذا مسجل بالفعل، لا يمكن استخدام نفس التحويل مرتين' });
       }
 
       console.error('verify-transfer error:', error);
 
-      // تسجيل المحاولة الفاشلة (لو قدرنا نستخرج بيانات جزئية) عشان تبقى متاحة للمراجعة اليدوية
       try {
         if (ex) {
           await PaymentVerification.create({
@@ -187,7 +233,6 @@ module.exports = function (app, deps) {
             transactionReference: (ex.transaction_reference || 'unknown') + '_FAILED_' + Date.now(),
             status: 'rejected',
             rejectionReason: error.message,
-            imagePath: req.file ? `/uploads/payment-proofs/${path.basename(req.file.path)}` : null,
             aiRawResponse: JSON.stringify(ex),
           });
         }
