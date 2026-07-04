@@ -1767,7 +1767,7 @@ async function buildStudentData(studentId) {
   const ownSessionByLesson = {};
   ownSessions.forEach(s => { ownSessionByLesson[s.lesson_number] = s; });
 
-  const sessions = lessonNumbers.map(lessonNumber => {
+  const sessions = lessonNumbers.map(async lessonNumber => {
     const ownSession = ownSessionByLesson[lessonNumber];
     const att = attendanceByLesson[lessonNumber];
     const hw = homeworkByLesson[lessonNumber];
