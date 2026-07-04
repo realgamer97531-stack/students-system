@@ -1783,6 +1783,23 @@ async function buildStudentData(studentId) {
       attendanceStatus = 'absent';
     }
 
+    // إحصائيات الامتحانات
+  const examStatsMap = {};
+  for (const lessonNum of lessonNumbers) {
+    const att = attendanceByLesson[lessonNum];
+    if (!att) continue;
+    const exam = await Exam.findOne({ where: { SessionId: att.Session?.id || att.SessionId } });
+    if (!exam) continue;
+    const allResults = await ExamResult.findAll({ where: { ExamId: exam.id }, attributes: ['score'] });
+    if (allResults.length === 0) continue;
+    const scores = allResults.map(r => parseFloat(r.score));
+    examStatsMap[lessonNum] = {
+      max: Math.max(...scores),
+      min: Math.min(...scores),
+      avg: (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1),
+    };
+  }
+
     return {
       lessonNumber,
       date: ownSession ? ownSession.session_date : (att ? att.Session.session_date : null),
@@ -1797,6 +1814,7 @@ async function buildStudentData(studentId) {
       homeworkTime: hw ? hw.createdAt : null,
       examScore: exam ? exam.score : null,
       examMax: exam ? exam.Exam.max_score : null,
+      examStats: examStatsMap[lessonNumber] || null,
       examUser: exam ? (exam.User ? exam.User.name : null) : null,
       examTime: exam ? exam.createdAt : null,
     };
