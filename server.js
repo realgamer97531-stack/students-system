@@ -1577,9 +1577,16 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
       attributes: ['StudentId', 'SessionId', 'status'],
     });
     const allExamResults = await ExamResult.findAll({
-      include: [{ model: Exam, include: [Session], attributes: ['id', 'lesson_number', 'max_score', 'status'] }],
-      attributes: ['StudentId', 'score', 'createdAt', 'ExamId'],
-    });
+  include: [{ 
+    model: Exam, 
+    attributes: ['id', 'max_score', 'status'],
+    include: [{ 
+      model: Session, 
+      attributes: ['lesson_number', 'SubjectId']
+    }]
+  }],
+  attributes: ['StudentId', 'score', 'createdAt', 'ExamId'],
+});
     const allWarnings = await Warning.findAll({
       attributes: ['StudentId', 'reason', 'createdAt'],
     });
@@ -1715,11 +1722,11 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
           ? Math.round((studentExams.reduce((sum, e) => sum + e.score, 0) / studentExams.length / (studentExams[0]?.Exam?.max_score || 100)) * 100)
           : 0,
         recentExams: studentExams.slice(0, 3).map(e => ({
-          lesson: e.Exam.lesson_number,
-          score: e.score,
-          maxScore: e.Exam.max_score,
-          percentage: Math.round((e.score / e.Exam.max_score) * 100),
-        })),
+  lesson: e.Exam.Session?.lesson_number || 'N/A',
+  score: e.score,
+  maxScore: e.Exam.max_score,
+  percentage: Math.round((e.score / e.Exam.max_score) * 100),
+})),
       };
 
       if (reasons.length > 0) {
