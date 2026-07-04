@@ -548,7 +548,31 @@ app.post('/students/:id/points', requireAdmin, async (req, res) => {
 
 app.post('/students', async (req, res) => {
   try {
-    const { name, phone, parent_phone, price_per_session, balance, booklet_status, center_id, subject_id } = req.body;
+    const { name, phone, parent_phone, price_per_session, balance, booklet_status, center_id, subject_id, admin_password } = req.body;
+
+    // البحث عن طالب بنفس البيانات
+    const existingStudent = await Student.findOne({
+      where: {
+        name: name,
+        phone: phone,
+        parent_phone: parent_phone,
+        CenterId: center_id,
+        SubjectId: subject_id,
+      },
+    });
+
+    // إذا وجدنا طالب بنفس البيانات
+    if (existingStudent) {
+      // التحقق من كلمة المرور الإدارية
+      if (admin_password !== process.env.ADMIN_DUPLICATE_PASSWORD) {
+        return res.status(409).json({
+          success: false,
+          isDuplicate: true,
+          message: `⚠️ تحذير: وجدنا طالب بنفس البيانات!\n\nالاسم: ${existingStudent.name}\nالتليفون: ${existingStudent.phone}\nولي الأمر: ${existingStudent.parent_phone}\n\nهل تريد المتابعة بإدخال كلمة المرور الإدارية؟`,
+          studentCode: existingStudent.student_code,
+        });
+      }
+    }
 
     const student = await Student.create({
       name,
