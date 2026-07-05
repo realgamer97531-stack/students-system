@@ -75,9 +75,6 @@
             <input type="number" name="balance" class="form-control" value="0">
           </div>
 
-          <!-- حقل كلمة المرور المخفية للإرسال مع النموذج -->
-          <input type="hidden" name="admin_password" id="hiddenAdminPassword" value="">
-
           <button type="submit" class="btn btn-primary w-100">حفظ الطالب</button>
         </form>
       </div>
@@ -90,7 +87,7 @@
     const studentForm = document.getElementById('studentForm');
     const duplicateAlert = document.getElementById('duplicateAlert');
     const adminPasswordInput = document.getElementById('adminPassword');
-    const hiddenAdminPassword = document.getElementById('hiddenAdminPassword');
+    let hiddenAdminPassword = ''; // Variable to store admin password
     const confirmDuplicateBtn = document.getElementById('confirmDuplicateBtn');
     const cancelDuplicateBtn = document.getElementById('cancelDuplicateBtn');
 
@@ -105,12 +102,25 @@
     studentForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const formData = new FormData(studentForm);
+      const formDataObj = {
+        name: studentForm.querySelector('[name="name"]').value,
+        phone: studentForm.querySelector('[name="phone"]').value,
+        parent_phone: studentForm.querySelector('[name="parent_phone"]').value,
+        subject_id: studentForm.querySelector('[name="subject_id"]').value,
+        center_id: studentForm.querySelector('[name="center_id"]').value,
+        price_per_session: studentForm.querySelector('[name="price_per_session"]').value,
+        balance: studentForm.querySelector('[name="balance"]').value,
+        booklet_status: studentForm.querySelector('[name="booklet_status"]').checked ? 'on' : '',
+        admin_password: hiddenAdminPassword,
+      };
 
       try {
         const response = await fetch('/students', {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formDataObj),
         });
 
         // إذا كان هناك تحذير ازدواج
@@ -130,7 +140,8 @@
           const html = await response.text();
           document.body.innerHTML = html;
         } else {
-          alert('❌ حصلت مشكلة: ' + (await response.text()));
+          const errorText = await response.text();
+          alert('❌ حصلت مشكلة: ' + errorText);
         }
       } catch (error) {
         alert('❌ خطأ في الاتصال: ' + error.message);
@@ -145,8 +156,8 @@
         return;
       }
 
-      hiddenAdminPassword.value = password;
-      studentForm.submit();
+      hiddenAdminPassword = password;
+      studentForm.dispatchEvent(new Event('submit'));
     });
 
     // إلغاء والعودة للنموذج
@@ -154,7 +165,7 @@
       duplicateAlert.style.display = 'none';
       studentForm.style.display = 'block';
       adminPasswordInput.value = '';
-      hiddenAdminPassword.value = '';
+      hiddenAdminPassword = '';
     });
   </script>
 
