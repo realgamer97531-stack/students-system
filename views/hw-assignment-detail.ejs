@@ -1,0 +1,125 @@
+<%- include('partials/header') %>
+
+<h3 class="mb-1">📝 <%= assignment.title %></h3>
+<p class="text-muted mb-4">واجب رقم <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
+
+<% const statusLabels = { submitted: 'تم التسليم', complete: 'كامل', incomplete: 'مش كامل', no_steps: 'من غير خطوات', not_done: 'مش معمول' }; %>
+<% const statusColors = { submitted: '#6B7280', complete: '#059669', incomplete: '#D97706', no_steps: '#6B7280', not_done: '#DC2626' }; %>
+
+<!-- الطلاب اللي سلموا -->
+<h5 class="mb-3">✅ سلّموا الواجب (<%= submissions.length %>)</h5>
+<div class="row g-3 mb-4">
+  <% submissions.forEach(sub => { %>
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100" style="border-right: 4px solid <%= statusColors[sub.status] %>;">
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <strong class="small"><%= sub.Student.name %></strong>
+            <span class="badge" style="background:<%= statusColors[sub.status] %>20;color:<%= statusColors[sub.status] %>;">
+              <%= statusLabels[sub.status] %>
+            </span>
+          </div>
+          <p class="small text-muted mb-1">
+            🎓 <%= sub.Student.Subject ? sub.Student.Subject.name : '-' %> | <%= sub.Student.Center ? sub.Student.Center.name : '-' %><br>
+            🔖 <%= sub.Student.student_code %><br>
+            📸 <%= JSON.parse(sub.images || '[]').length %> صورة | 
+            🕐 <%= new Date(sub.createdAt).toLocaleString('ar-EG') %>
+          </p>
+          <% if (sub.student_comment) { %>
+            <p class="small bg-light rounded p-2 mb-2">💬 <%= sub.student_comment %></p>
+          <% } %>
+
+          <!-- عرض الصور -->
+          <div class="d-flex flex-wrap gap-1 mb-3">
+            <% JSON.parse(sub.images || '[]').forEach((img, i) => { %>
+              <img src="<%= img %>" onclick="openImg('<%= img %>')"
+                style="width:60px;height:60px;object-fit:cover;border-radius:8px;cursor:pointer;">
+            <% }) %>
+          </div>
+
+          <!-- تصحيح -->
+          <div class="d-flex gap-1 flex-wrap">
+            <% ['complete','incomplete','no_steps','not_done'].forEach(s => { %>
+              <button onclick="gradeSubmission(<%= sub.id %>, '<%= s %>', <%= assignment.id %>)"
+                class="btn btn-sm"
+                style="font-size:0.72rem;padding:4px 8px;background:<%= sub.status===s ? statusColors[s] : '#F3F4F6' %>;color:<%= sub.status===s ? '#fff' : '#374151' %>;">
+                <%= statusLabels[s] %>
+              </button>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<!-- الطلاب اللي مسلموش ومصححوش -->
+<% if (notSubmittedAndNotGraded.length > 0) { %>
+  <h5 class="mb-3">⚠️ لم يسلّموا ولم يصحَّح لهم (<%= notSubmittedAndNotGraded.length %>)</h5>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead class="table-light">
+            <tr><th>الكود</th><th>الاسم</th><th>السنتر</th><th>تليفون ولي الأمر</th><th></th></tr>
+          </thead>
+          <tbody>
+            <% notSubmittedAndNotGraded.forEach(s => { %>
+              <tr>
+                <td><%= s.student_code %></td>
+                <td><%= s.name %></td>
+                <td><%= s.Center ? s.Center.name : '-' %></td>
+                <td><%= s.parent_phone || '-' %></td>
+                <td>
+                  <% if (s.parent_phone) { %>
+                    <a href="https://wa.me/2<%= s.parent_phone.replace(/^0/, '') %>?text=السلام+عليكم،+ابنك+<%= encodeURIComponent(s.name) %>+لم+يسلم+الواجب+بتاع+<%= encodeURIComponent(assignment.title) %>+حتى+الآن"
+                      target="_blank" class="btn btn-sm btn-success">
+                      💬 واتساب
+                    </a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<!-- مودال عرض الصور -->
+<div class="modal fade" id="imgModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content bg-dark">
+      <div class="modal-header border-0">
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center p-2">
+        <img id="modalImg" style="max-width:100%;max-height:80vh;border-radius:10px;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openImg(src) {
+  document.getElementById('modalImg').src = src;
+  new bootstrap.Modal(document.getElementById('imgModal')).show();
+}
+
+async function gradeSubmission(subId, status, assignmentId) {
+  const statusLabels = { complete:'كامل', incomplete:'مش كامل', no_steps:'من غير خطوات', not_done:'مش معمول' };
+  if (!confirm(`تأكيد تصحيح الواجب كـ "${statusLabels[status]}"؟`)) return;
+
+  const res = await fetch(`/hw/submissions/${subId}/grade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, assignment_id: assignmentId }),
+  });
+  const data = await res.json();
+  if (data.success) location.reload();
+  else alert('❌ حصلت مشكلة');
+}
+</script>
+
+<%- include('partials/footer') %>

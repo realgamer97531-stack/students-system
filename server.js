@@ -2662,6 +2662,225 @@ app.post('/api/portal/recharge', verifyPortalToken('student'), async (req, res) 
   }
 });
 
+// ===== نظام الواجب الأونلاين (مستقل تماماً) =====
+
+const HomeworkAssignment = require('./models/HomeworkAssignment');
+const HomeworkSubmission = require('./models/HomeworkSubmission');
+
+// Multer لرفع صور الواجبات
+const hwStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, 'public', 'uploads', 'homework');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}_${Math.random().toString(36).slice(2)}_${file.originalname}`);
+  },
+});
+const hwUpload = multer({ storage: hwStorage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// sync الجداول الجديدة
+HomeworkAssignment.belongsTo(require('./models/Subject'), { foreignKey: 'SubjectId' });
+HomeworkAssignment.belongsTo(require('./models/Session'), { foreignKey: 'SessionId' });
+HomeworkSubmission.belongsTo(HomeworkAssignment);
+HomeworkSubmission.belongsTo(require('./models/Student'), { foreignKey: 'StudentId' });
+HomeworkAssignment.hasMany(HomeworkSubmission);
+
+sequelize.sync({ alter: false }).catch(() => {});
+
+// --- صفحة إدارة الواجبات (لوحة التحكم) ---
+
+app.get('/hw/assignments', requirePermission('homework_scan'), async (req, res) => {
+  const assignments = await HomeworkAssignment.findAll({
+    include: [
+      { model: require('./models/Subject'), required: false },
+      { model: require('./models/Session'), required: false },
+    ],
+    order: [['order_number', 'ASC']],
+  });
+  const subjects = await Subject.findAll();
+  const sessions = await Session.findAll({ include: [Center, Subject], order: [['lesson_number', 'ASC']], limit: 100 });
+  res.render('hw-assignments', { assignments, subjects, sessions });
+});
+
+app.post('/hw/assignments/create', requirePermission('homework_scan'), async (req, res) => {
+  try {
+    const { title, description, order_number, start_date, end_date, subject_id, session_id } = req.body;
+    await HomeworkAssignment.create({
+      title, description, order_number,
+      start_date, end_date,
+      SubjectId: subject_id || null,
+      SessionId: session_id || null,
+    });
+    res.redirect('/hw/assignments');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/hw/assignments/:id/delete', requireAdmin, async (req, res) => {
+  await HomeworkSubmission.destroy({ where: { HomeworkAssignmentId: req.params.id } });
+  await HomeworkAssignment.destroy({ where: { id: req.params.id } });
+  res.redirect('/hw/assignments');
+});
+
+// --- صفحة تفاصيل واجب (الطلاب الي سلموا + الي مسلموش) ---
+
+app.get('/hw/assignments/:id', requirePermission('homework_scan'), async (req, res) => {
+  const assignment = await HomeworkAssignment.findByPk(req.params.id, {
+    include: [
+      { model: require('./models/Subject'), required: false },
+      { model: require('./models/Session'), required: false },
+    ],
+  });
+  if (!assignment) return res.status(404).send('❌ غير موجود');
+
+  const submissions = await HomeworkSubmission.findAll({
+    where: { HomeworkAssignmentId: req.params.id },
+    include: [{ model: Student, include: [Center, Subject] }],
+  });
+
+  // الطلاب اللي مسلموش ومصححوش في السنتر
+  let notSubmittedAndNotGraded = [];
+  if (assignment.SubjectId) {
+    const allStudents = await Student.findAll({ where: { SubjectId: assignment.SubjectId }, include: [Center] });
+    const submittedStudentIds = submissions.map(s => s.StudentId);
+
+    for (const student of allStudents) {
+      if (submittedStudentIds.includes(student.id)) continue;
+      // تحقق من حالة الواجب في السنتر
+      let hwStatus = null;
+      if (assignment.SessionId) {
+        const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: assignment.SessionId } });
+        hwStatus = hw ? hw.status : null;
+      }
+      if (!hwStatus) notSubmittedAndNotGraded.push(student);
+    }
+  }
+
+  res.render('hw-assignment-detail', { assignment, submissions, notSubmittedAndNotGraded });
+});
+
+// --- تصحيح الواجب ---
+
+app.post('/hw/submissions/:id/grade', requirePermission('homework_scan'), async (req, res) => {
+  try {
+    const { status, assignment_id } = req.body;
+    const submission = await HomeworkSubmission.findByPk(req.params.id, { include: [Student] });
+    if (!submission) return res.status(404).send('❌');
+
+    const statusOrder = { not_done: 0, no_steps: 1, incomplete: 2, complete: 3, submitted: 1 };
+
+    // تحديث في HomeworkCheck لو في session مرتبطة
+    const assignment = await HomeworkAssignment.findByPk(assignment_id);
+    if (assignment && assignment.SessionId) {
+      const [check] = await HomeworkCheck.findOrCreate({
+        where: { StudentId: submission.StudentId, SessionId: assignment.SessionId },
+        defaults: { status, UserId: req.session.userId },
+      });
+      if (statusOrder[status] >= statusOrder[check.status]) {
+        check.status = status;
+        check.UserId = req.session.userId;
+        await check.save();
+      }
+    }
+
+    submission.status = status;
+    submission.graded_by = req.session.userId;
+    submission.graded_at = new Date();
+    await submission.save();
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// --- API البوابة: قائمة الواجبات للطالب ---
+
+app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.portalStudentId);
+    const assignments = await HomeworkAssignment.findAll({
+      where: { SubjectId: student.SubjectId },
+      order: [['order_number', 'ASC']],
+    });
+
+    const result = await Promise.all(assignments.map(async a => {
+      const submission = await HomeworkSubmission.findOne({
+        where: { HomeworkAssignmentId: a.id, StudentId: student.id },
+      });
+
+      // حالة في السنتر
+      let centerStatus = null;
+      if (a.SessionId) {
+        const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: a.SessionId } });
+        centerStatus = hw ? hw.status : null;
+      }
+
+      return {
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        orderNumber: a.order_number,
+        startDate: a.start_date,
+        endDate: a.end_date,
+        submitted: !!submission,
+        submissionStatus: submission ? submission.status : null,
+        centerStatus,
+        imagesCount: submission ? JSON.parse(submission.images || '[]').length : 0,
+      };
+    }));
+
+    res.json({ success: true, assignments: result });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false });
+  }
+});
+
+// --- API البوابة: رفع واجب من الطالب ---
+
+app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), hwUpload.array('images', 20), async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.portalStudentId);
+    const assignment = await HomeworkAssignment.findByPk(req.params.id);
+    if (!assignment) return res.status(404).json({ success: false, message: 'الواجب غير موجود' });
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (today > assignment.end_date) return res.json({ success: false, message: '⚠️ انتهى وقت التسليم' });
+
+    const imagePaths = req.files.map(f => `/uploads/homework/${f.filename}`);
+
+    const existing = await HomeworkSubmission.findOne({
+      where: { HomeworkAssignmentId: req.params.id, StudentId: student.id },
+    });
+
+    if (existing) {
+      existing.images = JSON.stringify([...JSON.parse(existing.images), ...imagePaths]);
+      existing.student_comment = req.body.comment || existing.student_comment;
+      existing.status = 'submitted';
+      await existing.save();
+    } else {
+      await HomeworkSubmission.create({
+        HomeworkAssignmentId: req.params.id,
+        StudentId: student.id,
+        images: JSON.stringify(imagePaths),
+        student_comment: req.body.comment || null,
+        status: 'submitted',
+      });
+    }
+
+    res.json({ success: true, message: '✅ تم رفع الواجب بنجاح!' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 
 async function startServer() {
   try {
