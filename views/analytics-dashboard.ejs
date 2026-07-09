@@ -1,0 +1,214 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3>📊 الداشبورد التحليلي</h3>
+  <form method="GET" class="d-flex gap-2">
+    <input type="month" name="month" class="form-control" value="<%= currentMonth %>">
+    <button class="btn btn-primary">تطبيق</button>
+    <a href="/analytics/lock" class="btn btn-outline-secondary">🔒 قفل</a>
+  </form>
+</div>
+
+<!-- بطاقات الملخص المالي -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;">
+      <div class="small text-muted mb-1">الإيراد الشهري</div>
+      <h4 class="text-success mb-0"><%= monthlyRevenue.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;">
+      <div class="small text-muted mb-1">المصروفات + المرتبات</div>
+      <h4 class="text-danger mb-0"><%= (totalExpenses + totalSalaries).toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #4338CA;">
+      <div class="small text-muted mb-1">الصافي</div>
+      <h4 style="color:<%= netRevenue >= 0 ? '#059669' : '#DC2626' %>" class="mb-0"><%= netRevenue.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #D97706;">
+      <div class="small text-muted mb-1">توقع الشهر الجاي</div>
+      <h4 class="text-warning mb-0"><%= Math.round(projectedMonthly).toLocaleString() %> ج</h4>
+    </div>
+  </div>
+</div>
+
+<!-- رسم بياني مقارنة المجموعات -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">📈 مقارنة المجموعات</h6>
+    <canvas id="groupsChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- جدول المجموعات التفصيلي -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">👥 إحصائيات كل مجموعة</h6>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead class="table-light">
+          <tr>
+            <th>المجموعة</th><th>عدد الطلاب</th><th>حضور %</th>
+            <th>تعويض خارجي</th><th>واجب %</th>
+            <th>متوسط الامتحانات</th><th>مخفضين</th><th>مجانيين</th>
+            <th>الإيراد</th><th>نمو %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% groupStats.forEach(g => { %>
+            <tr>
+              <td><strong><%= g.subjectName %></strong><br><small class="text-muted"><%= g.centerName %></small></td>
+              <td><%= g.totalStudents %></td>
+              <td>
+                <div class="progress" style="height:6px;margin-bottom:3px;">
+                  <div class="progress-bar" style="width:<%= g.attendanceRate %>%;background:#14B8A6;"></div>
+                </div>
+                <%= g.attendanceRate %>%
+              </td>
+              <td>
+                <% if (g.outsideAttendance > 0) { %>
+                  <span class="badge" style="background:#FEF3C7;color:#92400E;"><%= g.outsideAttendance %> طالب خارجي</span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <td>
+                <span style="color:<%= g.hwRate >= 70 ? '#059669' : g.hwRate >= 40 ? '#D97706' : '#DC2626' %>">
+                  <%= g.hwRate %>%
+                </span>
+              </td>
+              <td><%= g.avgScore || '-' %></td>
+              <td><span class="badge bg-warning text-dark"><%= g.reducedCount %></span></td>
+              <td><span class="badge bg-secondary"><%= g.freeCount %></span></td>
+              <td class="text-success fw-bold"><%= g.revenue.toLocaleString() %> ج</td>
+              <td>
+                <span style="color:<%= g.growthRate >= 0 ? '#059669' : '#DC2626' %>">
+                  <%= g.growthRate >= 0 ? '▲' : '▼' %> <%= Math.abs(g.growthRate) %>%
+                </span>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- المصروفات -->
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="mb-3">💸 المصروفات (<%= currentMonth %>)</h6>
+        <form action="/analytics/expense/add" method="POST" class="row g-2 mb-3">
+          <input type="hidden" name="expense_date" value="<%= new Date().toISOString().slice(0,10) %>">
+          <div class="col-4"><input type="number" name="amount" class="form-control form-control-sm" placeholder="المبلغ" required></div>
+          <div class="col-4"><input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب" required></div>
+          <div class="col-3">
+            <select name="type" class="form-select form-select-sm">
+              <option value="daily">يومي</option>
+              <option value="weekly">أسبوعي</option>
+              <option value="monthly">شهري</option>
+              <option value="other">أخرى</option>
+            </select>
+          </div>
+          <div class="col-1"><button class="btn btn-sm btn-danger w-100">+</button></div>
+        </form>
+        <ul class="list-group list-group-flush">
+          <% expenses.forEach(e => { %>
+            <li class="list-group-item d-flex justify-content-between small px-0">
+              <span><%= e.reason %> <span class="badge bg-secondary"><%= e.type %></span></span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-danger fw-bold"><%= e.amount.toLocaleString() %> ج</span>
+                <form action="/analytics/expense/<%= e.id %>/delete" method="POST" onsubmit="return confirm('حذف؟')">
+                  <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:#FEE2E2;">🗑</button>
+                </form>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+        <div class="mt-2 text-end small"><strong>الإجمالي: <%= totalExpenses.toLocaleString() %> ج</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- المرتبات -->
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="mb-3">👥 المرتبات (<%= currentMonth %>)</h6>
+        <form action="/analytics/salary/add" method="POST" class="row g-2 mb-3">
+          <input type="hidden" name="month" value="<%= currentMonth %>">
+          <div class="col-5">
+            <select name="user_id" class="form-select form-select-sm" required>
+              <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-4"><input type="number" name="amount" class="form-control form-control-sm" placeholder="المرتب" required></div>
+          <div class="col-3"><button class="btn btn-sm btn-primary w-100">حفظ</button></div>
+        </form>
+        <ul class="list-group list-group-flush">
+          <% salaries.forEach(s => { %>
+            <li class="list-group-item d-flex justify-content-between small px-0">
+              <span><%= s.User ? s.User.name : '-' %></span>
+              <span class="text-danger fw-bold"><%= s.amount.toLocaleString() %> ج</span>
+            </li>
+          <% }) %>
+        </ul>
+        <div class="mt-2 text-end small"><strong>الإجمالي: <%= totalSalaries.toLocaleString() %> ج</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const groupStats = <%- JSON.stringify(groupStats) %>;
+
+  new Chart(document.getElementById('groupsChart'), {
+    type: 'bar',
+    data: {
+      labels: groupStats.map(g => `${g.subjectName}\n${g.centerName}`),
+      datasets: [
+        {
+          label: 'نسبة الحضور %',
+          data: groupStats.map(g => g.attendanceRate),
+          backgroundColor: '#14B8A650',
+          borderColor: '#14B8A6',
+          borderWidth: 2,
+          yAxisID: 'y',
+        },
+        {
+          label: 'نسبة الواجب %',
+          data: groupStats.map(g => g.hwRate),
+          backgroundColor: '#4338CA50',
+          borderColor: '#4338CA',
+          borderWidth: 2,
+          yAxisID: 'y',
+        },
+        {
+          label: 'عدد الطلاب',
+          data: groupStats.map(g => g.totalStudents),
+          backgroundColor: '#D9780650',
+          borderColor: '#D97806',
+          borderWidth: 2,
+          type: 'line',
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        y: { beginAtZero: true, max: 100, position: 'right', title: { display: true, text: 'نسبة %' } },
+        y1: { beginAtZero: true, position: 'left', title: { display: true, text: 'عدد الطلاب' } },
+      },
+    },
+  });
+</script>
+
+<%- include('partials/footer') %>

@@ -178,6 +178,7 @@
     <% if (canShow('students_add')) { %><a href="/students/new">➕ تسجيل طالب جديد</a><% } %>
     <hr>
     <% if (canShow('sessions_view')) { %><a href="/sessions">🗂️ كل الحصص</a><% } %>
+    <% if (canShow('sessions_view')) { %><a href="/schedule">📅 الجدول الأسبوعي</a><% } %>
     <% if (canShow('students_view')) { %><a href="/follow-up">⚠️ يحتاجون متابعة</a><% } %>
     <% if (canShow('sessions_create')) { %><a href="/sessions/new">▶️ بدء حصة جديدة</a><% } %>
     <hr>
@@ -192,6 +193,7 @@
       <hr>
       <a href="/users">👤 إدارة المستخدمين</a>
       <a href="/admin/closing">💰 التقفيل</a>
+      <a href="/analytics" onclick="fetch('/analytics/lock')">📊 الداشبورد التحليلي</a>
       <a href="/admin/recharge-codes">🎫 أكواد الشحن</a>
       <a href="/admin/payment-verifications">🎫 التحقق من المدفوعات</a>
     <% } %>

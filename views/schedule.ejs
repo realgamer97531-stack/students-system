@@ -1,0 +1,166 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="mb-1">📅 الجدول الأسبوعي</h3>
+    <p class="text-muted small mb-0">يوم اليوم: <strong><%= ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][todayDay] %></strong></p>
+  </div>
+  <% if (userRole === 'admin') { %>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEntryModal">+ إضافة حصة للجدول</button>
+  <% } %>
+</div>
+
+<!-- حصص اليوم -->
+<% if (todayEntries.length > 0) { %>
+<div class="card shadow-sm mb-4" style="border-right: 4px solid #14B8A6;">
+  <div class="card-body">
+    <h6 class="mb-3">🔴 حصص اليوم</h6>
+    <div class="row g-2">
+      <% todayEntries.forEach(entry => { %>
+        <div class="col-md-4">
+          <div class="p-3 rounded" style="background:#EEF0FB;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="small"><%= entry.Subject.name %></strong>
+              <span class="badge" style="background:#4338CA;color:#fff;"><%= entry.start_time.slice(0,5) %></span>
+            </div>
+            <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes %> دقيقة</p>
+            <% if (canShow('sessions_create')) { %>
+              <form action="/schedule/<%= entry.id %>/start-session" method="POST">
+                <button class="btn btn-sm w-100" style="background:#14B8A6;color:#fff;">▶ تشغيل الحصة الآن</button>
+              </form>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<!-- الجدول الأسبوعي Grid -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-bordered mb-0">
+        <thead>
+          <tr>
+            <% DAYS.forEach((day, i) => { %>
+              <th class="text-center small <%= i === todayDay ? 'table-primary' : '' %>" style="min-width:120px;">
+                <%= day %>
+                <% if (i === todayDay) { %><br><span class="badge bg-primary" style="font-size:0.65rem;">اليوم</span><% } %>
+              </th>
+            <% }) %>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <% for (let i = 0; i < 7; i++) { %>
+              <td class="<%= i === todayDay ? 'bg-primary bg-opacity-10' : '' %>" style="vertical-align:top;padding:8px;">
+                <% if (weekGrid[i] && weekGrid[i].length > 0) { %>
+                  <% weekGrid[i].forEach(entry => { %>
+                    <div class="mb-2 p-2 rounded" style="background:<%= entry.is_active ? '#D1FAE5' : '#F3F4F6' %>;">
+                      <div class="small fw-bold"><%= entry.start_time.slice(0,5) %></div>
+                      <div class="small"><%= entry.Subject.name %></div>
+                      <div class="small text-muted"><%= entry.Center.name %></div>
+                      <% if (entry.end_date) { %>
+                        <div class="small text-muted">حتى: <%= entry.end_date %></div>
+                        <%
+                          const today = new Date();
+                          const end = new Date(entry.end_date);
+                          const diffDays = Math.ceil((end - today) / (1000*60*60*24));
+                          const weeksLeft = Math.ceil(diffDays / 7);
+                          const completedSessions = sessions ? sessions.filter(s =>
+                            s.SubjectId === entry.SubjectId && s.CenterId === entry.CenterId
+                          ).length : 0;
+                        %>
+                        <% if (entry.expected_sessions_count) { %>
+                          <div class="small" style="color:#4338CA;">
+                            باقي ~<%= weeksLeft %> حصة |
+                            <%= completedSessions %>/<%= entry.expected_sessions_count %>
+                          </div>
+                        <% } %>
+                      <% } %>
+                      <% if (userRole === 'admin') { %>
+                        <div class="d-flex gap-1 mt-1">
+                          <form action="/schedule/<%= entry.id %>/toggle" method="POST">
+                            <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:<%= entry.is_active ? '#FEE2E2' : '#D1FAE5' %>;">
+                              <%= entry.is_active ? 'إيقاف' : 'تفعيل' %>
+                            </button>
+                          </form>
+                          <form action="/schedule/<%= entry.id %>/delete" method="POST" onsubmit="return confirm('حذف؟')">
+                            <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:#FEE2E2;">🗑</button>
+                          </form>
+                        </div>
+                      <% } %>
+                    </div>
+                  <% }) %>
+                <% } else { %>
+                  <span class="text-muted small">-</span>
+                <% } %>
+              </td>
+            <% } %>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- مودال إضافة حصة -->
+<div class="modal fade" id="addEntryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">إضافة حصة للجدول</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/schedule/add" method="POST">
+        <div class="modal-body row g-2">
+          <div class="col-6">
+            <label class="form-label small">اليوم</label>
+            <select name="day_of_week" class="form-select" required>
+              <% DAYS.forEach((d, i) => { %><option value="<%= i %>"><%= d %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">وقت البداية</label>
+            <input type="time" name="start_time" class="form-control" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">المادة</label>
+            <select name="subject_id" class="form-select" required>
+              <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">السنتر</label>
+            <select name="center_id" class="form-select" required>
+              <% centers.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">المدة (دقيقة)</label>
+            <input type="number" name="duration_minutes" class="form-control" value="90" min="30">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">عدد الحصص المتوقعة</label>
+            <input type="number" name="expected_sessions_count" class="form-control" placeholder="مثال: 30">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">تاريخ الانتهاء</label>
+            <input type="date" name="end_date" class="form-control">
+          </div>
+          <div class="col-12">
+            <label class="form-label small">ملاحظات</label>
+            <input type="text" name="notes" class="form-control" placeholder="اختياري">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+          <button type="submit" class="btn btn-primary">إضافة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

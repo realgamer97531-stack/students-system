@@ -2881,6 +2881,310 @@ app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), hwUplo
   }
 });
 
+// ===== نظام الجدول الزمني والداشبورد التحليلي (مستقل تماماً) =====
+
+const ScheduleEntry = require('./models/ScheduleEntry');
+const Expense = require('./models/Expense');
+const Salary = require('./models/Salary');
+
+ScheduleEntry.belongsTo(Subject, { foreignKey: 'SubjectId' });
+ScheduleEntry.belongsTo(Center, { foreignKey: 'CenterId' });
+Salary.belongsTo(User, { foreignKey: 'UserId' });
+
+// ===== صفحة الجدول الأسبوعي =====
+
+const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+app.get('/schedule', requirePermission('sessions_view'), async (req, res) => {
+  const entries = await ScheduleEntry.findAll({
+    where: { is_active: true },
+    include: [Subject, Center],
+    order: [['day_of_week', 'ASC'], ['start_time', 'ASC']],
+  });
+
+  const todayDay = new Date().getDay();
+  const todayEntries = entries.filter(e => e.day_of_week === todayDay);
+  const subjects = await Subject.findAll();
+  const centers = await Center.findAll();
+
+  // تنظيم الجدول في grid أسبوعي
+  const weekGrid = {};
+  for (let i = 0; i < 7; i++) weekGrid[i] = entries.filter(e => e.day_of_week === i);
+
+  res.render('schedule', { entries, todayEntries, weekGrid, DAYS, subjects, centers, todayDay });
+});
+
+app.post('/schedule/add', requireAdmin, async (req, res) => {
+  try {
+    const { day_of_week, start_time, duration_minutes, subject_id, center_id, expected_sessions_count, end_date, notes } = req.body;
+    await ScheduleEntry.create({
+      day_of_week, start_time, duration_minutes: duration_minutes || 90,
+      SubjectId: subject_id, CenterId: center_id,
+      expected_sessions_count: expected_sessions_count || null,
+      end_date: end_date || null,
+      notes: notes || null,
+    });
+    res.redirect('/schedule');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/schedule/:id/delete', requireAdmin, async (req, res) => {
+  await ScheduleEntry.destroy({ where: { id: req.params.id } });
+  res.redirect('/schedule');
+});
+
+app.post('/schedule/:id/toggle', requireAdmin, async (req, res) => {
+  const entry = await ScheduleEntry.findByPk(req.params.id);
+  if (entry) { entry.is_active = !entry.is_active; await entry.save(); }
+  res.redirect('/schedule');
+});
+
+// تفعيل حصة من الجدول مباشرة
+app.post('/schedule/:id/start-session', requirePermission('sessions_create'), async (req, res) => {
+  try {
+    const entry = await ScheduleEntry.findByPk(req.params.id, { include: [Subject, Center] });
+    if (!entry) return res.status(404).send('❌');
+
+    const series = await CenterSubjectSeries.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId } });
+    if (!series) return res.status(400).send('❌ مفيش أساس سيريال');
+
+    const lastSession = await Session.findOne({ where: { SubjectId: entry.SubjectId }, order: [['lesson_number', 'DESC']] });
+    const finalLessonNumber = lastSession ? lastSession.lesson_number + 1 : 1;
+    const serialNumber = series.base_number + finalLessonNumber;
+
+    const newSession = await Session.create({
+      lesson_number: finalLessonNumber,
+      serial_number: serialNumber,
+      CenterId: entry.CenterId,
+      SubjectId: entry.SubjectId,
+    });
+
+    req.session.activeSessionId = newSession.id;
+    res.redirect('/sessions');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// Cron: تفعيل الحصص تلقائياً بالوقت المحدد
+cron.schedule('* * * * *', async () => {
+  try {
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+
+    const entries = await ScheduleEntry.findAll({
+      where: { day_of_week: currentDay, start_time: currentTime, is_active: true },
+    });
+
+    for (const entry of entries) {
+      const series = await CenterSubjectSeries.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId } });
+      if (!series) continue;
+
+      const lastSession = await Session.findOne({ where: { SubjectId: entry.SubjectId }, order: [['lesson_number', 'DESC']] });
+      const finalLessonNumber = lastSession ? lastSession.lesson_number + 1 : 1;
+      const serialNumber = series.base_number + finalLessonNumber;
+
+      await Session.create({
+        lesson_number: finalLessonNumber, serial_number: serialNumber,
+        CenterId: entry.CenterId, SubjectId: entry.SubjectId,
+      });
+
+      console.log(`✅ تم تفعيل حصة تلقائياً: مادة ${entry.SubjectId} - سنتر ${entry.CenterId}`);
+    }
+  } catch (e) {
+    console.error('Cron schedule error:', e.message);
+  }
+});
+
+// ===== الداشبورد التحليلي (محمي بباسورد) =====
+
+app.get('/analytics/lock', requireAdmin, (req, res) => {
+  res.render('analytics-lock', { error: null });
+});
+
+app.post('/analytics/unlock', requireAdmin, async (req, res) => {
+  const adminUser = await User.findByPk(req.session.userId);
+  const match = await bcrypt.compare(req.body.password, adminUser.password);
+  if (!match) return res.render('analytics-lock', { error: 'كلمة المرور غير صحيحة' });
+  req.session.analyticsUnlocked = true;
+  res.redirect('/analytics');
+});
+
+function requireAnalyticsAuth(req, res, next) {
+  if (req.session.userRole !== 'admin') return res.status(403).send('⛔');
+  if (req.session.analyticsUnlocked) return next();
+  res.redirect('/analytics/lock');
+}
+
+app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
+  const { subject_id, center_id, month } = req.query;
+  const currentMonth = month || new Date().toISOString().slice(0, 7);
+
+  const subjects = await Subject.findAll();
+  const centers = await Center.findAll();
+  const users = await User.findAll();
+
+  // ===== إحصائيات المجموعات =====
+  const allStudents = await Student.findAll({ include: [Center, Subject] });
+  const allSessions = await Session.findAll({ include: [Center, Subject], where: { status: 'normal' } });
+  const allAttendances = await Attendance.findAll({ include: [{ model: Session, include: [Center, Subject] }] });
+  const allHomework = await HomeworkCheck.findAll();
+  const allExamResults = await ExamResult.findAll({ include: [Exam] });
+
+  // تجميع إحصائيات كل مجموعة (سنتر + مادة)
+  const groupStats = [];
+  const subjectsData = await Subject.findAll();
+  const centersData = await Center.findAll();
+
+  for (const subj of subjectsData) {
+    for (const cent of centersData) {
+      const groupStudents = allStudents.filter(s => s.SubjectId === subj.id && s.CenterId === cent.id);
+      if (groupStudents.length === 0) continue;
+
+      const groupSessions = allSessions.filter(s => s.SubjectId === subj.id && s.CenterId === cent.id);
+      if (groupSessions.length === 0) continue;
+
+      const sessionIds = groupSessions.map(s => s.id);
+      const studentIds = groupStudents.map(s => s.id);
+
+      const groupAttendances = allAttendances.filter(a => sessionIds.includes(a.SessionId));
+
+      // حضور الطلاب الأصلية vs طلاب من مجموعة تانية
+      let ownGroupAttendance = 0, outsideAttendance = 0;
+      groupAttendances.forEach(a => {
+        const student = allStudents.find(s => s.id === a.StudentId);
+        if (!student) return;
+        if (student.CenterId === cent.id && student.SubjectId === subj.id) ownGroupAttendance++;
+        else outsideAttendance++;
+      });
+
+      // نسبة الحضور
+      const totalPossible = groupStudents.length * groupSessions.length;
+      const actualOwn = groupAttendances.filter(a => studentIds.includes(a.StudentId)).length;
+      const attendanceRate = totalPossible > 0 ? ((actualOwn / totalPossible) * 100).toFixed(1) : 0;
+
+      // الطلاب المخفضين
+      const avgPrice = groupStudents.reduce((sum, s) => sum + s.price_per_session, 0) / groupStudents.length;
+      const normalPrice = Math.max(...groupStudents.map(s => s.price_per_session));
+      const reducedCount = groupStudents.filter(s => s.price_per_session < normalPrice && s.price_per_session > 0).length;
+      const freeCount = groupStudents.filter(s => s.price_per_session === 0).length;
+
+      // حالة الواجب
+      const hwRecords = allHomework.filter(h => studentIds.includes(h.StudentId) && sessionIds.includes(h.SessionId));
+      const completeHw = hwRecords.filter(h => h.status === 'complete').length;
+      const hwRate = hwRecords.length > 0 ? ((completeHw / hwRecords.length) * 100).toFixed(1) : 0;
+
+      // درجات الامتحانات
+      const examIds = allExamResults.filter(r => studentIds.includes(r.StudentId)).map(r => r.ExamId);
+      const avgScore = examIds.length > 0
+        ? (allExamResults.filter(r => studentIds.includes(r.StudentId)).reduce((s, r) => s + r.score, 0) / examIds.length).toFixed(1)
+        : null;
+
+      // الدخل الفعلي
+      const revenue = groupAttendances
+        .filter(a => studentIds.includes(a.StudentId))
+        .reduce((sum, a) => {
+          const student = allStudents.find(s => s.id === a.StudentId);
+          return sum + (student ? student.price_per_session : 0);
+        }, 0);
+
+      // معدل النمو (مقارنة أول 30 يوم vs آخر 30 يوم)
+      const sortedStudents = [...groupStudents].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const recentNew = sortedStudents.filter(s => new Date(s.createdAt) >= thirtyDaysAgo).length;
+      const prevNew = sortedStudents.filter(s => new Date(s.createdAt) >= sixtyDaysAgo && new Date(s.createdAt) < thirtyDaysAgo).length;
+      const growthRate = prevNew > 0 ? (((recentNew - prevNew) / prevNew) * 100).toFixed(1) : (recentNew > 0 ? 100 : 0);
+
+      groupStats.push({
+        subjectName: subj.name,
+        centerName: cent.name,
+        totalStudents: groupStudents.length,
+        totalSessions: groupSessions.length,
+        ownAttendance: ownGroupAttendance,
+        outsideAttendance,
+        attendanceRate,
+        reducedCount,
+        freeCount,
+        hwRate,
+        avgScore,
+        revenue,
+        growthRate: parseFloat(growthRate),
+      });
+    }
+  }
+
+  // ===== المصروفات والمرتبات =====
+  const monthStart = currentMonth + '-01';
+  const monthEnd = currentMonth + '-31';
+  const expenses = await Expense.findAll({
+    where: { expense_date: { [Op.between]: [monthStart, monthEnd] } },
+    order: [['expense_date', 'DESC']],
+  });
+  const salaries = await Salary.findAll({
+    where: { month: currentMonth },
+    include: [User],
+  });
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalSalaries = salaries.reduce((s, e) => s + e.amount, 0);
+
+  // ===== الدخل الشهري =====
+  const monthlyAttendances = await Attendance.findAll({
+    where: { attended_at: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] } },
+    include: [Student],
+  });
+  const monthlyRevenue = monthlyAttendances.reduce((s, a) => s + (a.Student ? a.Student.price_per_session : 0), 0);
+
+  // ===== التوقع المستقبلي =====
+  // بناءً على الجدول الزمني
+  const scheduleEntries = await ScheduleEntry.findAll({ where: { is_active: true }, include: [Subject, Center] });
+  let projectedMonthly = 0;
+  const sessionsPerMonth = 4;
+  for (const entry of scheduleEntries) {
+    const relatedStudents = allStudents.filter(s => s.SubjectId === entry.SubjectId && s.CenterId === entry.CenterId);
+    const avgSessionPrice = relatedStudents.length > 0
+      ? relatedStudents.reduce((s, st) => s + st.price_per_session, 0) / relatedStudents.length
+      : 0;
+    projectedMonthly += relatedStudents.length * avgSessionPrice * sessionsPerMonth;
+  }
+
+  res.render('analytics-dashboard', {
+    groupStats, expenses, salaries, users,
+    totalExpenses, totalSalaries, monthlyRevenue,
+    netRevenue: monthlyRevenue - totalExpenses - totalSalaries,
+    projectedMonthly,
+    currentMonth, subjects, centers,
+  });
+});
+
+// إضافة مصروف
+app.post('/analytics/expense/add', requireAnalyticsAuth, async (req, res) => {
+  const { amount, reason, type, expense_date } = req.body;
+  await Expense.create({ amount, reason, type, expense_date });
+  res.redirect('/analytics');
+});
+
+app.post('/analytics/expense/:id/delete', requireAnalyticsAuth, async (req, res) => {
+  await Expense.destroy({ where: { id: req.params.id } });
+  res.redirect('/analytics');
+});
+
+// إضافة مرتب
+app.post('/analytics/salary/add', requireAnalyticsAuth, async (req, res) => {
+  const { user_id, amount, month, notes } = req.body;
+  const [sal] = await Salary.findOrCreate({
+    where: { UserId: user_id, month },
+    defaults: { amount, notes },
+  });
+  if (sal.amount !== parseFloat(amount)) { sal.amount = amount; sal.notes = notes; await sal.save(); }
+  res.redirect('/analytics');
+});
+
 
 async function startServer() {
   try {
