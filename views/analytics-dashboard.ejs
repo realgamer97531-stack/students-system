@@ -1,136 +1,262 @@
 <%- include('partials/header') %>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h3>📊 الداشبورد التحليلي</h3>
-  <form method="GET" class="d-flex gap-2">
-    <input type="month" name="month" class="form-control" value="<%= currentMonth %>">
-    <button class="btn btn-primary">تطبيق</button>
-    <a href="/analytics/lock" class="btn btn-outline-secondary">🔒 قفل</a>
-  </form>
+<style>
+  .metric-card { border-radius: 14px; padding: 20px; text-align: center; }
+  .alert-badge { font-size: 0.75rem; padding: 4px 8px; border-radius: 6px; display: inline-block; margin: 2px; }
+  .group-card { border-radius: 14px; transition: 0.2s; cursor: pointer; }
+  .group-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(30,27,75,0.15) !important; }
+  .progress-thin { height: 5px; border-radius: 3px; }
+  .stat-mini { font-size: 0.72rem; color: #6B7280; }
+</style>
+
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-1">📊 الداشبورد التحليلي</h3>
+    <p class="text-muted small mb-0">مراقبة شاملة للأداء والمالية ونمو المجموعات</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <form method="GET" class="d-flex gap-2 flex-wrap align-items-center">
+      <select name="subject_id" class="form-select form-select-sm" style="width:140px;" onchange="this.form.submit()">
+        <option value="">كل المواد</option>
+        <% subjects.forEach(s => { %><option value="<%= s.id %>" <%= String(filters.subject_id)===String(s.id)?'selected':'' %>><%= s.name %></option><% }) %>
+      </select>
+      <select name="center_id" class="form-select form-select-sm" style="width:140px;" onchange="this.form.submit()">
+        <option value="">كل السناتر</option>
+        <% centers.forEach(c => { %><option value="<%= c.id %>" <%= String(filters.center_id)===String(c.id)?'selected':'' %>><%= c.name %></option><% }) %>
+      </select>
+      <input type="month" name="month" class="form-control form-control-sm" style="width:140px;" value="<%= currentMonth %>">
+      <input type="month" name="compare_month" class="form-control form-control-sm" style="width:140px;" value="<%= filters.compare_month || '' %>" placeholder="مقارنة مع">
+      <button class="btn btn-primary btn-sm">تطبيق</button>
+    </form>
+    <a href="/analytics/lock" class="btn btn-outline-secondary btn-sm">🔒 قفل</a>
+  </div>
 </div>
+
+<!-- تنبيهات -->
+<% if (allAlerts.length > 0) { %>
+<div class="card shadow-sm mb-4" style="border-right: 4px solid #DC2626;">
+  <div class="card-body">
+    <h6 class="mb-2">⚠️ تنبيهات تحتاج انتباه (<%= allAlerts.length %>)</h6>
+    <% allAlerts.forEach(a => { %>
+      <div class="alert-badge" style="background:<%= a.type==='danger'?'#FEE2E2':a.type==='warning'?'#FEF3C7':'#EEF0FB' %>;color:<%= a.type==='danger'?'#B91C1C':a.type==='warning'?'#92400E':'#4338CA' %>;">
+        <strong><%= a.group %>:</strong> <%= a.msg %>
+      </div>
+    <% }) %>
+  </div>
+</div>
+<% } %>
 
 <!-- بطاقات الملخص المالي -->
 <div class="row g-3 mb-4">
-  <div class="col-md-3">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;">
-      <div class="small text-muted mb-1">الإيراد الشهري</div>
-      <h4 class="text-success mb-0"><%= monthlyRevenue.toLocaleString() %> ج</h4>
+  <div class="col-6 col-md-3">
+    <div class="metric-card card shadow-sm" style="border-top: 4px solid #14B8A6;">
+      <div class="stat-mini mb-1">الإيراد الشهري</div>
+      <div style="font-size:1.6rem;font-weight:800;color:#059669;"><%= monthlyRevenue.toLocaleString() %></div>
+      <div class="stat-mini">جنيه</div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;">
-      <div class="small text-muted mb-1">المصروفات + المرتبات</div>
-      <h4 class="text-danger mb-0"><%= (totalExpenses + totalSalaries).toLocaleString() %> ج</h4>
+  <div class="col-6 col-md-3">
+    <div class="metric-card card shadow-sm" style="border-top: 4px solid #DC2626;">
+      <div class="stat-mini mb-1">المصروفات الكلية</div>
+      <div style="font-size:1.6rem;font-weight:800;color:#DC2626;"><%= (totalExpenses + totalSalaries).toLocaleString() %></div>
+      <div class="stat-mini">جنيه (مصروف + مرتبات)</div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #4338CA;">
-      <div class="small text-muted mb-1">الصافي</div>
-      <h4 style="color:<%= netRevenue >= 0 ? '#059669' : '#DC2626' %>" class="mb-0"><%= netRevenue.toLocaleString() %> ج</h4>
+  <div class="col-6 col-md-3">
+    <div class="metric-card card shadow-sm" style="border-top: 4px solid #4338CA;">
+      <div class="stat-mini mb-1">الصافي</div>
+      <div style="font-size:1.6rem;font-weight:800;color:<%= netRevenue >= 0 ? '#059669' : '#DC2626' %>;"><%= netRevenue.toLocaleString() %></div>
+      <div class="stat-mini">جنيه</div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #D97706;">
-      <div class="small text-muted mb-1">توقع الشهر الجاي</div>
-      <h4 class="text-warning mb-0"><%= Math.round(projectedMonthly).toLocaleString() %> ج</h4>
+  <div class="col-6 col-md-3">
+    <div class="metric-card card shadow-sm" style="border-top: 4px solid #D97706;">
+      <div class="stat-mini mb-1">توقع الشهر الجاي</div>
+      <div style="font-size:1.6rem;font-weight:800;color:#D97806;"><%= Math.round(projectedMonthly).toLocaleString() %></div>
+      <div class="stat-mini">جنيه تقريباً</div>
     </div>
   </div>
+</div>
+
+<!-- رسم بياني التطور الشهري -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">📈 التطور على مدار 6 شهور</h6>
+    <canvas id="trendChart" height="70"></canvas>
+  </div>
+</div>
+
+<!-- كروت المجموعات -->
+<h5 class="mb-3">👥 تفاصيل المجموعات
+  <span class="badge" style="background:#EEF0FB;color:#4338CA;font-size:0.8rem;"><%= groupStats.length %> مجموعة</span>
+</h5>
+<div class="row g-3 mb-4">
+  <% groupStats.forEach(g => { %>
+    <div class="col-md-6">
+      <div class="card shadow-sm group-card" onclick="window.location='/analytics/group/<%= g.subjectId %>/<%= g.centerId %>?month=<%= currentMonth %>'"
+        style="border-right: 4px solid <%= g.alerts.some(a=>a.type==='danger') ? '#DC2626' : g.alerts.some(a=>a.type==='warning') ? '#D97706' : '#14B8A6' %>;">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <strong><%= g.subjectName %></strong> - <span class="text-muted small"><%= g.centerName %></span>
+            </div>
+            <div>
+              <% g.alerts.forEach(a => { %>
+                <span class="badge" style="background:<%= a.type==='danger'?'#FEE2E2':a.type==='warning'?'#FEF3C7':'#EEF0FB' %>;color:<%= a.type==='danger'?'#B91C1C':a.type==='warning'?'#92400E':'#4338CA' %>;">
+                  <%= a.type==='danger'?'🔴':a.type==='warning'?'🟡':'🔵' %>
+                </span>
+              <% }) %>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-2">
+            <div class="col-4 text-center">
+              <div style="font-size:1.3rem;font-weight:800;color:#4338CA;"><%= g.totalStudents %></div>
+              <div class="stat-mini">طالب</div>
+            </div>
+            <div class="col-4 text-center">
+              <div style="font-size:1.3rem;font-weight:800;color:#059669;"><%= g.revenue.toLocaleString() %></div>
+              <div class="stat-mini">ج إيراد</div>
+            </div>
+            <div class="col-4 text-center">
+              <div style="font-size:1.3rem;font-weight:800;color:<%= g.growthRate >= 0 ? '#059669' : '#DC2626' %>;">
+                <%= g.growthRate >= 0 ? '▲' : '▼' %><%= Math.abs(g.growthRate) %>%
+              </div>
+              <div class="stat-mini">نمو</div>
+            </div>
+          </div>
+
+          <!-- شريط الحضور -->
+          <div class="mb-2">
+            <div class="d-flex justify-content-between stat-mini mb-1">
+              <span>نسبة الحضور</span><span><%= g.attendanceRate %>%</span>
+            </div>
+            <div class="progress progress-thin">
+              <div class="progress-bar" style="width:<%= g.attendanceRate %>%;background:<%= g.attendanceRate>=75?'#14B8A6':g.attendanceRate>=60?'#D97706':'#DC2626' %>;"></div>
+            </div>
+          </div>
+
+          <!-- شريط الواجب -->
+          <div class="mb-2">
+            <div class="d-flex justify-content-between stat-mini mb-1">
+              <span>إنجاز الواجب</span><span><%= g.hwRate %>%</span>
+            </div>
+            <div class="progress progress-thin">
+              <div class="progress-bar" style="width:<%= g.hwRate %>%;background:<%= g.hwRate>=70?'#4338CA':'#D97706' %>;"></div>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap gap-1 mt-2">
+            <% if (g.outsideAttendance > 0) { %>
+              <span class="badge-mini badge" style="background:#EEF0FB;color:#4338CA;font-size:0.7rem;">👥 <%= g.outsideAttendance %> خارجي</span>
+            <% } %>
+            <% if (g.onlineCompensation > 0) { %>
+              <span class="badge" style="background:#D1FAE5;color:#047857;font-size:0.7rem;">📹 <%= g.onlineCompensation %> تعويض أونلاين</span>
+            <% } %>
+            <% if (g.otherCenterCompensation > 0) { %>
+              <span class="badge" style="background:#FEF3C7;color:#92400E;font-size:0.7rem;">🔄 <%= g.otherCenterCompensation %> تعويض سنتر</span>
+            <% } %>
+            <% if (g.reducedCount > 0) { %>
+              <span class="badge" style="background:#FEE2E2;color:#B91C1C;font-size:0.7rem;">💲 <%= g.reducedCount %> مخفض</span>
+            <% } %>
+            <% if (g.freeCount > 0) { %>
+              <span class="badge bg-secondary" style="font-size:0.7rem;">🆓 <%= g.freeCount %> مجاني</span>
+            <% } %>
+          </div>
+
+          <!-- مقارنة مع الشهر التاني لو مختار -->
+          <% if (compareMonth) {
+            const comp = compareStats.find(c => c.subjectId === g.subjectId && c.centerId === g.centerId);
+            if (comp) { %>
+            <div class="mt-2 p-2 rounded" style="background:#F9FAFB;font-size:0.75rem;">
+              <strong>مقارنة مع <%= compareMonth %>:</strong>
+              حضور <%= comp.attendanceRate %>% (vs <%= g.attendanceRate %>%) |
+              إيراد <%= comp.revenue.toLocaleString() %> ج (vs <%= g.revenue.toLocaleString() %> ج)
+            </div>
+          <% } } %>
+
+          <!-- الواجب تفاصيل -->
+          <div class="mt-2 d-flex gap-2 flex-wrap">
+            <% const hwTotal = g.hwStats.complete + g.hwStats.incomplete + g.hwStats.no_steps + g.hwStats.not_done; %>
+            <% if (hwTotal > 0) { %>
+              <span class="stat-mini">✅ <%= g.hwStats.complete %> كامل</span>
+              <span class="stat-mini">⚠️ <%= g.hwStats.incomplete %> مش كامل</span>
+              <span class="stat-mini">❌ <%= g.hwStats.not_done %> مش معمول</span>
+            <% } %>
+            <% if (g.avgScore) { %>
+              <span class="stat-mini">🎯 متوسط امتحان: <%= g.avgScore %>%</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
 </div>
 
 <!-- رسم بياني مقارنة المجموعات -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">📈 مقارنة المجموعات</h6>
-    <canvas id="groupsChart" height="80"></canvas>
-  </div>
-</div>
-
-<!-- جدول المجموعات التفصيلي -->
-<div class="card shadow-sm mb-4">
-  <div class="card-body">
-    <h6 class="mb-3">👥 إحصائيات كل مجموعة</h6>
-    <div class="table-responsive">
-      <table class="table table-sm table-hover">
-        <thead class="table-light">
-          <tr>
-            <th>المجموعة</th><th>عدد الطلاب</th><th>حضور %</th>
-            <th>تعويض خارجي</th><th>واجب %</th>
-            <th>متوسط الامتحانات</th><th>مخفضين</th><th>مجانيين</th>
-            <th>الإيراد</th><th>نمو %</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% groupStats.forEach(g => { %>
-            <tr>
-              <td><strong><%= g.subjectName %></strong><br><small class="text-muted"><%= g.centerName %></small></td>
-              <td><%= g.totalStudents %></td>
-              <td>
-                <div class="progress" style="height:6px;margin-bottom:3px;">
-                  <div class="progress-bar" style="width:<%= g.attendanceRate %>%;background:#14B8A6;"></div>
-                </div>
-                <%= g.attendanceRate %>%
-              </td>
-              <td>
-                <% if (g.outsideAttendance > 0) { %>
-                  <span class="badge" style="background:#FEF3C7;color:#92400E;"><%= g.outsideAttendance %> طالب خارجي</span>
-                <% } else { %><span class="text-muted small">-</span><% } %>
-              </td>
-              <td>
-                <span style="color:<%= g.hwRate >= 70 ? '#059669' : g.hwRate >= 40 ? '#D97706' : '#DC2626' %>">
-                  <%= g.hwRate %>%
-                </span>
-              </td>
-              <td><%= g.avgScore || '-' %></td>
-              <td><span class="badge bg-warning text-dark"><%= g.reducedCount %></span></td>
-              <td><span class="badge bg-secondary"><%= g.freeCount %></span></td>
-              <td class="text-success fw-bold"><%= g.revenue.toLocaleString() %> ج</td>
-              <td>
-                <span style="color:<%= g.growthRate >= 0 ? '#059669' : '#DC2626' %>">
-                  <%= g.growthRate >= 0 ? '▲' : '▼' %> <%= Math.abs(g.growthRate) %>%
-                </span>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+    <h6 class="mb-3">📊 مقارنة المجموعات</h6>
+    <div class="d-flex gap-2 mb-3 flex-wrap">
+      <button class="btn btn-sm btn-outline-primary" onclick="switchGroupChart('attendance')">الحضور %</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="switchGroupChart('revenue')">الإيراد</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="switchGroupChart('students')">عدد الطلاب</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="switchGroupChart('hw')">الواجب %</button>
     </div>
+    <canvas id="groupChart" height="80"></canvas>
   </div>
 </div>
 
-<div class="row g-4">
+<div class="row g-4 mb-4">
   <!-- المصروفات -->
   <div class="col-md-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h6 class="mb-3">💸 المصروفات (<%= currentMonth %>)</h6>
-        <form action="/analytics/expense/add" method="POST" class="row g-2 mb-3">
+        <h6 class="mb-3">💸 المصروفات
+          <span class="text-danger fw-bold float-end"><%= totalExpenses.toLocaleString() %> ج</span>
+        </h6>
+        <form action="/analytics/expense/add" method="POST" class="row g-1 mb-3">
           <input type="hidden" name="expense_date" value="<%= new Date().toISOString().slice(0,10) %>">
-          <div class="col-4"><input type="number" name="amount" class="form-control form-control-sm" placeholder="المبلغ" required></div>
+          <div class="col-3"><input type="number" name="amount" class="form-control form-control-sm" placeholder="المبلغ" required></div>
           <div class="col-4"><input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب" required></div>
           <div class="col-3">
             <select name="type" class="form-select form-select-sm">
-              <option value="daily">يومي</option>
-              <option value="weekly">أسبوعي</option>
-              <option value="monthly">شهري</option>
-              <option value="other">أخرى</option>
+              <option value="daily">يومي</option><option value="weekly">أسبوعي</option>
+              <option value="monthly">شهري</option><option value="other">أخرى</option>
             </select>
           </div>
-          <div class="col-1"><button class="btn btn-sm btn-danger w-100">+</button></div>
+          <div class="col-2"><button class="btn btn-sm btn-danger w-100">+</button></div>
         </form>
-        <ul class="list-group list-group-flush">
+
+        <!-- رسم بياني للمصروفات حسب النوع -->
+        <% const expTypes = {daily:0,weekly:0,monthly:0,other:0};
+           expenses.forEach(e => expTypes[e.type] += e.amount); %>
+        <div class="mb-3" style="height:8px;border-radius:4px;overflow:hidden;display:flex;">
+          <% const totalExp = totalExpenses || 1; %>
+          <div style="width:<%= (expTypes.daily/totalExp*100) %>%;background:#4338CA;" title="يومي"></div>
+          <div style="width:<%= (expTypes.weekly/totalExp*100) %>%;background:#14B8A6;" title="أسبوعي"></div>
+          <div style="width:<%= (expTypes.monthly/totalExp*100) %>%;background:#D97706;" title="شهري"></div>
+          <div style="width:<%= (expTypes.other/totalExp*100) %>%;background:#DC2626;" title="أخرى"></div>
+        </div>
+        <div class="d-flex gap-3 stat-mini mb-2">
+          <span>🟣 يومي: <%= expTypes.daily.toLocaleString() %></span>
+          <span>🟢 أسبوعي: <%= expTypes.weekly.toLocaleString() %></span>
+          <span>🟡 شهري: <%= expTypes.monthly.toLocaleString() %></span>
+        </div>
+
+        <div style="max-height:200px;overflow-y:auto;">
           <% expenses.forEach(e => { %>
-            <li class="list-group-item d-flex justify-content-between small px-0">
-              <span><%= e.reason %> <span class="badge bg-secondary"><%= e.type %></span></span>
+            <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+              <div><span class="small"><%= e.reason %></span><br><span class="stat-mini"><%= e.expense_date %> | <%= e.type %></span></div>
               <div class="d-flex align-items-center gap-2">
-                <span class="text-danger fw-bold"><%= e.amount.toLocaleString() %> ج</span>
-                <form action="/analytics/expense/<%= e.id %>/delete" method="POST" onsubmit="return confirm('حذف؟')">
-                  <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:#FEE2E2;">🗑</button>
+                <span class="text-danger small fw-bold"><%= e.amount.toLocaleString() %> ج</span>
+                <form action="/analytics/expense/<%= e.id %>/delete" method="POST">
+                  <button class="btn btn-sm" style="padding:2px 6px;background:#FEE2E2;font-size:0.65rem;">🗑</button>
                 </form>
               </div>
-            </li>
+            </div>
           <% }) %>
-        </ul>
-        <div class="mt-2 text-end small"><strong>الإجمالي: <%= totalExpenses.toLocaleString() %> ج</strong></div>
+        </div>
       </div>
     </div>
   </div>
@@ -139,8 +265,10 @@
   <div class="col-md-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h6 class="mb-3">👥 المرتبات (<%= currentMonth %>)</h6>
-        <form action="/analytics/salary/add" method="POST" class="row g-2 mb-3">
+        <h6 class="mb-3">👤 المرتبات
+          <span class="text-danger fw-bold float-end"><%= totalSalaries.toLocaleString() %> ج</span>
+        </h6>
+        <form action="/analytics/salary/add" method="POST" class="row g-1 mb-3">
           <input type="hidden" name="month" value="<%= currentMonth %>">
           <div class="col-5">
             <select name="user_id" class="form-select form-select-sm" required>
@@ -150,15 +278,30 @@
           <div class="col-4"><input type="number" name="amount" class="form-control form-control-sm" placeholder="المرتب" required></div>
           <div class="col-3"><button class="btn btn-sm btn-primary w-100">حفظ</button></div>
         </form>
-        <ul class="list-group list-group-flush">
-          <% salaries.forEach(s => { %>
-            <li class="list-group-item d-flex justify-content-between small px-0">
-              <span><%= s.User ? s.User.name : '-' %></span>
-              <span class="text-danger fw-bold"><%= s.amount.toLocaleString() %> ج</span>
-            </li>
-          <% }) %>
-        </ul>
-        <div class="mt-2 text-end small"><strong>الإجمالي: <%= totalSalaries.toLocaleString() %> ج</strong></div>
+        <% salaries.forEach(s => { %>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="small"><%= s.User ? s.User.name : '-' %></span>
+            <span class="text-danger small fw-bold"><%= s.amount.toLocaleString() %> ج</span>
+          </div>
+        <% }) %>
+
+        <!-- ملخص مالي -->
+        <div class="mt-3 p-2 rounded" style="background:#EEF0FB;">
+          <div class="d-flex justify-content-between small mb-1">
+            <span>الإيراد</span><span class="text-success fw-bold"><%= monthlyRevenue.toLocaleString() %> ج</span>
+          </div>
+          <div class="d-flex justify-content-between small mb-1">
+            <span>المصروفات</span><span class="text-danger"><%= totalExpenses.toLocaleString() %> ج</span>
+          </div>
+          <div class="d-flex justify-content-between small mb-1">
+            <span>المرتبات</span><span class="text-danger"><%= totalSalaries.toLocaleString() %> ج</span>
+          </div>
+          <hr class="my-1">
+          <div class="d-flex justify-content-between small fw-bold">
+            <span>الصافي</span>
+            <span style="color:<%= netRevenue>=0?'#059669':'#DC2626' %>;"><%= netRevenue.toLocaleString() %> ج</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -166,49 +309,60 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const groupStats = <%- JSON.stringify(groupStats) %>;
+const groupStats = <%- JSON.stringify(groupStats) %>;
+const monthlyTrend = <%- JSON.stringify(monthlyTrend) %>;
 
-  new Chart(document.getElementById('groupsChart'), {
+// Trend Chart
+new Chart(document.getElementById('trendChart'), {
+  data: {
+    labels: monthlyTrend.map(m => m.month),
+    datasets: [
+      { type:'line', label:'الإيراد', data: monthlyTrend.map(m => m.revenue),
+        borderColor:'#14B8A6', backgroundColor:'rgba(20,184,166,0.1)', yAxisID:'y', tension:0.3, fill:true },
+      { type:'bar', label:'عدد الطلاب', data: monthlyTrend.map(m => m.students),
+        backgroundColor:'rgba(67,56,202,0.3)', yAxisID:'y1' },
+    ],
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position:'bottom' } },
+    scales: {
+      y: { position:'right', title:{ display:true, text:'الإيراد (ج)' } },
+      y1: { position:'left', title:{ display:true, text:'عدد الطلاب' } },
+    },
+  },
+});
+
+// Groups Chart
+let groupChartInstance = null;
+const groupLabels = groupStats.map(g => `${g.subjectName}\n${g.centerName}`);
+const chartDatasets = {
+  attendance: { label:'الحضور %', data: groupStats.map(g => g.attendanceRate), color:'#14B8A6' },
+  revenue: { label:'الإيراد (ج)', data: groupStats.map(g => g.revenue), color:'#4338CA' },
+  students: { label:'عدد الطلاب', data: groupStats.map(g => g.totalStudents), color:'#D97706' },
+  hw: { label:'الواجب %', data: groupStats.map(g => g.hwRate), color:'#059669' },
+};
+
+function switchGroupChart(type) {
+  if (groupChartInstance) groupChartInstance.destroy();
+  const d = chartDatasets[type];
+  groupChartInstance = new Chart(document.getElementById('groupChart'), {
     type: 'bar',
     data: {
-      labels: groupStats.map(g => `${g.subjectName}\n${g.centerName}`),
-      datasets: [
-        {
-          label: 'نسبة الحضور %',
-          data: groupStats.map(g => g.attendanceRate),
-          backgroundColor: '#14B8A650',
-          borderColor: '#14B8A6',
-          borderWidth: 2,
-          yAxisID: 'y',
-        },
-        {
-          label: 'نسبة الواجب %',
-          data: groupStats.map(g => g.hwRate),
-          backgroundColor: '#4338CA50',
-          borderColor: '#4338CA',
-          borderWidth: 2,
-          yAxisID: 'y',
-        },
-        {
-          label: 'عدد الطلاب',
-          data: groupStats.map(g => g.totalStudents),
-          backgroundColor: '#D9780650',
-          borderColor: '#D97806',
-          borderWidth: 2,
-          type: 'line',
-          yAxisID: 'y1',
-        },
-      ],
+      labels: groupLabels,
+      datasets: [{
+        label: d.label, data: d.data,
+        backgroundColor: d.color + '50', borderColor: d.color, borderWidth: 2,
+      }],
     },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom' } },
-      scales: {
-        y: { beginAtZero: true, max: 100, position: 'right', title: { display: true, text: 'نسبة %' } },
-        y1: { beginAtZero: true, position: 'left', title: { display: true, text: 'عدد الطلاب' } },
-      },
+      plugins: { legend: { display:false } },
+      scales: { y: { beginAtZero:true } },
     },
   });
+}
+switchGroupChart('attendance');
 </script>
 
 <%- include('partials/footer') %>

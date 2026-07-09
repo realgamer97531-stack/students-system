@@ -3022,143 +3022,255 @@ function requireAnalyticsAuth(req, res, next) {
 }
 
 app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
-  const { subject_id, center_id, month } = req.query;
+  const { month, compare_month, subject_id, center_id } = req.query;
   const currentMonth = month || new Date().toISOString().slice(0, 7);
+  const compareMonth = compare_month || null;
 
   const subjects = await Subject.findAll();
   const centers = await Center.findAll();
   const users = await User.findAll();
 
-  // ===== إحصائيات المجموعات =====
-  const allStudents = await Student.findAll({ include: [Center, Subject] });
-  const allSessions = await Session.findAll({ include: [Center, Subject], where: { status: 'normal' } });
-  const allAttendances = await Attendance.findAll({ include: [{ model: Session, include: [Center, Subject] }] });
-  const allHomework = await HomeworkCheck.findAll();
-  const allExamResults = await ExamResult.findAll({ include: [Exam] });
+  const monthStart = currentMonth + '-01';
+  const monthEnd = currentMonth + '-31';
 
-  // تجميع إحصائيات كل مجموعة (سنتر + مادة)
-  const groupStats = [];
+  // ===== دالة مساعدة لحساب إحصائيات مجموعة معينة =====
+  async function calcGroupStats(subj, cent, fromDate, toDate) {
+    const groupStudents = await Student.findAll({
+      where: { SubjectId: subj.id, CenterId: cent.id },
+      include: [Center, Subject],
+    });
+    if (groupStudents.length === 0) return null;
+
+    const groupSessions = await Session.findAll({
+      where: { SubjectId: subj.id, CenterId: cent.id, status: 'normal',
+        ...(fromDate && toDate ? { session_date: { [Op.between]: [fromDate, toDate] } } : {}),
+      },
+    });
+
+    const studentIds = groupStudents.map(s => s.id);
+    const sessionIds = groupSessions.map(s => s.id);
+
+    // حضور
+    const allAttendances = await Attendance.findAll({
+      where: { SessionId: sessionIds },
+      include: [{ model: Student, required: false }],
+    });
+    const ownAttendances = allAttendances.filter(a => studentIds.includes(a.StudentId));
+    const outsideAttendances = allAttendances.filter(a => !studentIds.includes(a.StudentId));
+
+    // تعويض أونلاين
+    const onlineCompensation = await Attendance.findAll({
+      where: { StudentId: studentIds },
+      include: [{ model: Session, include: [Center], where: { SubjectId: subj.id } }],
+    });
+    const onlineComp = onlineCompensation.filter(a => a.Session.Center.name === 'أونلاين').length;
+    const otherCenterComp = onlineCompensation.filter(a =>
+      a.Session.CenterId !== cent.id && a.Session.Center.name !== 'أونلاين'
+    ).length;
+
+    // واجب
+    const hwRecords = await HomeworkCheck.findAll({
+      where: { StudentId: studentIds, SessionId: sessionIds },
+    });
+    const hwStats = {
+      complete: hwRecords.filter(h => h.status === 'complete').length,
+      incomplete: hwRecords.filter(h => h.status === 'incomplete').length,
+      no_steps: hwRecords.filter(h => h.status === 'no_steps').length,
+      not_done: hwRecords.filter(h => h.status === 'not_done').length,
+    };
+
+    // امتحانات
+    const examResults = await ExamResult.findAll({
+      where: { StudentId: studentIds },
+      include: [{ model: Exam, where: { SubjectId: subj.id }, required: false }],
+    });
+    const validScores = examResults.filter(r => r.Exam).map(r => ({ score: r.score, max: r.Exam.max_score }));
+    const avgScore = validScores.length > 0
+      ? (validScores.reduce((s, r) => s + (r.score / r.max * 100), 0) / validScores.length).toFixed(1)
+      : null;
+
+    // مالي
+    const normalPrice = Math.max(...groupStudents.map(s => s.price_per_session));
+    const reducedStudents = groupStudents.filter(s => s.price_per_session < normalPrice && s.price_per_session > 0);
+    const freeStudents = groupStudents.filter(s => s.price_per_session === 0);
+    const revenue = ownAttendances.reduce((sum, a) => {
+      const st = groupStudents.find(s => s.id === a.StudentId);
+      return sum + (st ? st.price_per_session : 0);
+    }, 0);
+
+    // نمو الطلاب
+    const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+    const sixtyAgo = new Date(); sixtyAgo.setDate(sixtyAgo.getDate() - 60);
+    const recentNew = groupStudents.filter(s => new Date(s.createdAt) >= thirtyAgo).length;
+    const prevNew = groupStudents.filter(s => new Date(s.createdAt) >= sixtyAgo && new Date(s.createdAt) < thirtyAgo).length;
+    const growthRate = prevNew > 0 ? (((recentNew - prevNew) / prevNew) * 100).toFixed(1) : (recentNew > 0 ? 100 : 0);
+
+    // توقع الشهر الجاي
+    const avgRevPerStudent = revenue / (groupStudents.length || 1);
+    const projectedNext = Math.round(avgRevPerStudent * groupStudents.length * 1.05);
+
+    const totalPossible = groupStudents.length * groupSessions.length;
+    const attendanceRate = totalPossible > 0 ? ((ownAttendances.length / totalPossible) * 100).toFixed(1) : 0;
+    const hwRate = hwRecords.length > 0 ? ((hwStats.complete / hwRecords.length) * 100).toFixed(1) : 0;
+
+    // تنبيهات
+    const alerts = [];
+    if (parseFloat(attendanceRate) < 60) alerts.push({ type: 'danger', msg: `نسبة حضور منخفضة جداً (${attendanceRate}%)` });
+    else if (parseFloat(attendanceRate) < 75) alerts.push({ type: 'warning', msg: `نسبة حضور تحت المتوسط (${attendanceRate}%)` });
+    if (parseFloat(growthRate) < -10) alerts.push({ type: 'danger', msg: `تراجع في عدد الطلاب (${growthRate}%)` });
+    if (parseFloat(hwRate) < 50) alerts.push({ type: 'warning', msg: `نسبة إنجاز الواجب ضعيفة (${hwRate}%)` });
+    if (freeStudents.length / groupStudents.length > 0.2) alerts.push({ type: 'info', msg: `نسبة الطلاب المجانيين مرتفعة (${Math.round(freeStudents.length/groupStudents.length*100)}%)` });
+
+    return {
+      subjectId: subj.id, centerId: cent.id,
+      subjectName: subj.name, centerName: cent.name,
+      totalStudents: groupStudents.length,
+      totalSessions: groupSessions.length,
+      ownAttendance: ownAttendances.length,
+      outsideAttendance: outsideAttendances.length,
+      onlineCompensation: onlineComp,
+      otherCenterCompensation: otherCenterComp,
+      attendanceRate: parseFloat(attendanceRate),
+      reducedCount: reducedStudents.length,
+      freeCount: freeStudents.length,
+      hwStats, hwRate: parseFloat(hwRate),
+      avgScore, revenue,
+      growthRate: parseFloat(growthRate),
+      recentNew, projectedNext,
+      normalPrice, alerts,
+    };
+  }
+
+  // حساب كل المجموعات
   const subjectsData = await Subject.findAll();
   const centersData = await Center.findAll();
+  const groupStats = [];
 
   for (const subj of subjectsData) {
+    if (subject_id && String(subj.id) !== String(subject_id)) continue;
     for (const cent of centersData) {
-      const groupStudents = allStudents.filter(s => s.SubjectId === subj.id && s.CenterId === cent.id);
-      if (groupStudents.length === 0) continue;
-
-      const groupSessions = allSessions.filter(s => s.SubjectId === subj.id && s.CenterId === cent.id);
-      if (groupSessions.length === 0) continue;
-
-      const sessionIds = groupSessions.map(s => s.id);
-      const studentIds = groupStudents.map(s => s.id);
-
-      const groupAttendances = allAttendances.filter(a => sessionIds.includes(a.SessionId));
-
-      // حضور الطلاب الأصلية vs طلاب من مجموعة تانية
-      let ownGroupAttendance = 0, outsideAttendance = 0;
-      groupAttendances.forEach(a => {
-        const student = allStudents.find(s => s.id === a.StudentId);
-        if (!student) return;
-        if (student.CenterId === cent.id && student.SubjectId === subj.id) ownGroupAttendance++;
-        else outsideAttendance++;
-      });
-
-      // نسبة الحضور
-      const totalPossible = groupStudents.length * groupSessions.length;
-      const actualOwn = groupAttendances.filter(a => studentIds.includes(a.StudentId)).length;
-      const attendanceRate = totalPossible > 0 ? ((actualOwn / totalPossible) * 100).toFixed(1) : 0;
-
-      // الطلاب المخفضين
-      const avgPrice = groupStudents.reduce((sum, s) => sum + s.price_per_session, 0) / groupStudents.length;
-      const normalPrice = Math.max(...groupStudents.map(s => s.price_per_session));
-      const reducedCount = groupStudents.filter(s => s.price_per_session < normalPrice && s.price_per_session > 0).length;
-      const freeCount = groupStudents.filter(s => s.price_per_session === 0).length;
-
-      // حالة الواجب
-      const hwRecords = allHomework.filter(h => studentIds.includes(h.StudentId) && sessionIds.includes(h.SessionId));
-      const completeHw = hwRecords.filter(h => h.status === 'complete').length;
-      const hwRate = hwRecords.length > 0 ? ((completeHw / hwRecords.length) * 100).toFixed(1) : 0;
-
-      // درجات الامتحانات
-      const examIds = allExamResults.filter(r => studentIds.includes(r.StudentId)).map(r => r.ExamId);
-      const avgScore = examIds.length > 0
-        ? (allExamResults.filter(r => studentIds.includes(r.StudentId)).reduce((s, r) => s + r.score, 0) / examIds.length).toFixed(1)
-        : null;
-
-      // الدخل الفعلي
-      const revenue = groupAttendances
-        .filter(a => studentIds.includes(a.StudentId))
-        .reduce((sum, a) => {
-          const student = allStudents.find(s => s.id === a.StudentId);
-          return sum + (student ? student.price_per_session : 0);
-        }, 0);
-
-      // معدل النمو (مقارنة أول 30 يوم vs آخر 30 يوم)
-      const sortedStudents = [...groupStudents].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-      const recentNew = sortedStudents.filter(s => new Date(s.createdAt) >= thirtyDaysAgo).length;
-      const prevNew = sortedStudents.filter(s => new Date(s.createdAt) >= sixtyDaysAgo && new Date(s.createdAt) < thirtyDaysAgo).length;
-      const growthRate = prevNew > 0 ? (((recentNew - prevNew) / prevNew) * 100).toFixed(1) : (recentNew > 0 ? 100 : 0);
-
-      groupStats.push({
-        subjectName: subj.name,
-        centerName: cent.name,
-        totalStudents: groupStudents.length,
-        totalSessions: groupSessions.length,
-        ownAttendance: ownGroupAttendance,
-        outsideAttendance,
-        attendanceRate,
-        reducedCount,
-        freeCount,
-        hwRate,
-        avgScore,
-        revenue,
-        growthRate: parseFloat(growthRate),
-      });
+      if (center_id && String(cent.id) !== String(center_id)) continue;
+      const stats = await calcGroupStats(subj, cent, monthStart, monthEnd);
+      if (stats) groupStats.push(stats);
     }
   }
 
-  // ===== المصروفات والمرتبات =====
-  const monthStart = currentMonth + '-01';
-  const monthEnd = currentMonth + '-31';
+  // مقارنة مع شهر تاني
+  let compareStats = [];
+  if (compareMonth) {
+    const cStart = compareMonth + '-01';
+    const cEnd = compareMonth + '-31';
+    for (const subj of subjectsData) {
+      for (const cent of centersData) {
+        const stats = await calcGroupStats(subj, cent, cStart, cEnd);
+        if (stats) compareStats.push({ ...stats, isCompare: true });
+      }
+    }
+  }
+
+  // ===== مالي الشهر =====
+  const monthlyAttendances = await Attendance.findAll({
+    where: { createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] } },
+    include: [{ model: Student }],
+  });
+  const monthlyRevenue = monthlyAttendances.reduce((s, a) => s + (a.Student ? a.Student.price_per_session : 0), 0);
+
   const expenses = await Expense.findAll({
     where: { expense_date: { [Op.between]: [monthStart, monthEnd] } },
     order: [['expense_date', 'DESC']],
   });
-  const salaries = await Salary.findAll({
-    where: { month: currentMonth },
-    include: [User],
-  });
+  const salaries = await Salary.findAll({ where: { month: currentMonth }, include: [User] });
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const totalSalaries = salaries.reduce((s, e) => s + e.amount, 0);
 
-  // ===== الدخل الشهري =====
-  const monthlyAttendances = await Attendance.findAll({
-    where: { attended_at: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] } },
-    include: [Student],
-  });
-  const monthlyRevenue = monthlyAttendances.reduce((s, a) => s + (a.Student ? a.Student.price_per_session : 0), 0);
-
-  // ===== التوقع المستقبلي =====
-  // بناءً على الجدول الزمني
-  const scheduleEntries = await ScheduleEntry.findAll({ where: { is_active: true }, include: [Subject, Center] });
-  let projectedMonthly = 0;
-  const sessionsPerMonth = 4;
-  for (const entry of scheduleEntries) {
-    const relatedStudents = allStudents.filter(s => s.SubjectId === entry.SubjectId && s.CenterId === entry.CenterId);
-    const avgSessionPrice = relatedStudents.length > 0
-      ? relatedStudents.reduce((s, st) => s + st.price_per_session, 0) / relatedStudents.length
-      : 0;
-    projectedMonthly += relatedStudents.length * avgSessionPrice * sessionsPerMonth;
+  // ===== مؤشرات شهرية تاريخية (آخر 6 شهور) =====
+  const monthlyTrend = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const m = d.toISOString().slice(0, 7);
+    const mStart = m + '-01'; const mEnd = m + '-31';
+    const mAtts = await Attendance.findAll({
+      where: { createdAt: { [Op.between]: [mStart + ' 00:00:00', mEnd + ' 23:59:59'] } },
+      include: [Student],
+    });
+    const mRevenue = mAtts.reduce((s, a) => s + (a.Student ? a.Student.price_per_session : 0), 0);
+    const mStudents = await Student.count({ where: { createdAt: { [Op.lte]: mEnd + ' 23:59:59' } } });
+    monthlyTrend.push({ month: m, revenue: mRevenue, students: mStudents, sessions: mAtts.length });
   }
 
+  // ===== التنبيهات الكلية =====
+  const allAlerts = groupStats.flatMap(g => g.alerts.map(a => ({ ...a, group: `${g.subjectName} - ${g.centerName}` })));
+
+  // ===== توقع الشهر الجاي =====
+  const projectedMonthly = groupStats.reduce((s, g) => s + g.projectedNext, 0);
+
   res.render('analytics-dashboard', {
-    groupStats, expenses, salaries, users,
+    groupStats, compareStats, compareMonth,
+    expenses, salaries, users,
     totalExpenses, totalSalaries, monthlyRevenue,
     netRevenue: monthlyRevenue - totalExpenses - totalSalaries,
-    projectedMonthly,
+    projectedMonthly, monthlyTrend, allAlerts,
     currentMonth, subjects, centers,
+    filters: { subject_id, center_id, month: currentMonth, compare_month: compareMonth },
+  });
+});
+
+// Route تفاصيل مجموعة معينة
+app.get('/analytics/group/:subjectId/:centerId', requireAnalyticsAuth, async (req, res) => {
+  const { subjectId, centerId } = req.params;
+  const { month } = req.query;
+  const currentMonth = month || new Date().toISOString().slice(0, 7);
+  const monthStart = currentMonth + '-01';
+  const monthEnd = currentMonth + '-31';
+
+  const subj = await Subject.findByPk(subjectId);
+  const cent = await Center.findByPk(centerId);
+  if (!subj || !cent) return res.status(404).send('❌');
+
+  const groupStudents = await Student.findAll({
+    where: { SubjectId: subjectId, CenterId: centerId },
+    order: [['name', 'ASC']],
+  });
+  const groupSessions = await Session.findAll({
+    where: { SubjectId: subjectId, CenterId: centerId, status: 'normal' },
+    order: [['lesson_number', 'ASC']],
+  });
+  const sessionIds = groupSessions.map(s => s.id);
+  const studentIds = groupStudents.map(s => s.id);
+
+  // تفاصيل كل طالب
+  const studentDetails = [];
+  for (const student of groupStudents) {
+    const attCount = await Attendance.count({ where: { StudentId: student.id, SessionId: sessionIds } });
+    const hwComplete = await HomeworkCheck.count({ where: { StudentId: student.id, SessionId: sessionIds, status: 'complete' } });
+    const hwTotal = await HomeworkCheck.count({ where: { StudentId: student.id, SessionId: sessionIds } });
+    const examResults = await ExamResult.findAll({ where: { StudentId: student.id }, include: [Exam] });
+    const avgExam = examResults.length > 0
+      ? (examResults.reduce((s, r) => s + (r.score / (r.Exam?.max_score || 100) * 100), 0) / examResults.length).toFixed(1)
+      : null;
+
+    studentDetails.push({
+      id: student.id, name: student.name, code: student.student_code,
+      balance: student.balance, price: student.price_per_session,
+      points: student.points || 0,
+      attendanceCount: attCount, totalSessions: groupSessions.length,
+      attendanceRate: groupSessions.length > 0 ? ((attCount / groupSessions.length) * 100).toFixed(0) : 0,
+      hwComplete, hwTotal, avgExam,
+    });
+  }
+
+  // مشاهدة الحصص على مدار الوقت (chart)
+  const attendanceBySession = [];
+  for (const session of groupSessions.slice(-10)) {
+    const count = await Attendance.count({ where: { SessionId: session.id, StudentId: studentIds } });
+    const outside = await Attendance.count({ where: { SessionId: session.id, StudentId: { [Op.notIn]: studentIds } } });
+    attendanceBySession.push({ lesson: session.lesson_number, own: count, outside });
+  }
+
+  res.render('analytics-group-detail', {
+    subj, cent, studentDetails, groupSessions,
+    attendanceBySession, currentMonth,
   });
 });
 

@@ -1,0 +1,103 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <a href="/analytics?month=<%= currentMonth %>" class="btn btn-sm btn-outline-secondary mb-2">⬅ رجوع</a>
+    <h3 class="mb-1">🔍 <%= subj.name %> - <%= cent.name %></h3>
+    <p class="text-muted small mb-0"><%= studentDetails.length %> طالب | <%= groupSessions.length %> حصة</p>
+  </div>
+</div>
+
+<!-- رسم بياني الحضور عبر الزمن -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">📈 الحضور الفعلي في آخر 10 حصص</h6>
+    <canvas id="sessionChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- جدول الطلاب التفصيلي -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between mb-3">
+      <h6 class="mb-0">👥 تفاصيل الطلاب</h6>
+      <input type="text" id="studentSearch" class="form-control form-control-sm" style="max-width:200px;" placeholder="🔍 بحث...">
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover" id="studentTable">
+        <thead class="table-light">
+          <tr>
+            <th>الطالب</th><th>الحضور</th><th>الواجب</th><th>الامتحان %</th>
+            <th>الرصيد</th><th>النقاط</th><th>السعر</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% studentDetails.forEach(s => { %>
+            <tr data-search="<%= (s.name + ' ' + s.code).toLowerCase() %>">
+              <td>
+                <a href="/students/<%= s.id %>" class="fw-bold"><%= s.name %></a><br>
+                <span class="stat-mini"><%= s.code %></span>
+              </td>
+              <td>
+                <div class="progress progress-thin mb-1" style="height:4px;">
+                  <div class="progress-bar" style="width:<%= s.attendanceRate %>%;background:<%= s.attendanceRate>=75?'#14B8A6':s.attendanceRate>=60?'#D97706':'#DC2626' %>;"></div>
+                </div>
+                <span class="stat-mini"><%= s.attendanceCount %>/<%= s.totalSessions %> (<%= s.attendanceRate %>%)</span>
+              </td>
+              <td>
+                <span class="stat-mini"><%= s.hwComplete %>/<%= s.hwTotal %> كامل</span>
+              </td>
+              <td>
+                <% if (s.avgExam) { %>
+                  <span style="color:<%= s.avgExam>=70?'#059669':s.avgExam>=50?'#D97706':'#DC2626' %>;font-weight:700;">
+                    <%= s.avgExam %>%
+                  </span>
+                <% } else { %><span class="text-muted">-</span><% } %>
+              </td>
+              <td>
+                <span class="<%= s.balance < 0 ? 'text-danger' : s.balance < s.price ? 'text-warning' : 'text-success' %> fw-bold small">
+                  <%= s.balance %> ج
+                </span>
+              </td>
+              <td><span style="color:#D97706;font-weight:700;"><%= s.points %> ⭐</span></td>
+              <td>
+                <span class="<%= s.price < (Math.max(...studentDetails.map(x=>x.price))) ? 'text-danger' : '' %> small">
+                  <%= s.price %> ج
+                </span>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const attendanceBySession = <%- JSON.stringify(attendanceBySession) %>;
+
+new Chart(document.getElementById('sessionChart'), {
+  type: 'bar',
+  data: {
+    labels: attendanceBySession.map(s => `حصة ${s.lesson}`),
+    datasets: [
+      { label:'من المجموعة', data: attendanceBySession.map(s => s.own), backgroundColor:'#4338CA80', borderColor:'#4338CA', borderWidth:1 },
+      { label:'من خارجها', data: attendanceBySession.map(s => s.outside), backgroundColor:'#14B8A650', borderColor:'#14B8A6', borderWidth:1 },
+    ],
+  },
+  options: {
+    responsive:true, plugins:{legend:{position:'bottom'}},
+    scales:{x:{stacked:false},y:{beginAtZero:true}},
+  },
+});
+
+document.getElementById('studentSearch').addEventListener('input', function() {
+  const term = this.value.toLowerCase();
+  document.querySelectorAll('#studentTable tbody tr').forEach(row => {
+    row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+  });
+});
+</script>
+
+<%- include('partials/footer') %>
