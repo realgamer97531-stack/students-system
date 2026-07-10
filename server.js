@@ -772,7 +772,7 @@ app.get('/sessions/:id/report', async (req, res) => {
       include: [User],
       order: [['check_in', 'ASC']],
     });
-    const allUsers = await User.findAll({ where: { role: 'assistant' }, order: [['name', 'ASC']] });
+    const allUsers = await User.findAll({ order: [['name', 'ASC']] });
 
     res.render('session-report', {
       session, attendedRows, absentStudents,
@@ -1794,15 +1794,15 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
 
 // ===== API بتاعة بوابة الطالب وولي الأمر (مستقلة، تستخدم Token بدل الجلسة) =====
 
-app.get('/users/:id/stats', requireAdmin, async (req, res) => {
-  try {
-    const targetUser = await User.findByPk(req.params.id);
-    if (!targetUser) return res.status(404).send('❌ غير موجود');
+// app.get('/users/:id/stats', requireAdmin, async (req, res) => {
+//   try {
+//     const targetUser = await User.findByPk(req.params.id);
+//     if (!targetUser) return res.status(404).send('❌ غير موجود');
 
-    const attendanceCount = await Attendance.count({ where: { UserId: targetUser.id } });
-    const homeworkCount = await HomeworkCheck.count({ where: { UserId: targetUser.id } });
-    const examResultCount = await ExamResult.count({ where: { UserId: targetUser.id } });
-    const studentsRegistered = await Student.count({ where: { UserId: targetUser.id } });
+//     const attendanceCount = await Attendance.count({ where: { UserId: targetUser.id } });
+//     const homeworkCount = await HomeworkCheck.count({ where: { UserId: targetUser.id } });
+//     const examResultCount = await ExamResult.count({ where: { UserId: targetUser.id } });
+//     const studentsRegistered = await Student.count({ where: { UserId: targetUser.id } });
 
     // نشاط آخر 7 أيام
     const weekAgo = new Date();

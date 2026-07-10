@@ -187,6 +187,7 @@
             <select name="user_id" class="form-select form-select-sm" required>
               <option value="">-- اختر أسيستانت --</option>
               <% allUsers.forEach(u => { %>
+                <option value="<%= u.id %>"><%= u.name %> (<%= u.role === 'admin' ? 'أدمن' : 'أسيستانت' %>)</option>
                 <option value="<%= u.id %>"><%= u.name %></option>
               <% }) %>
             </select>
