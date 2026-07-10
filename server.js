@@ -1792,48 +1792,6 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
   }
 });
 
-// ===== API بتاعة بوابة الطالب وولي الأمر (مستقلة، تستخدم Token بدل الجلسة) =====
-
-app.get('/users/:id/stats', requireAdmin, async (req, res) => {
-  try {
-    const targetUser = await User.findByPk(req.params.id);
-    if (!targetUser) return res.status(404).send('❌ غير موجود');
-
-    const attendanceCount = await Attendance.count({ where: { UserId: targetUser.id } });
-    const homeworkCount = await HomeworkCheck.count({ where: { UserId: targetUser.id } });
-    const examResultCount = await ExamResult.count({ where: { UserId: targetUser.id } });
-    const studentsRegistered = await Student.count({ where: { UserId: targetUser.id } });
-
-    // نشاط آخر 7 أيام
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 6);
-    weekAgo.setHours(0, 0, 0, 0);
-
-    const recentAttendance = await Attendance.findAll({
-      where: { UserId: targetUser.id, createdAt: { [Op.gte]: weekAgo } },
-      attributes: ['createdAt'],
-    });
-
-    const dayCounts = {};
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekAgo);
-      d.setDate(d.getDate() + i);
-      dayCounts[d.toISOString().slice(0, 10)] = 0;
-    }
-    recentAttendance.forEach(a => {
-      const key = new Date(a.createdAt).toISOString().slice(0, 10);
-      if (dayCounts[key] !== undefined) dayCounts[key]++;
-    });
-
-    res.render('user-stats', {
-      targetUser, attendanceCount, homeworkCount, examResultCount, studentsRegistered, dayCounts,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
-  }
-});
-
 // دخول الطالب: برقم تليفونه + كود الطالب
 app.post('/api/portal/student-login', async (req, res) => {
   try {
