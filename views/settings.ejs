@@ -1,0 +1,153 @@
+<%- include('partials/header') %>
+
+<% function canShow(key) { return userRole === 'admin' || (userPermissions && userPermissions.includes(key)); } %>
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-8 mx-auto">
+      <!-- Header -->
+      <div class="mb-5">
+        <h2 class="mb-2">
+          <span class="ar-only">⚙️ الإعدادات</span>
+          <span class="en-only" style="display:none;">⚙️ Settings</span>
+        </h2>
+        <p class="text-muted">
+          <span class="ar-only">تخصيص تجربة التطبيق الخاصة بك</span>
+          <span class="en-only" style="display:none;">Customize your app experience</span>
+        </p>
+      </div>
+
+      <!-- Theme Settings -->
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h5 class="mb-1">
+                <span class="ar-only">🌙 الوضع الليلي</span>
+                <span class="en-only" style="display:none;">🌙 Dark Mode</span>
+              </h5>
+              <p class="text-muted small mb-0">
+                <span class="ar-only">تبديل بين الوضع الفاتح والوضع الليلي</span>
+                <span class="en-only" style="display:none;">Toggle between light and dark mode</span>
+              </p>
+            </div>
+            <div class="form-check form-switch" style="transform: scale(1.5); transform-origin: right;">
+              <input class="form-check-input" type="checkbox" id="darkModeToggle" 
+                     onchange="toggleDarkMode()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Language Settings -->
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h5 class="mb-1">
+                <span class="ar-only">🌐 اللغة</span>
+                <span class="en-only" style="display:none;">🌐 Language</span>
+              </h5>
+              <p class="text-muted small mb-0">
+                <span class="ar-only">اختر لغتك المفضلة</span>
+                <span class="en-only" style="display:none;">Choose your preferred language</span>
+              </p>
+            </div>
+            <select id="languageSelect" class="form-select" style="width: auto; max-width: 150px;"
+                    onchange="changeLanguage()">
+              <option value="ar" id="lang-ar">العربية</option>
+              <option value="en" id="lang-en">English</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Display Settings -->
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-3">
+            <span class="ar-only">📊 معلومات النظام</span>
+            <span class="en-only" style="display:none;">📊 System Information</span>
+          </h5>
+          
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="p-3 rounded" style="background: var(--sf-table-header-bg);">
+                <small class="text-muted">
+                  <span class="ar-only">اسم المستخدم</span>
+                  <span class="en-only" style="display:none;">Username</span>
+                </small>
+                <p class="mb-0"><strong><%= userName %></strong></p>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="p-3 rounded" style="background: var(--sf-table-header-bg);">
+                <small class="text-muted">
+                  <span class="ar-only">الدور</span>
+                  <span class="en-only" style="display:none;">Role</span>
+                </small>
+                <p class="mb-0"><strong>
+                  <span class="ar-only"><%= userRole === 'admin' ? 'أدمن' : 'أسيستانت' %></span>
+                  <span class="en-only" style="display:none;"><%= userRole === 'admin' ? 'Admin' : 'Assistant' %></span>
+                </strong></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Back Button -->
+      <div class="mb-4">
+        <button class="btn btn-secondary" onclick="window.history.back()">
+          <span class="ar-only">← رجوع</span>
+          <span class="en-only" style="display:none;">← Back</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleDarkMode() {
+    const checkbox = document.getElementById('darkModeToggle');
+    const theme = checkbox.checked ? 'dark' : 'light';
+    localStorage.setItem('theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+
+  function changeLanguage() {
+    const select = document.getElementById('languageSelect');
+    const lang = select.value;
+    localStorage.setItem('language', lang);
+    window.location.reload();
+  }
+
+  function applyLanguageDisplay() {
+    const lang = localStorage.getItem('language') || 'ar';
+    const arElements = document.querySelectorAll('.ar-only');
+    const enElements = document.querySelectorAll('.en-only');
+
+    if (lang === 'ar') {
+      arElements.forEach(el => el.style.display = '');
+      enElements.forEach(el => el.style.display = 'none');
+    } else {
+      arElements.forEach(el => el.style.display = 'none');
+      enElements.forEach(el => el.style.display = '');
+    }
+  }
+
+  function initializeSettings() {
+    const theme = localStorage.getItem('theme') || 'light';
+    const lang = localStorage.getItem('language') || 'ar';
+    
+    document.getElementById('darkModeToggle').checked = theme === 'dark';
+    document.getElementById('languageSelect').value = lang;
+    
+    applyLanguageDisplay();
+  }
+
+  document.addEventListener('DOMContentLoaded', initializeSettings);
+  initializeSettings();
+</script>
+
+<%- include('partials/footer') %>

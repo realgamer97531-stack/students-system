@@ -140,6 +140,10 @@ app.get('/logout', (req, res) => {
   });
 });
 
+app.get('/settings', requireLogin, (req, res) => {
+  res.render('settings');
+});
+
 // إتاحة بيانات المستخدم تلقائيًا في كل صفحة EJS
 app.use((req, res, next) => {
   res.locals.userName = req.session.userName;

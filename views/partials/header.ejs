@@ -20,6 +20,25 @@
       --sf-muted: #6B7280;
       --sf-radius: 14px;
       --sf-shadow: 0 4px 14px rgba(30, 27, 75, 0.07);
+      --sf-card-bg: #FFFFFF;
+      --sf-input-border: #E2E4F3;
+      --sf-table-header-bg: #EEF0FB;
+    }
+
+    /* Dark Mode Variables */
+    [data-theme="dark"] {
+      --sf-primary: #6366F1;
+      --sf-primary-dark: #4F46E5;
+      --sf-accent: #14B8A6;
+      --sf-bg: #0F172A;
+      --sf-sidebar: #1E293B;
+      --sf-sidebar-hover: #334155;
+      --sf-text: #E2E8F0;
+      --sf-muted: #94A3B8;
+      --sf-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      --sf-card-bg: #1E293B;
+      --sf-input-border: #334155;
+      --sf-table-header-bg: #1E293B;
     }
 
     * { font-family: 'Cairo', sans-serif; }
@@ -94,6 +113,8 @@
       border: none;
       border-radius: var(--sf-radius);
       box-shadow: var(--sf-shadow);
+      background: var(--sf-card-bg);
+      color: var(--sf-text);
     }
 
     .btn {
@@ -112,13 +133,13 @@
 
     .table { border-radius: var(--sf-radius); overflow: hidden; }
     .table thead th {
-      background: #EEF0FB;
-      color: var(--sf-primary-dark);
+      background: var(--sf-table-header-bg);
+      color: var(--sf-text);
       font-weight: 700;
       font-size: 0.85rem;
       border: none;
     }
-    .table td { font-size: 0.88rem; vertical-align: middle; }
+    .table td { font-size: 0.88rem; vertical-align: middle; color: var(--sf-text); }
 
     .badge { font-weight: 600; padding: 0.4em 0.7em; border-radius: 8px; }
 
@@ -127,16 +148,27 @@
 
     .form-control, .form-select {
       border-radius: 10px;
-      border: 1px solid #E2E4F3;
+      border: 1px solid var(--sf-input-border);
       font-size: 0.9rem;
+      background: var(--sf-card-bg);
+      color: var(--sf-text);
     }
     .form-control:focus, .form-select:focus {
       border-color: var(--sf-primary);
       box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.12);
+      background: var(--sf-card-bg);
+      color: var(--sf-text);
     }
 
     .mobile-topbar { display: none; }
     .sidebar-overlay { display: none; }
+
+    /* Language toggle classes */
+    .ar-only { display: inline; }
+    .en-only { display: none; }
+
+    [lang="en"] .ar-only { display: none !important; }
+    [lang="en"] .en-only { display: inline !important; }
 
     @media (max-width: 768px) {
       body { flex-direction: column; }
@@ -155,8 +187,61 @@
       table { font-size: 0.8rem; }
     }
   </style>
+
+  <script>
+    // Initialize theme on page load
+    function initializeTheme() {
+      const theme = localStorage.getItem('theme') || 'light';
+      const lang = localStorage.getItem('language') || 'ar';
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('lang', lang);
+      document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+    }
+
+    // Apply language display (show/hide text)
+    function applyLanguageDisplay() {
+      const lang = localStorage.getItem('language') || 'ar';
+      const arElements = document.querySelectorAll('.ar-only');
+      const enElements = document.querySelectorAll('.en-only');
+
+      if (lang === 'ar') {
+        arElements.forEach(el => el.style.display = '');
+        enElements.forEach(el => el.style.display = 'none');
+      } else {
+        arElements.forEach(el => el.style.display = 'none');
+        enElements.forEach(el => el.style.display = '');
+      }
+    }
+
+    // Toggle theme between light and dark
+    function toggleTheme() {
+      const current = localStorage.getItem('theme') || 'light';
+      const newTheme = current === 'light' ? 'dark' : 'light';
+      localStorage.setItem('theme', newTheme);
+      document.documentElement.setAttribute('data-theme', newTheme);
+    }
+
+    // Toggle language between Arabic and English
+    function toggleLanguage() {
+      const current = localStorage.getItem('language') || 'ar';
+      const newLang = current === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('language', newLang);
+      window.location.reload();
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeTheme();
+      applyLanguageDisplay();
+    });
+  </script>
 </head>
-<body>
+<body onload="initializeTheme(); applyLanguageDisplay();">
+  <script>
+    // Apply theme and language immediately before render to prevent flash
+    initializeTheme();
+    applyLanguageDisplay();
+  </script>
 
   <div class="mobile-topbar">
     <strong>Study<span style="color:#14B8A6">is</span>funny</strong>
@@ -170,35 +255,121 @@
       <div class="sf-logo-mark">S</div>
       <div class="sf-logo-text">Study<span>is</span>funny</div>
     </div>
-    <p class="welcome">مرحبًا، <%= userName %> (<%= userRole === 'admin' ? 'أدمن' : 'أسيستانت' %>)</p>
+    <p class="welcome">
+      <span class="ar-only">مرحبًا، <%= userName %> (<%= userRole === 'admin' ? 'أدمن' : 'أسيستانت' %>)</span>
+      <span class="en-only" style="display:none;">Welcome, <%= userName %> (<%= userRole === 'admin' ? 'Admin' : 'Assistant' %>)</span>
+    </p>
 
     <% function canShow(key) { return userRole === 'admin' || userPermissions.includes(key); } %>
 
-    <% if (canShow('students_view')) { %><a href="/students">📋 قائمة الطلاب</a><% } %>
-    <% if (canShow('students_add')) { %><a href="/students/new">➕ تسجيل طالب جديد</a><% } %>
-    <hr>
-    <% if (canShow('sessions_view')) { %><a href="/sessions">🗂️ كل الحصص</a><% } %>
-    <% if (canShow('sessions_view')) { %><a href="/schedule">📅 الجدول الأسبوعي</a><% } %>
-    <% if (canShow('students_view')) { %><a href="/follow-up">⚠️ يحتاجون متابعة</a><% } %>
-    <% if (canShow('sessions_create')) { %><a href="/sessions/new">▶️ بدء حصة جديدة</a><% } %>
-    <hr>
-    <% if (canShow('attendance_scan')) { %><a href="/attendance/scan">✅ تسجيل حضور</a><% } %>
-    <% if (canShow('homework_scan')) { %><a href="/homework/scan">📝 تصحيح الواجب</a><% } %>
-    <% if (canShow('homework_scan')) { %><a href="/hw/assignments">📋 الواجبات أونلاين</a><% } %>
-    <% if (canShow('door_scan')) { %><a href="/door/scan">🚪 سكان الباب</a><% } %>
-    <hr>
-    <% if (canShow('exams')) { %><a href="/exams">📊 الامتحانات والدرجات</a><% } %>
-    <% if (canShow('admin_videos')) { %><hr><a href="/admin/videos">🎬 إدارة الفيديوهات</a><% } %>
-    <% if (userRole === 'admin') { %>
-      <hr>
-      <a href="/users">👤 إدارة المستخدمين</a>
-      <a href="/admin/closing">💰 التقفيل</a>
-      <a href="/analytics" onclick="fetch('/analytics/lock')">📊 الداشبورد التحليلي</a>
-      <a href="/admin/recharge-codes">🎫 أكواد الشحن</a>
-      <a href="/admin/payment-verifications">🎫 التحقق من المدفوعات</a>
+    <% if (canShow('students_view')) { %>
+      <a href="/students">
+        <span class="ar-only">📋 قائمة الطلاب</span>
+        <span class="en-only" style="display:none;">📋 Students List</span>
+      </a>
+    <% } %>
+    <% if (canShow('students_add')) { %>
+      <a href="/students/new">
+        <span class="ar-only">➕ تسجيل طالب جديد</span>
+        <span class="en-only" style="display:none;">➕ Add Student</span>
+      </a>
     <% } %>
     <hr>
-    <a href="/logout">🚪 تسجيل خروج</a>
+    <% if (canShow('sessions_view')) { %>
+      <a href="/sessions">
+        <span class="ar-only">🗂️ كل الحصص</span>
+        <span class="en-only" style="display:none;">🗂️ All Sessions</span>
+      </a>
+    <% } %>
+    <% if (canShow('sessions_view')) { %>
+      <a href="/schedule">
+        <span class="ar-only">📅 الجدول الأسبوعي</span>
+        <span class="en-only" style="display:none;">📅 Weekly Schedule</span>
+      </a>
+    <% } %>
+    <% if (canShow('students_view')) { %>
+      <a href="/follow-up">
+        <span class="ar-only">⚠️ يحتاجون متابعة</span>
+        <span class="en-only" style="display:none;">⚠️ Follow-up Needed</span>
+      </a>
+    <% } %>
+    <% if (canShow('sessions_create')) { %>
+      <a href="/sessions/new">
+        <span class="ar-only">▶️ بدء حصة جديدة</span>
+        <span class="en-only" style="display:none;">▶️ Start New Session</span>
+      </a>
+    <% } %>
+    <hr>
+    <% if (canShow('attendance_scan')) { %>
+      <a href="/attendance/scan">
+        <span class="ar-only">✅ تسجيل حضور</span>
+        <span class="en-only" style="display:none;">✅ Attendance</span>
+      </a>
+    <% } %>
+    <% if (canShow('homework_scan')) { %>
+      <a href="/homework/scan">
+        <span class="ar-only">📝 تصحيح الواجب</span>
+        <span class="en-only" style="display:none;">📝 Check Homework</span>
+      </a>
+    <% } %>
+    <% if (canShow('homework_scan')) { %>
+      <a href="/hw/assignments">
+        <span class="ar-only">📋 الواجبات أونلاين</span>
+        <span class="en-only" style="display:none;">📋 Online Assignments</span>
+      </a>
+    <% } %>
+    <% if (canShow('door_scan')) { %>
+      <a href="/door/scan">
+        <span class="ar-only">🚪 سكان الباب</span>
+        <span class="en-only" style="display:none;">🚪 Door Scan</span>
+      </a>
+    <% } %>
+    <hr>
+    <% if (canShow('exams')) { %>
+      <a href="/exams">
+        <span class="ar-only">📊 الامتحانات والدرجات</span>
+        <span class="en-only" style="display:none;">📊 Exams & Scores</span>
+      </a>
+    <% } %>
+    <% if (canShow('admin_videos')) { %>
+      <hr>
+      <a href="/admin/videos">
+        <span class="ar-only">🎬 إدارة الفيديوهات</span>
+        <span class="en-only" style="display:none;">🎬 Manage Videos</span>
+      </a>
+    <% } %>
+    <% if (userRole === 'admin') { %>
+      <hr>
+      <a href="/users">
+        <span class="ar-only">👤 إدارة المستخدمين</span>
+        <span class="en-only" style="display:none;">👤 Manage Users</span>
+      </a>
+      <a href="/admin/closing">
+        <span class="ar-only">💰 التقفيل</span>
+        <span class="en-only" style="display:none;">💰 Closing</span>
+      </a>
+      <a href="/analytics" onclick="fetch('/analytics/lock')">
+        <span class="ar-only">📊 الداشبورد التحليلي</span>
+        <span class="en-only" style="display:none;">📊 Analytics</span>
+      </a>
+      <a href="/admin/recharge-codes">
+        <span class="ar-only">🎫 أكواد الشحن</span>
+        <span class="en-only" style="display:none;">🎫 Recharge Codes</span>
+      </a>
+      <a href="/admin/payment-verifications">
+        <span class="ar-only">🎫 التحقق من المدفوعات</span>
+        <span class="en-only" style="display:none;">🎫 Payment Verification</span>
+      </a>
+    <% } %>
+    <hr>
+    <a href="/settings">
+      <span class="ar-only">⚙️ الإعدادات</span>
+      <span class="en-only" style="display:none;">⚙️ Settings</span>
+    </a>
+    <a href="/logout">
+      <span class="ar-only">🚪 تسجيل خروج</span>
+      <span class="en-only" style="display:none;">🚪 Logout</span>
+    </a>
   </div>
 
   <div class="main-content">
