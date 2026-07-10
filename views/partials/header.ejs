@@ -215,6 +215,33 @@
     .mobile-topbar { display: none; }
     .sidebar-overlay { display: none; }
 
+    /* Fix text colors inside inputs and select options for Dark Mode */
+.form-control, 
+.form-select {
+    color: #e2e8f0 !important;
+    background-color: #1a202c !important;
+    border-color: #4a5568 !important;
+}
+
+/* Fix contrast for input placeholders globally */
+.form-control::placeholder {
+    color: #a0aec0 !important;
+    opacity: 1; /* Ensures browser defaults don't override it */
+}
+
+/* Fix faded/muted description text inside dark elements */
+.text-muted, 
+p.text-muted, 
+span.text-muted {
+    color: #cbd5e1 !important;
+}
+
+/* Specific fix for text inside option drops or disabled fields */
+select option {
+    background-color: #1a202c !important;
+    color: #e2e8f0 !important;
+}
+
     /* Language toggle classes */
     .ar-only { display: inline; }
     .en-only { display: none; }
