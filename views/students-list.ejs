@@ -1,37 +1,68 @@
 <%- include('partials/header') %>
 
 <style>
-  /* Seamless Dark Mode Support for the Table */
-  @media (prefers-color-scheme: dark) {
-    .custom-table-container {
-      background-color: #1e1e24 !important; /* Elegant dark surface */
-      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25) !important;
-    }
-    .table {
-      color: #e3e3e6 !important;
-    }
-    .table-light {
-      --bs-table-bg: #2d2d35 !important;
-      color: #ffffff !important;
-    }
-    .table th {
-      color: #ffffff !important;
-    }
-    /* Muted gray text fixes for secondary data in dark mode */
-    .table td, .table td a {
-      color: #d1d1d6 !important;
-    }
-    .table td:nth-child(1), /* Code column */
-    .table td:nth-child(3), /* Student Phone */
-    .table td:nth-child(4), /* Parent Phone */
-    .table td:nth-child(5), /* Subject */
-    .table td:nth-child(6)  /* Center */ {
-      color: #a1a1aa !important;
-    }
-    .badge.bg-secondary {
-      background-color: #4a4a52 !important;
-      color: #e3e3e6 !important;
-    }
+  /* Explicit Dark Theme Overrides to Match Reference */
+  .custom-dark-card {
+    background-color: #161622 !important; /* Deep dark background */
+    border: 1px solid #232334 !important;
+  }
+  
+  .custom-dark-table {
+    background-color: transparent !important;
+    color: #f1f1f5 !important;
+  }
+
+  .custom-dark-table thead tr {
+    background-color: #1e1e2f !important; /* Slightly lighter header row */
+    border-bottom: 2px solid #28283d !important;
+  }
+
+  .custom-dark-table th {
+    color: #ffffff !important;
+    font-weight: 600;
+    border-bottom: none !important;
+  }
+
+  .custom-dark-table tbody tr {
+    border-bottom: 1px solid #232334 !important;
+  }
+
+  /* Muted column colors for better readability */
+  .custom-dark-table td {
+    color: #d1d1d6 !important;
+    border-bottom: none !important;
+  }
+
+  /* Specific column text dimming from your reference image */
+  .custom-dark-table td:nth-child(1), /* Code */
+  .custom-dark-table td:nth-child(3), /* Student Phone */
+  .custom-dark-table td:nth-child(4), /* Parent Phone */
+  .custom-dark-table td:nth-child(5), /* Subject */
+  .custom-dark-table td:nth-child(6), /* Center */
+  .custom-dark-table td:nth-child(7), /* Price */
+  .custom-dark-table td:nth-child(8)  /* Balance */ {
+    color: #a1a1b5 !important;
+  }
+
+  /* Links styling */
+  .custom-dark-table td a {
+    color: #3b82f6 !important; /* Clean blue link */
+    text-decoration: none;
+  }
+  .custom-dark-table td a:hover {
+    text-decoration: underline;
+  }
+
+  /* Badges matching the second reference image */
+  .badge.bg-success {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+    color: #10b981 !important;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .badge.bg-secondary {
+    background-color: #3a3a4c !important;
+    color: #a1a1b5 !important;
   }
 </style>
 
@@ -92,9 +123,9 @@
   </div>
 </form>
 
-<div class="table-responsive custom-table-container bg-white rounded shadow-sm p-3">
-  <table class="table table-striped table-hover align-middle">
-    <thead class="table-light">
+<div class="table-responsive custom-dark-card rounded shadow-sm p-3">
+  <table class="table custom-dark-table align-middle m-0">
+    <thead>
       <tr>
         <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
         <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
@@ -111,7 +142,7 @@
       <% students.forEach(student => { %>
         <tr>
           <td><%= student.student_code %></td>
-          <td><a href="/students/<%= student.id %>" class="fw-bold text-decoration-none"><%= student.name %></a></td>
+          <td><a href="/students/<%= student.id %>"><%= student.name %></a></td>
           <td><%= student.phone %></td>
           <td><%= student.parent_phone %></td>
           <td><%= student.Subject ? student.Subject.name : '-' %></td>
