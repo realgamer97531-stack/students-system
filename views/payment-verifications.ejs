@@ -1,9 +1,9 @@
 <%- include('partials/header') %>
 
 <%
-  const safeReservations = Array.isArray(reservations) ? reservations : [];
-  const safeFilters = filters || {};
-  const activeTab = currentTab || 'reservations';
+  const safeReservations = typeof reservations !== 'undefined' && Array.isArray(reservations) ? reservations : [];
+  const safeFilters = typeof filters !== 'undefined' && filters ? filters : {};
+  const activeTab = typeof currentTab !== 'undefined' && currentTab ? currentTab : 'reservations';
 %>
 
 <h3 class="mb-4">💳 مراجعة المدفوعات والحجوزات</h3>
