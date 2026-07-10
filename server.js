@@ -2939,12 +2939,6 @@ app.get('/schedule', requirePermission('sessions_view'), async (req, res) => {
       weekGrid[i] = entries.filter(e => e && e.day_of_week === i && e.Subject && e.Center);
     }
 
-    // Helper function to check permissions
-    const canShow = (permission) => {
-      return req.user && req.user.Permissions && 
-             req.user.Permissions.some(p => p.name === permission);
-    };
-
     res.render('schedule', { 
       entries: entries.filter(e => e && e.Subject && e.Center), 
       todayEntries, 
@@ -2952,9 +2946,8 @@ app.get('/schedule', requirePermission('sessions_view'), async (req, res) => {
       DAYS, 
       subjects, 
       centers, 
-      todayDay,
-      userRole: req.user?.Role?.name,
-      canShow
+      todayDay
+      // userName, userRole, userPermissions are automatically available via res.locals middleware
     });
   } catch (e) {
     console.error('Schedule GET error:', e);

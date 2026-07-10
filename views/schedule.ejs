@@ -1,5 +1,7 @@
 <%- include('partials/header') %>
 
+<% function canShow(key) { return userRole === 'admin' || (userPermissions && userPermissions.includes(key)); } %>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h3 class="mb-1">📅 الجدول الأسبوعي</h3>
