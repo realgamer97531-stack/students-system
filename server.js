@@ -2896,22 +2896,70 @@ Salary.belongsTo(User, { foreignKey: 'UserId' });
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
 app.get('/schedule', requirePermission('sessions_view'), async (req, res) => {
-  const entries = await ScheduleEntry.findAll({
-    where: { is_active: true },
-    include: [Subject, Center],
-    order: [['day_of_week', 'ASC'], ['start_time', 'ASC']],
-  });
+  try {
+    // First try to fetch with eager loading
+    let entries = [];
+    try {
+      entries = await ScheduleEntry.findAll({
+        where: { is_active: true },
+        include: [
+          { model: Subject, required: false },
+          { model: Center, required: false }
+        ],
+        order: [['day_of_week', 'ASC'], ['start_time', 'ASC']],
+      });
+    } catch (includeError) {
+      console.warn('Eager loading failed, trying manual association:', includeError.message);
+      
+      // Fallback: fetch entries separately and manually associate
+      entries = await ScheduleEntry.findAll({
+        where: { is_active: true },
+        order: [['day_of_week', 'ASC'], ['start_time', 'ASC']],
+      });
+      
+      // Manually load associations
+      for (let entry of entries) {
+        try {
+          entry.Subject = await Subject.findByPk(entry.SubjectId);
+          entry.Center = await Center.findByPk(entry.CenterId);
+        } catch (e) {
+          console.error(`Failed to load associations for entry ${entry.id}:`, e.message);
+        }
+      }
+    }
 
-  const todayDay = new Date().getDay();
-  const todayEntries = entries.filter(e => e.day_of_week === todayDay);
-  const subjects = await Subject.findAll();
-  const centers = await Center.findAll();
+    const todayDay = new Date().getDay();
+    const todayEntries = entries.filter(e => e && e.day_of_week === todayDay && e.Subject && e.Center);
+    const subjects = await Subject.findAll() || [];
+    const centers = await Center.findAll() || [];
 
-  // تنظيم الجدول في grid أسبوعي
-  const weekGrid = {};
-  for (let i = 0; i < 7; i++) weekGrid[i] = entries.filter(e => e.day_of_week === i);
+    // تنظيم الجدول في grid أسبوعي
+    const weekGrid = {};
+    for (let i = 0; i < 7; i++) {
+      weekGrid[i] = entries.filter(e => e && e.day_of_week === i && e.Subject && e.Center);
+    }
 
-  res.render('schedule', { entries, todayEntries, weekGrid, DAYS, subjects, centers, todayDay });
+    // Helper function to check permissions
+    const canShow = (permission) => {
+      return req.user && req.user.Permissions && 
+             req.user.Permissions.some(p => p.name === permission);
+    };
+
+    res.render('schedule', { 
+      entries: entries.filter(e => e && e.Subject && e.Center), 
+      todayEntries, 
+      weekGrid, 
+      DAYS, 
+      subjects, 
+      centers, 
+      todayDay,
+      userRole: req.user?.Role?.name,
+      canShow
+    });
+  } catch (e) {
+    console.error('Schedule GET error:', e);
+    res.status(500).send('❌ حدث خطأ في تحميل الجدول: ' + e.message);
+  }
 });
 
 app.post('/schedule/add', requireAdmin, async (req, res) => {
@@ -2935,27 +2983,46 @@ app.post('/schedule/add', requireAdmin, async (req, res) => {
       return res.status(400).send('❌ اليوم غير صحيح');
     }
 
+    // Validate time format HH:MM
+    if (!/^\d{2}:\d{2}$/.test(start_time.trim())) {
+      return res.status(400).send('❌ صيغة الوقت غير صحيحة (يجب أن تكون HH:MM)');
+    }
+
     // Verify subject and center exist
     const subject = await Subject.findByPk(subjectId);
     const center = await Center.findByPk(centerId);
-    if (!subject || !center) {
-      return res.status(400).send('❌ المادة أو السنتر غير موجودة');
+    if (!subject) {
+      return res.status(400).send('❌ المادة غير موجودة');
+    }
+    if (!center) {
+      return res.status(400).send('❌ السنتر غير موجود');
+    }
+
+    // Verify end_date is valid if provided
+    let validEndDate = null;
+    if (end_date && end_date.trim()) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(end_date.trim())) {
+        return res.status(400).send('❌ صيغة التاريخ غير صحيحة (يجب أن تكون YYYY-MM-DD)');
+      }
+      validEndDate = end_date.trim();
     }
 
     await ScheduleEntry.create({
       day_of_week: dayOfWeek,
-      start_time,
+      start_time: start_time.trim(),
       duration_minutes: durationMins,
       SubjectId: subjectId,
       CenterId: centerId,
       expected_sessions_count: expectedSessions,
-      end_date: end_date && end_date.trim() ? end_date : null,
-      notes: notes && notes.trim() ? notes : null,
+      end_date: validEndDate,
+      notes: notes && notes.trim() ? notes.trim() : null,
     });
+    
     res.redirect('/schedule');
   } catch (e) {
     console.error('Schedule add error:', e);
-    res.status(500).send('❌ ' + e.message);
+    res.status(500).send('❌ خطأ: ' + (e.message || 'فشل إنشاء الجدول'));
   }
 });
 
