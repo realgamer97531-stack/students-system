@@ -1092,6 +1092,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
 
     const activeSession = await Session.findByPk(sessionId);
+    if (!activeSession) return res.json({ success: false, message: '⚠️ مفيش حصة شغالة' });
     if (activeSession.status === 'cancelled') {
       return res.json({ success: false, message: '⚠️ هذه الحصة ملغية' });
     }
@@ -1154,6 +1155,36 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       };
     });
 
+    const booklets = await Booklet.findAll({
+      where: { SubjectId: student.SubjectId, is_active: true },
+      order: [['order_index', 'ASC']],
+    });
+
+    const bookletStatuses = await Promise.all(booklets.map(async (booklet) => {
+      const studentBooklet = await StudentBooklet.findOne({
+        where: { StudentId: student.id, BookletId: booklet.id },
+      });
+      const reservation = await BookletReservation.findOne({
+        where: { StudentId: student.id, BookletId: booklet.id, status: { [Op.ne]: 'rejected' } },
+      });
+
+      const paidAmount = studentBooklet ? studentBooklet.paid_amount : 0;
+      const remaining = Math.max(0, (booklet.sell_price || 0) - paidAmount);
+
+      return {
+        id: booklet.id,
+        name: booklet.name,
+        sellPrice: booklet.sell_price,
+        paidAmount,
+        remaining,
+        studentBookletId: studentBooklet ? studentBooklet.id : null,
+        isDelivered: Boolean(studentBooklet && studentBooklet.is_delivered),
+        reservationStatus: reservation ? reservation.status : null,
+        reservationMethod: reservation ? reservation.payment_method : null,
+        isFullyPaid: remaining <= 0,
+      };
+    }));
+
     res.json({
       success: true,
       student: {
@@ -1161,10 +1192,12 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         name: student.name,
         code: student.student_code,
         balance: student.balance,
-        priceperSession: student.price_per_session,
+        pricePerSession: student.price_per_session,
         adminNote: student.admin_note,
       },
       summary,
+      bookletStatuses,
+      pendingBooklets: bookletStatuses.filter(b => !b.isFullyPaid && !b.isDelivered),
     });
   } catch (error) {
     console.error(error);
@@ -4016,6 +4049,7 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
       studentName: a.Student?.name || '-',
       studentCode: a.Student?.student_code || '-',
       assistantName: a.User?.name || '-',
+      assistantId: a.UserId,
       sessionPayment: a.payment_collected || 0,
       attendedAt: a.attended_at,
     }));
@@ -4034,11 +4068,39 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
 
     const totalSession = rows.reduce((s, r) => s + r.sessionPayment, 0);
     const totalBooklets = bookletTransactions.reduce((s, t) => s + t.amount, 0);
+    const assistantMap = new Map();
+
+    const ensureAssistantBucket = (user) => {
+      const key = user?.id || 'unknown';
+      if (!assistantMap.has(key)) {
+        assistantMap.set(key, {
+          assistantId: user?.id || null,
+          assistantName: user?.name || '-',
+          sessionTotal: 0,
+          bookletTotal: 0,
+        });
+      }
+      return assistantMap.get(key);
+    };
+
+    attendances.forEach(a => {
+      const bucket = ensureAssistantBucket(a.User);
+      bucket.sessionTotal += a.payment_collected || 0;
+    });
+
+    bookletTransactions.forEach(t => {
+      const bucket = ensureAssistantBucket(t.User);
+      bucket.bookletTotal += t.amount || 0;
+    });
+
+    const assistantBreakdown = Array.from(assistantMap.values())
+      .sort((a, b) => a.assistantName.localeCompare(b.assistantName, 'ar'));
 
     res.render('session-financial-report', {
       session, rows, bookletTransactions, allUsers,
       totalSession, totalBooklets, totalAll: totalSession + totalBooklets,
-      filters: { filter_user, filter_type },
+      assistantBreakdown,
+      filters: { filter_user, filter_type: filter_type || 'all' },
     });
   } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
 });

@@ -96,6 +96,7 @@
   const resultBox = document.getElementById('resultBox');
   const connectionStatus = document.getElementById('connectionStatus');
   const pendingBox = document.getElementById('pendingBox');
+  const canDeliverBooklets = <%= userRole === 'admin' ? 'true' : 'false' %>;
   let isProcessing = false;
 
   // ===== إدارة قائمة العمليات المعلّقة (المخزّنة محليًا) =====
@@ -230,25 +231,43 @@
 
       tbody.innerHTML += `<tr><td>${row.lessonNumber}</td><td>${attendHtml}</td><td class="small">${watchHtml}</td></tr>`;
     });
-    // عرض البوكليتس المعلقة
+    // عرض البوكليتس
     const bookletBox = document.getElementById('bookletPaymentsBox');
     if (bookletBox) {
-      if (data.pendingBooklets && data.pendingBooklets.length > 0) {
-        let bookletHtml = '<div class="mb-3"><label class="form-label small fw-bold">📚 مدفوعات البوكليتس</label>';
-        data.pendingBooklets.forEach(b => {
+      const bookletItems = data.bookletStatuses || data.pendingBooklets || [];
+      if (bookletItems.length > 0) {
+        let bookletHtml = '<div class="mb-3 text-start"><label class="form-label small fw-bold">📚 البوكليتس</label>';
+        bookletItems.forEach(b => {
+          const isComplete = b.isDelivered || b.remaining <= 0;
+          const badgeText = b.isDelivered ? '✓ استلم' : (b.remaining <= 0 ? '✓ مدفوع بالكامل' : `متبقي: ${b.remaining} ج`);
+          const badgeClass = b.isDelivered || b.remaining <= 0 ? 'bg-success' : 'bg-warning text-dark';
           bookletHtml += `
-            <div class="border rounded p-2 mb-2">
-              <div class="d-flex justify-content-between small mb-1">
+            <div class="border rounded p-2 mb-2 bg-white">
+              <div class="d-flex justify-content-between align-items-center small mb-1">
                 <span><strong>${b.name}</strong></span>
-                <span class="text-danger">متبقي: ${b.remaining} ج</span>
+                <div class="d-flex align-items-center gap-1 flex-wrap justify-content-end">
+                  ${b.reservationStatus ? `<span class="badge bg-secondary" style="font-size:0.65rem;">حجز: ${b.reservationStatus}</span>` : ''}
+                  <span class="badge ${badgeClass}" style="font-size:0.65rem;">${badgeText}</span>
+                </div>
               </div>
-              <div class="input-group input-group-sm">
-                <input type="number" class="form-control booklet-payment-input"
-                  data-booklet-id="${b.id}" data-remaining="${b.remaining}"
-                  placeholder="المبلغ المدفوع الآن" min="0" max="${b.remaining}"
-                  oninput="calcBookletRemaining(this, ${b.remaining})">
-                <span class="input-group-text small" id="remaining_${b.id}">سيتبقى: ${b.remaining} ج</span>
-              </div>
+              ${!isComplete ? `
+                <div class="input-group input-group-sm">
+                  <input type="number" class="form-control booklet-payment-input"
+                    data-booklet-id="${b.id}" data-remaining="${b.remaining}"
+                    placeholder="المبلغ المدفوع الآن" min="0" max="${b.remaining}"
+                    oninput="calcBookletRemaining(this, ${b.remaining})">
+                  <span class="input-group-text small" id="remaining_${b.id}">سيتبقى: ${b.remaining} ج</span>
+                </div>
+              ` : `
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  <span class="text-success small fw-bold">تم سداد البوكليت</span>
+                  ${!b.isDelivered && b.studentBookletId && canDeliverBooklets ? `
+                    <form action="/students/${data.student.id}/booklet-deliver/${b.studentBookletId}" method="POST">
+                      <button class="btn btn-sm btn-outline-success">تم التسليم ✓</button>
+                    </form>
+                  ` : `<span class="badge bg-success" style="font-size:0.65rem;">${b.isDelivered ? '✓ استلم' : 'في انتظار التسليم'}</span>`}
+                </div>
+              `}
             </div>`;
         });
         bookletHtml += '</div>';
@@ -434,14 +453,14 @@
   });
 
   function calcBookletRemaining(input, totalRemaining) {
-  const paid = parseFloat(input.value) || 0;
-  const remaining = totalRemaining - paid;
-  const bookletId = input.dataset.bookletId;
-  const display = document.getElementById('remaining_' + bookletId);
-  if (display) {
-    display.textContent = `سيتبقى: ${Math.max(0, remaining).toFixed(1)} ج`;
-    display.style.color = remaining <= 0 ? '#059669' : '#DC2626';
+    const paid = parseFloat(input.value) || 0;
+    const remaining = totalRemaining - paid;
+    const bookletId = input.dataset.bookletId;
+    const display = document.getElementById('remaining_' + bookletId);
+    if (display) {
+      display.textContent = `سيتبقى: ${Math.max(0, remaining).toFixed(1)} ج`;
+      display.style.color = remaining <= 0 ? '#059669' : '#DC2626';
+    }
   }
-}
 </script>
 <%- include('partials/footer') %>

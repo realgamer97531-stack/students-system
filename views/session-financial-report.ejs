@@ -21,6 +21,14 @@
           <% }) %>
         </select>
       </div>
+      <div class="col-md-3">
+        <label class="form-label small">نوع المدفوعات</label>
+        <select name="filter_type" class="form-select form-select-sm">
+          <option value="all" <%= filters.filter_type === 'all' ? 'selected' : '' %>>الكل</option>
+          <option value="session" <%= filters.filter_type === 'session' ? 'selected' : '' %>>الحصة فقط</option>
+          <option value="booklet" <%= filters.filter_type === 'booklet' ? 'selected' : '' %>>البوكليتس فقط</option>
+        </select>
+      </div>
       <div class="col-md-2">
         <button class="btn btn-primary btn-sm w-100">تطبيق</button>
       </div>
@@ -50,7 +58,36 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">👨‍💼 حساب الأسيستانتس</h6>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>الأسيستانت</th>
+            <th>الحصص</th>
+            <th>البوكليتس</th>
+            <th>الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% assistantBreakdown.forEach(a => { %>
+            <tr>
+              <td><%= a.assistantName %></td>
+              <td class="text-success fw-bold"><%= a.sessionTotal.toLocaleString() %> ج</td>
+              <td style="color:#4338CA; font-weight:700;"><%= a.bookletTotal.toLocaleString() %> ج</td>
+              <td class="fw-bold"><%= (a.sessionTotal + a.bookletTotal).toLocaleString() %> ج</td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- مدفوعات الحصة -->
+<% if (filters.filter_type !== 'booklet') { %>
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h6 class="mb-3">✅ مدفوعات الحصة</h6>
@@ -79,8 +116,10 @@
     </div>
   </div>
 </div>
+<% } %>
 
 <!-- مدفوعات البوكليتس -->
+<% if (filters.filter_type !== 'session') { %>
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h6 class="mb-3">📚 مدفوعات البوكليتس (في نفس يوم الحصة)</h6>
@@ -108,5 +147,6 @@
     </div>
   </div>
 </div>
+<% } %>
 
 <%- include('partials/footer') %>
