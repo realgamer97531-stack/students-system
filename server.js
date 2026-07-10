@@ -139,17 +139,6 @@ app.get('/logout', (req, res) => {
     res.redirect('/login');
   });
 });
-
-app.get('/settings', requireLogin, (req, res) => {
-  res.render('settings');
-});
-
-// إتاحة بيانات المستخدم تلقائيًا في كل صفحة EJS
-app.use((req, res, next) => {
-  res.locals.userName = req.session.userName;
-  res.locals.userRole = req.session.userRole;
-  next();
-});
 // ===== Middleware الحماية =====
 // أي صفحة بعد السطر ده هتكون محمية - لازم تسجيل دخول الأول
 function requireLogin(req, res, next) {
@@ -164,6 +153,13 @@ function requireLogin(req, res, next) {
 }
 
 app.use(requireLogin);
+
+// إتاحة بيانات المستخدم تلقائيًا في كل صفحة EJS
+app.use((req, res, next) => {
+  res.locals.userName = req.session.userName;
+  res.locals.userRole = req.session.userRole;
+  next();
+});
 
 // حماية إضافية لصفحات الأدمن بس
 function requireAdmin(req, res, next) {
@@ -228,6 +224,11 @@ app.use((req, res, next) => {
   res.locals.userPermissions = req.session.userPermissions || [];
   res.locals.PERMISSIONS_LIST = PERMISSIONS_LIST;
   next();
+});
+
+// ===== Settings Route =====
+app.get('/settings', (req, res) => {
+  res.render('settings');
 });
 
 // ===== Routes بتاعة الطلاب =====
