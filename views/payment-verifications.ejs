@@ -1,9 +1,10 @@
 <%- include('partials/header') %>
 
 <%
+  const safeRecords = typeof records !== 'undefined' && Array.isArray(records) ? records : [];
   const safeReservations = typeof reservations !== 'undefined' && Array.isArray(reservations) ? reservations : [];
   const safeFilters = typeof filters !== 'undefined' && filters ? filters : {};
-  const activeTab = typeof currentTab !== 'undefined' && currentTab ? currentTab : 'reservations';
+  const activeTab = typeof currentTab !== 'undefined' && currentTab ? currentTab : 'records';
 %>
 
 <h3 class="mb-4">💳 مراجعة المدفوعات والحجوزات</h3>
@@ -49,67 +50,158 @@
             <th>التاريخ والوقت</th><th>الطالب</th><th>البوكليت</th><th>طريقة الدفع</th>
             <th>الحالة</th><th>الاستلام</th><th>صورة التحويل</th><th>إجراء</th>
           </tr>
-        </thead>
-        <tbody>
-          <% safeReservations.forEach(r => { %>
-            <tr>
-              <td class="small"><%= new Date(r.createdAt).toLocaleString('ar-EG') %></td>
-              <td>
-                <a href="/students/<%= r.StudentId %>" class="fw-bold"><%= r.Student?.name %></a><br>
-                <span class="small text-muted"><%= r.Student?.student_code %></span>
-              </td>
-              <td><%= r.Booklet?.name %><br><span class="small text-success"><%= r.Booklet?.sell_price %> ج</span></td>
-              <td>
-                <span class="badge <%= r.payment_method==='center'?'bg-primary':'bg-success' %>">
-                  <%= r.payment_method==='center'?'🏫 سنتر':'📱 فودافون كاش' %>
-                </span>
-              </td>
-              <td>
-                <% const statusColors = { pending:'#FEF3C7', verified:'#D1FAE5', rejected:'#FEE2E2' }; %>
-                <% const statusText = { pending:'في الانتظار', verified:'محقق ✓', rejected:'مرفوض ✗' }; %>
-                <span class="badge" style="background:<%= statusColors[r.status] %>;color:#1F2937;">
-                  <%= statusText[r.status] %>
-                </span>
-              </td>
-              <td>
-                <% if (r.is_delivered) { %>
-                  <span class="badge bg-success" style="font-size:0.65rem;">✓ استلم</span>
-                <% } else { %>
-                  <span class="badge bg-secondary" style="font-size:0.65rem;">لم يستلم</span>
-                <% } %>
-              </td>
-              <td>
-                <% if (r.transfer_image_url) { %>
-                  <img src="<%= r.transfer_image_url %>" onclick="window.open('<%= r.transfer_image_url %>','_blank')"
-                    style="width:50px;height:50px;object-fit:cover;border-radius:6px;cursor:pointer;">
-                <% } else { %><span class="text-muted small">-</span><% } %>
-              </td>
-              <td>
-                <% if (r.status === 'pending') { %>
-                  <form action="/admin/payment-verifications/<%= r.id %>/verify" method="POST" class="mb-1">
-                    <div class="input-group input-group-sm mb-1">
-                      <input type="number" name="paid_amount" class="form-control" placeholder="المبلغ" value="<%= r.Booklet?.sell_price %>">
-                    </div>
-                    <button class="btn btn-sm btn-success w-100">✓ تحقيق</button>
-                  </form>
-                  <form action="/admin/payment-verifications/<%= r.id %>/reject" method="POST">
-                    <button class="btn btn-sm btn-outline-danger w-100">✗ رفض</button>
-                  </form>
-                <% } else if (r.status === 'verified' && !r.is_delivered) { %>
-                  <form action="/admin/payment-verifications/<%= r.id %>/deliver" method="POST">
-                    <button class="btn btn-sm btn-outline-primary w-100">📦 تم التسليم</button>
-                  </form>
-                <% } %>
-              </td>
-            </tr>
-          <% }) %>
-          <% if (safeReservations.length === 0) { %>
-            <tr><td colspan="8" class="text-muted text-center">لا يوجد حجوزات</td></tr>
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link <%= activeTab === 'records' ? 'active' : '' %>" href="/admin/payment-verifications?tab=records">🧾 التحويلات</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <%= activeTab === 'reservations' ? 'active' : '' %>" href="/admin/payment-verifications?tab=reservations">📚 الحجوزات</a>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+    <div class="tab-pane fade <%= activeTab === 'records' ? 'show active' : '' %>">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-4">🧾 مراجعة عمليات التحقق من التحويلات</h5>
+
+          <% if (safeRecords.length === 0) { %>
+            <p class="text-muted small">لا توجد عمليات تحقق ناجحة مسجلة بعد</p>
           <% } %>
-        </tbody>
-      </table>
+
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>صورة الإيصال</th>
+                  <th>كود الطالب</th>
+                  <th>المبلغ المضاف</th>
+                  <th>تاريخ التحويل</th>
+                  <th>ساعة التحويل</th>
+                  <th>واتساب</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% safeRecords.forEach(r => { %>
+                  <tr>
+                    <td>
+                      <% if (r.imagePath) { %>
+                        <a href="<%= r.imagePath %>" target="_blank">
+                          <img src="<%= r.imagePath %>" alt="إيصال التحويل"
+                            style="max-height:70px; border-radius:6px; border:1px solid #E2E4F3;">
+                        </a>
+                      <% } else { %>
+                        <span class="text-muted small">لا توجد صورة</span>
+                      <% } %>
+                    </td>
+                    <td><%= r.Student ? r.Student.student_code : '-' %></td>
+                    <td class="text-success fw-bold"><%= r.amount %> ج</td>
+                    <td class="text-muted small"><%= r.transactionDate || '-' %></td>
+                    <td class="text-muted small"><%= r.transactionTime || '-' %></td>
+                    <%
+  let phone = '';
+
+  if (r.Student && r.Student.phone) {
+      phone = r.Student.phone.replace(/\D/g, '');
+
+      if (phone.startsWith('0')) {
+          phone = '20' + phone.substring(1);
+      }
+  }
+  %>
+
+  <td>
+      <% if (phone) { %>
+          <a href="https://wa.me/<%= phone %>"
+             target="_blank"
+             class="btn btn-success btn-sm">
+              <i class="bi bi-whatsapp"></i> واتساب
+          </a>
+      <% } else { %>
+          <span class="text-muted">لا يوجد رقم</span>
+      <% } %>
+  </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade <%= activeTab === 'reservations' ? 'show active' : '' %>">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-3">📚 حجوزات البوكليتس (<%= safeReservations.length %>)</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>التاريخ والوقت</th><th>الطالب</th><th>البوكليت</th><th>طريقة الدفع</th>
+                  <th>الحالة</th><th>الاستلام</th><th>صورة التحويل</th><th>إجراء</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% safeReservations.forEach(r => { %>
+                  <tr>
+                    <td class="small"><%= new Date(r.createdAt).toLocaleString('ar-EG') %></td>
+                    <td>
+                      <a href="/students/<%= r.StudentId %>" class="fw-bold"><%= r.Student?.name %></a><br>
+                      <span class="small text-muted"><%= r.Student?.student_code %></span>
+                    </td>
+                    <td><%= r.Booklet?.name %><br><span class="small text-success"><%= r.Booklet?.sell_price %> ج</span></td>
+                    <td>
+                      <span class="badge <%= r.payment_method==='center'?'bg-primary':'bg-success' %>">
+                        <%= r.payment_method==='center'?'🏫 سنتر':'📱 فودافون كاش' %>
+                      </span>
+                    </td>
+                    <td>
+                      <% const statusColors = { pending:'#FEF3C7', verified:'#D1FAE5', rejected:'#FEE2E2' }; %>
+                      <% const statusText = { pending:'في الانتظار', verified:'محقق ✓', rejected:'مرفوض ✗' }; %>
+                      <span class="badge" style="background:<%= statusColors[r.status] %>;color:#1F2937;">
+                        <%= statusText[r.status] %>
+                      </span>
+                    </td>
+                    <td>
+                      <% if (r.is_delivered) { %>
+                        <span class="badge bg-success" style="font-size:0.65rem;">✓ استلم</span>
+                      <% } else { %>
+                        <span class="badge bg-secondary" style="font-size:0.65rem;">لم يستلم</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (r.transfer_image_url) { %>
+                        <img src="<%= r.transfer_image_url %>" onclick="window.open('<%= r.transfer_image_url %>','_blank')"
+                          style="width:50px;height:50px;object-fit:cover;border-radius:6px;cursor:pointer;">
+                      <% } else { %><span class="text-muted small">-</span><% } %>
+                    </td>
+                    <td>
+                      <% if (r.status === 'pending') { %>
+                        <form action="/admin/payment-verifications/<%= r.id %>/verify" method="POST" class="mb-1">
+                          <div class="input-group input-group-sm mb-1">
+                            <input type="number" name="paid_amount" class="form-control" placeholder="المبلغ" value="<%= r.Booklet?.sell_price %>">
+                          </div>
+                          <button class="btn btn-sm btn-success w-100">✓ تحقيق</button>
+                        </form>
+                        <form action="/admin/payment-verifications/<%= r.id %>/reject" method="POST">
+                          <button class="btn btn-sm btn-outline-danger w-100">✗ رفض</button>
+                        </form>
+                      <% } else if (r.status === 'verified' && !r.is_delivered) { %>
+                        <form action="/admin/payment-verifications/<%= r.id %>/deliver" method="POST">
+                          <button class="btn btn-sm btn-outline-primary w-100">📦 تم التسليم</button>
+                        </form>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (safeReservations.length === 0) { %>
+                  <tr><td colspan="8" class="text-muted text-center">لا يوجد حجوزات</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-</div>
-
-<%- include('partials/footer') %>

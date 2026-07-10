@@ -122,6 +122,13 @@ module.exports = function (app, deps) {
       const { status, from, to, tab } = req.query;
       const currentTab = tab || 'reservations';
 
+      const records = await PaymentVerification.findAll({
+        where: { status: 'approved' },
+        include: [Student],
+        order: [['createdAt', 'DESC']],
+        limit: 300,
+      });
+
       const whereClause = {};
       if (status) whereClause.status = status;
       if (from && to) {
@@ -139,6 +146,7 @@ module.exports = function (app, deps) {
       });
 
       res.render('payment-verifications', {
+        records,
         reservations,
         currentTab,
         filters: { status, from, to },
