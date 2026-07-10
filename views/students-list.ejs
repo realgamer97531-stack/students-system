@@ -1,68 +1,86 @@
 <%- include('partials/header') %>
 
 <style>
-  /* Explicit Dark Theme Overrides to Match Reference */
-  .custom-dark-card {
-    background-color: #161622 !important; /* Deep dark background */
-    border: 1px solid #232334 !important;
+  /* System-Compliant Adaptive Table Styling */
+  .custom-adaptive-card {
+    background: var(--sf-card-bg) !important;
+    border: 1px solid var(--sf-input-border) !important;
+    transition: background 0.2s, border 0.2s;
   }
   
-  .custom-dark-table {
-    background-color: transparent !important;
-    color: #f1f1f5 !important;
+  .custom-adaptive-table {
+    background: transparent !important;
+    color: var(--sf-text) !important;
+    border-collapse: collapse !important;
   }
 
-  .custom-dark-table thead tr {
-    background-color: #1e1e2f !important; /* Slightly lighter header row */
-    border-bottom: 2px solid #28283d !important;
+  .custom-adaptive-table thead tr {
+    background: var(--sf-table-header-bg) !important;
   }
 
-  .custom-dark-table th {
-    color: #ffffff !important;
+  .custom-adaptive-table th {
+    color: var(--sf-text) !important;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border: 1px solid var(--sf-input-border) !important;
+    padding: 12px 8px !important;
+  }
+
+  .custom-adaptive-table tbody tr {
+    background: var(--sf-card-bg) !important;
+    border-bottom: 1px solid var(--sf-input-border) !important;
+    transition: background 0.2s;
+  }
+
+  .custom-adaptive-table tbody tr:hover {
+    background: var(--sf-table-header-bg) !important;
+  }
+
+  .custom-adaptive-table td {
+    color: var(--sf-text) !important;
+    font-size: 0.88rem;
+    vertical-align: middle;
+    border: 1px solid var(--sf-input-border) !important;
+    padding: 12px 8px !important;
+  }
+
+  /* Secondary data dimming for better visual hierarchy */
+  .custom-adaptive-table td:nth-child(1), /* Code */
+  .custom-adaptive-table td:nth-child(3), /* Student Phone */
+  .custom-adaptive-table td:nth-child(4), /* Parent Phone */
+  .custom-adaptive-table td:nth-child(5), /* Subject */
+  .custom-adaptive-table td:nth-child(6), /* Center */
+  .custom-adaptive-table td:nth-child(7), /* Price */
+  .custom-adaptive-table td:nth-child(8)  /* Balance */ {
+    color: var(--sf-muted) !important;
+  }
+
+  /* Primary links matching your system accents */
+  .custom-adaptive-table td a {
+    color: var(--sf-primary) !important;
     font-weight: 600;
-    border-bottom: none !important;
-  }
-
-  .custom-dark-table tbody tr {
-    border-bottom: 1px solid #232334 !important;
-  }
-
-  /* Muted column colors for better readability */
-  .custom-dark-table td {
-    color: #d1d1d6 !important;
-    border-bottom: none !important;
-  }
-
-  /* Specific column text dimming from your reference image */
-  .custom-dark-table td:nth-child(1), /* Code */
-  .custom-dark-table td:nth-child(3), /* Student Phone */
-  .custom-dark-table td:nth-child(4), /* Parent Phone */
-  .custom-dark-table td:nth-child(5), /* Subject */
-  .custom-dark-table td:nth-child(6), /* Center */
-  .custom-dark-table td:nth-child(7), /* Price */
-  .custom-dark-table td:nth-child(8)  /* Balance */ {
-    color: #a1a1b5 !important;
-  }
-
-  /* Links styling */
-  .custom-dark-table td a {
-    color: #3b82f6 !important; /* Clean blue link */
     text-decoration: none;
   }
-  .custom-dark-table td a:hover {
+  
+  [data-theme="dark"] .custom-adaptive-table td a {
+    color: #60a5fa !important; /* Slightly brighter blue for dark mode contrast */
+  }
+
+  .custom-adaptive-table td a:hover {
     text-decoration: underline;
   }
 
-  /* Badges matching the second reference image */
+  /* Badge Customizations */
   .badge.bg-success {
-    background-color: rgba(16, 185, 129, 0.2) !important;
-    color: #10b981 !important;
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background-color: rgba(20, 184, 166, 0.15) !important; /* var(--sf-accent) translucent background */
+    color: var(--sf-accent) !important;
+    border: 1px solid rgba(20, 184, 166, 0.3);
   }
 
   .badge.bg-secondary {
-    background-color: #3a3a4c !important;
-    color: #a1a1b5 !important;
+    background-color: var(--sf-input-border) !important;
+    color: var(--sf-muted) !important;
+    border: 1px solid rgba(0, 0, 0, 0.05);
   }
 </style>
 
@@ -123,8 +141,8 @@
   </div>
 </form>
 
-<div class="table-responsive custom-dark-card rounded shadow-sm p-3">
-  <table class="table custom-dark-table align-middle m-0">
+<div class="table-responsive custom-adaptive-card rounded shadow-sm p-3">
+  <table class="table custom-adaptive-table align-middle m-0">
     <thead>
       <tr>
         <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
