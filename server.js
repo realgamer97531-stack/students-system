@@ -2917,29 +2917,74 @@ app.get('/schedule', requirePermission('sessions_view'), async (req, res) => {
 app.post('/schedule/add', requireAdmin, async (req, res) => {
   try {
     const { day_of_week, start_time, duration_minutes, subject_id, center_id, expected_sessions_count, end_date, notes } = req.body;
+    
+    // Validate required fields
+    if (!day_of_week || !start_time || !subject_id || !center_id) {
+      return res.status(400).send('❌ الحقول المطلوبة: اليوم، الوقت، المادة، السنتر');
+    }
+
+    // Convert form string data to proper types
+    const dayOfWeek = parseInt(day_of_week, 10);
+    const durationMins = parseInt(duration_minutes, 10) || 90;
+    const subjectId = parseInt(subject_id, 10);
+    const centerId = parseInt(center_id, 10);
+    const expectedSessions = expected_sessions_count ? parseInt(expected_sessions_count, 10) : null;
+
+    // Validate day is in range 0-6
+    if (isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      return res.status(400).send('❌ اليوم غير صحيح');
+    }
+
+    // Verify subject and center exist
+    const subject = await Subject.findByPk(subjectId);
+    const center = await Center.findByPk(centerId);
+    if (!subject || !center) {
+      return res.status(400).send('❌ المادة أو السنتر غير موجودة');
+    }
+
     await ScheduleEntry.create({
-      day_of_week, start_time, duration_minutes: duration_minutes || 90,
-      SubjectId: subject_id, CenterId: center_id,
-      expected_sessions_count: expected_sessions_count || null,
-      end_date: end_date || null,
-      notes: notes || null,
+      day_of_week: dayOfWeek,
+      start_time,
+      duration_minutes: durationMins,
+      SubjectId: subjectId,
+      CenterId: centerId,
+      expected_sessions_count: expectedSessions,
+      end_date: end_date && end_date.trim() ? end_date : null,
+      notes: notes && notes.trim() ? notes : null,
     });
     res.redirect('/schedule');
   } catch (e) {
-    console.error(e);
+    console.error('Schedule add error:', e);
     res.status(500).send('❌ ' + e.message);
   }
 });
 
 app.post('/schedule/:id/delete', requireAdmin, async (req, res) => {
-  await ScheduleEntry.destroy({ where: { id: req.params.id } });
-  res.redirect('/schedule');
+  try {
+    const result = await ScheduleEntry.destroy({ where: { id: req.params.id } });
+    if (!result) {
+      return res.status(404).send('❌ الحصة غير موجودة');
+    }
+    res.redirect('/schedule');
+  } catch (e) {
+    console.error('Schedule delete error:', e);
+    res.status(500).send('❌ ' + e.message);
+  }
 });
 
 app.post('/schedule/:id/toggle', requireAdmin, async (req, res) => {
-  const entry = await ScheduleEntry.findByPk(req.params.id);
-  if (entry) { entry.is_active = !entry.is_active; await entry.save(); }
-  res.redirect('/schedule');
+  try {
+    const entry = await ScheduleEntry.findByPk(req.params.id);
+    if (!entry) {
+      return res.status(404).send('❌ الحصة غير موجودة');
+    }
+    entry.is_active = !entry.is_active;
+    await entry.save();
+    res.redirect('/schedule');
+  } catch (e) {
+    console.error('Schedule toggle error:', e);
+    res.status(500).send('❌ ' + e.message);
+  }
 });
 
 // تفعيل حصة من الجدول مباشرة
