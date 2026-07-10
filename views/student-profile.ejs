@@ -174,6 +174,49 @@
   </div>
 </div>
 
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h6 class="mb-3">📚 البوكليتس</h6>
+    <% if (availableBooklets.length === 0) { %>
+      <p class="text-muted small">لا يوجد بوكليتس لهذه المادة</p>
+    <% } %>
+    <% availableBooklets.forEach(b => { %>
+      <% const sb = studentBooklets.find(s => s.BookletId === b.id); %>
+      <% const paid = sb ? sb.paid_amount : 0; %>
+      <% const remaining = b.sell_price - paid; %>
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <strong class="small"><%= b.name %></strong>
+          <div class="d-flex gap-1 align-items-center">
+            <% if (sb && sb.is_delivered) { %>
+              <span class="badge bg-success" style="font-size:0.65rem;">✓ استلم</span>
+            <% } else if (sb) { %>
+              <% if (userRole === 'admin') { %>
+              <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
+                <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 8px;background:#D1FAE5;color:#047857;">تسليم ✓</button>
+              </form>
+              <% } %>
+            <% } %>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between small text-muted mb-2">
+          <span>السعر: <%= b.sell_price %> ج</span>
+          <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
+          <span>متبقي: <span class="<%= remaining > 0 ? 'text-danger' : 'text-success' %>"><%= remaining %> ج</span></span>
+        </div>
+        <% if (remaining > 0 && userRole === 'admin') { %>
+          <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1">
+            <input type="hidden" name="booklet_id" value="<%= b.id %>">
+            <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ المدفوع" min="1" max="<%= remaining %>" required>
+            <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة">
+            <button class="btn btn-sm btn-primary" style="white-space:nowrap;">دفع</button>
+          </form>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+</div>
+
     <!-- سجل تعديلات الرصيد -->
     <div class="card shadow-sm mt-3">
       <div class="card-body">

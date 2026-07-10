@@ -27,14 +27,7 @@
       <button class="btn btn-primary" onclick="submitManual()">إرسال</button>
     </div>
 
-    <div class="mb-3 text-start">
-      <label class="form-label small">كومنت على الطالب (اختياري)</label>
-      <input type="text" id="commentInput" class="form-control form-control-sm" placeholder="مثال: جاب بوكليت جديد">
-    </div>
-    <div class="mb-3 text-start">
-      <label class="form-label small">مبلغ تم تحصيله الآن (اختياري)</label>
-      <input type="number" id="paymentInput" class="form-control form-control-sm" placeholder="0">
-    </div>
+
 
     <div id="summaryBox" style="display:none;" class="text-start mt-3">
       <div class="alert alert-secondary small" id="adminNoteBox" style="display:none;"></div>
@@ -50,6 +43,14 @@
         </thead>
         <tbody id="summaryTableBody"></tbody>
       </table>
+          <div class="mb-3 text-start">
+      <label class="form-label small">كومنت على الطالب (اختياري)</label>
+      <input type="text" id="commentInput" class="form-control form-control-sm" placeholder="مثال: جاب بوكليت جديد">
+    </div>
+    <div class="mb-3 text-start">
+      <label class="form-label small">مبلغ تم تحصيله الآن (اختياري)</label>
+      <input type="number" id="paymentInput" class="form-control form-control-sm" placeholder="0">
+    </div>
       
       <button class="btn btn-success w-100 mt-2" onclick="confirmAttendance()">✅ تأكيد تسجيل الحضور</button>
       <button class="btn btn-outline-secondary w-100 mt-2" onclick="cancelSummary()">إلغاء</button>
@@ -228,6 +229,31 @@
 
       tbody.innerHTML += `<tr><td>${row.lessonNumber}</td><td>${attendHtml}</td><td class="small">${watchHtml}</td></tr>`;
     });
+    // عرض البوكليتس المعلقة
+const bookletBox = document.getElementById('bookletPaymentsBox');
+if (data.pendingBooklets && data.pendingBooklets.length > 0) {
+  let bookletHtml = '<div class="mb-3"><label class="form-label small fw-bold">📚 مدفوعات البوكليتس</label>';
+  data.pendingBooklets.forEach(b => {
+    bookletHtml += `
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between small mb-1">
+          <span><strong>${b.name}</strong></span>
+          <span class="text-danger">متبقي: ${b.remaining} ج</span>
+        </div>
+        <div class="input-group input-group-sm">
+          <input type="number" class="form-control booklet-payment-input"
+            data-booklet-id="${b.id}" data-remaining="${b.remaining}"
+            placeholder="المبلغ المدفوع الآن" min="0" max="${b.remaining}"
+            oninput="calcBookletRemaining(this, ${b.remaining})">
+          <span class="input-group-text small" id="remaining_${b.id}">سيتبقى: ${b.remaining} ج</span>
+        </div>
+      </div>`;
+  });
+  bookletHtml += '</div>';
+  bookletBox.innerHTML = bookletHtml;
+} else {
+  bookletBox.innerHTML = '';
+}
 
     document.getElementById('summaryBox').style.display = 'block';
   }
@@ -248,11 +274,21 @@
   function confirmAttendance() {
     const comment = document.getElementById('commentInput').value.trim();
     const payment = document.getElementById('paymentInput').value.trim();
+    const bookletPayments = [];
+    document.querySelectorAll('.booklet-payment-input').forEach(input => {
+      const amount = parseFloat(input.value) || 0;
+      if (amount > 0) bookletPayments.push({ booklet_id: input.dataset.bookletId, amount });
+    });
 
     fetch('/attendance/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ student_code: pendingCode, comment, payment_collected: payment }),
+      body: JSON.stringify({
+        student_code: pendingCode,
+        comment,
+        payment_collected: payment,
+        booklet_payments: bookletPayments,
+      }),
     })
       .then(res => res.json())
       .then(data => {
@@ -395,5 +431,16 @@
         <div class="p-2 d-inline-block bg-white rounded"><img src="${data.qrCodeImage}" style="max-width:150px;"></div>
       </div>`;
   });
+
+  function calcBookletRemaining(input, totalRemaining) {
+  const paid = parseFloat(input.value) || 0;
+  const remaining = totalRemaining - paid;
+  const bookletId = input.dataset.bookletId;
+  const display = document.getElementById('remaining_' + bookletId);
+  if (display) {
+    display.textContent = `سيتبقى: ${Math.max(0, remaining).toFixed(1)} ج`;
+    display.style.color = remaining <= 0 ? '#059669' : '#DC2626';
+  }
+}
 </script>
 <%- include('partials/footer') %>

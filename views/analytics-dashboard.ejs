@@ -77,7 +77,37 @@
     </div>
   </div>
 </div>
-
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">📚 إحصائيات البوكليتس</h6>
+    <div class="row g-2">
+      <div class="col-md-3">
+        <div class="text-center p-2 rounded" style="background:#EEF0FB;">
+          <div class="small text-muted">إيراد البوكليتس (الشهر)</div>
+          <div class="fw-bold" style="color:#4338CA;"><%= totalBookletRevenue.toLocaleString() %> ج</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-center p-2 rounded" style="background:#FEE2E2;">
+          <div class="small text-muted">تكلفة الطباعة (الإجمالي)</div>
+          <div class="fw-bold text-danger"><%= totalBookletCost.toLocaleString() %> ج</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-center p-2 rounded" style="background:#D1FAE5;">
+          <div class="small text-muted">هامش الربح المتوقع</div>
+          <div class="fw-bold text-success"><%= totalBookletProfit.toLocaleString() %> ج</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-center p-2 rounded" style="background:#FEF3C7;">
+          <div class="small text-muted">عدد البوكليتس المتاحة</div>
+          <div class="fw-bold text-warning"><%= allBooklets.reduce((s,b) => s+b.stock_count, 0) %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- رسم بياني التطور الشهري -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">

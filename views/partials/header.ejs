@@ -427,6 +427,7 @@ select option {
         <span class="ar-only">💰 التقفيل</span>
         <span class="en-only" style="display:none;">💰 Closing</span>
       </a>
+      
       <a href="/analytics" onclick="fetch('/analytics/lock')">
         <span class="ar-only">📊 الداشبورد التحليلي</span>
         <span class="en-only" style="display:none;">📊 Analytics</span>
@@ -440,6 +441,10 @@ select option {
         <span class="en-only" style="display:none;">🎫 Payment Verification</span>
       </a>
     <% } %>
+    <% if (userRole === 'admin') { %>
+  <a href="/admin/booklets">📚 البوكليتس</a>
+  <a href="/admin/payment-verifications">💳 مراجعة المدفوعات</a>
+<% } %>
     <hr>
     <a href="/settings">
       <span class="ar-only">⚙️ الإعدادات</span>

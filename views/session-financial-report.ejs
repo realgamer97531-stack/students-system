@@ -1,0 +1,112 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between mb-4">
+  <div>
+    <h3 class="mb-1">💰 التقرير المالي المفصل</h3>
+    <p class="text-muted small"><%= session.Subject.name %> - <%= session.Center.name %> - حصة <%= session.lesson_number %></p>
+  </div>
+  <a href="/sessions/<%= session.id %>/report" class="btn btn-outline-secondary btn-sm">⬅ رجوع للتقرير</a>
+</div>
+
+<!-- فلاتر -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small">الأسيستانت</label>
+        <select name="filter_user" class="form-select form-select-sm">
+          <option value="">الكل</option>
+          <% allUsers.forEach(u => { %>
+            <option value="<%= u.id %>" <%= filters.filter_user == u.id ? 'selected':'' %>><%= u.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-primary btn-sm w-100">تطبيق</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ملخص -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;">
+      <div class="small text-muted">إجمالي مدفوعات الحصة</div>
+      <h4 class="text-success"><%= totalSession.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #4338CA;">
+      <div class="small text-muted">إجمالي مدفوعات البوكليتس</div>
+      <h4 style="color:#4338CA;"><%= totalBooklets.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #D97706;">
+      <div class="small text-muted">الإجمالي الكلي</div>
+      <h4 class="text-warning"><%= totalAll.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+</div>
+
+<!-- مدفوعات الحصة -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">✅ مدفوعات الحصة</h6>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead class="table-light">
+          <tr><th>الطالب</th><th>الكود</th><th>المبلغ</th><th>الوقت</th><th>الأسيستانت</th></tr>
+        </thead>
+        <tbody>
+          <% rows.filter(r => r.sessionPayment > 0).forEach(r => { %>
+            <tr>
+              <td><%= r.studentName %></td>
+              <td><%= r.studentCode %></td>
+              <td class="text-success fw-bold"><%= r.sessionPayment %> ج</td>
+              <td class="small text-muted"><%= r.attendedAt ? new Date(r.attendedAt).toLocaleString('ar-EG') : '-' %></td>
+              <td><%= r.assistantName %></td>
+            </tr>
+          <% }) %>
+          <tr class="table-success fw-bold">
+            <td colspan="2">الإجمالي</td>
+            <td><%= totalSession %> ج</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- مدفوعات البوكليتس -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">📚 مدفوعات البوكليتس (في نفس يوم الحصة)</h6>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead class="table-light">
+          <tr><th>الطالب</th><th>البوكليت</th><th>المبلغ</th><th>الوقت</th></tr>
+        </thead>
+        <tbody>
+          <% bookletTransactions.forEach(t => { %>
+            <tr>
+              <td><%= t.Student?.name || '-' %></td>
+              <td class="small"><%= t.reason.replace('دفع بوكليت: ','') %></td>
+              <td class="fw-bold" style="color:#4338CA;"><%= t.amount %> ج</td>
+              <td class="small text-muted"><%= new Date(t.createdAt).toLocaleString('ar-EG') %></td>
+            </tr>
+          <% }) %>
+          <tr class="fw-bold" style="background:#EEF0FB;">
+            <td colspan="2">الإجمالي</td>
+            <td style="color:#4338CA;"><%= totalBooklets %> ج</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -38,6 +38,27 @@ const WatchProgress = require('./models/WatchProgress');
 const multer = require('multer');
 const VideoAccessGrant = require('./models/VideoAccessGrant');
 const Warning = require('./models/Warning');
+const Booklet = require('./models/Booklet');
+const StudentBooklet = require('./models/StudentBooklet');
+const BookletReservation = require('./models/BookletReservation');
+const cloudinary = require('cloudinary').v2;
+const { Readable } = require('stream');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+Booklet.belongsTo(Subject, { foreignKey: 'SubjectId' });
+Subject.hasMany(Booklet, { foreignKey: 'SubjectId' });
+StudentBooklet.belongsTo(Student, { foreignKey: 'StudentId' });
+StudentBooklet.belongsTo(Booklet, { foreignKey: 'BookletId' });
+Student.hasMany(StudentBooklet, { foreignKey: 'StudentId' });
+Booklet.hasMany(StudentBooklet, { foreignKey: 'BookletId' });
+BookletReservation.belongsTo(Student, { foreignKey: 'StudentId' });
+BookletReservation.belongsTo(Booklet, { foreignKey: 'BookletId' });
+Student.hasMany(BookletReservation, { foreignKey: 'StudentId' });
 
 require('./models/associations')();
 
@@ -488,6 +509,14 @@ app.get('/students/:id', async (req, res) => {
       })),
     }));
 
+    const studentBooklets = await StudentBooklet.findAll({
+      where: { StudentId: student.id },
+      include: [Booklet],
+    });
+    const availableBooklets = await Booklet.findAll({
+      where: { SubjectId: student.SubjectId, is_active: true },
+    });
+
     res.render('student-profile', {
       student,
       centers,
@@ -497,6 +526,8 @@ app.get('/students/:id', async (req, res) => {
       examResults: examResults.filter(r => !r.Exam.Session),
       videoWatchData,
       warnings,
+      studentBooklets,
+      availableBooklets,
     });
   } catch (error) {
     console.error(error);
@@ -1205,6 +1236,10 @@ app.post('/attendance/scan', async (req, res) => {
       comment: comment || null,
       payment_collected: paymentAmount,
     });
+    // معالجة مدفوعات البوكليتس
+    if (req.body.booklet_payments && req.body.booklet_payments.length > 0) {
+      await processBookletPayments(student.id, req.body.booklet_payments, req.session.userId);
+    }
 
     await addPoints(student.id, 2);
 
@@ -3227,6 +3262,19 @@ app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
   const subjectsData = await Subject.findAll();
   const centersData = await Center.findAll();
   const groupStats = [];
+  // إجمالي البوكليتس في الشهر
+  const bookletSales = await BalanceTransaction.findAll({
+    where: {
+      reason: { [Op.like]: 'دفع بوكليت:%' },
+      createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+    },
+  });
+  const totalBookletRevenue = bookletSales.reduce((s, t) => s + t.amount, 0);
+
+  // تكلفة البوكليتس
+  const allBooklets = await Booklet.findAll({ include: [Subject] });
+  const totalBookletCost = allBooklets.reduce((s, b) => s + (b.print_price * b.stock_count), 0);
+  const totalBookletProfit = allBooklets.reduce((s, b) => s + ((b.sell_price - b.print_price) * b.stock_count), 0);
 
   for (const subj of subjectsData) {
     if (subject_id && String(subj.id) !== String(subject_id)) continue;
@@ -3306,6 +3354,7 @@ app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
     filters: { subject_id, center_id, month: currentMonth, compare_month: compareMonth },
     totalAssistantSalaries,
     netRevenue: monthlyRevenue - totalExpenses - totalSalaries - totalAssistantSalaries,
+    totalBookletRevenue, totalBookletCost, totalBookletProfit, allBooklets,
   });
 });
 
@@ -3595,6 +3644,403 @@ app.use(async (req, res, next) => {
     }
   }
   next();
+});
+
+// ===== نظام البوكليتس (مستقل تماماً) =====
+
+// ===== ADMIN: إدارة البوكليتس =====
+
+app.get('/admin/booklets', requireAdmin, async (req, res) => {
+  const booklets = await Booklet.findAll({
+    include: [Subject],
+    order: [['SubjectId', 'ASC'], ['order_index', 'ASC']],
+  });
+  const subjects = await Subject.findAll();
+  res.render('manage-booklets', { booklets, subjects });
+});
+
+app.post('/admin/booklets/add', requireAdmin, async (req, res) => {
+  try {
+    const { name, subject_id, print_price, sell_price, stock_count, order_index } = req.body;
+    await Booklet.create({ name, SubjectId: subject_id, print_price, sell_price, stock_count, order_index: order_index || 1 });
+    res.redirect('/admin/booklets');
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+app.post('/admin/booklets/:id/edit', requireAdmin, async (req, res) => {
+  try {
+    const { name, print_price, sell_price, stock_count, order_index, is_active } = req.body;
+    await Booklet.update({
+      name, print_price, sell_price, stock_count, order_index,
+      is_active: is_active === 'on',
+    }, { where: { id: req.params.id } });
+    res.redirect('/admin/booklets');
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+app.post('/admin/booklets/:id/delete', requireAdmin, async (req, res) => {
+  await Booklet.destroy({ where: { id: req.params.id } });
+  res.redirect('/admin/booklets');
+});
+
+// ===== ADMIN: تسجيل دفع بوكليت لطالب من ملفه =====
+
+app.post('/students/:studentId/booklet-payment', requireAdmin, async (req, res) => {
+  try {
+    const { booklet_id, paid_amount, notes } = req.body;
+    const student = await Student.findByPk(req.params.studentId);
+    const booklet = await Booklet.findByPk(booklet_id);
+    if (!student || !booklet) return res.status(404).send('❌');
+
+    const existing = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: booklet_id } });
+    if (existing) {
+      existing.paid_amount += parseFloat(paid_amount);
+      existing.notes = notes || existing.notes;
+      await existing.save();
+    } else {
+      await StudentBooklet.create({ StudentId: student.id, BookletId: booklet_id, paid_amount: parseFloat(paid_amount), notes });
+    }
+
+    await BalanceTransaction.create({
+      StudentId: student.id,
+      amount: parseFloat(paid_amount),
+      reason: `دفع بوكليت: ${booklet.name}`,
+      UserId: req.session.userId,
+    });
+
+    res.redirect('/students/' + req.params.studentId);
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+app.post('/students/:studentId/booklet-deliver/:sbId', requireAdmin, async (req, res) => {
+  const sb = await StudentBooklet.findByPk(req.params.sbId);
+  if (sb) { sb.is_delivered = true; sb.delivered_at = new Date(); await sb.save(); }
+  res.redirect('/students/' + req.params.studentId);
+});
+
+// ===== Lookup: جلب بيانات الطالب مع البوكليتس (للصفحة اللي تظهر بعد السكان) =====
+
+app.post('/attendance/scan/lookup', async (req, res) => {
+  try {
+    const { student_code } = req.body;
+    const sessionId = req.session.activeSessionId;
+
+    const student = await Student.findOne({
+      where: { student_code },
+      include: [Center, Subject],
+    });
+    if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
+
+    if (student.is_blocked) return res.json({ success: false, message: '⛔ الطالب محظور من النظام' });
+
+    const activeSession = await Session.findByPk(sessionId);
+    if (!activeSession) return res.json({ success: false, message: '⚠️ مفيش حصة شغالة' });
+    if (activeSession.status === 'cancelled') return res.json({ success: false, message: '⚠️ هذه الحصة ملغية' });
+
+    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
+    if (existing) return res.json({ success: false, message: `${student.name} مسجل حضوره من قبل` });
+
+    // بوكليتس المادة بتاعة الطالب
+    const booklets = await Booklet.findAll({
+      where: { SubjectId: student.SubjectId, is_active: true },
+      order: [['order_index', 'ASC']],
+    });
+
+    const bookletStatus = await Promise.all(booklets.map(async b => {
+      const sb = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: b.id } });
+      const paidAmount = sb ? sb.paid_amount : 0;
+      const remaining = b.sell_price - paidAmount;
+      const isDelivered = sb ? sb.is_delivered : false;
+      return {
+        id: b.id, name: b.name,
+        sellPrice: b.sell_price,
+        paidAmount, remaining,
+        isDelivered,
+        isFullyPaid: remaining <= 0,
+      };
+    }));
+
+    const pendingBooklets = bookletStatus.filter(b => !b.isFullyPaid && !b.isDelivered);
+
+    // حصص متابعة الطالب
+    const ownSessions = await Session.findAll({
+      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
+      order: [['lesson_number', 'ASC']],
+    });
+    const attendanceRecords = await Attendance.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Session, include: [Center] }],
+    });
+    const attByLesson = {};
+    attendanceRecords.forEach(a => {
+      if (a.Session.SubjectId === student.SubjectId) attByLesson[a.Session.lesson_number] = a.Session;
+    });
+
+    const videos = await Video.findAll({ where: { SubjectId: student.SubjectId }, include: [Session, VideoPart] });
+    const videoBySessionId = {};
+    videos.forEach(v => { videoBySessionId[v.SessionId] = v; });
+    const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
+    const watchMap = {};
+    watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
+    const categoryLabels = { explanation: 'شرح', questions: 'أسئلة', homework_solution: 'حل واجب' };
+
+    const lessonNumbersSet = new Set();
+    ownSessions.forEach(s => lessonNumbersSet.add(s.lesson_number));
+    Object.keys(attByLesson).forEach(n => lessonNumbersSet.add(parseInt(n)));
+    const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
+
+    const summary = lessonNumbers.map(lessonNumber => {
+      const att = attByLesson[lessonNumber];
+      let parts = [];
+      if (att) {
+        const video = videoBySessionId[att.id];
+        if (video && video.VideoParts) {
+          parts = video.VideoParts.map(p => ({
+            category: categoryLabels[p.category] || p.category,
+            watchedSeconds: watchMap[p.id] || 0,
+            durationSeconds: p.duration_seconds,
+          }));
+        }
+      }
+      return {
+        lessonNumber,
+        attended: !!att,
+        attendedWhere: att ? att.Center.name : null,
+        parts,
+      };
+    });
+
+    res.json({
+      success: true,
+      student: {
+        id: student.id, name: student.name,
+        code: student.student_code,
+        balance: student.balance,
+        pricePerSession: student.price_per_session,
+        adminNote: student.admin_note,
+      },
+      pendingBooklets,
+      summary,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
+  }
+});
+
+// ===== تسجيل حضور مع دفع بوكليت =====
+
+// تأكد إن route الـ /attendance/scan POST بيستقبل booklet_payments
+// ضيف الكود ده بعد حفظ الـ Attendance:
+
+async function processBookletPayments(studentId, bookletPayments, userId) {
+  if (!bookletPayments) return;
+  const payments = Array.isArray(bookletPayments) ? bookletPayments : [bookletPayments];
+  for (const payment of payments) {
+    if (!payment.booklet_id || !payment.amount || parseFloat(payment.amount) <= 0) continue;
+    const booklet = await Booklet.findByPk(payment.booklet_id);
+    if (!booklet) continue;
+
+    const [sb] = await StudentBooklet.findOrCreate({
+      where: { StudentId: studentId, BookletId: payment.booklet_id },
+      defaults: { paid_amount: 0 },
+    });
+    sb.paid_amount += parseFloat(payment.amount);
+    await sb.save();
+
+    await BalanceTransaction.create({
+      StudentId: studentId,
+      amount: parseFloat(payment.amount),
+      reason: `دفع بوكليت: ${booklet.name}`,
+      UserId: userId,
+    });
+  }
+}
+
+// ===== ADMIN: صفحة مراجعة المدفوعات والحجوزات =====
+
+app.get('/admin/payment-verifications', requireAdmin, async (req, res) => {
+  const { status, from, to, tab } = req.query;
+  const currentTab = tab || 'reservations';
+
+  const whereClause = {};
+  if (status) whereClause.status = status;
+  if (from && to) whereClause.createdAt = { [Op.between]: [from + ' 00:00:00', to + ' 23:59:59'] };
+
+  const reservations = await BookletReservation.findAll({
+    where: whereClause,
+    include: [
+      { model: Student, include: [Subject, Center] },
+      { model: Booklet },
+    ],
+    order: [['createdAt', 'DESC']],
+  });
+
+  res.render('payment-verifications', { reservations, currentTab, filters: { status, from, to } });
+});
+
+app.post('/admin/payment-verifications/:id/verify', requireAdmin, async (req, res) => {
+  try {
+    const { paid_amount, notes } = req.body;
+    const reservation = await BookletReservation.findByPk(req.params.id, { include: [Student, Booklet] });
+    if (!reservation) return res.status(404).send('❌');
+
+    reservation.status = 'verified';
+    reservation.paid_amount = parseFloat(paid_amount) || reservation.Booklet.sell_price;
+    reservation.verified_by = req.session.userId;
+    reservation.notes = notes;
+    await reservation.save();
+
+    // تسجيل الدفع في StudentBooklet
+    const [sb] = await StudentBooklet.findOrCreate({
+      where: { StudentId: reservation.StudentId, BookletId: reservation.BookletId },
+      defaults: { paid_amount: 0 },
+    });
+    sb.paid_amount += reservation.paid_amount;
+    await sb.save();
+
+    await BalanceTransaction.create({
+      StudentId: reservation.StudentId,
+      amount: reservation.paid_amount,
+      reason: `حجز بوكليت محقق: ${reservation.Booklet.name}`,
+      UserId: req.session.userId,
+    });
+
+    res.redirect('/admin/payment-verifications?tab=reservations');
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+app.post('/admin/payment-verifications/:id/reject', requireAdmin, async (req, res) => {
+  await BookletReservation.update({ status: 'rejected' }, { where: { id: req.params.id } });
+  res.redirect('/admin/payment-verifications?tab=reservations');
+});
+
+app.post('/admin/payment-verifications/:id/deliver', requireAdmin, async (req, res) => {
+  const r = await BookletReservation.findByPk(req.params.id);
+  if (r) { r.is_delivered = true; r.delivered_at = new Date(); await r.save(); }
+  res.redirect('/admin/payment-verifications?tab=reservations');
+});
+
+// ===== API البوابة: قائمة البوكليتس للطالب =====
+
+app.get('/api/portal/booklets', verifyPortalToken('student'), async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.portalStudentId);
+    const booklets = await Booklet.findAll({
+      where: { SubjectId: student.SubjectId, is_active: true },
+      order: [['order_index', 'ASC']],
+    });
+
+    const result = await Promise.all(booklets.map(async b => {
+      const sb = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: b.id } });
+      const reservation = await BookletReservation.findOne({
+        where: { StudentId: student.id, BookletId: b.id, status: { [Op.ne]: 'rejected' } },
+      });
+      return {
+        id: b.id, name: b.name, sellPrice: b.sell_price,
+        paidAmount: sb ? sb.paid_amount : 0,
+        remaining: b.sell_price - (sb ? sb.paid_amount : 0),
+        isDelivered: sb ? sb.is_delivered : false,
+        reservation: reservation ? { status: reservation.status, method: reservation.payment_method, isDelivered: reservation.is_delivered } : null,
+      };
+    }));
+
+    res.json({ success: true, booklets: result });
+  } catch (e) { console.error(e); res.status(500).json({ success: false }); }
+});
+
+// ===== API البوابة: حجز بوكليت =====
+
+const reservationUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+app.post('/api/portal/booklets/:id/reserve', verifyPortalToken('student'), reservationUpload.single('transfer_image'), async (req, res) => {
+  try {
+    const { payment_method } = req.body;
+    const student = await Student.findByPk(req.portalStudentId);
+    const booklet = await Booklet.findByPk(req.params.id);
+    if (!booklet) return res.status(404).json({ success: false, message: 'البوكليت غير موجود' });
+
+    // تحقق مفيش حجز موجود
+    const existing = await BookletReservation.findOne({
+      where: { StudentId: student.id, BookletId: booklet.id, status: { [Op.ne]: 'rejected' } },
+    });
+    if (existing) return res.json({ success: false, message: 'عندك حجز موجود بالفعل لهذا البوكليت' });
+
+    let transferImageUrl = null;
+
+    // رفع الصورة على Cloudinary لو فودافون كاش
+    if (payment_method === 'vodafone' && req.file) {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'booklet_reservations', resource_type: 'image' },
+          (error, result) => error ? reject(error) : resolve(result)
+        );
+        const readable = new Readable();
+        readable.push(req.file.buffer);
+        readable.push(null);
+        readable.pipe(stream);
+      });
+      transferImageUrl = uploadResult.secure_url;
+    }
+
+    await BookletReservation.create({
+      StudentId: student.id,
+      BookletId: booklet.id,
+      payment_method,
+      transfer_image_url: transferImageUrl,
+      status: 'pending',
+    });
+
+    res.json({ success: true, message: payment_method === 'vodafone' ? '✅ تم إرسال الحجز، في انتظار التحقق من التحويل' : '✅ تم الحجز، ادفع عند التسجيل في السنتر' });
+  } catch (e) { console.error(e); res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ===== تقرير الحصة المالي المفصل =====
+
+app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
+  try {
+    const { filter_user, filter_type } = req.query;
+    const session = await Session.findByPk(req.params.id, { include: [Center, Subject] });
+    if (!session) return res.status(404).send('❌');
+
+    const whereAtt = { SessionId: session.id };
+    if (filter_user) whereAtt.UserId = filter_user;
+
+    const attendances = await Attendance.findAll({
+      where: whereAtt,
+      include: [Student, User],
+    });
+
+    // تجميع المدفوعات
+    const rows = attendances.map(a => ({
+      studentName: a.Student?.name || '-',
+      studentCode: a.Student?.student_code || '-',
+      assistantName: a.User?.name || '-',
+      sessionPayment: a.payment_collected || 0,
+      attendedAt: a.attended_at,
+    }));
+
+    // مدفوعات البوكليتس في نفس اليوم (بناءً على التاريخ)
+    const sessionDate = session.session_date;
+    const bookletTransactions = await BalanceTransaction.findAll({
+      where: {
+        reason: { [Op.like]: 'دفع بوكليت:%' },
+        createdAt: { [Op.between]: [sessionDate + ' 00:00:00', sessionDate + ' 23:59:59'] },
+      },
+      include: [Student, User],
+    });
+
+    const allUsers = await User.findAll({ order: [['name', 'ASC']] });
+
+    const totalSession = rows.reduce((s, r) => s + r.sessionPayment, 0);
+    const totalBooklets = bookletTransactions.reduce((s, t) => s + t.amount, 0);
+
+    res.render('session-financial-report', {
+      session, rows, bookletTransactions, allUsers,
+      totalSession, totalBooklets, totalAll: totalSession + totalBooklets,
+      filters: { filter_user, filter_type },
+    });
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
 });
 
 
