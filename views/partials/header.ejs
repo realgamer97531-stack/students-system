@@ -38,7 +38,7 @@
       --sf-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
       --sf-card-bg: #1E293B;
       --sf-input-border: #334155;
-      --sf-table-header-bg: #1E293B;
+      --sf-table-header-bg: #111827; /* Cleaned up to contrast beautifully with the cards */
     }
 
     * { font-family: 'Cairo', sans-serif; }
@@ -136,32 +136,61 @@
     .btn-success { background: var(--sf-accent); border-color: var(--sf-accent); }
     .btn-success:hover { background: #0F9488; border-color: #0F9488; }
 
+    /* GLOBAL SYSTEM-WIDE ADAPTIVE TABLE FIX */
     .table { 
       border-radius: var(--sf-radius); 
       overflow: hidden;
-      border: 1px solid var(--sf-input-border);
-      background: var(--sf-card-bg);
+      border: 1px solid var(--sf-input-border) !important;
+      background: var(--sf-card-bg) !important;
+      color: var(--sf-text) !important;
     }
     .table thead th {
-      background: var(--sf-table-header-bg);
-      color: var(--sf-text);
+      background: var(--sf-table-header-bg) !important;
+      color: var(--sf-text) !important;
       font-weight: 700;
       font-size: 0.85rem;
-      border: 1px solid var(--sf-input-border);
+      border: 1px solid var(--sf-input-border) !important;
     }
     .table tbody tr {
-      background: var(--sf-card-bg);
-      border-bottom: 1px solid var(--sf-input-border);
+      background: var(--sf-card-bg) !important;
+      border-bottom: 1px solid var(--sf-input-border) !important;
       transition: background 0.2s;
     }
     .table tbody tr:hover {
-      background: var(--sf-table-header-bg);
+      background: var(--sf-table-header-bg) !important;
     }
     .table td { 
       font-size: 0.88rem; 
       vertical-align: middle; 
-      color: var(--sf-text);
-      border: 1px solid var(--sf-input-border);
+      color: var(--sf-text) !important;
+      border: 1px solid var(--sf-input-border) !important;
+      background: transparent !important;
+    }
+    
+    /* Global subtle dimming for columns that hold auxiliary data */
+    .table td:nth-child(1),
+    .table td:not(:nth-child(2)) {
+      color: var(--sf-muted) !important;
+    }
+
+    /* System link behavior handling color dynamics */
+    .table td a {
+      color: var(--sf-primary) !important;
+      font-weight: 600;
+    }
+    [data-theme="dark"] .table td a {
+      color: #60a5fa !important;
+    }
+
+    /* Clean translucent badges across all pages */
+    .badge.bg-success {
+      background-color: rgba(20, 184, 166, 0.15) !important;
+      color: var(--sf-accent) !important;
+      border: 1px solid rgba(20, 184, 166, 0.3);
+    }
+    .badge.bg-secondary {
+      background-color: var(--sf-input-border) !important;
+      color: var(--sf-muted) !important;
     }
 
     .badge { font-weight: 600; padding: 0.4em 0.7em; border-radius: 8px; }
