@@ -32,7 +32,11 @@
           <!-- عرض الصور -->
           <div class="d-flex flex-wrap gap-1 mb-3">
             <% JSON.parse(sub.images || '[]').forEach((img, i) => { %>
-              <img src="<%= img %>" onclick="openImg('<%= img %>')"
+              <%
+  const PLATFORM = 'https://your-platform.hostinger.com';
+  const imgUrl = img.startsWith('http') ? img : PLATFORM + '/' + img;
+%>
+<img src="<%= imgUrl %>" onclick="openImg('<%= imgUrl %>')"
                 style="width:60px;height:60px;object-fit:cover;border-radius:8px;cursor:pointer;">
             <% }) %>
           </div>

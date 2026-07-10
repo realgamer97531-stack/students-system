@@ -2844,7 +2844,7 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
 
 // --- API البوابة: رفع واجب من الطالب ---
 
-app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), hwUpload.array('images', 20), async (req, res) => {
+app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
     const assignment = await HomeworkAssignment.findByPk(req.params.id);
@@ -2853,15 +2853,20 @@ app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), hwUplo
     const today = new Date().toISOString().slice(0, 10);
     if (today > assignment.end_date) return res.json({ success: false, message: '⚠️ انتهى وقت التسليم' });
 
-    const imagePaths = req.files.map(f => `/uploads/homework/${f.filename}`);
+    // بنستقبل المسارات بس (مش ملفات) - الصور اتخزنت على Hostinger بالفعل
+    const { imagePaths, comment } = req.body;
+    if (!imagePaths || imagePaths.length === 0) {
+      return res.json({ success: false, message: 'مفيش صور مرفوعة' });
+    }
 
     const existing = await HomeworkSubmission.findOne({
       where: { HomeworkAssignmentId: req.params.id, StudentId: student.id },
     });
 
     if (existing) {
-      existing.images = JSON.stringify([...JSON.parse(existing.images), ...imagePaths]);
-      existing.student_comment = req.body.comment || existing.student_comment;
+      const oldPaths = JSON.parse(existing.images || '[]');
+      existing.images = JSON.stringify([...oldPaths, ...imagePaths]);
+      existing.student_comment = comment || existing.student_comment;
       existing.status = 'submitted';
       await existing.save();
     } else {
@@ -2869,7 +2874,7 @@ app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), hwUplo
         HomeworkAssignmentId: req.params.id,
         StudentId: student.id,
         images: JSON.stringify(imagePaths),
-        student_comment: req.body.comment || null,
+        student_comment: comment || null,
         status: 'submitted',
       });
     }
