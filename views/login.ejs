@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" id="htmlRoot">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,56 +7,267 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --sf-primary: #4338CA;
+      --sf-primary-dark: #312E81;
+      --sf-accent: #14B8A6;
+      --sf-bg: #F5F6FB;
+      --sf-text: #1E1B2E;
+      --sf-muted: #6B7280;
+      --sf-card-bg: #FFFFFF;
+      --sf-input-border: #E2E4F3;
+    }
+
+    /* Dark Mode Variables */
+    [data-theme="dark"] {
+      --sf-primary: #6366F1;
+      --sf-primary-dark: #4F46E5;
+      --sf-accent: #14B8A6;
+      --sf-bg: #0F172A;
+      --sf-text: #E2E8F0;
+      --sf-muted: #94A3B8;
+      --sf-card-bg: #1E293B;
+      --sf-input-border: #334155;
+    }
+
     * { font-family: 'Cairo', sans-serif; }
     body {
       min-height: 100vh;
-      display: flex; align-items: center;
-      background: linear-gradient(135deg, #1E1B4B 0%, #4338CA 100%);
+      display: flex; 
+      align-items: center;
+      background: linear-gradient(135deg, var(--sf-primary) 0%, var(--sf-primary-dark) 100%);
+      color: var(--sf-text);
+      transition: background 0.3s ease;
     }
+
+    [data-theme="dark"] body {
+      background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+    }
+
+    .login-container {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      justify-content: center;
+    }
+
     .login-card {
-      border: none; border-radius: 20px;
-      box-shadow: 0 20px 50px rgba(30,27,75,0.3);
+      border: none; 
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
       overflow: hidden;
+      background: var(--sf-card-bg);
+      color: var(--sf-text);
     }
+
     .logo-mark {
-      width: 56px; height: 56px; margin: 0 auto 10px;
-      background: linear-gradient(135deg, #14B8A6, #4338CA);
+      width: 56px; 
+      height: 56px; 
+      margin: 0 auto 10px;
+      background: linear-gradient(135deg, var(--sf-accent), var(--sf-primary));
       border-radius: 16px;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-weight: 800; font-size: 1.6rem;
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      color: #fff; 
+      font-weight: 800; 
+      font-size: 1.6rem;
     }
-    .logo-text { text-align: center; font-weight: 800; font-size: 1.4rem; color: #1E1B4B; margin-bottom: 4px; }
-    .logo-text span { color: #14B8A6; }
-    .form-control { border-radius: 10px; padding: 0.7rem 1rem; }
+
+    .logo-text { 
+      text-align: center; 
+      font-weight: 800; 
+      font-size: 1.4rem; 
+      color: var(--sf-text); 
+      margin-bottom: 4px; 
+    }
+    .logo-text span { color: var(--sf-accent); }
+
+    .form-control { 
+      border-radius: 10px; 
+      padding: 0.7rem 1rem;
+      background: var(--sf-card-bg);
+      color: var(--sf-text);
+      border: 1px solid var(--sf-input-border);
+    }
+
+    .form-control:focus {
+      background: var(--sf-card-bg);
+      color: var(--sf-text);
+      border-color: var(--sf-primary);
+      box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.12);
+    }
+
+    .form-label {
+      color: var(--sf-text);
+    }
+
     .btn-login {
-      background: linear-gradient(135deg, #4338CA, #312E81);
-      border: none; border-radius: 10px; font-weight: 700; padding: 0.7rem;
+      background: linear-gradient(135deg, var(--sf-primary), var(--sf-primary-dark));
+      border: none; 
+      border-radius: 10px; 
+      font-weight: 700; 
+      padding: 0.7rem;
+      color: white;
+      transition: transform 0.2s;
+    }
+
+    .btn-login:hover {
+      transform: translateY(-2px);
+      color: white;
+    }
+
+    .text-muted { color: var(--sf-muted) !important; }
+    .alert { background: var(--sf-card-bg); color: var(--sf-text); border-color: var(--sf-input-border); }
+
+    /* Language toggle classes */
+    .ar-only { display: inline; }
+    .en-only { display: none; }
+
+    [lang="en"] .ar-only { display: none !important; }
+    [lang="en"] .en-only { display: inline !important; }
+
+    .theme-toggle {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      color: white;
+      cursor: pointer;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.3s;
+    }
+
+    .theme-toggle:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    [data-theme="dark"] .theme-toggle {
+      background: rgba(30,41,59,0.4);
+    }
+
+    .language-toggle {
+      position: absolute;
+      top: 20px;
+      left: 80px;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      color: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.3s;
+    }
+
+    .language-toggle:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    [data-theme="dark"] .language-toggle {
+      background: rgba(30,41,59,0.4);
     }
   </style>
 </head>
-<body>
+<body onload="initializeTheme(); applyLanguageDisplay();">
+  <button class="theme-toggle" title="Toggle Dark Mode" onclick="toggleDarkMode()">
+    <span class="ar-only">🌙</span>
+    <span class="en-only" style="display:none;">🌙</span>
+  </button>
+  <button class="language-toggle" title="تغيير اللغة" onclick="toggleLanguage()">
+    <span class="ar-only">EN</span>
+    <span class="en-only" style="display:none;">AR</span>
+  </button>
+
   <div class="container">
     <div class="card login-card mx-auto p-4" style="max-width: 400px;">
       <div class="card-body">
         <div class="logo-mark">S</div>
         <div class="logo-text">Study<span>is</span>funny</div>
-        <p class="text-center text-muted small mb-4">نظام متابعة الطلاب</p>
+        <p class="text-center text-muted small mb-4">
+          <span class="ar-only">نظام متابعة الطلاب</span>
+          <span class="en-only" style="display:none;">Student Tracking System</span>
+        </p>
 
         <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
 
         <form action="/login" method="POST">
           <div class="mb-3">
-            <label class="form-label small fw-bold">اليوزرنيم</label>
+            <label class="form-label small fw-bold">
+              <span class="ar-only">اليوزرنيم</span>
+              <span class="en-only" style="display:none;">Username</span>
+            </label>
             <input type="text" name="username" class="form-control" required autofocus>
           </div>
           <div class="mb-3">
-            <label class="form-label small fw-bold">الباسورد</label>
+            <label class="form-label small fw-bold">
+              <span class="ar-only">الباسورد</span>
+              <span class="en-only" style="display:none;">Password</span>
+            </label>
             <input type="password" name="password" class="form-control" required>
           </div>
-          <button type="submit" class="btn btn-login text-white w-100">دخول</button>
+          <button type="submit" class="btn btn-login text-white w-100">
+            <span class="ar-only">دخول</span>
+            <span class="en-only" style="display:none;">Login</span>
+          </button>
         </form>
       </div>
     </div>
   </div>
+
+  <script>
+    function initializeTheme() {
+      const theme = localStorage.getItem('theme') || 'light';
+      const lang = localStorage.getItem('language') || 'ar';
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('lang', lang);
+      document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+    }
+
+    function applyLanguageDisplay() {
+      const lang = localStorage.getItem('language') || 'ar';
+      const arElements = document.querySelectorAll('.ar-only');
+      const enElements = document.querySelectorAll('.en-only');
+
+      if (lang === 'ar') {
+        arElements.forEach(el => el.style.display = '');
+        enElements.forEach(el => el.style.display = 'none');
+      } else {
+        arElements.forEach(el => el.style.display = 'none');
+        enElements.forEach(el => el.style.display = '');
+      }
+    }
+
+    function toggleDarkMode() {
+      const current = localStorage.getItem('theme') || 'light';
+      const newTheme = current === 'light' ? 'dark' : 'light';
+      localStorage.setItem('theme', newTheme);
+      document.documentElement.setAttribute('data-theme', newTheme);
+    }
+
+    function toggleLanguage() {
+      const current = localStorage.getItem('language') || 'ar';
+      const newLang = current === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('language', newLang);
+      document.documentElement.setAttribute('lang', newLang);
+      document.documentElement.setAttribute('dir', newLang === 'ar' ? 'rtl' : 'ltr');
+      applyLanguageDisplay();
+    }
+
+    // Apply theme immediately before render to prevent flash
+    initializeTheme();
+  </script>
 </body>
 </html>

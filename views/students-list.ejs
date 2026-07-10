@@ -1,23 +1,34 @@
 <%- include('partials/header') %>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h3>قائمة الطلاب (<%= students.length %>)</h3>
+  <h3>
+    <span class="ar-only">قائمة الطلاب (<%= students.length %>)</span>
+    <span class="en-only" style="display:none;">Students List (<%= students.length %>)</span>
+  </h3>
   <div>
     <a href="/students/export?<%= new URLSearchParams(filters).toString() %>" class="btn btn-outline-success">
-      📥 تصدير إكسيل
+      <span class="ar-only">📥 تصدير إكسيل</span>
+      <span class="en-only" style="display:none;">📥 Export Excel</span>
     </a>
-    <a href="/students/new" class="btn btn-primary">+ تسجيل طالب جديد</a>
+    <a href="/students/new" class="btn btn-primary">
+      <span class="ar-only">+ تسجيل طالب جديد</span>
+      <span class="en-only" style="display:none;">+ Add Student</span>
+    </a>
   </div>
 </div>
 
 <form method="GET" action="/students" class="row g-2 mb-3">
   <div class="col-md-4">
-    <input type="text" name="search" class="form-control" placeholder="🔍 بحث بالاسم، الكود، أو التليفون"
-      value="<%= filters.search %>">
+    <input type="text" name="search" class="form-control" 
+      placeholder="🔍 بحث بالاسم، الكود، أو التليفون"
+      value="<%= filters.search %>" title="Search by name, code, or phone">
   </div>
   <div class="col-md-3">
     <select name="center_id" class="form-select">
-      <option value="">-- كل السناتر --</option>
+      <option value="">
+        <span class="ar-only">-- كل السناتر --</span>
+        <span class="en-only" style="display:none;">-- All Centers --</span>
+      </option>
       <% centers.forEach(c => { %>
         <option value="<%= c.id %>" <%= String(filters.center_id) === String(c.id) ? 'selected' : '' %>>
           <%= c.name %>
@@ -27,7 +38,10 @@
   </div>
   <div class="col-md-3">
     <select name="subject_id" class="form-select">
-      <option value="">-- كل المواد --</option>
+      <option value="">
+        <span class="ar-only">-- كل المواد --</span>
+        <span class="en-only" style="display:none;">-- All Subjects --</span>
+      </option>
       <% subjects.forEach(s => { %>
         <option value="<%= s.id %>" <%= String(filters.subject_id) === String(s.id) ? 'selected' : '' %>>
           <%= s.name %>
@@ -36,7 +50,10 @@
     </select>
   </div>
   <div class="col-md-2">
-    <button type="submit" class="btn btn-secondary w-100">بحث</button>
+    <button type="submit" class="btn btn-secondary w-100">
+      <span class="ar-only">بحث</span>
+      <span class="en-only" style="display:none;">Search</span>
+    </button>
   </div>
 </form>
 
@@ -44,15 +61,15 @@
   <table class="table table-hover align-middle">
     <thead class="table-light">
       <tr>
-        <th>الكود</th>
-        <th>الاسم</th>
-        <th>تليفون الطالب</th>
-        <th>تليفون ولي الأمر</th>
-        <th>المادة</th>
-        <th>السنتر</th>
-        <th>السعر</th>
-        <th>الرصيد</th>
-        <th>البوكليت</th>
+        <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+        <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+        <th><span class="ar-only">تليفون الطالب</span><span class="en-only" style="display:none;">Student Phone</span></th>
+        <th><span class="ar-only">تليفون ولي الأمر</span><span class="en-only" style="display:none;">Parent Phone</span></th>
+        <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
+        <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
+        <th><span class="ar-only">السعر</span><span class="en-only" style="display:none;">Price</span></th>
+        <th><span class="ar-only">الرصيد</span><span class="en-only" style="display:none;">Balance</span></th>
+        <th><span class="ar-only">البوكليت</span><span class="en-only" style="display:none;">Booklet</span></th>
       </tr>
     </thead>
     <tbody>
@@ -68,9 +85,15 @@
           <td><%= student.balance %> ج</td>
           <td>
             <% if (student.booklet_status) { %>
-              <span class="badge bg-success">تم الشراء</span>
+              <span class="badge bg-success">
+                <span class="ar-only">تم الشراء</span>
+                <span class="en-only" style="display:none;">Purchased</span>
+              </span>
             <% } else { %>
-              <span class="badge bg-secondary">لسه</span>
+              <span class="badge bg-secondary">
+                <span class="ar-only">لسه</span>
+                <span class="en-only" style="display:none;">Pending</span>
+              </span>
             <% } %>
           </td>
         </tr>

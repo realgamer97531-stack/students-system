@@ -1,19 +1,29 @@
 <%- include('partials/header') %>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h3>الامتحانات</h3>
+  <h3>
+    <span class="ar-only">الامتحانات</span>
+    <span class="en-only" style="display:none;">Exams</span>
+  </h3>
 </div>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h5 class="mb-3">إنشاء امتحان جديد</h5>
+    <h5 class="mb-3">
+      <span class="ar-only">إنشاء امتحان جديد</span>
+      <span class="en-only" style="display:none;">Create New Exam</span>
+    </h5>
     <form action="/exams" method="POST" class="row g-2">
       <div class="col-md-3">
-        <input type="text" name="name" class="form-control" placeholder="اسم الامتحان" required>
+        <input type="text" name="name" class="form-control" 
+          placeholder="اسم الامتحان" title="Exam Name" required>
       </div>
       <div class="col-md-3">
         <select name="subject_id" id="subjectSelect" class="form-select" required>
-          <option value="">-- المادة --</option>
+          <option value="">
+            <span class="ar-only">-- المادة --</span>
+            <span class="en-only" style="display:none;">-- Subject --</span>
+          </option>
           <% subjects.forEach(subj => { %>
             <option value="<%= subj.id %>"><%= subj.name %></option>
           <% }) %>
@@ -21,10 +31,14 @@
       </div>
       <div class="col-md-3">
         <select name="session_id" id="sessionSelect" class="form-select">
-          <option value="">-- بدون ربط بحصة معينة --</option>
+          <option value="">
+            <span class="ar-only">-- بدون ربط بحصة معينة --</span>
+            <span class="en-only" style="display:none;">-- No Session Link --</span>
+          </option>
           <% allSessions.forEach(s => { %>
             <option value="<%= s.id %>" data-subject="<%= s.SubjectId %>">
-              حصة <%= s.lesson_number %> - <%= s.Center.name %> (<%= s.serial_number %>)
+              <span class="ar-only">حصة <%= s.lesson_number %> - <%= s.Center.name %> (<%= s.serial_number %>)</span>
+              <span class="en-only" style="display:none;">Lesson <%= s.lesson_number %> - <%= s.Center.name %> (<%= s.serial_number %>)</span>
             </option>
           <% }) %>
         </select>
@@ -36,10 +50,16 @@
         <input type="date" name="exam_date" class="form-control" required>
       </div>
       <div class="col-md-1">
-        <button type="submit" class="btn btn-primary w-100">إنشاء</button>
+        <button type="submit" class="btn btn-primary w-100">
+          <span class="ar-only">إنشاء</span>
+          <span class="en-only" style="display:none;">Create</span>
+        </button>
       </div>
     </form>
-    <p class="text-muted small mt-2">💡 لو حددت حصة، الدرجة هتظهر تلقائي جمب الواجب في ملف كل طالب حضر هذه الحصة (في أي سنتر).</p>
+    <p class="text-muted small mt-2">
+      <span class="ar-only">💡 لو حددت حصة، الدرجة هتظهر تلقائي جمب الواجب في ملف كل طالب حضر هذه الحصة (في أي سنتر).</span>
+      <span class="en-only" style="display:none;">💡 If you link a session, the score will auto-display for all students who attended.</span>
+    </p>
   </div>
 </div>
 
@@ -47,11 +67,11 @@
   <table class="table table-hover align-middle">
     <thead class="table-light">
       <tr>
-        <th>الامتحان</th>
-        <th>المادة</th>
-        <th>الحصة المرتبطة</th>
-        <th>الدرجة الكاملة</th>
-        <th>التاريخ</th>
+        <th><span class="ar-only">الامتحان</span><span class="en-only" style="display:none;">Exam</span></th>
+        <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
+        <th><span class="ar-only">الحصة المرتبطة</span><span class="en-only" style="display:none;">Linked Session</span></th>
+        <th><span class="ar-only">الدرجة الكاملة</span><span class="en-only" style="display:none;">Max Score</span></th>
+        <th><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
         <th></th>
       </tr>
     </thead>
@@ -62,14 +82,23 @@
           <td><%= exam.Subject.name %></td>
           <td>
             <% if (exam.Session) { %>
-              حصة <%= exam.Session.lesson_number %>
+              <span class="ar-only">حصة <%= exam.Session.lesson_number %></span>
+              <span class="en-only" style="display:none;">Lesson <%= exam.Session.lesson_number %></span>
             <% } else { %>
-              <span class="text-muted">مستقل</span>
+              <span class="text-muted">
+                <span class="ar-only">مستقل</span>
+                <span class="en-only" style="display:none;">Independent</span>
+              </span>
             <% } %>
           </td>
           <td><%= exam.max_score %></td>
           <td><%= exam.exam_date %></td>
-          <td><a href="/exams/<%= exam.id %>" class="btn btn-sm btn-outline-primary">رصد الدرجات</a></td>
+          <td>
+            <a href="/exams/<%= exam.id %>" class="btn btn-sm btn-outline-primary">
+              <span class="ar-only">رصد الدرجات</span>
+              <span class="en-only" style="display:none;">Record Scores</span>
+            </a>
+          </td>
         </tr>
       <% }) %>
     </tbody>

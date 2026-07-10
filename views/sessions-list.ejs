@@ -2,22 +2,31 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h3 class="mb-1">🗂️ كل الحصص</h3>
-    <p class="text-muted small mb-0">إدارة ومتابعة كل حصص السناتر والأونلاين</p>
+    <h3 class="mb-1">
+      <span class="ar-only">🗂️ كل الحصص</span>
+      <span class="en-only" style="display:none;">🗂️ All Sessions</span>
+    </h3>
+    <p class="text-muted small mb-0">
+      <span class="ar-only">إدارة ومتابعة كل حصص السناتر والأونلاين</span>
+      <span class="en-only" style="display:none;">Manage all center and online sessions</span>
+    </p>
   </div>
-  <a href="/sessions/new" class="btn btn-primary">+ بدء حصة جديدة</a>
+  <a href="/sessions/new" class="btn btn-primary">
+    <span class="ar-only">+ بدء حصة جديدة</span>
+    <span class="en-only" style="display:none;">+ New Session</span>
+  </a>
 </div>
 
 <div class="table-responsive bg-white rounded shadow-sm p-3">
   <table class="table table-hover align-middle">
     <thead class="table-light">
       <tr>
-        <th>السيريال</th>
-        <th>المادة</th>
-        <th>السنتر</th>
-        <th>الرقم النسبي</th>
-        <th>التاريخ</th>
-        <th>الحالة</th>
+        <th><span class="ar-only">السيريال</span><span class="en-only" style="display:none;">Serial</span></th>
+        <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
+        <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
+        <th><span class="ar-only">الرقم النسبي</span><span class="en-only" style="display:none;">Lesson #</span></th>
+        <th><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
+        <th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th>
         <th></th>
       </tr>
     </thead>
@@ -31,41 +40,64 @@
           <td><%= s.session_date %></td>
           <td>
   <% if (s.status === 'cancelled') { %>
-    <span class="badge" style="background:#FEE2E2; color:#B91C1C;">⛔ ملغية</span>
+    <span class="badge" style="background:#FEE2E2; color:#B91C1C;">
+      <span class="ar-only">⛔ ملغية</span>
+      <span class="en-only" style="display:none;">⛔ Cancelled</span>
+    </span>
   <% } else { %>
-    <span class="badge" style="background:#D1FAE5; color:#047857;">✓ عادية</span>
+    <span class="badge" style="background:#D1FAE5; color:#047857;">
+      <span class="ar-only">✓ عادية</span>
+      <span class="en-only" style="display:none;">✓ Active</span>
+    </span>
   <% } %>
 </td>
           <td class="text-nowrap">
             <% if (String(s.id) === String(activeSessionId)) { %>
-              <span class="badge bg-primary">✓ الشغالة دلوقتي</span>
+              <span class="badge bg-primary">
+                <span class="ar-only">✓ الشغالة دلوقتي</span>
+                <span class="en-only" style="display:none;">✓ Running</span>
+              </span>
             <% } else { %>
               <form action="/sessions/<%= s.id %>/activate" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-sm btn-outline-primary">تفعيل</button>
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                  <span class="ar-only">تفعيل</span>
+                  <span class="en-only" style="display:none;">Activate</span>
+                </button>
               </form>
             <% } %>
-            <a href="/sessions/<%= s.id %>/report" class="btn btn-sm btn-outline-dark">📊 تقرير</a>
+            <a href="/sessions/<%= s.id %>/report" class="btn btn-sm btn-outline-dark">
+              <span class="ar-only">📊 تقرير</span>
+              <span class="en-only" style="display:none;">📊 Report</span>
+            </a>
 
             <% if (userRole === 'admin') { %>
               <% if (s.status === 'cancelled') { %>
                 <form action="/sessions/<%= s.id %>/restore" method="POST" class="d-inline">
-                  <button type="submit" class="btn btn-sm btn-outline-success">إلغاء الإلغاء</button>
+                  <button type="submit" class="btn btn-sm btn-outline-success">
+                    <span class="ar-only">إلغاء الإلغاء</span>
+                    <span class="en-only" style="display:none;">Restore</span>
+                  </button>
                 </form>
               <% } else { %>
                 <button type="button" class="btn btn-sm btn-outline-danger"
                   onclick="openCancelModal(<%= s.id %>, '<%= s.lesson_number %>', '<%= s.Subject.name %>')">
-                  🚫 إلغاء
+                  <span class="ar-only">🚫 إلغاء</span>
+                  <span class="en-only" style="display:none;">🚫 Cancel</span>
                 </button>
               <% } %>
 
               <button type="button" class="btn btn-sm btn-outline-secondary"
                 onclick="openEditModal(<%= s.id %>, '<%= s.session_date %>')">
-                ✏️ تعديل
+                <span class="ar-only">✏️ تعديل</span>
+                <span class="en-only" style="display:none;">✏️ Edit</span>
               </button>
 
               <form action="/sessions/<%= s.id %>/delete" method="POST" class="d-inline"
                 onsubmit="return confirm('متأكد من حذف الحصة دي بالكامل؟ ده غير قابل للتراجع.')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ حذف</button>
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <span class="ar-only">🗑️ حذف</span>
+                  <span class="en-only" style="display:none;">🗑️ Delete</span>
+                </button>
               </form>
             <% } %>
           </td>
