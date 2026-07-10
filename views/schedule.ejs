@@ -2,10 +2,42 @@
 
 <% function canShow(key) { return userRole === 'admin' || (userPermissions && userPermissions.includes(key)); } %>
 
+<style>
+  /* Theme-aware layout adjustments for schedule cards */
+  .today-session-card {
+    background: var(--sf-table-header-bg) !important;
+    border: 1px solid var(--sf-input-border);
+  }
+  
+  .grid-entry-active {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: var(--sf-text) !important;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+  }
+  
+  .grid-entry-inactive {
+    background-color: var(--sf-table-header-bg) !important;
+    color: var(--sf-muted) !important;
+    border: 1px solid var(--sf-input-border);
+  }
+
+  .table-primary-adaptive {
+    background-color: var(--sf-primary) !important;
+    color: #ffffff !important;
+  }
+
+  [data-theme="dark"] .table-td-today {
+    background-color: rgba(99, 102, 241, 0.05) !important;
+  }
+  [data-theme="light"] .table-td-today {
+    background-color: rgba(67, 56, 202, 0.05) !important;
+  }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h3 class="mb-1">📅 الجدول الأسبوعي</h3>
-    <p class="text-muted small mb-0">يوم اليوم: <strong><%= ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][todayDay] %></strong></p>
+    <p class="text-muted small mb-0">اليوم: <strong><%= ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][todayDay] %></strong></p>
   </div>
   <% if (userRole === 'admin') { %>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEntryModal">+ إضافة حصة للجدول</button>
@@ -14,22 +46,22 @@
 
 <!-- حصص اليوم -->
 <% if (todayEntries.length > 0) { %>
-<div class="card shadow-sm mb-4" style="border-right: 4px solid #14B8A6;">
+<div class="card mb-4" style="border-right: 4px solid var(--sf-accent) !important;">
   <div class="card-body">
     <h6 class="mb-3">🔴 حصص اليوم</h6>
     <div class="row g-2">
       <% todayEntries && todayEntries.forEach(entry => { %>
         <% if (entry && entry.Subject && entry.Center) { %>
         <div class="col-md-4">
-          <div class="p-3 rounded" style="background:#EEF0FB;">
+          <div class="p-3 rounded today-session-card">
             <div class="d-flex justify-content-between align-items-center mb-1">
-              <strong class="small"><%= entry.Subject.name %></strong>
-              <span class="badge" style="background:#4338CA;color:#fff;"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></span>
+              <strong class="small" style="color: var(--sf-text);"><%= entry.Subject.name %></strong>
+              <span class="badge bg-primary"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></span>
             </div>
             <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes || 'N/A' %> دقيقة</p>
             <% if (canShow && canShow('sessions_create')) { %>
               <form action="/schedule/<%= entry.id %>/start-session" method="POST">
-                <button class="btn btn-sm w-100" style="background:#14B8A6;color:#fff;">▶ تشغيل الحصة الآن</button>
+                <button class="btn btn-success btn-sm w-100">▶ تشغيل الحصة الآن</button>
               </form>
             <% } %>
           </div>
@@ -42,16 +74,16 @@
 <% } %>
 
 <!-- الجدول الأسبوعي Grid -->
-<div class="card shadow-sm mb-4">
+<div class="card mb-4">
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-bordered mb-0">
         <thead>
           <tr>
             <% DAYS.forEach((day, i) => { %>
-              <th class="text-center small <%= i === todayDay ? 'table-primary' : '' %>" style="min-width:120px;">
+              <th class="text-center small <%= i === todayDay ? 'table-primary-adaptive' : '' %>" style="min-width:120px;">
                 <%= day %>
-                <% if (i === todayDay) { %><br><span class="badge bg-primary" style="font-size:0.65rem;">اليوم</span><% } %>
+                <% if (i === todayDay) { %><br><span class="badge bg-light text-dark mt-1" style="font-size:0.65rem;">اليوم</span><% } %>
               </th>
             <% }) %>
           </tr>
@@ -59,16 +91,16 @@
         <tbody>
           <tr>
             <% for (let i = 0; i < 7; i++) { %>
-              <td class="<%= i === todayDay ? 'bg-primary bg-opacity-10' : '' %>" style="vertical-align:top;padding:8px;">
+              <td class="<%= i === todayDay ? 'table-td-today' : '' %>" style="vertical-align:top; padding:8px;">
                 <% if (weekGrid[i] && weekGrid[i].length > 0) { %>
                   <% weekGrid[i] && weekGrid[i].forEach(entry => { %>
                     <% if (entry && entry.Subject && entry.Center) { %>
-                    <div class="mb-2 p-2 rounded" style="background:<%= entry.is_active ? '#D1FAE5' : '#F3F4F6' %>;">
+                    <div class="mb-2 p-2 rounded <%= entry.is_active ? 'grid-entry-active' : 'grid-entry-inactive' %>">
                       <div class="small fw-bold"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></div>
-                      <div class="small"><%= entry.Subject.name %></div>
-                      <div class="small text-muted"><%= entry.Center.name %></div>
+                      <div class="small fw-semibold"><%= entry.Subject.name %></div>
+                      <div class="small opacity-75"><%= entry.Center.name %></div>
                       <% if (entry.end_date && entry.end_date !== 'Invalid Date') { %>
-                        <div class="small text-muted">حتى: <%= entry.end_date %></div>
+                        <div class="small opacity-75">حتى: <%= entry.end_date %></div>
                         <%
                           try {
                             const today = new Date();
@@ -78,7 +110,7 @@
                               const weeksLeft = Math.ceil(diffDays / 7);
                         %>
                               <% if (entry.expected_sessions_count) { %>
-                                <div class="small" style="color:#4338CA;">
+                                <div class="small mt-1 fw-medium" style="color: var(--sf-primary);">
                                   باقي ~<%= weeksLeft %> حصة | تم جدولة: <%= entry.expected_sessions_count %>
                                 </div>
                               <% } %>
@@ -90,17 +122,18 @@
                         %>
                       <% } %>
                       <% if (userRole === 'admin') { %>
-                        <div class="d-flex gap-1 mt-1">
+                        <div class="d-flex gap-1 mt-2">
                           <form action="/schedule/<%= entry.id %>/toggle" method="POST">
-                            <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:<%= entry.is_active ? '#FEE2E2' : '#D1FAE5' %>;">
+                            <button class="btn btn-sm py-1 px-2" style="font-size:0.65rem; background-color: var(--sf-input-border); color: var(--sf-text);">
                               <%= entry.is_active ? 'إيقاف' : 'تفعيل' %>
                             </button>
                           </form>
                           <form action="/schedule/<%= entry.id %>/delete" method="POST" onsubmit="return confirm('حذف؟')">
-                            <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:#FEE2E2;">🗑</button>
+                            <button class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:0.65rem;">🗑</button>
                           </form>
                         </div>
                       <% } %>
+                    </div>
                     <% } %>
                   <% }) %>
                 <% } else { %>
@@ -118,8 +151,9 @@
 <!-- مودال إضافة حصة -->
 <div class="modal fade" id="addEntryModal" tabindex="-1">
   <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">إضافة حصة للجدول</h5>
+    <div class="modal-content card">
+      <div class="modal-header border-bottom-0">
+        <h5 class="modal-title">إضافة حصة للجدول</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form action="/schedule/add" method="POST">
@@ -171,7 +205,7 @@
             <input type="text" name="notes" class="form-control" placeholder="اختياري">
           </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer border-top-0">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
           <button type="submit" class="btn btn-primary">إضافة</button>
         </div>

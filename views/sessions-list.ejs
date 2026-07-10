@@ -1,5 +1,28 @@
 <%- include('partials/header') %>
 
+<style>
+  /* Fix hardcoded color states for Dark/Light adaptive themes */
+  [data-theme="dark"] .table-success-adaptive {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #10b981 !important;
+  }
+  [data-theme="light"] .table-success-adaptive {
+    background-color: #ecfdf5 !important;
+  }
+
+  /* Status Badges adaptive styles */
+  .badge-status-cancelled {
+    background-color: rgba(239, 68, 68, 0.15) !important; 
+    color: #ef4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  .badge-status-active {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #10b981 !important;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+  }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h3 class="mb-1">
@@ -17,9 +40,9 @@
   </a>
 </div>
 
-<div class="table-responsive bg-white rounded shadow-sm p-3">
+<div class="table-responsive card p-3">
   <table class="table table-hover align-middle">
-    <thead class="table-light">
+    <thead>
       <tr>
         <th><span class="ar-only">السيريال</span><span class="en-only" style="display:none;">Serial</span></th>
         <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
@@ -32,25 +55,25 @@
     </thead>
     <tbody>
       <% sessions.forEach(s => { %>
-        <tr class="<%= String(s.id) === String(activeSessionId) ? 'table-success' : '' %>">
+        <tr class="<%= String(s.id) === String(activeSessionId) ? 'table-success-adaptive' : '' %>">
           <td><strong><%= s.serial_number %></strong></td>
           <td><%= s.Subject.name %></td>
           <td><%= s.Center.name %></td>
           <td><%= s.lesson_number %></td>
           <td><%= s.session_date %></td>
           <td>
-  <% if (s.status === 'cancelled') { %>
-    <span class="badge" style="background:#FEE2E2; color:#B91C1C;">
-      <span class="ar-only">⛔ ملغية</span>
-      <span class="en-only" style="display:none;">⛔ Cancelled</span>
-    </span>
-  <% } else { %>
-    <span class="badge" style="background:#D1FAE5; color:#047857;">
-      <span class="ar-only">✓ عادية</span>
-      <span class="en-only" style="display:none;">✓ Active</span>
-    </span>
-  <% } %>
-</td>
+            <% if (s.status === 'cancelled') { %>
+              <span class="badge badge-status-cancelled">
+                <span class="ar-only">⛔ ملغية</span>
+                <span class="en-only" style="display:none;">⛔ Cancelled</span>
+              </span>
+            <% } else { %>
+              <span class="badge badge-status-active">
+                <span class="ar-only">✓ عادية</span>
+                <span class="en-only" style="display:none;">✓ Active</span>
+              </span>
+            <% } %>
+          </td>
           <td class="text-nowrap">
             <% if (String(s.id) === String(activeSessionId)) { %>
               <span class="badge bg-primary">
@@ -107,11 +130,10 @@
   </table>
 </div>
 
-<!-- مودال إلغاء الحصة -->
 <div class="modal fade" id="cancelModal" tabindex="-1">
   <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
+    <div class="modal-content card">
+      <div class="modal-header border-bottom-0">
         <h5 class="modal-title">إلغاء حصة</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -131,7 +153,7 @@
             </label>
           </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer border-top-0">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">رجوع</button>
           <button type="submit" class="btn btn-danger">تأكيد الإلغاء</button>
         </div>
@@ -140,11 +162,10 @@
   </div>
 </div>
 
-<!-- مودال تعديل تاريخ الحصة -->
 <div class="modal fade" id="editModal" tabindex="-1">
   <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
+    <div class="modal-content card">
+      <div class="modal-header border-bottom-0">
         <h5 class="modal-title">تعديل تاريخ الحصة</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -153,7 +174,7 @@
           <label class="form-label">التاريخ الصحيح</label>
           <input type="date" name="session_date" id="editDateInput" class="form-control" required>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer border-top-0">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">رجوع</button>
           <button type="submit" class="btn btn-primary">حفظ</button>
         </div>

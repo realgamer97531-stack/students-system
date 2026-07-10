@@ -2,11 +2,11 @@
 
 <h3 class="mb-4">🎬 إدارة فيديوهات الحصص</h3>
 
-<div class="card shadow-sm mb-4">
+<div class="card mb-4">
   <div class="card-body">
-    <h5 class="mb-3">إنشاء درس جديد مرتبط بحصة</h5>
+    <h5 class="mb-3 fw-bold">إنشاء درس جديد مرتبط بحصة</h5>
     <form action="/admin/videos/create" method="POST" class="row g-2">
-      <div class="col-md-3">
+      <div class="col-md-4">
         <select name="session_id" class="form-select" required>
           <option value="">-- اختر الحصة --</option>
           <% allSessions.forEach(s => { %>
@@ -16,7 +16,7 @@
           <% }) %>
         </select>
       </div>
-      <div class="col-md-5">
+      <div class="col-md-6">
         <input type="text" name="title" class="form-control" placeholder="اسم الدرس (مثال: التفاضل - الجزء الأول)" required>
       </div>
       <div class="col-md-2">
@@ -26,25 +26,27 @@
   </div>
 </div>
 
-<h5 class="mb-3">الدروس الموجودة</h5>
+<h5 class="mb-3 fw-bold">الدروس الموجودة</h5>
 <div class="row g-3">
   <% videos.forEach(v => { %>
     <div class="col-md-4">
-      <div class="card shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <h6 class="mb-0"><%= v.title %></h6>
-            <form action="/admin/videos/delete/<%= v.id %>" method="POST" onsubmit="return confirm('متأكد من حذف الدرس بالكامل؟ سيُحذف كل ما يتعلق به (فيديوهات، صلاحيات مشاهدة).')">
-              <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف الدرس بالكامل">🗑️</button>
-            </form>
+      <div class="card h-100">
+        <div class="card-body d-flex flex-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+              <h6 class="mb-0 fw-bold"><%= v.title %></h6>
+              <form action="/admin/videos/delete/<%= v.id %>" method="POST" onsubmit="return confirm('متأكد من حذف الدرس بالكامل؟ سيُحذف كل ما يتعلق به (فيديوهات، صلاحيات مشاهدة).')">
+                <button type="submit" class="btn btn-sm btn-outline-danger border-0 py-1 px-2" title="حذف الدرس بالكامل">🗑️</button>
+              </form>
+            </div>
+            <p class="text-muted small mb-3">
+              <%= v.Session.Subject.name %> - <%= v.Session.Center.name %><br>
+              حصة رقم <%= v.Session.lesson_number %> • <%= v.Session.session_date %>
+            </p>
           </div>
-          <p class="text-muted small mb-3">
-            <%= v.Session.Subject.name %> - <%= v.Session.Center.name %><br>
-            حصة رقم <%= v.Session.lesson_number %> • <%= v.Session.session_date %>
-          </p>
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 mt-2">
             <a href="/admin/videos/<%= v.id %>" class="btn btn-sm btn-outline-primary flex-grow-1">إدارة الفيديوهات</a>
-            <a href="/admin/videos/<%= v.id %>/access" class="btn btn-sm btn-outline-dark flex-grow-1">التحكم</a>
+            <a href="/admin/videos/<%= v.id %>/access" class="btn btn-sm btn-outline-secondary flex-grow-1">التحكم</a>
           </div>
         </div>
       </div>
