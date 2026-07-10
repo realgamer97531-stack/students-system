@@ -4,6 +4,7 @@
   تقرير حصة: <%= session.Subject.name %> - <%= session.Center.name %>
   (سيريال <%= session.serial_number %> / رقم نسبي <%= session.lesson_number %>)
 </h3>
+
 <div class="mb-3">
   <a href="/sessions/<%= session.id %>/report/export-attendance" class="btn btn-outline-success">
     📥 تصدير الحاضرين
@@ -12,6 +13,7 @@
     📥 تصدير الغايبين
   </a>
 </div>
+
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h6 class="mb-3">💰 تقفيل السنتر (حساب التكلفة)</h6>
@@ -41,6 +43,7 @@
     <h4 class="text-success"><%= totalCashCollected %> ج</h4>
   </div>
 </div>
+
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item">
     <a class="nav-link active" data-bs-toggle="tab" href="#attendedTab">
@@ -52,10 +55,15 @@
       الغايبين (<%= absentStudents.length %>)
     </a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#assistantTab">
+      الأسيستانتس (<%= assistantAttendances ? assistantAttendances.length : 0 %>)
+    </a>
+  </li>
 </ul>
 
 <div class="tab-content">
-  <!-- تاب الحاضرين -->
+  
   <div class="tab-pane fade show active" id="attendedTab">
     <div class="table-responsive bg-white rounded shadow-sm p-3">
       <table class="table table-sm table-hover align-middle">
@@ -136,7 +144,6 @@
     </div>
   </div>
 
-  <!-- تاب الغايبين -->
   <div class="tab-pane fade" id="absentTab">
     <% if (session.status === 'cancelled') { %>
       <div class="alert alert-secondary">هذه الحصة ملغية، فلا يوجد غياب محسوب.</div>
@@ -166,6 +173,156 @@
       </table>
     </div>
   </div>
+
+  <div class="tab-pane fade" id="assistantTab">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">👨‍💼 الأسيستانتس الحاضرين</h6>
+        </div>
+
+        <% if (userRole === 'admin') { %>
+        <form action="/sessions/<%= session.id %>/assistant-attendance/add" method="POST" class="row g-2 mb-3">
+          <div class="col-md-3">
+            <select name="user_id" class="form-select form-select-sm" required>
+              <option value="">-- اختر أسيستانت --</option>
+              <% allUsers.forEach(u => { %>
+                <option value="<%= u.id %>"><%= u.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <input type="datetime-local" name="check_in" class="form-control form-control-sm">
+            <small class="text-muted">وقت الحضور (فاضي = دلوقتي)</small>
+          </div>
+          <div class="col-md-3">
+            <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة (اختياري)">
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-sm btn-primary w-100">+ تسجيل حضور</button>
+          </div>
+        </form>
+        <% } %>
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>الاسم</th>
+                <th>وقت الحضور</th>
+                <th>وقت الانصراف</th>
+                <th>ساعات العمل</th>
+                <th>الراتب المحسوب</th>
+                <th>الطريقة</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (assistantAttendances && assistantAttendances.length > 0) { %>
+                <% assistantAttendances.forEach(aa => { %>
+                  <tr>
+                    <td><strong><%= aa.User ? aa.User.name : '-' %></strong></td>
+                    <td>
+                      <%= aa.check_in ? new Date(aa.check_in).toLocaleString('ar-EG') : '-' %>
+                      <% if (aa.check_in_method === 'auto') { %><span class="badge bg-secondary" style="font-size:0.65rem;">auto</span><% } %>
+                    </td>
+                    <td>
+                      <% if (aa.check_out) { %>
+                        <%= new Date(aa.check_out).toLocaleString('ar-EG') %>
+                        <% if (aa.check_out_method === 'auto') { %><span class="badge bg-secondary" style="font-size:0.65rem;">auto</span><% } %>
+                      <% } else { %>
+                        <% if (userRole === 'admin') { %>
+                          <form action="/sessions/<%= session.id %>/assistant-attendance/<%= aa.id %>/checkout" method="POST" class="d-flex gap-1">
+                            <input type="datetime-local" name="check_out" class="form-control form-control-sm" style="max-width:180px;">
+                            <button class="btn btn-sm btn-outline-success">تسجيل انصراف</button>
+                          </form>
+                        <% } else { %>
+                          <span class="text-muted small">لم ينصرف بعد</span>
+                        <% } %>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (aa.working_minutes) { %>
+                        <span class="fw-bold"><%= Math.floor(aa.working_minutes / 60) %>س <%= aa.working_minutes % 60 %>د</span>
+                      <% } else { %><span class="text-muted">-</span><% } %>
+                    </td>
+                    <td>
+                      <% if (aa.salary_calculated) { %>
+                        <span class="text-success fw-bold"><%= aa.salary_calculated.toFixed(2) %> ج</span>
+                        <span class="text-muted" style="font-size:0.7rem;">(<%= aa.salary_type === 'fixed' ? 'ثابت' : aa.salary_type === 'hourly' ? 'بالساعة' : 'بالحصة' %>)</span>
+                      <% } else { %><span class="text-muted">-</span><% } %>
+                    </td>
+                    <td>
+                      <span class="badge" style="background:#EEF0FB;color:#4338CA;font-size:0.7rem;">
+                        <%= aa.check_in_method === 'auto' ? '🤖 تلقائي' : '✋ يدوي' %>
+                      </span>
+                    </td>
+                    <td>
+                      <% if (userRole === 'admin') { %>
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editModal<%= aa.id %>">تعديل</button>
+                        <form action="/sessions/<%= session.id %>/assistant-attendance/<%= aa.id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('حذف؟')">
+                          <button class="btn btn-sm btn-outline-danger">🗑</button>
+                        </form>
+
+                        <div class="modal fade" id="editModal<%= aa.id %>" tabindex="-1">
+                          <div class="modal-dialog">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h6 class="modal-title">تعديل حضور: <%= aa.User ? aa.User.name : '' %></h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                              </div>
+                              <form action="/sessions/<%= session.id %>/assistant-attendance/<%= aa.id %>/edit" method="POST">
+                                <div class="modal-body row g-2">
+                                  <div class="col-6">
+                                    <label class="form-label small">وقت الحضور</label>
+                                    <input type="datetime-local" name="check_in" class="form-control form-control-sm"
+                                      value="<%= aa.check_in ? new Date(aa.check_in).toISOString().slice(0,16) : '' %>">
+                                  </div>
+                                  <div class="col-6">
+                                    <label class="form-label small">وقت الانصراف</label>
+                                    <input type="datetime-local" name="check_out" class="form-control form-control-sm"
+                                      value="<%= aa.check_out ? new Date(aa.check_out).toISOString().slice(0,16) : '' %>">
+                                  </div>
+                                  <div class="col-6">
+                                    <label class="form-label small">طريقة الراتب</label>
+                                    <select name="salary_type" class="form-select form-select-sm">
+                                      <option value="fixed" <%= aa.salary_type==='fixed'?'selected':'' %>>ثابت</option>
+                                      <option value="hourly" <%= aa.salary_type==='hourly'?'selected':'' %>>بالساعة</option>
+                                      <option value="per_session" <%= aa.salary_type==='per_session'?'selected':'' %>>بالحصة</option>
+                                    </select>
+                                  </div>
+                                  <div class="col-6">
+                                    <label class="form-label small">المبلغ</label>
+                                    <input type="number" name="salary_amount" class="form-control form-control-sm" step="0.5"
+                                      value="<%= aa.salary_amount || 0 %>">
+                                  </div>
+                                  <div class="col-12">
+                                    <label class="form-label small">ملاحظات</label>
+                                    <input type="text" name="notes" class="form-control form-control-sm" value="<%= aa.notes || '' %>">
+                                  </div>
+                                </div>
+                                <div class="modal-footer">
+                                  <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                                  <button type="submit" class="btn btn-primary btn-sm">حفظ</button>
+                                </div>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="7" class="text-muted text-center small">لا يوجد أسيستانتس مسجلين في هذه الحصة</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <%- include('partials/footer') %>

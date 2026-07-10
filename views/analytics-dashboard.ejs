@@ -268,6 +268,10 @@
         <h6 class="mb-3">👤 المرتبات
           <span class="text-danger fw-bold float-end"><%= totalSalaries.toLocaleString() %> ج</span>
         </h6>
+        <div class="d-flex justify-content-between small mb-1">
+  <span>رواتب أسيستانتس (محسوبة)</span>
+  <span class="text-danger"><%= totalAssistantSalaries.toFixed(0) %> ج</span>
+</div>
         <form action="/analytics/salary/add" method="POST" class="row g-1 mb-3">
           <input type="hidden" name="month" value="<%= currentMonth %>">
           <div class="col-5">

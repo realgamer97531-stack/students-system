@@ -767,10 +767,19 @@ app.get('/sessions/:id/report', async (req, res) => {
     const totalCost = (session.cost_per_normal || 0) * normalCount + (session.cost_per_reduced || 0) * reducedCount;
     const totalCashCollected = attendances.reduce((sum, a) => sum + (a.payment_collected || 0), 0);
 
+    const assistantAttendances = await AssistantAttendance.findAll({
+      where: { SessionId: session.id },
+      include: [User],
+      order: [['check_in', 'ASC']],
+    });
+    const allUsers = await User.findAll({ where: { role: 'assistant' }, order: [['name', 'ASC']] });
+
     res.render('session-report', {
       session, attendedRows, absentStudents,
       closing: { normalCount, reducedCount, freeCount, totalRevenue, totalCost },
       totalCashCollected,
+      assistantAttendances,
+      allUsers,
     });
   } catch (error) {
     console.error(error);
@@ -3297,6 +3306,15 @@ app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
   const salaries = await Salary.findAll({ where: { month: currentMonth }, include: [User] });
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const totalSalaries = salaries.reduce((s, e) => s + e.amount, 0);
+  // راتب الأسيستانتس المحسوب من حضورهم الفعلي في الشهر
+  const assistantSalariesMonth = await AssistantAttendance.findAll({
+    where: {
+      createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+      salary_calculated: { [Op.not]: null },
+    },
+    include: [User],
+  });
+  const totalAssistantSalaries = assistantSalariesMonth.reduce((s, a) => s + (a.salary_calculated || 0), 0);
 
   // ===== مؤشرات شهرية تاريخية (آخر 6 شهور) =====
   const monthlyTrend = [];
@@ -3328,6 +3346,8 @@ app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
     projectedMonthly, monthlyTrend, allAlerts,
     currentMonth, subjects, centers,
     filters: { subject_id, center_id, month: currentMonth, compare_month: compareMonth },
+    totalAssistantSalaries,
+    netRevenue: monthlyRevenue - totalExpenses - totalSalaries - totalAssistantSalaries,
   });
 });
 
@@ -3410,6 +3430,213 @@ app.post('/analytics/salary/add', requireAnalyticsAuth, async (req, res) => {
   });
   if (sal.amount !== parseFloat(amount)) { sal.amount = amount; sal.notes = notes; await sal.save(); }
   res.redirect('/analytics');
+});
+
+// ===== نظام حضور الأسيستانت (مستقل تماماً) =====
+
+const AssistantAttendance = require('./models/AssistantAttendance');
+const SalaryConfig = require('./models/SalaryConfig');
+
+AssistantAttendance.belongsTo(User, { foreignKey: 'UserId' });
+AssistantAttendance.belongsTo(Session, { foreignKey: 'SessionId' });
+User.hasMany(AssistantAttendance, { foreignKey: 'UserId' });
+Session.hasMany(AssistantAttendance, { foreignKey: 'SessionId' });
+SalaryConfig.belongsTo(User, { foreignKey: 'UserId' });
+User.hasOne(SalaryConfig, { foreignKey: 'UserId' });
+
+// دالة مساعدة: تسجيل حضور تلقائي للأسيستانت لو عمل أي حاجة في الحصة
+async function autoRegisterAssistantAttendance(userId, sessionId) {
+  try {
+    const existing = await AssistantAttendance.findOne({ where: { UserId: userId, SessionId: sessionId } });
+    if (existing) return; // مسجل بالفعل
+
+    const salaryConfig = await SalaryConfig.findOne({ where: { UserId: userId } });
+    await AssistantAttendance.create({
+      UserId: userId,
+      SessionId: sessionId,
+      check_in: new Date(),
+      check_in_method: 'auto',
+      salary_type: salaryConfig ? salaryConfig.salary_type : 'fixed',
+      salary_amount: salaryConfig ? salaryConfig.base_amount : 0,
+    });
+  } catch (e) {
+    console.error('Auto register assistant attendance error:', e.message);
+  }
+}
+
+// ===== Routes =====
+
+// تسجيل حضور يدوي للأسيستانت في حصة
+app.post('/sessions/:id/assistant-attendance/add', requireAdmin, async (req, res) => {
+  try {
+    const { user_id, check_in, notes } = req.body;
+    const salaryConfig = await SalaryConfig.findOne({ where: { UserId: user_id } });
+
+    await AssistantAttendance.findOrCreate({
+      where: { UserId: user_id, SessionId: req.params.id },
+      defaults: {
+        check_in: check_in ? new Date(check_in) : new Date(),
+        check_in_method: 'manual',
+        notes,
+        salary_type: salaryConfig ? salaryConfig.salary_type : 'fixed',
+        salary_amount: salaryConfig ? salaryConfig.base_amount : 0,
+      },
+    });
+
+    res.redirect(`/sessions/${req.params.id}/report`);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// تسجيل وقت الانصراف + حساب الراتب
+app.post('/sessions/:sessionId/assistant-attendance/:id/checkout', requireAdmin, async (req, res) => {
+  try {
+    const { check_out } = req.body;
+    const record = await AssistantAttendance.findByPk(req.params.id);
+    if (!record) return res.status(404).send('❌');
+
+    const checkOutTime = check_out ? new Date(check_out) : new Date();
+    record.check_out = checkOutTime;
+    record.check_out_method = check_out ? 'manual' : 'auto';
+
+    if (record.check_in) {
+      record.working_minutes = Math.round((checkOutTime - new Date(record.check_in)) / 60000);
+    }
+
+    // حساب الراتب
+    if (record.salary_type === 'fixed') {
+      record.salary_calculated = record.salary_amount;
+    } else if (record.salary_type === 'hourly') {
+      record.salary_calculated = (record.working_minutes / 60) * record.salary_amount;
+    } else if (record.salary_type === 'per_session') {
+      record.salary_calculated = record.salary_amount;
+    }
+
+    await record.save();
+    res.redirect(`/sessions/${req.params.sessionId}/report`);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// تعديل يدوي لبيانات الحضور
+app.post('/sessions/:sessionId/assistant-attendance/:id/edit', requireAdmin, async (req, res) => {
+  try {
+    const { check_in, check_out, notes, salary_amount, salary_type } = req.body;
+    const record = await AssistantAttendance.findByPk(req.params.id);
+    if (!record) return res.status(404).send('❌');
+
+    record.check_in = check_in ? new Date(check_in) : record.check_in;
+    record.check_out = check_out ? new Date(check_out) : record.check_out;
+    record.check_in_method = 'manual';
+    record.notes = notes;
+    record.salary_type = salary_type || record.salary_type;
+    record.salary_amount = salary_amount || record.salary_amount;
+
+    if (record.check_in && record.check_out) {
+      record.working_minutes = Math.round((new Date(record.check_out) - new Date(record.check_in)) / 60000);
+      if (record.salary_type === 'fixed') {
+        record.salary_calculated = record.salary_amount;
+      } else if (record.salary_type === 'hourly') {
+        record.salary_calculated = (record.working_minutes / 60) * record.salary_amount;
+      } else {
+        record.salary_calculated = record.salary_amount;
+      }
+    }
+
+    await record.save();
+    res.redirect(`/sessions/${req.params.sessionId}/report`);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// حذف سجل حضور أسيستانت
+app.post('/sessions/:sessionId/assistant-attendance/:id/delete', requireAdmin, async (req, res) => {
+  await AssistantAttendance.destroy({ where: { id: req.params.id } });
+  res.redirect(`/sessions/${req.params.sessionId}/report`);
+});
+
+// صفحة إحصائيات الأسيستانت الموسعة (مع فلتر تواريخ)
+app.get('/users/:id/stats', requireAdmin, async (req, res) => {
+  const { from, to } = req.query;
+  const targetUser = await User.findByPk(req.params.id);
+  if (!targetUser) return res.status(404).send('❌');
+
+  const dateFilter = from && to ? { createdAt: { [Op.between]: [from + ' 00:00:00', to + ' 23:59:59'] } } : {};
+
+  const attendanceCount = await Attendance.count({ where: { UserId: targetUser.id, ...dateFilter } });
+  const homeworkCount = await HomeworkCheck.count({ where: { UserId: targetUser.id, ...dateFilter } });
+  const examResultCount = await ExamResult.count({ where: { UserId: targetUser.id, ...dateFilter } });
+  const studentsRegistered = await Student.count({ where: { UserId: targetUser.id } });
+
+  // حضور الأسيستانت للحصص
+  const assistantAttFilter = from && to ? { createdAt: { [Op.between]: [from + ' 00:00:00', to + ' 23:59:59'] } } : {};
+  const assistantAttendances = await AssistantAttendance.findAll({
+    where: { UserId: targetUser.id, ...assistantAttFilter },
+    include: [{ model: Session, include: [Center, Subject] }],
+    order: [['check_in', 'DESC']],
+  });
+
+  const totalWorkingMinutes = assistantAttendances.reduce((s, a) => s + (a.working_minutes || 0), 0);
+  const totalSalaryCalculated = assistantAttendances.reduce((s, a) => s + (a.salary_calculated || 0), 0);
+  const sessionsAttended = assistantAttendances.length;
+
+  // سجل اليوم الأخيرة 7 أيام
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  weekAgo.setHours(0, 0, 0, 0);
+  const recentAttendance = await Attendance.findAll({
+    where: { UserId: targetUser.id, createdAt: { [Op.gte]: weekAgo } },
+    attributes: ['createdAt'],
+  });
+  const dayCounts = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekAgo);
+    d.setDate(d.getDate() + i);
+    dayCounts[d.toISOString().slice(0, 10)] = 0;
+  }
+  recentAttendance.forEach(a => {
+    const key = new Date(a.createdAt).toISOString().slice(0, 10);
+    if (dayCounts[key] !== undefined) dayCounts[key]++;
+  });
+
+  // إعداد الراتب
+  const salaryConfig = await SalaryConfig.findOne({ where: { UserId: targetUser.id } });
+
+  res.render('user-stats', {
+    targetUser, attendanceCount, homeworkCount, examResultCount,
+    studentsRegistered, dayCounts, assistantAttendances,
+    totalWorkingMinutes, totalSalaryCalculated, sessionsAttended,
+    salaryConfig, filters: { from, to },
+  });
+});
+
+// حفظ إعداد الراتب للأسيستانت
+app.post('/users/:id/salary-config', requireAdmin, async (req, res) => {
+  const { salary_type, base_amount, notes } = req.body;
+  await SalaryConfig.upsert({
+    UserId: req.params.id,
+    salary_type, base_amount, notes,
+  });
+  res.redirect(`/users/${req.params.id}/stats`);
+});
+
+// تطبيق autoRegister على كل عمليات الأسيستانت
+// ملاحظة: ده بيستخدم app.use عشان يكتشف تلقائياً
+app.use(async (req, res, next) => {
+  if (req.method === 'POST' && req.session?.userId && req.session?.userRole === 'assistant' && req.session?.activeSessionId) {
+    const autoTriggers = ['/attendance/scan', '/homework/scan/save', '/exams/'];
+    const shouldTrigger = autoTriggers.some(path => req.path.startsWith(path));
+    if (shouldTrigger) {
+      await autoRegisterAssistantAttendance(req.session.userId, req.session.activeSessionId);
+    }
+  }
+  next();
 });
 
 
