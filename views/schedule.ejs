@@ -16,21 +16,23 @@
   <div class="card-body">
     <h6 class="mb-3">🔴 حصص اليوم</h6>
     <div class="row g-2">
-      <% todayEntries.forEach(entry => { %>
+      <% todayEntries && todayEntries.forEach(entry => { %>
+        <% if (entry && entry.Subject && entry.Center) { %>
         <div class="col-md-4">
           <div class="p-3 rounded" style="background:#EEF0FB;">
             <div class="d-flex justify-content-between align-items-center mb-1">
               <strong class="small"><%= entry.Subject.name %></strong>
-              <span class="badge" style="background:#4338CA;color:#fff;"><%= entry.start_time.slice(0,5) %></span>
+              <span class="badge" style="background:#4338CA;color:#fff;"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></span>
             </div>
-            <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes %> دقيقة</p>
-            <% if (canShow('sessions_create')) { %>
+            <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes || 'N/A' %> دقيقة</p>
+            <% if (canShow && canShow('sessions_create')) { %>
               <form action="/schedule/<%= entry.id %>/start-session" method="POST">
                 <button class="btn btn-sm w-100" style="background:#14B8A6;color:#fff;">▶ تشغيل الحصة الآن</button>
               </form>
             <% } %>
           </div>
         </div>
+        <% } %>
       <% }) %>
     </div>
   </div>
@@ -57,28 +59,33 @@
             <% for (let i = 0; i < 7; i++) { %>
               <td class="<%= i === todayDay ? 'bg-primary bg-opacity-10' : '' %>" style="vertical-align:top;padding:8px;">
                 <% if (weekGrid[i] && weekGrid[i].length > 0) { %>
-                  <% weekGrid[i].forEach(entry => { %>
+                  <% weekGrid[i] && weekGrid[i].forEach(entry => { %>
+                    <% if (entry && entry.Subject && entry.Center) { %>
                     <div class="mb-2 p-2 rounded" style="background:<%= entry.is_active ? '#D1FAE5' : '#F3F4F6' %>;">
-                      <div class="small fw-bold"><%= entry.start_time.slice(0,5) %></div>
+                      <div class="small fw-bold"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></div>
                       <div class="small"><%= entry.Subject.name %></div>
                       <div class="small text-muted"><%= entry.Center.name %></div>
-                      <% if (entry.end_date) { %>
+                      <% if (entry.end_date && entry.end_date !== 'Invalid Date') { %>
                         <div class="small text-muted">حتى: <%= entry.end_date %></div>
                         <%
-                          const today = new Date();
-                          const end = new Date(entry.end_date);
-                          const diffDays = Math.ceil((end - today) / (1000*60*60*24));
-                          const weeksLeft = Math.ceil(diffDays / 7);
-                          const completedSessions = sessions ? sessions.filter(s =>
-                            s.SubjectId === entry.SubjectId && s.CenterId === entry.CenterId
-                          ).length : 0;
+                          try {
+                            const today = new Date();
+                            const end = new Date(entry.end_date);
+                            if (end instanceof Date && !isNaN(end)) {
+                              const diffDays = Math.ceil((end - today) / (1000*60*60*24));
+                              const weeksLeft = Math.ceil(diffDays / 7);
                         %>
-                        <% if (entry.expected_sessions_count) { %>
-                          <div class="small" style="color:#4338CA;">
-                            باقي ~<%= weeksLeft %> حصة |
-                            <%= completedSessions %>/<%= entry.expected_sessions_count %>
-                          </div>
-                        <% } %>
+                              <% if (entry.expected_sessions_count) { %>
+                                <div class="small" style="color:#4338CA;">
+                                  باقي ~<%= weeksLeft %> حصة | تم جدولة: <%= entry.expected_sessions_count %>
+                                </div>
+                              <% } %>
+                        <%
+                            }
+                          } catch(e) {
+                            // Invalid date, skip calculation
+                          }
+                        %>
                       <% } %>
                       <% if (userRole === 'admin') { %>
                         <div class="d-flex gap-1 mt-1">
@@ -92,7 +99,7 @@
                           </form>
                         </div>
                       <% } %>
-                    </div>
+                    <% } %>
                   <% }) %>
                 <% } else { %>
                   <span class="text-muted small">-</span>
@@ -128,13 +135,21 @@
           <div class="col-6">
             <label class="form-label small">المادة</label>
             <select name="subject_id" class="form-select" required>
-              <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+              <% if (subjects && subjects.length > 0) { %>
+                <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+              <% } else { %>
+                <option disabled>لا توجد مواد متاحة</option>
+              <% } %>
             </select>
           </div>
           <div class="col-6">
             <label class="form-label small">السنتر</label>
             <select name="center_id" class="form-select" required>
-              <% centers.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+              <% if (centers && centers.length > 0) { %>
+                <% centers.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+              <% } else { %>
+                <option disabled>لا توجد سنترات متاحة</option>
+              <% } %>
             </select>
           </div>
           <div class="col-6">
