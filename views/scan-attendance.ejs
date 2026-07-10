@@ -43,14 +43,17 @@
         </thead>
         <tbody id="summaryTableBody"></tbody>
       </table>
-          <div class="mb-3 text-start">
-      <label class="form-label small">كومنت على الطالب (اختياري)</label>
-      <input type="text" id="commentInput" class="form-control form-control-sm" placeholder="مثال: جاب بوكليت جديد">
-    </div>
-    <div class="mb-3 text-start">
-      <label class="form-label small">مبلغ تم تحصيله الآن (اختياري)</label>
-      <input type="number" id="paymentInput" class="form-control form-control-sm" placeholder="0">
-    </div>
+      <div id="bookletPaymentsBox"></div>
+      <div class="mt-3">
+        <div class="mb-2 text-start">
+          <label class="form-label small fw-bold">💵 مبلغ الحصة (اختياري)</label>
+          <input type="number" id="paymentInput" class="form-control form-control-sm" placeholder="0">
+        </div>
+        <div class="mb-2 text-start">
+          <label class="form-label small fw-bold">💬 كومنت (اختياري)</label>
+          <input type="text" id="commentInput" class="form-control form-control-sm" placeholder="ملاحظة...">
+        </div>
+      </div>
       
       <button class="btn btn-success w-100 mt-2" onclick="confirmAttendance()">✅ تأكيد تسجيل الحضور</button>
       <button class="btn btn-outline-secondary w-100 mt-2" onclick="cancelSummary()">إلغاء</button>
@@ -196,8 +199,6 @@
   function showSummary(data) {
     document.getElementById('reader').style.display = 'none';
     document.getElementById('manualCode').closest('.input-group').style.display = 'none';
-    document.getElementById('commentInput').closest('.mb-3').style.display = 'none';
-    document.getElementById('paymentInput').closest('.mb-3').style.display = 'none';
 
     resultBox.innerHTML = '';
     document.getElementById('summaryStudentName').textContent =
@@ -230,30 +231,32 @@
       tbody.innerHTML += `<tr><td>${row.lessonNumber}</td><td>${attendHtml}</td><td class="small">${watchHtml}</td></tr>`;
     });
     // عرض البوكليتس المعلقة
-const bookletBox = document.getElementById('bookletPaymentsBox');
-if (data.pendingBooklets && data.pendingBooklets.length > 0) {
-  let bookletHtml = '<div class="mb-3"><label class="form-label small fw-bold">📚 مدفوعات البوكليتس</label>';
-  data.pendingBooklets.forEach(b => {
-    bookletHtml += `
-      <div class="border rounded p-2 mb-2">
-        <div class="d-flex justify-content-between small mb-1">
-          <span><strong>${b.name}</strong></span>
-          <span class="text-danger">متبقي: ${b.remaining} ج</span>
-        </div>
-        <div class="input-group input-group-sm">
-          <input type="number" class="form-control booklet-payment-input"
-            data-booklet-id="${b.id}" data-remaining="${b.remaining}"
-            placeholder="المبلغ المدفوع الآن" min="0" max="${b.remaining}"
-            oninput="calcBookletRemaining(this, ${b.remaining})">
-          <span class="input-group-text small" id="remaining_${b.id}">سيتبقى: ${b.remaining} ج</span>
-        </div>
-      </div>`;
-  });
-  bookletHtml += '</div>';
-  bookletBox.innerHTML = bookletHtml;
-} else {
-  bookletBox.innerHTML = '';
-}
+    const bookletBox = document.getElementById('bookletPaymentsBox');
+    if (bookletBox) {
+      if (data.pendingBooklets && data.pendingBooklets.length > 0) {
+        let bookletHtml = '<div class="mb-3"><label class="form-label small fw-bold">📚 مدفوعات البوكليتس</label>';
+        data.pendingBooklets.forEach(b => {
+          bookletHtml += `
+            <div class="border rounded p-2 mb-2">
+              <div class="d-flex justify-content-between small mb-1">
+                <span><strong>${b.name}</strong></span>
+                <span class="text-danger">متبقي: ${b.remaining} ج</span>
+              </div>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control booklet-payment-input"
+                  data-booklet-id="${b.id}" data-remaining="${b.remaining}"
+                  placeholder="المبلغ المدفوع الآن" min="0" max="${b.remaining}"
+                  oninput="calcBookletRemaining(this, ${b.remaining})">
+                <span class="input-group-text small" id="remaining_${b.id}">سيتبقى: ${b.remaining} ج</span>
+              </div>
+            </div>`;
+        });
+        bookletHtml += '</div>';
+        bookletBox.innerHTML = bookletHtml;
+      } else {
+        bookletBox.innerHTML = '';
+      }
+    }
 
     document.getElementById('summaryBox').style.display = 'block';
   }
@@ -267,8 +270,6 @@ if (data.pendingBooklets && data.pendingBooklets.length > 0) {
   function showScannerUI() {
     document.getElementById('reader').style.display = 'block';
     document.getElementById('manualCode').closest('.input-group').style.display = 'flex';
-    document.getElementById('commentInput').closest('.mb-3').style.display = 'block';
-    document.getElementById('paymentInput').closest('.mb-3').style.display = 'block';
   }
 
   function confirmAttendance() {
