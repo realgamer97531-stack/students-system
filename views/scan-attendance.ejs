@@ -32,7 +32,7 @@
     <div id="summaryBox" style="display:none;" class="text-start mt-3">
       <div class="alert alert-secondary small" id="adminNoteBox" style="display:none;"></div>
       <h6 id="summaryStudentName" class="mb-2 fw-bold"></h6>
-      
+      <div id="bookletDeliveredBox"></div>
       <table class="table table-sm">
         <thead>
           <tr>
@@ -213,6 +213,25 @@
       noteBox.style.display = 'none';
     }
 
+    const bookletDeliveredBox = document.getElementById('bookletDeliveredBox');
+    if (bookletDeliveredBox) {
+      if (!data.student.bookletStatus && canDeliverBooklets) {
+        bookletDeliveredBox.innerHTML = `
+          <div class="mb-3 p-3 rounded border bg-light text-start">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="scanBookletDeliveredCheckbox"
+                data-student-id="${data.student.id}">
+              <label class="form-check-label fw-bold" for="scanBookletDeliveredCheckbox">
+                استلم البوكليت
+              </label>
+            </div>
+            <div class="small text-muted mt-1">اضغط هنا لو الطالب استلم البوكليت قبل تسجيل الحضور.</div>
+          </div>`;
+      } else {
+        bookletDeliveredBox.innerHTML = '';
+      }
+    }
+
     const tbody = document.getElementById('summaryTableBody');
     tbody.innerHTML = '';
     data.summary.forEach(row => {
@@ -284,6 +303,29 @@
   }
 
   document.addEventListener('change', async function (event) {
+    if (event.target.id === 'scanBookletDeliveredCheckbox') {
+      const checkbox = event.target;
+      if (!checkbox.checked) return;
+
+      try {
+        const response = await fetch('/attendance/scan/booklet-deliver', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: checkbox.dataset.studentId,
+          }),
+        });
+        const data = await response.json();
+        if (data.success) {
+          checkbox.disabled = true;
+          checkbox.closest('.form-check').querySelector('label').textContent = '✓ تم تسجيل الاستلام';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
     if (!event.target.classList.contains('booklet-delivery-checkbox')) return;
     const checkbox = event.target;
     if (!checkbox.checked) return;

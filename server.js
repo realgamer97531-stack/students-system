@@ -1196,6 +1196,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         balance: student.balance,
         pricePerSession: student.price_per_session,
         adminNote: student.admin_note,
+        bookletStatus: student.booklet_status,
       },
       summary,
       bookletStatuses,
@@ -3885,25 +3886,33 @@ app.post('/students/:studentId/booklet-deliver/:sbId', requireAdmin, async (req,
 app.post('/attendance/scan/booklet-deliver', requireAdmin, async (req, res) => {
   try {
     const { studentId, studentBookletId } = req.body;
-    if (!studentId || !studentBookletId) {
-      return res.status(400).json({ success: false, message: 'بيانات البوكليت ناقصة' });
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'الطالب غير محدد' });
     }
-
-    const sb = await StudentBooklet.findOne({ where: { id: studentBookletId, StudentId: studentId } });
-    if (!sb) {
-      return res.status(404).json({ success: false, message: 'البيانات غير موجودة' });
-    }
-
-    if (sb.is_delivered) {
-      return res.json({ success: true, alreadyDelivered: true });
-    }
-
-    sb.is_delivered = true;
-    sb.delivered_at = new Date();
-    await sb.save();
 
     const student = await Student.findByPk(studentId);
-    if (student && !student.booklet_status) {
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'الطالب غير موجود' });
+    }
+
+    if (studentBookletId) {
+      const sb = await StudentBooklet.findOne({ where: { id: studentBookletId, StudentId: studentId } });
+      if (!sb) {
+        return res.status(404).json({ success: false, message: 'البيانات غير موجودة' });
+      }
+      if (sb.is_delivered) {
+        if (!student.booklet_status) {
+          student.booklet_status = true;
+          await student.save();
+        }
+        return res.json({ success: true, alreadyDelivered: true });
+      }
+      sb.is_delivered = true;
+      sb.delivered_at = new Date();
+      await sb.save();
+    }
+
+    if (!student.booklet_status) {
       student.booklet_status = true;
       await student.save();
     }
