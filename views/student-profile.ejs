@@ -15,300 +15,302 @@
 <% } %>
 
 <div class="row g-4">
-  
-  <div class="col-md-5 col-lg-4">
-    
-    <div class="card shadow-sm mb-4" style="border-right: 4px solid <%= warnings.length === 3 ? '#DC2626' : warnings.length === 2 ? '#F59E0B' : '#E2E4F3' %>;">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h6 class="mb-0 font-weight-bold">🚨 الإنذارات</h6>
-          <span class="badge" style="background: <%= warnings.length === 3 ? '#FEE2E2; color:#B91C1C' : warnings.length === 2 ? '#FEF3C7; color:#92400E' : '#EEF0FB; color:#4338CA' %>;">
-            <%= warnings.length %> / 3
-          </span>
-        </div>
-
-        <% if (warnings.length === 0) { %>
-          <p class="text-muted small mb-2">لا يوجد إنذارات</p>
-        <% } %>
-
-        <ul class="list-group list-group-flush mb-3">
-          <% warnings.forEach((w, i) => { %>
-            <li class="list-group-item d-flex justify-content-between align-items-center small px-0">
-              <span>
-                <span class="badge bg-warning text-dark me-2">إنذار <%= i + 1 %></span>
-                <%= w.reason || 'بدون سبب محدد' %><br>
-                <span class="text-muted" style="font-size:0.7rem;">
-                  بواسطة: <%= w.User ? w.User.name : '-' %> - 
-                  <%= new Date(w.createdAt).toLocaleString('ar-EG') %>
-                </span>
+  <div class="col-12">
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="card shadow-sm mb-4" style="border-right: 4px solid <%= warnings.length === 3 ? '#DC2626' : warnings.length === 2 ? '#F59E0B' : '#E2E4F3' %>;">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="mb-0 fw-bold">🚨 الإنذارات</h6>
+              <span class="badge" style="background: <%= warnings.length === 3 ? '#FEE2E2; color:#B91C1C' : warnings.length === 2 ? '#FEF3C7; color:#92400E' : '#EEF0FB; color:#4338CA' %>;">
+                <%= warnings.length %> / 3
               </span>
-              <% if (userRole === 'admin') { %>
-                <form action="/students/<%= student.id %>/warning/remove/<%= w.id %>" method="POST"
-                  onsubmit="return confirm('متأكد من إلغاء هذا الإنذار؟')">
-                  <button class="btn btn-sm btn-outline-secondary">إلغاء</button>
-                </form>
-              <% } %>
-            </li>
-          <% }) %>
-        </ul>
-
-        <% if (warnings.length < 3 && userRole === 'admin') { %>
-          <form action="/students/<%= student.id %>/warning/add" method="POST" class="d-flex gap-2">
-            <input type="text" name="reason" class="form-control form-control-sm" placeholder="سبب الإنذار (اختياري)">
-            <button class="btn btn-sm btn-warning text-white" style="white-space:nowrap;">إضافة إنذار</button>
-          </form>
-        <% } %>
-      </div>
-    </div>
-
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h5 class="card-title mb-3 border-bottom pb-2 text-primary">بيانات الطالب</h5>
-        <form action="/students/<%= student.id %>/edit" method="POST">
-          <div class="mb-2">
-            <label class="form-label small">الاسم</label>
-            <input type="text" name="name" class="form-control form-control-sm" value="<%= student.name %>" required>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small">تليفون الطالب</label>
-            <input type="text" name="phone" class="form-control form-control-sm" value="<%= student.phone %>" required>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small">تليفون ولي الأمر</label>
-            <input type="text" name="parent_phone" class="form-control form-control-sm" value="<%= student.parent_phone %>" required>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small">المادة</label>
-            <select name="subject_id" class="form-select form-select-sm" required>
-              <% subjects.forEach(subj => { %>
-                <option value="<%= subj.id %>" <%= subj.id === student.SubjectId ? 'selected' : '' %>>
-                  <%= subj.name %>
-                </option>
-              <% }) %>
-            </select>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small">السنتر</label>
-            <select name="center_id" class="form-select form-select-sm" required>
-              <% centers.forEach(center => { %>
-                <option value="<%= center.id %>" <%= center.id === student.CenterId ? 'selected' : '' %>>
-                  <%= center.name %>
-                </option>
-              <% }) %>
-            </select>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small">سعر الحصة</label>
-            <input type="number" name="price_per_session" class="form-control form-control-sm" value="<%= student.price_per_session %>" required>
-          </div>
-          <div class="mb-2 form-check">
-            <input type="checkbox" name="booklet_status" class="form-check-input" id="bookletCheck" <%= student.booklet_status ? 'checked' : '' %>>
-            <label class="form-check-label small" for="bookletCheck">اشترى البوكليت</label>
-          </div>
-          <div class="mb-3">
-            <label class="form-label small">ملاحظة دائمة (تظهر للأسيستانت وقت تسجيل الحضور)</label>
-            <textarea name="admin_note" class="form-control form-control-sm" rows="2"><%= student.admin_note || '' %></textarea>
-          </div>
-          <button type="submit" class="btn btn-primary btn-sm w-100">حفظ التعديلات</button>
-        </form>
-      </div>
-    </div>
-
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h5 class="card-title mb-3 border-bottom pb-2">الرصيد الحالي: <span class="text-success"><%= student.balance %> ج</span></h5>
-        <form action="/students/<%= student.id %>/balance" method="POST">
-          <div class="mb-2">
-            <label class="form-label small">المبلغ</label>
-            <input type="number" name="amount" class="form-control form-control-sm" placeholder="مثال: 320" required>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small">نوع العملية</label>
-            <select name="type" class="form-select form-select-sm">
-              <option value="add">إضافة رصيد</option>
-              <option value="deduct">خصم رصيد</option>
-            </select>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small">السبب (اختياري)</label>
-            <input type="text" name="reason" class="form-control form-control-sm" placeholder="مثال: تجديد شهري">
-          </div>
-          <button type="submit" class="btn btn-success btn-sm w-100">تنفيذ العملية</button>
-        </form>
-      </div>
-    </div>
-
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h6 class="mb-3 font-weight-bold">⭐ النقاط: <span class="text-warning"><%= student.points || 0 %> نقطة</span></h6>
-        <p class="text-muted" style="font-size: 0.75rem; line-height: 1.4;">
-          نظام النقاط: حضور +2 | واجب كامل +3 | درجة امتحان = نفس عدد النقاط | مشاهدة فيديو +1
-        </p>
-        <form action="/students/<%= student.id %>/points" method="POST" class="row g-2 mb-2">
-          <div class="col-6">
-            <input type="number" name="amount" class="form-control form-control-sm" placeholder="النقاط" required min="1">
-          </div>
-          <div class="col-6">
-            <select name="type" class="form-select form-select-sm">
-              <option value="add">إضافة</option>
-              <option value="deduct">خصم</option>
-            </select>
-          </div>
-          <div class="col-8">
-            <input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب (اختياري)">
-          </div>
-          <div class="col-4">
-            <button type="submit" class="btn btn-sm btn-warning w-100 text-white">تنفيذ</button>
-          </div>
-        </form>
-        <hr class="my-2">
-        <p class="small text-muted mb-1 fw-bold">سجل النقاط (آخر 10):</p>
-        <ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
-          <% transactions.filter(t => t.reason && t.reason.startsWith('نقاط:')).slice(0, 10).forEach(t => { %>
-            <li class="list-group-item d-flex justify-content-between small px-0 py-1" style="font-size:0.75rem;">
-              <span class="text-truncate" style="max-width: 70%;"><%= t.reason.replace('نقاط: ', '') %></span>
-              <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %> fw-bold">
-                <%= t.amount >= 0 ? '+' : '' %><%= t.amount %>
-              </span>
-            </li>
-          <% }) %>
-        </ul>
-      </div>
-    </div>
-
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h6 class="mb-3 font-weight-bold">📚 البوكليتس</h6>
-        <% if (availableBooklets.length === 0) { %>
-          <p class="text-muted small">لا يوجد بوكليتس لهذه المادة</p>
-        <% } %>
-        <% availableBooklets.forEach(b => { %>
-          <% const sb = studentBooklets.find(s => s.BookletId === b.id); %>
-          <% const paid = sb ? sb.paid_amount : 0; %>
-          <% const remaining = b.sell_price - paid; %>
-          <div class="border rounded p-2 mb-2 bg-light">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <strong class="small"><%= b.name %></strong>
-              <div class="d-flex gap-1 align-items-center">
-                <% if (sb && sb.is_delivered) { %>
-                  <span class="badge bg-success" style="font-size:0.65rem;">✓ تم التسليم</span>
-                <% } else if (sb) { %>
-                  <div class="d-flex align-items-center gap-1">
-                    <span class="badge bg-warning text-dark" style="font-size:0.65rem;">⚠️ غير مستلم</span>
-                    <% if (userRole === 'admin') { %>
-                      <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
-                        <button class="btn btn-sm btn-success" style="font-size:0.65rem;padding:1px 5px;">تسليم</button>
-                      </form>
-                    <% } %>
-                  </div>
-                <% } %>
-              </div>
             </div>
-            <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem; margin-bottom: 5px;">
-              <span>السعر: <%= b.sell_price %> ج</span>
-              <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
-              <span>متبقي: <span class="<%= remaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= remaining %> ج</span></span>
-            </div>
-            <% if (remaining > 0 && userRole === 'admin') { %>
-              <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1 mt-1">
-                <input type="hidden" name="booklet_id" value="<%= b.id %>">
-                <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ" min="1" max="<%= remaining %>" required style="font-size: 0.75rem; padding: 2px 5px;">
-                <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة" style="font-size: 0.75rem; padding: 2px 5px;">
-                <button class="btn btn-sm btn-primary" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">دفع</button>
+
+            <% if (warnings.length === 0) { %>
+              <p class="text-muted small mb-2">لا يوجد إنذارات</p>
+            <% } %>
+
+            <ul class="list-group list-group-flush mb-3">
+              <% warnings.forEach((w, i) => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-center small px-0">
+                  <span>
+                    <span class="badge bg-warning text-dark me-2">إنذار <%= i + 1 %></span>
+                    <%= w.reason || 'بدون سبب محدد' %><br>
+                    <span class="text-muted" style="font-size:0.7rem;">
+                      بواسطة: <%= w.User ? w.User.name : '-' %> - 
+                      <%= new Date(w.createdAt).toLocaleString('ar-EG') %>
+                    </span>
+                  </span>
+                  <% if (userRole === 'admin') { %>
+                    <form action="/students/<%= student.id %>/warning/remove/<%= w.id %>" method="POST"
+                      onsubmit="return confirm('متأكد من إلغاء هذا الإنذار؟')">
+                      <button class="btn btn-sm btn-outline-secondary">إلغاء</button>
+                    </form>
+                  <% } %>
+                </li>
+              <% }) %>
+            </ul>
+
+            <% if (warnings.length < 3 && userRole === 'admin') { %>
+              <form action="/students/<%= student.id %>/warning/add" method="POST" class="d-flex gap-2">
+                <input type="text" name="reason" class="form-control form-control-sm" placeholder="سبب الإنذار (اختياري)">
+                <button class="btn btn-sm btn-warning text-white" style="white-space:nowrap;">إضافة إنذار</button>
               </form>
             <% } %>
           </div>
-        <% }) %>
-      </div>
-    </div>
+        </div>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h6 class="mb-3 font-weight-bold">💳 سجل تعديلات الرصيد</h6>
-        <% if (transactions.length === 0) { %>
-          <p class="text-muted small">لا يوجد تعديلات سابقة</p>
-        <% } %>
-        <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
-          <% transactions.forEach(t => { %>
-            <li class="list-group-item d-flex justify-content-between small px-0 py-2">
-              <div>
-                <span><%= t.reason || '-' %></span><br>
-                <span class="text-muted" style="font-size: 0.65rem;">
-                  <%= new Date(t.createdAt).toLocaleString('ar-EG') %>
-                </span>
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title mb-3 border-bottom pb-2 text-primary">بيانات الطالب</h5>
+            <form action="/students/<%= student.id %>/edit" method="POST">
+              <div class="mb-2">
+                <label class="form-label small">الاسم</label>
+                <input type="text" name="name" class="form-control form-control-sm" value="<%= student.name %>" required>
               </div>
-              <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %> fw-bold">
-                <%= t.amount >= 0 ? '+' : '' %><%= t.amount %> ج
-              </span>
-            </li>
-          <% }) %>
-        </ul>
-      </div>
-    </div>
+              <div class="mb-2">
+                <label class="form-label small">تليفون الطالب</label>
+                <input type="text" name="phone" class="form-control form-control-sm" value="<%= student.phone %>" required>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">تليفون ولي الأمر</label>
+                <input type="text" name="parent_phone" class="form-control form-control-sm" value="<%= student.parent_phone %>" required>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">المادة</label>
+                <select name="subject_id" class="form-select form-select-sm" required>
+                  <% subjects.forEach(subj => { %>
+                    <option value="<%= subj.id %>" <%= subj.id === student.SubjectId ? 'selected' : '' %>>
+                      <%= subj.name %>
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">السنتر</label>
+                <select name="center_id" class="form-select form-select-sm" required>
+                  <% centers.forEach(center => { %>
+                    <option value="<%= center.id %>" <%= center.id === student.CenterId ? 'selected' : '' %>>
+                      <%= center.name %>
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">سعر الحصة</label>
+                <input type="number" name="price_per_session" class="form-control form-control-sm" value="<%= student.price_per_session %>" required>
+              </div>
+              <div class="mb-2 form-check">
+                <input type="checkbox" name="booklet_status" class="form-check-input" id="bookletCheck" <%= student.booklet_status ? 'checked' : '' %>>
+                <label class="form-check-label small" for="bookletCheck">اشترى البوكليت</label>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small">ملاحظة دائمة (تظهر للأسيستانت وقت تسجيل الحضور)</label>
+                <textarea name="admin_note" class="form-control form-control-sm" rows="2"><%= student.admin_note || '' %></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm w-100">حفظ التعديلات</button>
+            </form>
+          </div>
+        </div>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h6 class="mb-3 font-weight-bold">📝 درجات الامتحانات</h6>
-        <% if (examResults.length === 0) { %>
-          <p class="text-muted small">لا يوجد امتحانات مرصودة بعد</p>
-        <% } %>
-        <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
-          <% examResults.forEach(r => { %>
-            <li class="list-group-item d-flex justify-content-between align-items-center small px-0 py-2">
-              <div>
-                <span class="fw-bold"><%= r.Exam.name %></span><br>
-                <span class="text-muted" style="font-size: 0.65rem;">
-                  رصده: <%= r.User ? r.User.name : '-' %><br>
-                  <%= new Date(r.createdAt).toLocaleString('ar-EG') %>
-                </span>
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title mb-3 border-bottom pb-2">الرصيد الحالي: <span class="text-success"><%= student.balance %> ج</span></h5>
+            <form action="/students/<%= student.id %>/balance" method="POST">
+              <div class="mb-2">
+                <label class="form-label small">المبلغ</label>
+                <input type="number" name="amount" class="form-control form-control-sm" placeholder="مثال: 320" required>
               </div>
-              <span class="badge bg-secondary p-2"><strong><%= r.score %></strong> / <%= r.Exam.max_score %></span>
-            </li>
-          <% }) %>
-        </ul>
+              <div class="mb-2">
+                <label class="form-label small">نوع العملية</label>
+                <select name="type" class="form-select form-select-sm">
+                  <option value="add">إضافة رصيد</option>
+                  <option value="deduct">خصم رصيد</option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">السبب (اختياري)</label>
+                <input type="text" name="reason" class="form-control form-control-sm" placeholder="مثال: تجديد شهري">
+              </div>
+              <button type="submit" class="btn btn-success btn-sm w-100">تنفيذ العملية</button>
+            </form>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h6 class="mb-3 font-weight-bold">🎬 مشاهدات الفيديو</h6>
-        <% if (videoWatchData.length === 0) { %>
-          <p class="text-muted small">لا يوجد فيديوهات لمادة هذا الطالب</p>
-        <% } %>
-        <div style="max-height: 300px; overflow-y: auto;">
-          <% videoWatchData.forEach(v => { %>
-            <div class="mb-2 pb-2 border-bottom">
-              <div class="d-flex justify-content-between align-items-center">
-                <strong class="small text-primary"><%= v.title %></strong>
-                <span class="badge bg-light text-dark border small" style="font-size: 0.65rem;">
-                  حصة <%= v.lessonNumber %><% if (v.centerName) { %> (<%= v.centerName %>)<% } %>
-                </span>
+      <div class="col-lg-6">
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h6 class="mb-3 fw-bold">⭐ النقاط: <span class="text-warning"><%= student.points || 0 %> نقطة</span></h6>
+            <p class="text-muted" style="font-size: 0.75rem; line-height: 1.4;">
+              نظام النقاط: حضور +2 | واجب كامل +3 | درجة امتحان = نفس عدد النقاط | مشاهدة فيديو +1
+            </p>
+            <form action="/students/<%= student.id %>/points" method="POST" class="row g-2 mb-2">
+              <div class="col-6">
+                <input type="number" name="amount" class="form-control form-control-sm" placeholder="النقاط" required min="1">
               </div>
-              <% v.parts.forEach(p => { %>
-                <div class="d-flex justify-content-between text-muted mt-1" style="font-size:0.7rem;">
-                  <span><%= p.category %><% if (p.orderIndex > 1) { %> #<%= p.orderIndex %><% } %></span>
-                  <span>
-                    <%= Math.floor(p.watchedSeconds / 60) %>:<%= String(p.watchedSeconds % 60).padStart(2, '0') %> 
-                    من 
-                    <%= Math.floor(p.durationSeconds / 60) %>:<%= String(p.durationSeconds % 60).padStart(2, '0') %>
+              <div class="col-6">
+                <select name="type" class="form-select form-select-sm">
+                  <option value="add">إضافة</option>
+                  <option value="deduct">خصم</option>
+                </select>
+              </div>
+              <div class="col-8">
+                <input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب (اختياري)">
+              </div>
+              <div class="col-4">
+                <button type="submit" class="btn btn-sm btn-warning w-100 text-white">تنفيذ</button>
+              </div>
+            </form>
+            <hr class="my-2">
+            <p class="small text-muted mb-1 fw-bold">سجل النقاط (آخر 10):</p>
+            <ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
+              <% transactions.filter(t => t.reason && t.reason.startsWith('نقاط:')).slice(0, 10).forEach(t => { %>
+                <li class="list-group-item d-flex justify-content-between small px-0 py-1" style="font-size:0.75rem;">
+                  <span class="text-truncate" style="max-width: 70%;"><%= t.reason.replace('نقاط: ', '') %></span>
+                  <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %> fw-bold">
+                    <%= t.amount >= 0 ? '+' : '' %><%= t.amount %>
                   </span>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h6 class="mb-3 fw-bold">📚 البوكليتس</h6>
+            <% if (availableBooklets.length === 0) { %>
+              <p class="text-muted small">لا يوجد بوكليتس لهذه المادة</p>
+            <% } %>
+            <% availableBooklets.forEach(b => { %>
+              <% const sb = studentBooklets.find(s => s.BookletId === b.id); %>
+              <% const paid = sb ? sb.paid_amount : 0; %>
+              <% const remaining = b.sell_price - paid; %>
+              <div class="border rounded p-2 mb-2 bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <strong class="small"><%= b.name %></strong>
+                  <div class="d-flex gap-1 align-items-center">
+                    <% if (sb && sb.is_delivered) { %>
+                      <span class="badge bg-success" style="font-size:0.65rem;">✓ تم التسليم</span>
+                    <% } else if (sb) { %>
+                      <div class="d-flex align-items-center gap-1">
+                        <span class="badge bg-warning text-dark" style="font-size:0.65rem;">⚠️ غير مستلم</span>
+                        <% if (userRole === 'admin') { %>
+                          <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
+                            <button class="btn btn-sm btn-success" style="font-size:0.65rem;padding:1px 5px;">تسليم</button>
+                          </form>
+                        <% } %>
+                      </div>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem; margin-bottom: 5px;">
+                  <span>السعر: <%= b.sell_price %> ج</span>
+                  <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
+                  <span>متبقي: <span class="<%= remaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= remaining %> ج</span></span>
+                </div>
+                <% if (remaining > 0 && userRole === 'admin') { %>
+                  <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1 mt-1">
+                    <input type="hidden" name="booklet_id" value="<%= b.id %>">
+                    <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ" min="1" max="<%= remaining %>" required style="font-size: 0.75rem; padding: 2px 5px;">
+                    <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة" style="font-size: 0.75rem; padding: 2px 5px;">
+                    <button class="btn btn-sm btn-primary" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">دفع</button>
+                  </form>
+                <% } %>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h6 class="mb-3 fw-bold">💳 سجل تعديلات الرصيد</h6>
+            <% if (transactions.length === 0) { %>
+              <p class="text-muted small">لا يوجد تعديلات سابقة</p>
+            <% } %>
+            <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+              <% transactions.forEach(t => { %>
+                <li class="list-group-item d-flex justify-content-between small px-0 py-2">
+                  <div>
+                    <span><%= t.reason || '-' %></span><br>
+                    <span class="text-muted" style="font-size: 0.65rem;">
+                      <%= new Date(t.createdAt).toLocaleString('ar-EG') %>
+                    </span>
+                  </div>
+                  <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %> fw-bold">
+                    <%= t.amount >= 0 ? '+' : '' %><%= t.amount %> ج
+                  </span>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h6 class="mb-3 fw-bold">📝 درجات الامتحانات</h6>
+            <% if (examResults.length === 0) { %>
+              <p class="text-muted small">لا يوجد امتحانات مرصودة بعد</p>
+            <% } %>
+            <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+              <% examResults.forEach(r => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-center small px-0 py-2">
+                  <div>
+                    <span class="fw-bold"><%= r.Exam.name %></span><br>
+                    <span class="text-muted" style="font-size: 0.65rem;">
+                      رصده: <%= r.User ? r.User.name : '-' %><br>
+                      <%= new Date(r.createdAt).toLocaleString('ar-EG') %>
+                    </span>
+                  </div>
+                  <span class="badge bg-secondary p-2"><strong><%= r.score %></strong> / <%= r.Exam.max_score %></span>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h6 class="mb-3 fw-bold">🎬 مشاهدات الفيديو</h6>
+            <% if (videoWatchData.length === 0) { %>
+              <p class="text-muted small">لا يوجد فيديوهات لمادة هذا الطالب</p>
+            <% } %>
+            <div style="max-height: 300px; overflow-y: auto;">
+              <% videoWatchData.forEach(v => { %>
+                <div class="mb-2 pb-2 border-bottom">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong class="small text-primary"><%= v.title %></strong>
+                    <span class="badge bg-light text-dark border small" style="font-size: 0.65rem;">
+                      حصة <%= v.lessonNumber %><% if (v.centerName) { %> (<%= v.centerName %>)<% } %>
+                    </span>
+                  </div>
+                  <% v.parts.forEach(p => { %>
+                    <div class="d-flex justify-content-between text-muted mt-1" style="font-size:0.7rem;">
+                      <span><%= p.category %><% if (p.orderIndex > 1) { %> #<%= p.orderIndex %><% } %></span>
+                      <span>
+                        <%= Math.floor(p.watchedSeconds / 60) %>:<%= String(p.watchedSeconds % 60).padStart(2, '0') %> 
+                        من 
+                        <%= Math.floor(p.durationSeconds / 60) %>:<%= String(p.durationSeconds % 60).padStart(2, '0') %>
+                      </span>
+                    </div>
+                  <% }) %>
                 </div>
               <% }) %>
             </div>
-          <% }) %>
+          </div>
         </div>
       </div>
     </div>
-
   </div>
 
-  <div class="col-md-7 col-lg-8">
+  <div class="col-12">
     <div class="card shadow-sm border-0">
       <div class="card-body">
         <h5 class="card-title mb-4 border-bottom pb-3 text-dark fw-bold">
           📅 سجل الحضور والواجب والامتحانات (مادة: <%= student.Subject.name %>)
         </h5>
-        
         <div class="table-responsive">
           <table class="table table-striped table-hover align-middle border text-center" style="min-width: 650px;">
             <thead class="table-dark">
@@ -393,11 +395,9 @@
             </tbody>
           </table>
         </div>
-        
       </div>
     </div>
   </div>
-
 </div>
 
 <%- include('partials/footer') %>
