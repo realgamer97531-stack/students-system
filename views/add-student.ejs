@@ -71,6 +71,21 @@
           </div>
 
           <div class="mb-3">
+            <label class="form-label">المبلغ المدفوع للبوكليت الآن (اختياري)</label>
+            <input type="number" name="booklet_paid_amount" class="form-control" min="0" step="0.01" value="0">
+            <div class="form-text">سيتم تسجيل هذا المبلغ كدفع بوكليت في سجل الطالب.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">سجل حضور في الحصة الشغالة الآن</label>
+            <div class="form-check">
+              <input type="checkbox" name="register_attendance" class="form-check-input" id="registerAttendanceCheck">
+              <label class="form-check-label" for="registerAttendanceCheck">أضف هذا الطالب كحاضر الآن</label>
+            </div>
+            <div class="form-text">سيتم تنفيذ نفس منطق تسجيل الحضور الحالي عند حفظ الطالب.</div>
+          </div>
+
+          <div class="mb-3">
             <label class="form-label">رصيد ابتدائي (اختياري)</label>
             <input type="number" name="balance" class="form-control" value="0">
           </div>
@@ -111,6 +126,8 @@
         price_per_session: studentForm.querySelector('[name="price_per_session"]').value,
         balance: studentForm.querySelector('[name="balance"]').value,
         booklet_status: studentForm.querySelector('[name="booklet_status"]').checked ? 'on' : '',
+        booklet_paid_amount: studentForm.querySelector('[name="booklet_paid_amount"]').value,
+        register_attendance: studentForm.querySelector('[name="register_attendance"]').checked ? 'on' : '',
         admin_password: hiddenAdminPassword,
       };
 

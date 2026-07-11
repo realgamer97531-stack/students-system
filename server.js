@@ -586,9 +586,20 @@ app.post('/students/:id/points', requireAdmin, async (req, res) => {
 
 app.post('/students', async (req, res) => {
   try {
-    const { name, phone, parent_phone, price_per_session, balance, booklet_status, center_id, subject_id, admin_password } = req.body;
+    const {
+      name,
+      phone,
+      parent_phone,
+      price_per_session,
+      balance,
+      booklet_status,
+      booklet_paid_amount,
+      register_attendance,
+      center_id,
+      subject_id,
+      admin_password,
+    } = req.body;
 
-    // البحث عن طالب بنفس البيانات
     const existingStudent = await Student.findOne({
       where: {
         name: name,
@@ -599,9 +610,7 @@ app.post('/students', async (req, res) => {
       },
     });
 
-    // إذا وجدنا طالب بنفس البيانات
     if (existingStudent) {
-      // التحقق من كلمة المرور الإدارية
       if (admin_password !== process.env.ADMIN_DUPLICATE_PASSWORD) {
         return res.status(409).json({
           success: false,
@@ -612,21 +621,70 @@ app.post('/students', async (req, res) => {
       }
     }
 
+    const initialBalance = parseFloat(balance) || 0;
+    const paidAmount = parseFloat(booklet_paid_amount) || 0;
+    const shouldHaveBookletStatus = booklet_status === 'on' || paidAmount > 0;
+
     const student = await Student.create({
       name,
       phone,
       parent_phone,
       price_per_session,
-      balance: balance || 0,
-      booklet_status: booklet_status === 'on',
+      balance: initialBalance,
+      booklet_status: shouldHaveBookletStatus,
       CenterId: center_id,
       SubjectId: subject_id,
       UserId: req.session.userId,
     });
 
-    const qrCodeImage = await QRCode.toDataURL(student.student_code);
+    let attendanceNote = null;
 
-    res.render('student-created', { student, qrCodeImage });
+    if (paidAmount > 0) {
+      const booklet = await Booklet.findOne({
+        where: { SubjectId: subject_id, is_active: true },
+        order: [['order_index', 'ASC']],
+      });
+      if (booklet) {
+        await processBookletPayments(student.id, [{ booklet_id: booklet.id, amount: paidAmount }], req.session.userId);
+      }
+    }
+
+    if (register_attendance === 'on') {
+      const sessionId = req.session.activeSessionId;
+      if (!sessionId) {
+        attendanceNote = '⚠️ لا توجد حصة شغالة الآن لتسجيل حضور الطالب.';
+      } else {
+        const activeSession = await Session.findByPk(sessionId);
+        if (!activeSession || activeSession.status === 'cancelled') {
+          attendanceNote = '⚠️ الحصة الحالية غير متاحة للتسجيل.';
+        } else {
+          const existingAttendance = await Attendance.findOne({
+            where: { StudentId: student.id, SessionId: sessionId },
+          });
+          if (existingAttendance) {
+            attendanceNote = '⚠️ الطالب مسجل حضور في هذه الحصة بالفعل.';
+          } else if (student.balance < student.price_per_session) {
+            attendanceNote = `⚠️ رصيد الطالب غير كافٍ لتسجيل الحضور (الرصيد: ${student.balance} ج).`;
+          } else {
+            student.balance -= student.price_per_session;
+            await student.save();
+
+            await Attendance.create({
+              StudentId: student.id,
+              SessionId: sessionId,
+              UserId: req.session.userId,
+              comment: null,
+              payment_collected: 0,
+            });
+            await addPoints(student.id, 2);
+            attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
+          }
+        }
+      }
+    }
+
+    const qrCodeImage = await QRCode.toDataURL(student.student_code);
+    res.render('student-created', { student, qrCodeImage, attendanceNote });
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة في الحفظ: ' + error.message);

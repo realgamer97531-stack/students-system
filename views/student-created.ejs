@@ -4,6 +4,11 @@
       <h3 class="text-success mb-3">✅ تم تسجيل الطالب بنجاح</h3>
       <h5 class="mb-3"><%= student.name %></h5>
       <p class="text-muted">كود الطالب: <strong><%= student.student_code %></strong></p>
+      <% if (typeof attendanceNote !== 'undefined' && attendanceNote) { %>
+        <div class="alert alert-info text-start">
+          <%= attendanceNote %>
+        </div>
+      <% } %>
 
       <img src="<%= qrCodeImage %>" alt="QR Code" class="img-fluid mb-3" style="max-width: 250px; margin: auto;">
 
