@@ -1,83 +1,85 @@
 <%- include('partials/header') %>
+
 <% if (student.is_blocked) { %>
-  <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+  <div class="alert alert-danger d-flex align-items-center gap-2 mb-4 shadow-sm border-0">
     <span style="font-size:1.5rem;">⛔</span>
     <div>
       <strong>هذا الطالب محظور من النظام</strong> - وصل لـ 3 إنذارات
       <% if (userRole === 'admin') { %>
         <form action="/students/<%= student.id %>/unblock" method="POST" class="d-inline ms-3">
-          <button class="btn btn-sm btn-success">فك الحظر</button>
+          <button class="btn btn-sm btn-success px-3">فك الحظر</button>
         </form>
       <% } %>
     </div>
   </div>
 <% } %>
 
-<div class="card shadow-sm mb-3" style="border-right: 4px solid <%= warnings.length === 3 ? '#DC2626' : warnings.length === 2 ? '#F59E0B' : '#E2E4F3' %>;">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h6 class="mb-0">🚨 الإنذارات</h6>
-      <span class="badge" style="background: <%= warnings.length === 3 ? '#FEE2E2; color:#B91C1C' : warnings.length === 2 ? '#FEF3C7; color:#92400E' : '#EEF0FB; color:#4338CA' %>;">
-        <%= warnings.length %> / 3
-      </span>
+<div class="row g-4">
+  
+  <div class="col-md-5 col-lg-4">
+    
+    <div class="card shadow-sm mb-4" style="border-right: 4px solid <%= warnings.length === 3 ? '#DC2626' : warnings.length === 2 ? '#F59E0B' : '#E2E4F3' %>;">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0 font-weight-bold">🚨 الإنذارات</h6>
+          <span class="badge" style="background: <%= warnings.length === 3 ? '#FEE2E2; color:#B91C1C' : warnings.length === 2 ? '#FEF3C7; color:#92400E' : '#EEF0FB; color:#4338CA' %>;">
+            <%= warnings.length %> / 3
+          </span>
+        </div>
+
+        <% if (warnings.length === 0) { %>
+          <p class="text-muted small mb-2">لا يوجد إنذارات</p>
+        <% } %>
+
+        <ul class="list-group list-group-flush mb-3">
+          <% warnings.forEach((w, i) => { %>
+            <li class="list-group-item d-flex justify-content-between align-items-center small px-0">
+              <span>
+                <span class="badge bg-warning text-dark me-2">إنذار <%= i + 1 %></span>
+                <%= w.reason || 'بدون سبب محدد' %><br>
+                <span class="text-muted" style="font-size:0.7rem;">
+                  بواسطة: <%= w.User ? w.User.name : '-' %> - 
+                  <%= new Date(w.createdAt).toLocaleString('ar-EG') %>
+                </span>
+              </span>
+              <% if (userRole === 'admin') { %>
+                <form action="/students/<%= student.id %>/warning/remove/<%= w.id %>" method="POST"
+                  onsubmit="return confirm('متأكد من إلغاء هذا الإنذار؟')">
+                  <button class="btn btn-sm btn-outline-secondary">إلغاء</button>
+                </form>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+
+        <% if (warnings.length < 3 && userRole === 'admin') { %>
+          <form action="/students/<%= student.id %>/warning/add" method="POST" class="d-flex gap-2">
+            <input type="text" name="reason" class="form-control form-control-sm" placeholder="سبب الإنذار (اختياري)">
+            <button class="btn btn-sm btn-warning text-white" style="white-space:nowrap;">إضافة إنذار</button>
+          </form>
+        <% } %>
+      </div>
     </div>
 
-    <% if (warnings.length === 0) { %>
-      <p class="text-muted small mb-2">لا يوجد إنذارات</p>
-    <% } %>
-
-    <ul class="list-group list-group-flush mb-3">
-      <% warnings.forEach((w, i) => { %>
-        <li class="list-group-item d-flex justify-content-between align-items-center small px-0">
-          <span>
-            <span class="badge bg-warning text-dark me-2">إنذار <%= i + 1 %></span>
-            <%= w.reason || 'بدون سبب محدد' %><br>
-            <span class="text-muted" style="font-size:0.7rem;">
-              بواسطة: <%= w.User ? w.User.name : '-' %> -
-              <%= new Date(w.createdAt).toLocaleString('ar-EG') %>
-            </span>
-          </span>
-          <% if (userRole === 'admin') { %>
-            <form action="/students/<%= student.id %>/warning/remove/<%= w.id %>" method="POST"
-              onsubmit="return confirm('متأكد من إلغاء هذا الإنذار؟')">
-              <button class="btn btn-sm btn-outline-secondary">إلغاء</button>
-            </form>
-          <% } %>
-        </li>
-      <% }) %>
-    </ul>
-
-    <% if (warnings.length < 3 && userRole === 'admin') { %>
-      <form action="/students/<%= student.id %>/warning/add" method="POST" class="d-flex gap-2">
-        <input type="text" name="reason" class="form-control form-control-sm" placeholder="سبب الإنذار (اختياري)">
-        <button class="btn btn-sm btn-warning text-white" style="white-space:nowrap;">إضافة إنذار</button>
-      </form>
-    <% } %>
-  </div>
-</div>
-
-<div class="row g-4">
-  <!-- بيانات الطالب وتعديلها -->
-  <div class="col-md-5">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <h5 class="mb-3">بيانات الطالب</h5>
+        <h5 class="card-title mb-3 border-bottom pb-2 text-primary">بيانات الطالب</h5>
         <form action="/students/<%= student.id %>/edit" method="POST">
           <div class="mb-2">
-            <label class="form-label">الاسم</label>
-            <input type="text" name="name" class="form-control" value="<%= student.name %>" required>
+            <label class="form-label small">الاسم</label>
+            <input type="text" name="name" class="form-control form-control-sm" value="<%= student.name %>" required>
           </div>
           <div class="mb-2">
-            <label class="form-label">تليفون الطالب</label>
-            <input type="text" name="phone" class="form-control" value="<%= student.phone %>" required>
+            <label class="form-label small">تليفون الطالب</label>
+            <input type="text" name="phone" class="form-control form-control-sm" value="<%= student.phone %>" required>
           </div>
           <div class="mb-2">
-            <label class="form-label">تليفون ولي الأمر</label>
-            <input type="text" name="parent_phone" class="form-control" value="<%= student.parent_phone %>" required>
+            <label class="form-label small">تليفون ولي الأمر</label>
+            <input type="text" name="parent_phone" class="form-control form-control-sm" value="<%= student.parent_phone %>" required>
           </div>
           <div class="mb-2">
-            <label class="form-label">المادة</label>
-            <select name="subject_id" class="form-select" required>
+            <label class="form-label small">المادة</label>
+            <select name="subject_id" class="form-select form-select-sm" required>
               <% subjects.forEach(subj => { %>
                 <option value="<%= subj.id %>" <%= subj.id === student.SubjectId ? 'selected' : '' %>>
                   <%= subj.name %>
@@ -86,8 +88,8 @@
             </select>
           </div>
           <div class="mb-2">
-            <label class="form-label">السنتر</label>
-            <select name="center_id" class="form-select" required>
+            <label class="form-label small">السنتر</label>
+            <select name="center_id" class="form-select form-select-sm" required>
               <% centers.forEach(center => { %>
                 <option value="<%= center.id %>" <%= center.id === student.CenterId ? 'selected' : '' %>>
                   <%= center.name %>
@@ -96,147 +98,146 @@
             </select>
           </div>
           <div class="mb-2">
-            <label class="form-label">سعر الحصة</label>
-            <input type="number" name="price_per_session" class="form-control" value="<%= student.price_per_session %>" required>
+            <label class="form-label small">سعر الحصة</label>
+            <input type="number" name="price_per_session" class="form-control form-control-sm" value="<%= student.price_per_session %>" required>
           </div>
           <div class="mb-2 form-check">
-            <input type="checkbox" name="booklet_status" class="form-check-input" <%= student.booklet_status ? 'checked' : '' %>>
-            <label class="form-check-label">اشترى البوكليت</label>
+            <input type="checkbox" name="booklet_status" class="form-check-input" id="bookletCheck" <%= student.booklet_status ? 'checked' : '' %>>
+            <label class="form-check-label small" for="bookletCheck">اشترى البوكليت</label>
           </div>
-          <div class="mb-2">
-  <label class="form-label">ملاحظة دائمة (تظهر للأسيستانت وقت تسجيل الحضور)</label>
-  <textarea name="admin_note" class="form-control" rows="2"><%= student.admin_note || '' %></textarea>
-</div>
-          <button type="submit" class="btn btn-primary w-100 mt-2">حفظ التعديلات</button>
+          <div class="mb-3">
+            <label class="form-label small">ملاحظة دائمة (تظهر للأسيستانت وقت تسجيل الحضور)</label>
+            <textarea name="admin_note" class="form-control form-control-sm" rows="2"><%= student.admin_note || '' %></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm w-100">حفظ التعديلات</button>
         </form>
       </div>
     </div>
 
-    <!-- تعديل الرصيد -->
-    <div class="card shadow-sm mt-3">
+    <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <h5 class="mb-3">الرصيد الحالي: <span class="text-success"><%= student.balance %> ج</span></h5>
+        <h5 class="card-title mb-3 border-bottom pb-2">الرصيد الحالي: <span class="text-success"><%= student.balance %> ج</span></h5>
         <form action="/students/<%= student.id %>/balance" method="POST">
           <div class="mb-2">
-            <label class="form-label">المبلغ</label>
-            <input type="number" name="amount" class="form-control" placeholder="مثال: 320" required>
+            <label class="form-label small">المبلغ</label>
+            <input type="number" name="amount" class="form-control form-control-sm" placeholder="مثال: 320" required>
           </div>
           <div class="mb-2">
-            <label class="form-label">نوع العملية</label>
-            <select name="type" class="form-select">
+            <label class="form-label small">نوع العملية</label>
+            <select name="type" class="form-select form-select-sm">
               <option value="add">إضافة رصيد</option>
               <option value="deduct">خصم رصيد</option>
             </select>
           </div>
           <div class="mb-2">
-            <label class="form-label">السبب (اختياري)</label>
-            <input type="text" name="reason" class="form-control" placeholder="مثال: تجديد شهري">
+            <label class="form-label small">السبب (اختياري)</label>
+            <input type="text" name="reason" class="form-control form-control-sm" placeholder="مثال: تجديد شهري">
           </div>
-          <button type="submit" class="btn btn-success w-100">تنفيذ</button>
+          <button type="submit" class="btn btn-success btn-sm w-100">تنفيذ العملية</button>
         </form>
       </div>
     </div>
-    <div class="card shadow-sm mt-3">
-  <div class="card-body">
-    <h6 class="mb-3">⭐ النقاط: <span class="text-warning"><%= student.points || 0 %> نقطة</span></h6>
-    <p class="small text-muted mb-2">
-      نظام النقاط: حضور +2 | واجب كامل +3 | درجة امتحان = نفس عدد النقاط | مشاهدة فيديو +1
-    </p>
-    <form action="/students/<%= student.id %>/points" method="POST" class="row g-2">
-      <div class="col-md-3">
-        <input type="number" name="amount" class="form-control form-control-sm" placeholder="عدد النقاط" required min="1">
-      </div>
-      <div class="col-md-3">
-        <select name="type" class="form-select form-select-sm">
-          <option value="add">إضافة نقاط</option>
-          <option value="deduct">خصم نقاط</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب (اختياري)">
-      </div>
-      <div class="col-md-2">
-        <button type="submit" class="btn btn-sm btn-warning w-100">تنفيذ</button>
-      </div>
-    </form>
-    <hr class="my-2">
-    <p class="small text-muted mb-1">سجل النقاط (آخر 10):</p>
-    <ul class="list-group list-group-flush">
-      <% transactions.filter(t => t.reason && t.reason.startsWith('نقاط:')).slice(0, 10).forEach(t => { %>
-        <li class="list-group-item d-flex justify-content-between small px-0">
-          <span><%= t.reason.replace('نقاط: ', '') %></span>
-          <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %>">
-            <%= t.amount >= 0 ? '+' : '' %><%= t.amount %>
-          </span>
-        </li>
-      <% }) %>
-    </ul>
-  </div>
-</div>
 
-<div class="card shadow-sm mt-3">
-  <div class="card-body">
-    <h6 class="mb-3">📚 البوكليتس</h6>
-    <% if (availableBooklets.length === 0) { %>
-      <p class="text-muted small">لا يوجد بوكليتس لهذه المادة</p>
-    <% } %>
-    <% availableBooklets.forEach(b => { %>
-      <% const sb = studentBooklets.find(s => s.BookletId === b.id); %>
-      <% const paid = sb ? sb.paid_amount : 0; %>
-      <% const remaining = b.sell_price - paid; %>
-      <div class="border rounded p-2 mb-2">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <strong class="small"><%= b.name %></strong>
-          <div class="d-flex gap-1 align-items-center">
-            <% if (sb && sb.is_delivered) { %>
-              <span class="badge bg-success" style="font-size:0.65rem;">✓ تم التسليم</span>
-            <% } else if (sb) { %>
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-warning text-dark" style="font-size:0.65rem;">⚠️ لسه غير مستلم</span>
-                <% if (userRole === 'admin') { %>
-                  <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
-                    <button class="btn btn-sm btn-success" style="font-size:0.65rem;padding:2px 8px;">تسليم البوكليت</button>
-                  </form>
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h6 class="mb-3 font-weight-bold">⭐ النقاط: <span class="text-warning"><%= student.points || 0 %> نقطة</span></h6>
+        <p class="text-muted" style="font-size: 0.75rem; line-height: 1.4;">
+          نظام النقاط: حضور +2 | واجب كامل +3 | درجة امتحان = نفس عدد النقاط | مشاهدة فيديو +1
+        </p>
+        <form action="/students/<%= student.id %>/points" method="POST" class="row g-2 mb-2">
+          <div class="col-6">
+            <input type="number" name="amount" class="form-control form-control-sm" placeholder="النقاط" required min="1">
+          </div>
+          <div class="col-6">
+            <select name="type" class="form-select form-select-sm">
+              <option value="add">إضافة</option>
+              <option value="deduct">خصم</option>
+            </select>
+          </div>
+          <div class="col-8">
+            <input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب (اختياري)">
+          </div>
+          <div class="col-4">
+            <button type="submit" class="btn btn-sm btn-warning w-100 text-white">تنفيذ</button>
+          </div>
+        </form>
+        <hr class="my-2">
+        <p class="small text-muted mb-1 fw-bold">سجل النقاط (آخر 10):</p>
+        <ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
+          <% transactions.filter(t => t.reason && t.reason.startsWith('نقاط:')).slice(0, 10).forEach(t => { %>
+            <li class="list-group-item d-flex justify-content-between small px-0 py-1" style="font-size:0.75rem;">
+              <span class="text-truncate" style="max-width: 70%;"><%= t.reason.replace('نقاط: ', '') %></span>
+              <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %> fw-bold">
+                <%= t.amount >= 0 ? '+' : '' %><%= t.amount %>
+              </span>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h6 class="mb-3 font-weight-bold">📚 البوكليتس</h6>
+        <% if (availableBooklets.length === 0) { %>
+          <p class="text-muted small">لا يوجد بوكليتس لهذه المادة</p>
+        <% } %>
+        <% availableBooklets.forEach(b => { %>
+          <% const sb = studentBooklets.find(s => s.BookletId === b.id); %>
+          <% const paid = sb ? sb.paid_amount : 0; %>
+          <% const remaining = b.sell_price - paid; %>
+          <div class="border rounded p-2 mb-2 bg-light">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="small"><%= b.name %></strong>
+              <div class="d-flex gap-1 align-items-center">
+                <% if (sb && sb.is_delivered) { %>
+                  <span class="badge bg-success" style="font-size:0.65rem;">✓ تم التسليم</span>
+                <% } else if (sb) { %>
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="badge bg-warning text-dark" style="font-size:0.65rem;">⚠️ غير مستلم</span>
+                    <% if (userRole === 'admin') { %>
+                      <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
+                        <button class="btn btn-sm btn-success" style="font-size:0.65rem;padding:1px 5px;">تسليم</button>
+                      </form>
+                    <% } %>
+                  </div>
                 <% } %>
               </div>
+            </div>
+            <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem; margin-bottom: 5px;">
+              <span>السعر: <%= b.sell_price %> ج</span>
+              <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
+              <span>متبقي: <span class="<%= remaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= remaining %> ج</span></span>
+            </div>
+            <% if (remaining > 0 && userRole === 'admin') { %>
+              <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1 mt-1">
+                <input type="hidden" name="booklet_id" value="<%= b.id %>">
+                <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ" min="1" max="<%= remaining %>" required style="font-size: 0.75rem; padding: 2px 5px;">
+                <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة" style="font-size: 0.75rem; padding: 2px 5px;">
+                <button class="btn btn-sm btn-primary" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">دفع</button>
+              </form>
             <% } %>
           </div>
-        </div>
-        <div class="d-flex justify-content-between small text-muted mb-2">
-          <span>السعر: <%= b.sell_price %> ج</span>
-          <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
-          <span>متبقي: <span class="<%= remaining > 0 ? 'text-danger' : 'text-success' %>"><%= remaining %> ج</span></span>
-        </div>
-        <% if (remaining > 0 && userRole === 'admin') { %>
-          <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1">
-            <input type="hidden" name="booklet_id" value="<%= b.id %>">
-            <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ المدفوع" min="1" max="<%= remaining %>" required>
-            <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة">
-            <button class="btn btn-sm btn-primary" style="white-space:nowrap;">دفع</button>
-          </form>
-        <% } %>
+        <% }) %>
       </div>
-    <% }) %>
-  </div>
-</div>
+    </div>
 
-    <!-- سجل تعديلات الرصيد -->
-    <div class="card shadow-sm mt-3">
+    <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <h6 class="mb-3">سجل تعديلات الرصيد</h6>
+        <h6 class="mb-3 font-weight-bold">💳 سجل تعديلات الرصيد</h6>
         <% if (transactions.length === 0) { %>
           <p class="text-muted small">لا يوجد تعديلات سابقة</p>
         <% } %>
-        <ul class="list-group list-group-flush">
+        <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
           <% transactions.forEach(t => { %>
-            <li class="list-group-item d-flex justify-content-between small">
+            <li class="list-group-item d-flex justify-content-between small px-0 py-2">
               <div>
                 <span><%= t.reason || '-' %></span><br>
                 <span class="text-muted" style="font-size: 0.65rem;">
                   <%= new Date(t.createdAt).toLocaleString('ar-EG') %>
                 </span>
               </div>
-              <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %>">
+              <span class="<%= t.amount >= 0 ? 'text-success' : 'text-danger' %> fw-bold">
                 <%= t.amount >= 0 ? '+' : '' %><%= t.amount %> ج
               </span>
             </li>
@@ -244,152 +245,159 @@
         </ul>
       </div>
     </div>
-    <div class="card shadow-sm mt-3">
+
+    <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <h6 class="mb-3">درجات الامتحانات</h6>
+        <h6 class="mb-3 font-weight-bold">📝 درجات الامتحانات</h6>
         <% if (examResults.length === 0) { %>
           <p class="text-muted small">لا يوجد امتحانات مرصودة بعد</p>
         <% } %>
-        <ul class="list-group list-group-flush">
-<% examResults.forEach(r => { %>
-        <li class="list-group-item d-flex justify-content-between align-items-center small">
-          <div>
-            <span><%= r.Exam.name %></span><br>
-            <span class="text-muted" style="font-size: 0.7rem;">
-              رصده: <%= r.User ? r.User.name : '-' %><br>
-              <%= new Date(r.createdAt).toLocaleString('ar-EG') %>
-            </span>
-          </div>
-          <span><strong><%= r.score %></strong> / <%= r.Exam.max_score %></span>
-        </li>
-      <% }) %>
+        <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+          <% examResults.forEach(r => { %>
+            <li class="list-group-item d-flex justify-content-between align-items-center small px-0 py-2">
+              <div>
+                <span class="fw-bold"><%= r.Exam.name %></span><br>
+                <span class="text-muted" style="font-size: 0.65rem;">
+                  رصده: <%= r.User ? r.User.name : '-' %><br>
+                  <%= new Date(r.createdAt).toLocaleString('ar-EG') %>
+                </span>
+              </div>
+              <span class="badge bg-secondary p-2"><strong><%= r.score %></strong> / <%= r.Exam.max_score %></span>
+            </li>
+          <% }) %>
         </ul>
       </div>
     </div>
-    <div class="card shadow-sm mt-3">
-  <div class="card-body">
-    <h6 class="mb-3">مشاهدات الفيديو</h6>
-    <% if (videoWatchData.length === 0) { %>
-      <p class="text-muted small">لا يوجد فيديوهات لمادة هذا الطالب</p>
-    <% } %>
-    <% videoWatchData.forEach(v => { %>
-      <div class="mb-2 pb-2 border-bottom">
-        <div class="d-flex justify-content-between">
-          <strong class="small"><%= v.title %></strong>
-          <span class="text-muted small">
-            حصة <%= v.lessonNumber %><% if (v.centerName) { %> (<%= v.centerName %>)<% } %>
-          </span>
-        </div>
-        <% v.parts.forEach(p => { %>
-          <div class="d-flex justify-content-between small text-muted">
-            <span><%= p.category %><% if (p.orderIndex > 1) { %> #<%= p.orderIndex %><% } %></span>
-            <span>
-              <%= Math.floor(p.watchedSeconds / 60) %>:<%= String(p.watchedSeconds % 60).padStart(2, '0') %>
-              من
-              <%= Math.floor(p.durationSeconds / 60) %>:<%= String(p.durationSeconds % 60).padStart(2, '0') %>
-            </span>
-          </div>
-        <% }) %>
-      </div>
-    <% }) %>
-  </div>
-</div>
-  </div>
 
-  <!-- سجل الحضور والغياب -->
-  <div class="col-md-7">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <h5 class="mb-3">سجل الحضور والواجب (مادة <%= student.Subject.name %>)</h5>
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-              <thead class="table-light">
-                  <tr>
-                    <th>رقم الحصة</th>
-                    <th>السيريال بتاع مجموعته</th>
-                    <th>التاريخ</th>
-                    <th>الحضور</th>
-                    <th>الواجب</th>
-                    <th>الامتحان</th>
-                  </tr>
-                </thead>
-              <tbody>
-                <% attendanceRows.forEach(row => { %>
-                  <tr>
-                    <td><%= row.session.lesson_number %></td>
-                    <td><%= row.session.serial_number %></td>
-                    <td><%= row.session.session_date %></td>
-                    <td>
-                      <% if (row.attendanceStatus === 'attended') { %>
-  <span class="badge bg-success">حضر</span><br>
-  <span class="text-muted" style="font-size: 0.7rem;">
-    سجّله: <%= row.attendanceUser %><br>
-    <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
-  </span>
-  <% if (userRole === 'admin' && row.attendanceId) { %>
-    <br>
-    <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟')">
-      <button type="submit" class="btn btn-sm btn-outline-danger mt-1">حذف الحضور</button>
-    </form>
-  <% } %>
-<% } else if (row.attendanceStatus === 'attended_elsewhere') { %>
-  <span class="badge bg-info text-dark">حضر في: <%= row.attendedElsewhere %></span><br>
-  <span class="text-muted" style="font-size: 0.7rem;">
-    سجّله: <%= row.attendanceUser %><br>
-    <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
-  </span>
-  <% if (userRole === 'admin' && row.attendanceId) { %>
-    <br>
-    <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟ سيتم استرجاع المبلغ للطالب.')">
-  <input type="hidden" name="redirect_to" value="/students/<%= student.id %>">
-  <button type="submit" class="btn btn-sm btn-outline-danger mt-1">حذف الحضور</button>
-</form>
-  <% } %>
-                        <% } else if (row.attendanceStatus === 'cancelled') { %>
-                        <span class="badge bg-secondary">ملغية</span>
-                      <% } else { %>
-                        <span class="badge bg-danger">غاب</span>
-                      <% } %>
-                    </td>
-                    <td>
-                              <% if (!row.homeworkStatus) { %>
-                                <span class="text-muted small">-</span>
-                              <% } else { %>
-                                <% if (row.homeworkStatus === 'complete') { %>
-                                  <span class="badge bg-success">كامل</span>
-                                <% } else if (row.homeworkStatus === 'incomplete') { %>
-                                  <span class="badge bg-warning text-dark">مش كامل</span>
-                                <% } else if (row.homeworkStatus === 'no_steps') { %>
-                                  <span class="badge bg-secondary">من غير خطوات</span>
-                                <% } else { %>
-                                  <span class="badge bg-danger">مش معمول</span>
-                                <% } %>
-                                <br>
-            <span class="text-muted" style="font-size: 0.7rem;">
-              صحّحه: <%= row.homeworkUser %><br>
-              <%= row.homeworkTime ? new Date(row.homeworkTime).toLocaleString('ar-EG') : '' %>
-            </span>
-          <% } %>
-        </td>
-                    <td>
-                      <% if (row.examInfo) { %>
-            <strong><%= row.examInfo.score %></strong> / <%= row.examInfo.max_score %><br>
-            <span class="text-muted" style="font-size: 0.7rem;">
-              رصده: <%= row.examInfo.recordedBy %><br>
-              <%= row.examInfo.recordedAt ? new Date(row.examInfo.recordedAt).toLocaleString('ar-EG') : '' %>
-            </span>
-                      <% } else { %>
-                        <span class="text-muted small">-</span>
-                      <% } %>
-                    </td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
+        <h6 class="mb-3 font-weight-bold">🎬 مشاهدات الفيديو</h6>
+        <% if (videoWatchData.length === 0) { %>
+          <p class="text-muted small">لا يوجد فيديوهات لمادة هذا الطالب</p>
+        <% } %>
+        <div style="max-height: 300px; overflow-y: auto;">
+          <% videoWatchData.forEach(v => { %>
+            <div class="mb-2 pb-2 border-bottom">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong class="small text-primary"><%= v.title %></strong>
+                <span class="badge bg-light text-dark border small" style="font-size: 0.65rem;">
+                  حصة <%= v.lessonNumber %><% if (v.centerName) { %> (<%= v.centerName %>)<% } %>
+                </span>
+              </div>
+              <% v.parts.forEach(p => { %>
+                <div class="d-flex justify-content-between text-muted mt-1" style="font-size:0.7rem;">
+                  <span><%= p.category %><% if (p.orderIndex > 1) { %> #<%= p.orderIndex %><% } %></span>
+                  <span>
+                    <%= Math.floor(p.watchedSeconds / 60) %>:<%= String(p.watchedSeconds % 60).padStart(2, '0') %> 
+                    من 
+                    <%= Math.floor(p.durationSeconds / 60) %>:<%= String(p.durationSeconds % 60).padStart(2, '0') %>
+                  </span>
+                </div>
+              <% }) %>
+            </div>
+          <% }) %>
         </div>
       </div>
     </div>
+
   </div>
+
+  <div class="col-md-7 col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h5 class="card-title mb-4 border-bottom pb-3 text-dark fw-bold">
+          📅 سجل الحضور والواجب والامتحانات (مادة: <%= student.Subject.name %>)
+        </h5>
+        
+        <div class="table-responsive">
+          <table class="table table-striped table-hover align-middle border text-center" style="min-width: 650px;">
+            <thead class="table-dark">
+              <tr>
+                <th style="width: 10%;">رقم الحصة</th>
+                <th style="width: 18%;">سيريال المجموعة</th>
+                <th style="width: 15%;">التاريخ</th>
+                <th style="width: 22%;">الحضور</th>
+                <th style="width: 18%;">الواجب</th>
+                <th style="width: 17%;">الامتحان المفاجئ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% attendanceRows.forEach(row => { %>
+                <tr>
+                  <td class="fw-bold"><%= row.session.lesson_number %></td>
+                  <td><span class="badge bg-light text-dark border"><%= row.session.serial_number %></span></td>
+                  <td class="small text-muted"><%= row.session.session_date %></td>
+                  <td>
+                    <% if (row.attendanceStatus === 'attended') { %>
+                      <span class="badge bg-success px-2 py-1 mb-1">حضر</span><br>
+                      <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
+                        سجّله: <%= row.attendanceUser %><br>
+                        <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
+                      </span>
+                      <% if (userRole === 'admin' && row.attendanceId) { %>
+                        <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟')">
+                          <button type="submit" class="btn btn-xs btn-outline-danger mt-1" style="font-size:0.65rem; padding: 2px 6px;">حذف الحضور</button>
+                        </form>
+                      <% } %>
+                    <% } else if (row.attendanceStatus === 'attended_elsewhere') { %>
+                      <span class="badge bg-info text-dark px-2 py-1 mb-1">حضر في: <%= row.attendedElsewhere %></span><br>
+                      <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
+                        سجّله: <%= row.attendanceUser %><br>
+                        <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
+                      </span>
+                      <% if (userRole === 'admin' && row.attendanceId) { %>
+                        <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟ سيتم استرجاع المبلغ للطالب.')">
+                          <input type="hidden" name="redirect_to" value="/students/<%= student.id %>">
+                          <button type="submit" class="btn btn-xs btn-outline-danger mt-1" style="font-size:0.65rem; padding: 2px 6px;">حذف الحضور</button>
+                        </form>
+                      <% } %>
+                    <% } else if (row.attendanceStatus === 'cancelled') { %>
+                      <span class="badge bg-secondary px-2 py-1">ملغية</span>
+                    <% } else { %>
+                      <span class="badge bg-danger px-2 py-1">غاب</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (!row.homeworkStatus) { %>
+                      <span class="text-muted small">-</span>
+                    <% } else { %>
+                      <% if (row.homeworkStatus === 'complete') { %>
+                        <span class="badge bg-success px-2 py-1 mb-1">كامل</span>
+                      <% } else if (row.homeworkStatus === 'incomplete') { %>
+                        <span class="badge bg-warning text-dark px-2 py-1 mb-1">مش كامل</span>
+                      <% } else if (row.homeworkStatus === 'no_steps') { %>
+                        <span class="badge bg-secondary px-2 py-1 mb-1">من غير خطوات</span>
+                      <% } else { %>
+                        <span class="badge bg-danger px-2 py-1 mb-1">مش معمول</span>
+                      <% } %>
+                      <br>
+                      <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
+                        صحّحه: <%= row.homeworkUser %><br>
+                        <%= row.homeworkTime ? new Date(row.homeworkTime).toLocaleString('ar-EG') : '' %>
+                      </span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (row.examInfo) { %>
+                      <span class="fs-6 fw-bold text-dark"><%= row.examInfo.score %></span> / <span class="small text-muted"><%= row.examInfo.max_score %></span><br>
+                      <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
+                        رصده: <%= row.examInfo.recordedBy %><br>
+                        <%= row.examInfo.recordedAt ? new Date(row.examInfo.recordedAt).toLocaleString('ar-EG') : '' %>
+                      </span>
+                    <% } else { %>
+                      <span class="text-muted small">-</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <%- include('partials/footer') %>
