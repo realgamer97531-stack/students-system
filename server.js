@@ -42,6 +42,7 @@ const Booklet = require('./models/Booklet');
 const StudentBooklet = require('./models/StudentBooklet');
 const BookletReservation = require('./models/BookletReservation');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
+const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
 
@@ -50,36 +51,6 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
-async function analyzeImageWithAI(buffer, mimeType) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
-
-  const base64 = buffer.toString('base64');
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: 'استخرج فقط transaction_reference و is_successful_transaction من صورة إيصال دفع Vodafone Cash بصيغة JSON.' },
-          { inline_data: { mime_type: mimeType || 'image/jpeg', data: base64 } },
-        ],
-      }],
-      generationConfig: { responseMimeType: 'application/json' },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(await response.text());
-  }
-
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('AI did not return a readable response');
-
-  return JSON.parse(text.trim());
-}
 
 Booklet.belongsTo(Subject, { foreignKey: 'SubjectId' });
 Subject.hasMany(Booklet, { foreignKey: 'SubjectId' });
@@ -4035,20 +4006,23 @@ app.post('/api/portal/booklets/:id/reserve', verifyPortalToken('student'), reser
     let transactionReference = null;
 
     // رفع الصورة على Cloudinary لو فودافون كاش
-    if (payment_method === 'vodafone' && req.file) {
-      const aiAnalysis = await analyzeImageWithAI(req.file.buffer, req.file.mimetype);
-      if (!aiAnalysis || !aiAnalysis.is_successful_transaction || !aiAnalysis.transaction_reference) {
-        return res.status(400).json({ success: false, message: 'الصورة غير واضحة أو ليست إيصال فودافون كاش صالح.' });
+    if (payment_method === 'vodafone') {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'يرجى رفع صورة إيصال فودافون كاش' });
       }
 
-      transactionReference = String(aiAnalysis.transaction_reference).trim();
-
-      const reused = await BookletReservation.findOne({
-        where: { transaction_reference: transactionReference },
+      const receiptCheck = await checkReceiptWithAI({
+        imageBuffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        PaymentVerification,
+        BookletReservation,
       });
-      if (reused) {
-        return res.status(400).json({ success: false, message: '❌ عذراً، هذا الإيصال تم استخدامه مسبقاً! يرجى مراجعة الإدارة.' });
+
+      if (!receiptCheck.success) {
+        return res.status(400).json({ success: false, message: receiptCheck.message });
       }
+
+      transactionReference = receiptCheck.transactionReference;
 
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
