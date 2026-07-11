@@ -4,39 +4,44 @@
 <p class="text-muted mb-4">نظام متقدم لمتابعة أداء الطلاب مع تحليل شامل للمخاطر</p>
 
 <style>
-  .severity-critical { background-color: #fee2e2; border-left: 4px solid #dc2626; }
-  .severity-warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; }
-  .severity-caution { background-color: #e0f2fe; border-left: 4px solid #0284c7; }
+  .severity-critical { background-color: #fee2e2; border-right: 4px solid #dc2626; border-radius: 8px; }
+  .severity-warning { background-color: #fef3c7; border-right: 4px solid #f59e0b; border-radius: 8px; }
+  .severity-caution { background-color: #e0f2fe; border-right: 4px solid #0284c7; border-radius: 8px; }
+  [data-theme="dark"] .severity-critical { background-color: rgba(220, 38, 38, 0.15); }
+  [data-theme="dark"] .severity-warning { background-color: rgba(245, 158, 11, 0.15); }
+  [data-theme="dark"] .severity-caution { background-color: rgba(2, 132, 199, 0.15); }
   
   .risk-badge { 
     font-size: 0.85rem; 
     font-weight: bold;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
   }
   .risk-critical { background: #dc2626; color: white; }
   .risk-warning { background: #f59e0b; color: white; }
   .risk-caution { background: #0284c7; color: white; }
 
-  .student-row { cursor: pointer; transition: all 0.3s ease; }
-  .student-row:hover { transform: translateX(4px); }
+  .student-row { cursor: pointer; transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), background 0.2s ease; }
+  .student-row:hover { transform: translateX(-4px); }
   
-  .details-section { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+  .details-section { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
   .details-section.open { max-height: 500px; }
   
-  .stat-mini { display: inline-block; margin: 4px 8px 4px 0; padding: 4px 8px; background: #f3f4f6; border-radius: 4px; font-size: 0.85rem; }
-  .exam-item { background: #f9fafb; padding: 8px; margin: 4px 0; border-radius: 4px; font-size: 0.85rem; }
+  .stat-mini { display: inline-block; margin: 4px 8px 4px 0; padding: 4px 10px; background: var(--sf-table-header-bg, #f3f4f6); color: var(--sf-text, inherit); border-radius: 6px; font-size: 0.85rem; }
+  .exam-item { background: var(--sf-table-header-bg, #f9fafb); color: var(--sf-text, inherit); padding: 8px 10px; margin: 4px 0; border-radius: 6px; font-size: 0.85rem; }
   
   .badge-flag {
     display: inline-block;
     margin: 2px 4px;
-    padding: 4px 8px;
+    padding: 4px 10px;
     border-radius: 12px;
     font-size: 0.75rem;
     font-weight: bold;
   }
   .badge-critical { background: #fee2e2; color: #991b1b; }
   .badge-warning { background: #fef3c7; color: #92400e; }
+  [data-theme="dark"] .badge-critical { background: rgba(220, 38, 38, 0.2); color: #fca5a5; }
+  [data-theme="dark"] .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
 </style>
 
 <div class="card shadow-sm">
