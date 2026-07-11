@@ -3297,6 +3297,26 @@ app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
   const subjectsData = await Subject.findAll();
   const centersData = await Center.findAll();
   const groupStats = [];
+
+  // تحويلات فودافون كاش (من سجل المعاملات)
+  const vodafoneTransactions = await BalanceTransaction.findAll({
+    where: {
+      createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+      amount: { [Op.gt]: 0 },
+    },
+    include: [{ model: Student, attributes: ['name', 'student_code'] }],
+    order: [['createdAt', 'DESC']],
+  });
+
+  const vodafoneBooklet = vodafoneTransactions.filter(t => t.reason && t.reason.includes('بوكليت'));
+  const vodafoneBalance = vodafoneTransactions.filter(t => t.reason && t.reason.includes('شحن رصيد'));
+  const vodafoneOther = vodafoneTransactions.filter(t =>
+    t.reason && !t.reason.includes('بوكليت') && !t.reason.includes('شحن رصيد') && !t.reason.includes('دفع')
+  );
+  const totalVodafone = vodafoneTransactions.reduce((s, t) => s + t.amount, 0);
+  const totalVodafoneBooklet = vodafoneBooklet.reduce((s, t) => s + t.amount, 0);
+  const totalVodafoneBalance = vodafoneBalance.reduce((s, t) => s + t.amount, 0);
+
   // إجمالي البوكليتس في الشهر
   const bookletSales = await BalanceTransaction.findAll({
     where: {
@@ -3357,6 +3377,61 @@ app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
   });
   const totalAssistantSalaries = assistantSalariesMonth.reduce((s, a) => s + (a.salary_calculated || 0), 0);
 
+  // حسابات السناتر (إيراد كل سنتر + عدد الطلاب + نسبة الحضور)
+  const centerStats = [];
+  for (const cent of centersData) {
+    if (cent.name === 'أونلاين') continue;
+
+    const centerStudents = await Student.findAll({ where: { CenterId: cent.id } });
+    const centerSessions = await Session.findAll({
+      where: { CenterId: cent.id, status: 'normal',
+        session_date: { [Op.between]: [monthStart, monthEnd] },
+      },
+    });
+    const centerSessionIds = centerSessions.map(s => s.id);
+    const centerStudentIds = centerStudents.map(s => s.id);
+
+    const centerAttendances = await Attendance.findAll({
+      where: { SessionId: centerSessionIds },
+      include: [{ model: Student, attributes: ['price_per_session'] }],
+    });
+
+    const ownAtt = centerAttendances.filter(a => centerStudentIds.includes(a.StudentId));
+    const outsideAtt = centerAttendances.filter(a => !centerStudentIds.includes(a.StudentId));
+
+    const revenue = centerAttendances.reduce((s, a) =>
+      s + (a.Student ? a.Student.price_per_session : 0), 0
+    );
+
+    const totalPossible = centerStudents.length * centerSessions.length;
+    const attendanceRate = totalPossible > 0
+      ? ((ownAtt.length / totalPossible) * 100).toFixed(1)
+      : 0;
+
+    // إيراد البوكليتس لهذا السنتر
+    const centerBookletRevenue = await BalanceTransaction.findAll({
+      where: {
+        reason: { [Op.like]: 'دفع بوكليت:%' },
+        createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+        StudentId: centerStudentIds.length > 0 ? centerStudentIds : [0],
+      },
+    });
+    const bookletRev = centerBookletRevenue.reduce((s, t) => s + t.amount, 0);
+
+    centerStats.push({
+      centerName: cent.name,
+      centerId: cent.id,
+      totalStudents: centerStudents.length,
+      totalSessions: centerSessions.length,
+      ownAttendance: ownAtt.length,
+      outsideAttendance: outsideAtt.length,
+      attendanceRate: parseFloat(attendanceRate),
+      sessionRevenue: revenue,
+      bookletRevenue: bookletRev,
+      totalRevenue: revenue + bookletRev,
+    });
+  }
+
   // ===== مؤشرات شهرية تاريخية (آخر 6 شهور) =====
   const monthlyTrend = [];
   for (let i = 5; i >= 0; i--) {
@@ -3390,6 +3465,9 @@ app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
     totalAssistantSalaries,
     netRevenue: monthlyRevenue - totalExpenses - totalSalaries - totalAssistantSalaries,
     totalBookletRevenue, totalBookletCost, totalBookletProfit, allBooklets,
+    vodafoneTransactions, vodafoneBooklet, vodafoneBalance, vodafoneOther,
+    totalVodafone, totalVodafoneBooklet, totalVodafoneBalance,
+    centerStats,
   });
 });
 
