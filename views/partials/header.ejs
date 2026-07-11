@@ -18,16 +18,16 @@
       --sf-warning: #F59E0B;
       --sf-danger: #E11D48;
       --sf-info: #0EA5E9;
-      --sf-bg: #F5F6FB;
-      --sf-sidebar: #1E1B4B;
+      --sf-bg: #F4F5FC;
+      --sf-sidebar: #191653;
       --sf-sidebar-hover: #312E81;
-      --sf-text: #1E1B2E;
+      --sf-text: #181527;
       --sf-muted: #6B7280;
-      --sf-radius: 14px;
-      --sf-radius-sm: 10px;
-      --sf-shadow: 0 4px 14px rgba(30, 27, 75, 0.07);
-      --sf-shadow-md: 0 8px 24px rgba(30, 27, 75, 0.10);
-      --sf-shadow-lg: 0 16px 40px rgba(30, 27, 75, 0.14);
+      --sf-radius: 16px;
+      --sf-radius-sm: 11px;
+      --sf-shadow: 0 2px 8px rgba(30, 27, 75, 0.06);
+      --sf-shadow-md: 0 10px 28px rgba(30, 27, 75, 0.12);
+      --sf-shadow-lg: 0 20px 48px rgba(30, 27, 75, 0.16);
       --sf-card-bg: #FFFFFF;
       --sf-input-border: #E2E4F3;
       --sf-table-header-bg: #EEF0FB;
@@ -119,16 +119,24 @@
     .sf-logo-text span { color: var(--sf-accent); }
 
     .sidebar p.welcome {
-      text-align: center; font-size: 0.78rem; color: #A5B4FC; margin-bottom: 20px;
+      text-align: center; font-size: 0.78rem; color: #A5B4FC; margin-bottom: 18px;
       padding-bottom: 18px;
       border-bottom: 1px solid rgba(255,255,255,0.08);
       margin-left: 18px; margin-right: 18px;
     }
 
+    .sf-nav-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #7C7FB8;
+      padding: 4px 24px 8px;
+      letter-spacing: 0.3px;
+    }
+
     .sidebar a {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 11px;
       color: #C7C9E8;
       padding: 10.5px 22px;
       margin: 1px 10px;
@@ -136,6 +144,7 @@
       text-decoration: none;
       font-size: 0.92rem;
       font-weight: 500;
+      line-height: 1.3;
       transition: background 0.2s var(--sf-ease), color 0.2s var(--sf-ease), transform 0.15s var(--sf-ease);
       border-right: 3px solid transparent;
     }
@@ -172,6 +181,23 @@
 
     h3, h4, h5, h6 { font-weight: 700; color: var(--sf-text); letter-spacing: -0.2px; }
     h1, h2 { color: var(--sf-text); font-weight: 800; letter-spacing: -0.3px; }
+
+    /* Consistent page-title rhythm: almost every page opens with an h3 (+ optional subtitle) */
+    .main-content > h3:first-child,
+    .main-content > div:first-child > h3,
+    .main-content > .d-flex:first-child h3 {
+      font-size: 1.55rem;
+      margin-bottom: 4px;
+    }
+    .main-content > p.text-muted:first-of-type,
+    .main-content > div:first-child p.text-muted,
+    .main-content > .d-flex:first-child p.text-muted {
+      font-size: 0.93rem;
+      margin-bottom: 0;
+    }
+
+    .card-body { padding: 1.35rem; }
+    .card-body.p-0 { padding: 0 !important; }
 
     .card {
       border: none;
@@ -514,6 +540,11 @@ span.text-muted {
       <span class="en-only" style="display:none;">Welcome, <%= userName %> (<%= userRole === 'admin' ? 'Admin' : 'Assistant' %>)</span>
     </p>
 
+    <div class="sf-nav-label">
+      <span class="ar-only">الطلاب</span>
+      <span class="en-only" style="display:none;">Students</span>
+    </div>
+
     <% function canShow(key) { return userRole === 'admin' || userPermissions.includes(key); } %>
 
     <% if (canShow('students_view')) { %>
@@ -529,6 +560,10 @@ span.text-muted {
       </a>
     <% } %>
     <hr>
+    <div class="sf-nav-label">
+      <span class="ar-only">الحصص والجدول</span>
+      <span class="en-only" style="display:none;">Sessions & Schedule</span>
+    </div>
     <% if (canShow('sessions_view')) { %>
       <a href="/sessions">
         <span class="ar-only">🗂️ كل الحصص</span>
@@ -554,6 +589,10 @@ span.text-muted {
       </a>
     <% } %>
     <hr>
+    <div class="sf-nav-label">
+      <span class="ar-only">الحضور والواجبات</span>
+      <span class="en-only" style="display:none;">Attendance & Homework</span>
+    </div>
     <% if (canShow('attendance_scan')) { %>
       <a href="/attendance/scan">
         <span class="ar-only">✅ تسجيل حضور</span>
@@ -579,6 +618,10 @@ span.text-muted {
       </a>
     <% } %>
     <hr>
+    <div class="sf-nav-label">
+      <span class="ar-only">التقارير والامتحانات</span>
+      <span class="en-only" style="display:none;">Reports & Exams</span>
+    </div>
     <% if (canShow('exams')) { %>
       <a href="/exams">
         <span class="ar-only">📊 الامتحانات والدرجات</span>
@@ -587,6 +630,10 @@ span.text-muted {
     <% } %>
     <% if (canShow('admin_videos')) { %>
       <hr>
+      <div class="sf-nav-label">
+        <span class="ar-only">المحتوى</span>
+        <span class="en-only" style="display:none;">Content</span>
+      </div>
       <a href="/admin/videos">
         <span class="ar-only">🎬 إدارة الفيديوهات</span>
         <span class="en-only" style="display:none;">🎬 Manage Videos</span>
@@ -594,6 +641,10 @@ span.text-muted {
     <% } %>
     <% if (userRole === 'admin') { %>
       <hr>
+      <div class="sf-nav-label">
+        <span class="ar-only">الإدارة</span>
+        <span class="en-only" style="display:none;">Administration</span>
+      </div>
       <a href="/users">
         <span class="ar-only">👤 إدارة المستخدمين</span>
         <span class="en-only" style="display:none;">👤 Manage Users</span>
