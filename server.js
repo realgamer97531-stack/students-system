@@ -3868,7 +3868,17 @@ app.post('/students/:studentId/booklet-payment', requireAdmin, async (req, res) 
 
 app.post('/students/:studentId/booklet-deliver/:sbId', requireAdmin, async (req, res) => {
   const sb = await StudentBooklet.findByPk(req.params.sbId);
-  if (sb) { sb.is_delivered = true; sb.delivered_at = new Date(); await sb.save(); }
+  if (sb) {
+    sb.is_delivered = true;
+    sb.delivered_at = new Date();
+    await sb.save();
+
+    const student = await Student.findByPk(sb.StudentId);
+    if (student && !student.booklet_status) {
+      student.booklet_status = true;
+      await student.save();
+    }
+  }
   res.redirect('/students/' + req.params.studentId);
 });
 
@@ -3891,6 +3901,12 @@ app.post('/attendance/scan/booklet-deliver', requireAdmin, async (req, res) => {
     sb.is_delivered = true;
     sb.delivered_at = new Date();
     await sb.save();
+
+    const student = await Student.findByPk(studentId);
+    if (student && !student.booklet_status) {
+      student.booklet_status = true;
+      await student.save();
+    }
 
     res.json({ success: true, alreadyDelivered: false });
   } catch (error) {
@@ -4018,6 +4034,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
 
 async function processBookletPayments(studentId, bookletPayments, userId) {
   if (!bookletPayments) return;
+  const student = await Student.findByPk(studentId);
   const payments = Array.isArray(bookletPayments) ? bookletPayments : [bookletPayments];
   for (const payment of payments) {
     if (!payment.booklet_id || !payment.amount || parseFloat(payment.amount) <= 0) continue;
@@ -4030,6 +4047,11 @@ async function processBookletPayments(studentId, bookletPayments, userId) {
     });
     sb.paid_amount += parseFloat(payment.amount);
     await sb.save();
+
+    if (student && !student.booklet_status) {
+      student.booklet_status = true;
+      await student.save();
+    }
 
     await BalanceTransaction.create({
       StudentId: studentId,
