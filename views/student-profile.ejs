@@ -189,13 +189,16 @@
           <strong class="small"><%= b.name %></strong>
           <div class="d-flex gap-1 align-items-center">
             <% if (sb && sb.is_delivered) { %>
-              <span class="badge bg-success" style="font-size:0.65rem;">✓ استلم</span>
+              <span class="badge bg-success" style="font-size:0.65rem;">✓ تم التسليم</span>
             <% } else if (sb) { %>
-              <% if (userRole === 'admin') { %>
-              <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
-                <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 8px;background:#D1FAE5;color:#047857;">تسليم ✓</button>
-              </form>
-              <% } %>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-warning text-dark" style="font-size:0.65rem;">⚠️ لسه غير مستلم</span>
+                <% if (userRole === 'admin') { %>
+                  <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
+                    <button class="btn btn-sm btn-success" style="font-size:0.65rem;padding:2px 8px;">تسليم البوكليت</button>
+                  </form>
+                <% } %>
+              </div>
             <% } %>
           </div>
         </div>

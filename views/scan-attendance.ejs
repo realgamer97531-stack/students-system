@@ -250,24 +250,27 @@
                   <span class="badge ${badgeClass}" style="font-size:0.65rem;">${badgeText}</span>
                 </div>
               </div>
+              ${b.studentBookletId && !b.isDelivered ? `
+                <div class="mt-2">
+                  <div class="form-check">
+                    <input class="form-check-input booklet-delivery-checkbox" type="checkbox"
+                      data-student-id="${data.student.id}" data-student-booklet-id="${b.studentBookletId}"
+                      id="booklet-deliver-${b.studentBookletId}">
+                    <label class="form-check-label small" for="booklet-deliver-${b.studentBookletId}">
+                      <span class="booklet-delivery-state text-warning">تم تسليم البوكليت</span>
+                    </label>
+                  </div>
+                </div>
+              ` : ''}
               ${!isComplete ? `
-                <div class="input-group input-group-sm">
+                <div class="input-group input-group-sm mt-2">
                   <input type="number" class="form-control booklet-payment-input"
                     data-booklet-id="${b.id}" data-remaining="${b.remaining}"
                     placeholder="المبلغ المدفوع الآن" min="0" max="${b.remaining}"
                     oninput="calcBookletRemaining(this, ${b.remaining})">
                   <span class="input-group-text small" id="remaining_${b.id}">سيتبقى: ${b.remaining} ج</span>
                 </div>
-              ` : `
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                  <span class="text-success small fw-bold">تم سداد البوكليت</span>
-                  ${!b.isDelivered && b.studentBookletId && canDeliverBooklets ? `
-                    <form action="/students/${data.student.id}/booklet-deliver/${b.studentBookletId}" method="POST">
-                      <button class="btn btn-sm btn-outline-success">تم التسليم ✓</button>
-                    </form>
-                  ` : `<span class="badge bg-success" style="font-size:0.65rem;">${b.isDelivered ? '✓ استلم' : 'في انتظار التسليم'}</span>`}
-                </div>
-              `}
+              ` : ''}
             </div>`;
         });
         bookletHtml += '</div>';
@@ -279,6 +282,34 @@
 
     document.getElementById('summaryBox').style.display = 'block';
   }
+
+  document.addEventListener('change', async function (event) {
+    if (!event.target.classList.contains('booklet-delivery-checkbox')) return;
+    const checkbox = event.target;
+    if (!checkbox.checked) return;
+
+    try {
+      const response = await fetch('/attendance/scan/booklet-deliver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: checkbox.dataset.studentId,
+          studentBookletId: checkbox.dataset.studentBookletId,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        const state = checkbox.closest('.form-check').querySelector('.booklet-delivery-state');
+        if (state) {
+          state.className = 'booklet-delivery-state text-success fw-bold';
+          state.textContent = 'تم التسليم';
+        }
+        checkbox.disabled = true;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  });
 
   function cancelSummary() {
     document.getElementById('summaryBox').style.display = 'none';

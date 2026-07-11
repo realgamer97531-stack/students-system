@@ -3872,6 +3872,33 @@ app.post('/students/:studentId/booklet-deliver/:sbId', requireAdmin, async (req,
   res.redirect('/students/' + req.params.studentId);
 });
 
+app.post('/attendance/scan/booklet-deliver', requireAdmin, async (req, res) => {
+  try {
+    const { studentId, studentBookletId } = req.body;
+    if (!studentId || !studentBookletId) {
+      return res.status(400).json({ success: false, message: 'بيانات البوكليت ناقصة' });
+    }
+
+    const sb = await StudentBooklet.findOne({ where: { id: studentBookletId, StudentId: studentId } });
+    if (!sb) {
+      return res.status(404).json({ success: false, message: 'البيانات غير موجودة' });
+    }
+
+    if (sb.is_delivered) {
+      return res.json({ success: true, alreadyDelivered: true });
+    }
+
+    sb.is_delivered = true;
+    sb.delivered_at = new Date();
+    await sb.save();
+
+    res.json({ success: true, alreadyDelivered: false });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في تحديث حالة التسليم' });
+  }
+});
+
 // ===== Lookup: جلب بيانات الطالب مع البوكليتس (للصفحة اللي تظهر بعد السكان) =====
 
 app.post('/attendance/scan/lookup', async (req, res) => {
@@ -3911,6 +3938,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         paidAmount, remaining,
         isDelivered,
         isFullyPaid: remaining <= 0,
+        studentBookletId: sb ? sb.id : null,
       };
     }));
 
@@ -3973,6 +4001,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         pricePerSession: student.price_per_session,
         adminNote: student.admin_note,
       },
+      bookletStatuses: bookletStatus,
       pendingBooklets,
       summary,
     });
