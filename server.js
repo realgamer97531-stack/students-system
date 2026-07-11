@@ -3173,302 +3173,343 @@ function requireAnalyticsAuth(req, res, next) {
   res.redirect('/analytics/lock');
 }
 
-app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
-  const { month, compare_month, subject_id, center_id } = req.query;
+// Middleware مشترك للـ tabs
+async function getAnalyticsBase(req, res) {
+  const { month } = req.query;
   const currentMonth = month || new Date().toISOString().slice(0, 7);
-  const compareMonth = compare_month || null;
-
   const subjects = await Subject.findAll();
   const centers = await Center.findAll();
-  const users = await User.findAll();
+  return { currentMonth, subjects, centers };
+}
 
-  const monthStart = currentMonth + '-01';
-  const monthEnd = currentMonth + '-31';
+// ===== Tab 1: الملخص =====
+app.get('/analytics', requireAnalyticsAuth, async (req, res) => {
+  try {
+    const { currentMonth, subjects, centers } = await getAnalyticsBase(req, res);
+    const monthStart = currentMonth + '-01';
+    const monthEnd = currentMonth + '-31';
 
-  // ===== دالة مساعدة لحساب إحصائيات مجموعة معينة =====
-  async function calcGroupStats(subj, cent, fromDate, toDate) {
-    const groupStudents = await Student.findAll({
-      where: { SubjectId: subj.id, CenterId: cent.id },
-      include: [Center, Subject],
-    });
-    if (groupStudents.length === 0) return null;
-
-    const groupSessions = await Session.findAll({
-      where: { SubjectId: subj.id, CenterId: cent.id, status: 'normal',
-        ...(fromDate && toDate ? { session_date: { [Op.between]: [fromDate, toDate] } } : {}),
-      },
-    });
-
-    const studentIds = groupStudents.map(s => s.id);
-    const sessionIds = groupSessions.map(s => s.id);
-
-    // حضور
-    const allAttendances = await Attendance.findAll({
-      where: { SessionId: sessionIds },
-      include: [{ model: Student, required: false }],
-    });
-    const ownAttendances = allAttendances.filter(a => studentIds.includes(a.StudentId));
-    const outsideAttendances = allAttendances.filter(a => !studentIds.includes(a.StudentId));
-
-    // تعويض أونلاين
-    const onlineCompensation = await Attendance.findAll({
-      where: { StudentId: studentIds },
-      include: [{ model: Session, include: [Center], where: { SubjectId: subj.id } }],
-    });
-    const onlineComp = onlineCompensation.filter(a => a.Session.Center.name === 'أونلاين').length;
-    const otherCenterComp = onlineCompensation.filter(a =>
-      a.Session.CenterId !== cent.id && a.Session.Center.name !== 'أونلاين'
-    ).length;
-
-    // واجب
-    const hwRecords = await HomeworkCheck.findAll({
-      where: { StudentId: studentIds, SessionId: sessionIds },
-    });
-    const hwStats = {
-      complete: hwRecords.filter(h => h.status === 'complete').length,
-      incomplete: hwRecords.filter(h => h.status === 'incomplete').length,
-      no_steps: hwRecords.filter(h => h.status === 'no_steps').length,
-      not_done: hwRecords.filter(h => h.status === 'not_done').length,
-    };
-
-    // امتحانات
-    const examResults = await ExamResult.findAll({
-      where: { StudentId: studentIds },
-      include: [{ model: Exam, where: { SubjectId: subj.id }, required: false }],
-    });
-    const validScores = examResults.filter(r => r.Exam).map(r => ({ score: r.score, max: r.Exam.max_score }));
-    const avgScore = validScores.length > 0
-      ? (validScores.reduce((s, r) => s + (r.score / r.max * 100), 0) / validScores.length).toFixed(1)
-      : null;
-
-    // مالي
-    const normalPrice = Math.max(...groupStudents.map(s => s.price_per_session));
-    const reducedStudents = groupStudents.filter(s => s.price_per_session < normalPrice && s.price_per_session > 0);
-    const freeStudents = groupStudents.filter(s => s.price_per_session === 0);
-    const revenue = ownAttendances.reduce((sum, a) => {
-      const st = groupStudents.find(s => s.id === a.StudentId);
-      return sum + (st ? st.price_per_session : 0);
-    }, 0);
-
-    // نمو الطلاب
-    const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30);
-    const sixtyAgo = new Date(); sixtyAgo.setDate(sixtyAgo.getDate() - 60);
-    const recentNew = groupStudents.filter(s => new Date(s.createdAt) >= thirtyAgo).length;
-    const prevNew = groupStudents.filter(s => new Date(s.createdAt) >= sixtyAgo && new Date(s.createdAt) < thirtyAgo).length;
-    const growthRate = prevNew > 0 ? (((recentNew - prevNew) / prevNew) * 100).toFixed(1) : (recentNew > 0 ? 100 : 0);
-
-    // توقع الشهر الجاي
-    const avgRevPerStudent = revenue / (groupStudents.length || 1);
-    const projectedNext = Math.round(avgRevPerStudent * groupStudents.length * 1.05);
-
-    const totalPossible = groupStudents.length * groupSessions.length;
-    const attendanceRate = totalPossible > 0 ? ((ownAttendances.length / totalPossible) * 100).toFixed(1) : 0;
-    const hwRate = hwRecords.length > 0 ? ((hwStats.complete / hwRecords.length) * 100).toFixed(1) : 0;
-
-    // تنبيهات
-    const alerts = [];
-    if (parseFloat(attendanceRate) < 60) alerts.push({ type: 'danger', msg: `نسبة حضور منخفضة جداً (${attendanceRate}%)` });
-    else if (parseFloat(attendanceRate) < 75) alerts.push({ type: 'warning', msg: `نسبة حضور تحت المتوسط (${attendanceRate}%)` });
-    if (parseFloat(growthRate) < -10) alerts.push({ type: 'danger', msg: `تراجع في عدد الطلاب (${growthRate}%)` });
-    if (parseFloat(hwRate) < 50) alerts.push({ type: 'warning', msg: `نسبة إنجاز الواجب ضعيفة (${hwRate}%)` });
-    if (freeStudents.length / groupStudents.length > 0.2) alerts.push({ type: 'info', msg: `نسبة الطلاب المجانيين مرتفعة (${Math.round(freeStudents.length/groupStudents.length*100)}%)` });
-
-    return {
-      subjectId: subj.id, centerId: cent.id,
-      subjectName: subj.name, centerName: cent.name,
-      totalStudents: groupStudents.length,
-      totalSessions: groupSessions.length,
-      ownAttendance: ownAttendances.length,
-      outsideAttendance: outsideAttendances.length,
-      onlineCompensation: onlineComp,
-      otherCenterCompensation: otherCenterComp,
-      attendanceRate: parseFloat(attendanceRate),
-      reducedCount: reducedStudents.length,
-      freeCount: freeStudents.length,
-      hwStats, hwRate: parseFloat(hwRate),
-      avgScore, revenue,
-      growthRate: parseFloat(growthRate),
-      recentNew, projectedNext,
-      normalPrice, alerts,
-    };
-  }
-
-  // حساب كل المجموعات
-  const subjectsData = await Subject.findAll();
-  const centersData = await Center.findAll();
-  const groupStats = [];
-
-  // تحويلات فودافون كاش (من سجل المعاملات)
-  const vodafoneTransactions = await BalanceTransaction.findAll({
-    where: {
-      createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
-      amount: { [Op.gt]: 0 },
-    },
-    include: [{ model: Student, attributes: ['name', 'student_code'] }],
-    order: [['createdAt', 'DESC']],
-  });
-
-  const vodafoneBooklet = vodafoneTransactions.filter(t => t.reason && t.reason.includes('بوكليت'));
-  const vodafoneBalance = vodafoneTransactions.filter(t => t.reason && t.reason.includes('شحن رصيد'));
-  const vodafoneOther = vodafoneTransactions.filter(t =>
-    t.reason && !t.reason.includes('بوكليت') && !t.reason.includes('شحن رصيد') && !t.reason.includes('دفع')
-  );
-  const totalVodafone = vodafoneTransactions.reduce((s, t) => s + t.amount, 0);
-  const totalVodafoneBooklet = vodafoneBooklet.reduce((s, t) => s + t.amount, 0);
-  const totalVodafoneBalance = vodafoneBalance.reduce((s, t) => s + t.amount, 0);
-
-  // إجمالي البوكليتس في الشهر
-  const bookletSales = await BalanceTransaction.findAll({
-    where: {
-      reason: { [Op.like]: 'دفع بوكليت:%' },
-      createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
-    },
-  });
-  const totalBookletRevenue = bookletSales.reduce((s, t) => s + t.amount, 0);
-
-  // تكلفة البوكليتس
-  const allBooklets = await Booklet.findAll({ include: [Subject] });
-  const totalBookletCost = allBooklets.reduce((s, b) => s + (b.print_price * b.stock_count), 0);
-  const totalBookletProfit = allBooklets.reduce((s, b) => s + ((b.sell_price - b.print_price) * b.stock_count), 0);
-
-  for (const subj of subjectsData) {
-    if (subject_id && String(subj.id) !== String(subject_id)) continue;
-    for (const cent of centersData) {
-      if (center_id && String(cent.id) !== String(center_id)) continue;
-      const stats = await calcGroupStats(subj, cent, monthStart, monthEnd);
-      if (stats) groupStats.push(stats);
-    }
-  }
-
-  // مقارنة مع شهر تاني
-  let compareStats = [];
-  if (compareMonth) {
-    const cStart = compareMonth + '-01';
-    const cEnd = compareMonth + '-31';
-    for (const subj of subjectsData) {
-      for (const cent of centersData) {
-        const stats = await calcGroupStats(subj, cent, cStart, cEnd);
-        if (stats) compareStats.push({ ...stats, isCompare: true });
-      }
-    }
-  }
-
-  // ===== مالي الشهر =====
-  const monthlyAttendances = await Attendance.findAll({
-    where: { createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] } },
-    include: [{ model: Student }],
-  });
-  const monthlyRevenue = monthlyAttendances.reduce((s, a) => s + (a.Student ? a.Student.price_per_session : 0), 0);
-
-  const expenses = await Expense.findAll({
-    where: { expense_date: { [Op.between]: [monthStart, monthEnd] } },
-    order: [['expense_date', 'DESC']],
-  });
-  const salaries = await Salary.findAll({ where: { month: currentMonth }, include: [User] });
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalSalaries = salaries.reduce((s, e) => s + e.amount, 0);
-  // راتب الأسيستانتس المحسوب من حضورهم الفعلي في الشهر
-  const assistantSalariesMonth = await AssistantAttendance.findAll({
-    where: {
-      createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
-      salary_calculated: { [Op.not]: null },
-    },
-    include: [User],
-  });
-  const totalAssistantSalaries = assistantSalariesMonth.reduce((s, a) => s + (a.salary_calculated || 0), 0);
-
-  // حسابات السناتر (إيراد كل سنتر + عدد الطلاب + نسبة الحضور)
-  const centerStats = [];
-  for (const cent of centersData) {
-    if (cent.name === 'أونلاين') continue;
-
-    const centerStudents = await Student.findAll({ where: { CenterId: cent.id } });
-    const centerSessions = await Session.findAll({
-      where: { CenterId: cent.id, status: 'normal',
-        session_date: { [Op.between]: [monthStart, monthEnd] },
-      },
-    });
-    const centerSessionIds = centerSessions.map(s => s.id);
-    const centerStudentIds = centerStudents.map(s => s.id);
-
-    const centerAttendances = await Attendance.findAll({
-      where: { SessionId: centerSessionIds },
+    const monthlyAttendances = await Attendance.findAll({
+      where: { createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] } },
       include: [{ model: Student, attributes: ['price_per_session'] }],
     });
+    const monthlyRevenue = monthlyAttendances.reduce((s, a) => s + (a.Student?.price_per_session || 0), 0);
 
-    const ownAtt = centerAttendances.filter(a => centerStudentIds.includes(a.StudentId));
-    const outsideAtt = centerAttendances.filter(a => !centerStudentIds.includes(a.StudentId));
+    const expenses = await Expense.findAll({
+      where: { expense_date: { [Op.between]: [monthStart, monthEnd] } },
+    });
+    const salaries = await Salary.findAll({ where: { month: currentMonth } });
+    const assistantSalaries = await AssistantAttendance.findAll({
+      where: {
+        createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+        salary_calculated: { [Op.not]: null },
+      },
+    });
 
-    const revenue = centerAttendances.reduce((s, a) =>
-      s + (a.Student ? a.Student.price_per_session : 0), 0
-    );
+    const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+    const totalSalaries = salaries.reduce((s, e) => s + e.amount, 0);
+    const totalAssistantSalaries = assistantSalaries.reduce((s, a) => s + (a.salary_calculated || 0), 0);
 
-    const totalPossible = centerStudents.length * centerSessions.length;
-    const attendanceRate = totalPossible > 0
-      ? ((ownAtt.length / totalPossible) * 100).toFixed(1)
-      : 0;
-
-    // إيراد البوكليتس لهذا السنتر
-    const centerBookletRevenue = await BalanceTransaction.findAll({
+    const bookletSales = await BalanceTransaction.findAll({
       where: {
         reason: { [Op.like]: 'دفع بوكليت:%' },
         createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
-        StudentId: centerStudentIds.length > 0 ? centerStudentIds : [0],
       },
     });
-    const bookletRev = centerBookletRevenue.reduce((s, t) => s + t.amount, 0);
+    const totalBookletRevenue = bookletSales.reduce((s, t) => s + t.amount, 0);
 
-    centerStats.push({
-      centerName: cent.name,
-      centerId: cent.id,
-      totalStudents: centerStudents.length,
-      totalSessions: centerSessions.length,
-      ownAttendance: ownAtt.length,
-      outsideAttendance: outsideAtt.length,
-      attendanceRate: parseFloat(attendanceRate),
-      sessionRevenue: revenue,
-      bookletRevenue: bookletRev,
-      totalRevenue: revenue + bookletRev,
+    const totalStudents = await Student.count();
+    const totalSessions = await Session.count({ where: { status: 'normal' } });
+
+    const monthlyTrend = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(); d.setMonth(d.getMonth() - i);
+      const m = d.toISOString().slice(0, 7);
+      const mStart = m + '-01'; const mEnd = m + '-31';
+      const mAtts = await Attendance.findAll({
+        where: { createdAt: { [Op.between]: [mStart + ' 00:00:00', mEnd + ' 23:59:59'] } },
+        include: [{ model: Student, attributes: ['price_per_session'] }],
+      });
+      const mRevenue = mAtts.reduce((s, a) => s + (a.Student?.price_per_session || 0), 0);
+      const mStudents = await Student.count({ where: { createdAt: { [Op.lte]: mEnd + ' 23:59:59' } } });
+      monthlyTrend.push({ month: m, revenue: mRevenue, students: mStudents });
+    }
+
+    res.render('analytics/summary', {
+      currentMonth, monthlyRevenue, totalExpenses, totalSalaries,
+      totalAssistantSalaries, totalBookletRevenue,
+      netRevenue: monthlyRevenue - totalExpenses - totalSalaries - totalAssistantSalaries,
+      totalStudents, totalSessions, monthlyTrend,
     });
-  }
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
 
-  // ===== مؤشرات شهرية تاريخية (آخر 6 شهور) =====
-  const monthlyTrend = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const m = d.toISOString().slice(0, 7);
-    const mStart = m + '-01'; const mEnd = m + '-31';
-    const mAtts = await Attendance.findAll({
-      where: { createdAt: { [Op.between]: [mStart + ' 00:00:00', mEnd + ' 23:59:59'] } },
+// ===== Tab 2: المجموعات =====
+app.get('/analytics/groups', requireAnalyticsAuth, async (req, res) => {
+  try {
+    const { currentMonth, subjects, centers } = await getAnalyticsBase(req, res);
+    const { subject_id, center_id } = req.query;
+    const monthStart = currentMonth + '-01';
+    const monthEnd = currentMonth + '-31';
+
+    const subjectsData = await Subject.findAll();
+    const centersData = await Center.findAll();
+    const groupStats = [];
+
+    for (const subj of subjectsData) {
+      if (subject_id && String(subj.id) !== String(subject_id)) continue;
+      for (const cent of centersData) {
+        if (center_id && String(cent.id) !== String(center_id)) continue;
+        const groupStudents = await Student.findAll({ where: { SubjectId: subj.id, CenterId: cent.id } });
+        if (groupStudents.length === 0) continue;
+
+        const groupSessions = await Session.findAll({
+          where: { SubjectId: subj.id, CenterId: cent.id, status: 'normal',
+            session_date: { [Op.between]: [monthStart, monthEnd] } },
+        });
+        if (groupSessions.length === 0) continue;
+
+        const studentIds = groupStudents.map(s => s.id);
+        const sessionIds = groupSessions.map(s => s.id);
+
+        const allAtt = await Attendance.findAll({ where: { SessionId: sessionIds } });
+        const ownAtt = allAtt.filter(a => studentIds.includes(a.StudentId));
+        const outsideAtt = allAtt.filter(a => !studentIds.includes(a.StudentId));
+
+        const hwRecords = await HomeworkCheck.findAll({ where: { StudentId: studentIds, SessionId: sessionIds } });
+        const completeHw = hwRecords.filter(h => h.status === 'complete').length;
+
+        const revenue = ownAtt.reduce((s, a) => {
+          const st = groupStudents.find(x => x.id === a.StudentId);
+          return s + (st ? st.price_per_session : 0);
+        }, 0);
+
+        const normalPrice = Math.max(...groupStudents.map(s => s.price_per_session));
+        const reducedCount = groupStudents.filter(s => s.price_per_session < normalPrice && s.price_per_session > 0).length;
+        const freeCount = groupStudents.filter(s => s.price_per_session === 0).length;
+
+        const totalPossible = groupStudents.length * groupSessions.length;
+        const attendanceRate = totalPossible > 0 ? ((ownAtt.length / totalPossible) * 100).toFixed(1) : 0;
+        const hwRate = hwRecords.length > 0 ? ((completeHw / hwRecords.length) * 100).toFixed(1) : 0;
+
+        const alerts = [];
+        if (parseFloat(attendanceRate) < 60) alerts.push({ type: 'danger', msg: `حضور منخفض جداً (${attendanceRate}%)` });
+        else if (parseFloat(attendanceRate) < 75) alerts.push({ type: 'warning', msg: `حضور تحت المتوسط (${attendanceRate}%)` });
+        if (parseFloat(hwRate) < 50) alerts.push({ type: 'warning', msg: `واجبات ضعيفة (${hwRate}%)` });
+
+        groupStats.push({
+          subjectId: subj.id, centerId: cent.id,
+          subjectName: subj.name, centerName: cent.name,
+          totalStudents: groupStudents.length,
+          totalSessions: groupSessions.length,
+          ownAttendance: ownAtt.length,
+          outsideAttendance: outsideAtt.length,
+          attendanceRate: parseFloat(attendanceRate),
+          reducedCount, freeCount,
+          hwRate: parseFloat(hwRate),
+          revenue, alerts,
+        });
+      }
+    }
+
+    res.render('analytics/groups', {
+      currentMonth, groupStats, subjects, centers,
+      filters: { subject_id, center_id },
+    });
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+// ===== Tab 3: السناتر =====
+app.get('/analytics/centers', requireAnalyticsAuth, async (req, res) => {
+  try {
+    const { currentMonth } = await getAnalyticsBase(req, res);
+    const monthStart = currentMonth + '-01';
+    const monthEnd = currentMonth + '-31';
+
+    const centersData = await Center.findAll({ where: { name: { [Op.ne]: 'أونلاين' } } });
+    const allStudents = await Student.findAll();
+    const centerStats = [];
+
+    for (const cent of centersData) {
+      const centerStudents = allStudents.filter(s => s.CenterId === cent.id);
+      if (centerStudents.length === 0) continue;
+
+      const centerSessions = await Session.findAll({
+        where: { CenterId: cent.id, status: 'normal',
+          session_date: { [Op.between]: [monthStart, monthEnd] } },
+      });
+
+      const centerSessionIds = centerSessions.map(s => s.id);
+      const centerStudentIds = centerStudents.map(s => s.id);
+
+      const centerAttendances = await Attendance.findAll({
+        where: { SessionId: centerSessionIds },
+        include: [{ model: Student, attributes: ['price_per_session'] }],
+      });
+
+      const ownAtt = centerAttendances.filter(a => centerStudentIds.includes(a.StudentId));
+      const outsideAtt = centerAttendances.filter(a => !centerStudentIds.includes(a.StudentId));
+
+      const revenue = centerAttendances.reduce((s, a) => s + (a.Student?.price_per_session || 0), 0);
+
+      const bookletTrans = await BalanceTransaction.findAll({
+        where: {
+          reason: { [Op.like]: 'دفع بوكليت:%' },
+          createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+          StudentId: centerStudentIds.length > 0 ? centerStudentIds : [0],
+        },
+      });
+      const bookletRev = bookletTrans.reduce((s, t) => s + t.amount, 0);
+
+      const totalPossible = centerStudents.length * centerSessions.length;
+      const attendanceRate = totalPossible > 0 ? ((ownAtt.length / totalPossible) * 100).toFixed(1) : 0;
+
+      centerStats.push({
+        centerName: cent.name, centerId: cent.id,
+        totalStudents: centerStudents.length,
+        totalSessions: centerSessions.length,
+        ownAttendance: ownAtt.length,
+        outsideAttendance: outsideAtt.length,
+        attendanceRate: parseFloat(attendanceRate),
+        sessionRevenue: revenue,
+        bookletRevenue: bookletRev,
+        totalRevenue: revenue + bookletRev,
+      });
+    }
+
+    res.render('analytics/centers', { currentMonth, centerStats });
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+// ===== Tab 4: المعاملات =====
+app.get('/analytics/transactions', requireAnalyticsAuth, async (req, res) => {
+  try {
+    const { currentMonth } = await getAnalyticsBase(req, res);
+    const { type } = req.query;
+    const monthStart = currentMonth + '-01';
+    const monthEnd = currentMonth + '-31';
+
+    const whereClause = {
+      amount: { [Op.gt]: 0 },
+      createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+    };
+    if (type === 'booklet') whereClause.reason = { [Op.like]: 'دفع بوكليت:%' };
+    else if (type === 'recharge') whereClause.reason = { [Op.like]: 'شحن رصيد%' };
+    else if (type === 'refund') whereClause.amount = { [Op.lt]: 0 };
+
+    const transactions = await BalanceTransaction.findAll({
+      where: whereClause,
+      include: [{ model: Student, attributes: ['name', 'student_code'] }],
+      order: [['createdAt', 'DESC']],
+      limit: 200,
+    });
+
+    const allTrans = await BalanceTransaction.findAll({
+      where: { createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] } },
+    });
+    const totalIn = allTrans.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    const totalOut = allTrans.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0);
+    const bookletTotal = allTrans.filter(t => t.reason?.includes('بوكليت')).reduce((s, t) => s + t.amount, 0);
+    const rechargeTotal = allTrans.filter(t => t.reason?.includes('شحن رصيد')).reduce((s, t) => s + t.amount, 0);
+
+    res.render('analytics/transactions', {
+      currentMonth, transactions, totalIn, totalOut, bookletTotal, rechargeTotal,
+      filters: { type },
+    });
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+// ===== Tab 5: المصروفات والمرتبات =====
+app.get('/analytics/expenses', requireAnalyticsAuth, async (req, res) => {
+  try {
+    const { currentMonth } = await getAnalyticsBase(req, res);
+    const monthStart = currentMonth + '-01';
+    const monthEnd = currentMonth + '-31';
+
+    const expenses = await Expense.findAll({
+      where: { expense_date: { [Op.between]: [monthStart, monthEnd] } },
+      order: [['expense_date', 'DESC']],
+    });
+    const salaries = await Salary.findAll({ where: { month: currentMonth }, include: [User] });
+    const assistantSalaries = await AssistantAttendance.findAll({
+      where: {
+        createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+        salary_calculated: { [Op.not]: null },
+      },
+      include: [User],
+    });
+    const users = await User.findAll({ order: [['name', 'ASC']] });
+
+    const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+    const totalSalaries = salaries.reduce((s, e) => s + e.amount, 0);
+    const totalAssistantSalaries = assistantSalaries.reduce((s, a) => s + (a.salary_calculated || 0), 0);
+
+    res.render('analytics/expenses', {
+      currentMonth, expenses, salaries, assistantSalaries, users,
+      totalExpenses, totalSalaries, totalAssistantSalaries,
+    });
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+// ===== Tab 6: البوكليتس =====
+app.get('/analytics/booklets', requireAnalyticsAuth, async (req, res) => {
+  try {
+    const { currentMonth } = await getAnalyticsBase(req, res);
+    const monthStart = currentMonth + '-01';
+    const monthEnd = currentMonth + '-31';
+
+    const allBooklets = await Booklet.findAll({ include: [Subject] });
+    const bookletSales = await BalanceTransaction.findAll({
+      where: {
+        reason: { [Op.like]: 'دفع بوكليت:%' },
+        createdAt: { [Op.between]: [monthStart + ' 00:00:00', monthEnd + ' 23:59:59'] },
+      },
       include: [Student],
     });
-    const mRevenue = mAtts.reduce((s, a) => s + (a.Student ? a.Student.price_per_session : 0), 0);
-    const mStudents = await Student.count({ where: { createdAt: { [Op.lte]: mEnd + ' 23:59:59' } } });
-    monthlyTrend.push({ month: m, revenue: mRevenue, students: mStudents, sessions: mAtts.length });
-  }
 
-  // ===== التنبيهات الكلية =====
-  const allAlerts = groupStats.flatMap(g => g.alerts.map(a => ({ ...a, group: `${g.subjectName} - ${g.centerName}` })));
+    const bookletStats = await Promise.all(allBooklets.map(async b => {
+      const sales = bookletSales.filter(t => t.reason?.includes(b.name));
+      const totalSold = await StudentBooklet.count({ where: { BookletId: b.id } });
+      const totalDelivered = await StudentBooklet.count({ where: { BookletId: b.id, is_delivered: true } });
+      const totalRevenue = sales.reduce((s, t) => s + t.amount, 0);
+      const profit = (b.sell_price - b.print_price) * totalSold;
+      return {
+        name: b.name, subjectName: b.Subject?.name,
+        printPrice: b.print_price, sellPrice: b.sell_price,
+        stock: b.stock_count, totalSold, totalDelivered,
+        totalRevenue, profit,
+        remainingStock: b.stock_count - totalSold,
+      };
+    }));
 
-  // ===== توقع الشهر الجاي =====
-  const projectedMonthly = groupStats.reduce((s, g) => s + g.projectedNext, 0);
+    const totalBookletRevenue = bookletSales.reduce((s, t) => s + t.amount, 0);
+    const totalProfit = bookletStats.reduce((s, b) => s + b.profit, 0);
+    const totalCost = allBooklets.reduce((s, b) => s + (b.print_price * b.stock_count), 0);
 
-  res.render('analytics-dashboard', {
-    groupStats, compareStats, compareMonth,
-    expenses, salaries, users,
-    totalExpenses, totalSalaries, monthlyRevenue,
-    netRevenue: monthlyRevenue - totalExpenses - totalSalaries,
-    projectedMonthly, monthlyTrend, allAlerts,
-    currentMonth, subjects, centers,
-    filters: { subject_id, center_id, month: currentMonth, compare_month: compareMonth },
-    totalAssistantSalaries,
-    netRevenue: monthlyRevenue - totalExpenses - totalSalaries - totalAssistantSalaries,
-    totalBookletRevenue, totalBookletCost, totalBookletProfit, allBooklets,
-    vodafoneTransactions, vodafoneBooklet, vodafoneBalance, vodafoneOther,
-    totalVodafone, totalVodafoneBooklet, totalVodafoneBalance,
-    centerStats,
+    res.render('analytics/booklets', {
+      currentMonth, bookletStats, totalBookletRevenue, totalProfit, totalCost,
+    });
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+// Routes إضافة مصروف ومرتب (من tab المصروفات)
+app.post('/analytics/expense/add', requireAnalyticsAuth, async (req, res) => {
+  const { amount, reason, type, expense_date } = req.body;
+  await Expense.create({ amount, reason, type, expense_date });
+  res.redirect('/analytics/expenses');
+});
+app.post('/analytics/expense/:id/delete', requireAnalyticsAuth, async (req, res) => {
+  await Expense.destroy({ where: { id: req.params.id } });
+  res.redirect('/analytics/expenses');
+});
+app.post('/analytics/salary/add', requireAnalyticsAuth, async (req, res) => {
+  const { user_id, amount, month, notes } = req.body;
+  const [sal] = await Salary.findOrCreate({
+    where: { UserId: user_id, month },
+    defaults: { amount, notes },
   });
+  if (sal.amount !== parseFloat(amount)) { sal.amount = amount; sal.notes = notes; await sal.save(); }
+  res.redirect('/analytics/expenses');
 });
 
 // Route تفاصيل مجموعة معينة

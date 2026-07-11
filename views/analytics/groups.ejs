@@ -1,0 +1,68 @@
+<%- include('../partials/header') %>
+<% const currentPath = '/analytics/groups'; %>
+<%- include('_tabs') %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">👥 المجموعات</h4>
+  <form method="GET" class="d-flex gap-2">
+    <input type="hidden" name="month" value="<%= currentMonth %>">
+    <select name="subject_id" class="form-select form-select-sm" style="width:130px;" onchange="this.form.submit()">
+      <option value="">كل المواد</option>
+      <% subjects.forEach(s => { %><option value="<%= s.id %>" <%= filters.subject_id==s.id?'selected':'' %>><%= s.name %></option><% }) %>
+    </select>
+    <select name="center_id" class="form-select form-select-sm" style="width:130px;" onchange="this.form.submit()">
+      <option value="">كل السناتر</option>
+      <% centers.forEach(c => { %><option value="<%= c.id %>" <%= filters.center_id==c.id?'selected':'' %>><%= c.name %></option><% }) %>
+    </select>
+  </form>
+</div>
+
+<div class="row g-3">
+  <% groupStats.forEach(g => { %>
+    <div class="col-md-6">
+      <div class="card shadow-sm" style="border-right:4px solid <%= g.alerts.some(a=>a.type==='danger')?'#DC2626':g.alerts.some(a=>a.type==='warning')?'#D97706':'#14B8A6' %>;">
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <div>
+              <strong><%= g.subjectName %></strong>
+              <span class="text-muted small"> - <%= g.centerName %></span>
+            </div>
+            <a href="/analytics/group/<%= g.subjectId %>/<%= g.centerId %>?month=<%= currentMonth %>" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem;">تفاصيل</a>
+          </div>
+
+          <div class="row g-2 mb-2 text-center">
+            <div class="col-3"><div class="small text-muted">طلاب</div><div class="fw-bold" style="color:#4338CA;"><%= g.totalStudents %></div></div>
+            <div class="col-3"><div class="small text-muted">حصص</div><div class="fw-bold"><%= g.totalSessions %></div></div>
+            <div class="col-3"><div class="small text-muted">إيراد</div><div class="fw-bold text-success"><%= g.revenue.toLocaleString() %></div></div>
+            <div class="col-3"><div class="small text-muted">خارجيين</div><div class="fw-bold text-warning"><%= g.outsideAttendance %></div></div>
+          </div>
+
+          <div class="mb-1">
+            <div class="d-flex justify-content-between" style="font-size:0.75rem;"><span>حضور</span><span><%= g.attendanceRate %>%</span></div>
+            <div class="progress" style="height:5px;"><div class="progress-bar" style="width:<%= g.attendanceRate %>%;background:<%= g.attendanceRate>=75?'#14B8A6':g.attendanceRate>=60?'#D97706':'#DC2626' %>;"></div></div>
+          </div>
+          <div class="mb-2">
+            <div class="d-flex justify-content-between" style="font-size:0.75rem;"><span>واجب</span><span><%= g.hwRate %>%</span></div>
+            <div class="progress" style="height:5px;"><div class="progress-bar" style="width:<%= g.hwRate %>%;background:#4338CA;"></div></div>
+          </div>
+
+          <% g.alerts.forEach(a => { %>
+            <div class="small p-1 rounded mb-1" style="background:<%= a.type==='danger'?'#FEE2E2':'#FEF3C7' %>;color:<%= a.type==='danger'?'#B91C1C':'#92400E' %>;">
+              <%= a.type==='danger'?'🔴':'🟡' %> <%= a.msg %>
+            </div>
+          <% }) %>
+
+          <div class="d-flex gap-2 mt-1" style="font-size:0.7rem;color:#6B7280;">
+            <% if (g.reducedCount > 0) { %><span>💲 <%= g.reducedCount %> مخفض</span><% } %>
+            <% if (g.freeCount > 0) { %><span>🆓 <%= g.freeCount %> مجاني</span><% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+  <% if (groupStats.length === 0) { %>
+    <p class="text-muted text-center">لا توجد بيانات للفترة المختارة</p>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,68 @@
+<%- include('../partials/header') %>
+<% const currentPath = '/analytics/expenses'; %>
+<%- include('_tabs') %>
+
+<h4 class="mb-4">💸 المصروفات والمرتبات - <%= currentMonth %></h4>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;"><div class="small text-muted">مصروفات</div><h5 class="text-danger"><%= totalExpenses.toLocaleString() %> ج</h5></div></div>
+  <div class="col-md-4"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #D97706;"><div class="small text-muted">مرتبات ثابتة</div><h5 class="text-warning"><%= totalSalaries.toLocaleString() %> ج</h5></div></div>
+  <div class="col-md-4"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #4338CA;"><div class="small text-muted">مرتبات أسيستانتس (محسوبة)</div><h5 style="color:#4338CA;"><%= totalAssistantSalaries.toFixed(0) %> ج</h5></div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="mb-3">💸 المصروفات</h6>
+        <form action="/analytics/expense/add" method="POST" class="row g-1 mb-3">
+          <input type="hidden" name="expense_date" value="<%= new Date().toISOString().slice(0,10) %>">
+          <div class="col-3"><input type="number" name="amount" class="form-control form-control-sm" placeholder="المبلغ" required></div>
+          <div class="col-4"><input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب" required></div>
+          <div class="col-3"><select name="type" class="form-select form-select-sm"><option value="daily">يومي</option><option value="weekly">أسبوعي</option><option value="monthly">شهري</option><option value="other">أخرى</option></select></div>
+          <div class="col-2"><button class="btn btn-sm btn-danger w-100">+</button></div>
+        </form>
+        <% expenses.forEach(e => { %>
+          <div class="d-flex justify-content-between py-1 border-bottom align-items-center">
+            <div><span class="small"><%= e.reason %></span> <span class="badge bg-secondary" style="font-size:0.6rem;"><%= e.type %></span><br><span style="font-size:0.65rem;color:#6B7280;"><%= e.expense_date %></span></div>
+            <div class="d-flex align-items-center gap-1">
+              <span class="text-danger small fw-bold"><%= e.amount %> ج</span>
+              <form action="/analytics/expense/<%= e.id %>/delete" method="POST"><button class="btn btn-sm" style="padding:2px 5px;background:#FEE2E2;font-size:0.65rem;">🗑</button></form>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="mb-3">👤 المرتبات</h6>
+        <form action="/analytics/salary/add" method="POST" class="row g-1 mb-3">
+          <input type="hidden" name="month" value="<%= currentMonth %>">
+          <div class="col-5"><select name="user_id" class="form-select form-select-sm" required><% users.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></div>
+          <div class="col-4"><input type="number" name="amount" class="form-control form-control-sm" placeholder="المرتب" required></div>
+          <div class="col-3"><button class="btn btn-sm btn-primary w-100">حفظ</button></div>
+        </form>
+        <% salaries.forEach(s => { %>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="small"><%= s.User?.name || '-' %></span>
+            <span class="text-danger small fw-bold"><%= s.amount.toLocaleString() %> ج</span>
+          </div>
+        <% }) %>
+        <% if (assistantSalaries.length > 0) { %>
+          <hr><p class="small text-muted mb-2">مرتبات محسوبة من الحضور:</p>
+          <% assistantSalaries.forEach(a => { %>
+            <div class="d-flex justify-content-between py-1 border-bottom">
+              <span class="small"><%= a.User?.name || '-' %> <span class="text-muted" style="font-size:0.65rem;">(<%= a.salary_type %>)</span></span>
+              <span style="color:#4338CA;" class="small fw-bold"><%= a.salary_calculated?.toFixed(0) %> ج</span>
+            </div>
+          <% }) %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

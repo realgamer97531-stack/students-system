@@ -1,0 +1,90 @@
+<%- include('../partials/header') %>
+<% const currentPath = '/analytics'; %>
+<%- include('_tabs') %>
+
+<h3 class="mb-4">📊 الملخص المالي - <%= currentMonth %></h3>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;">
+      <div class="small text-muted">الإيراد الشهري</div>
+      <h4 class="text-success mb-0"><%= monthlyRevenue.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;">
+      <div class="small text-muted">المصروفات الكلية</div>
+      <h4 class="text-danger mb-0"><%= (totalExpenses + totalSalaries + totalAssistantSalaries).toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #4338CA;">
+      <div class="small text-muted">الصافي</div>
+      <h4 style="color:<%= netRevenue >= 0 ? '#059669' : '#DC2626' %>;" class="mb-0"><%= netRevenue.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #D97706;">
+      <div class="small text-muted">إيراد البوكليتس</div>
+      <h4 class="text-warning mb-0"><%= totalBookletRevenue.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm">
+      <div class="small text-muted">إجمالي الطلاب</div>
+      <h4 style="color:#4338CA;"><%= totalStudents %></h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm">
+      <div class="small text-muted">إجمالي الحصص</div>
+      <h4 style="color:#14B8A6;"><%= totalSessions %></h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm">
+      <div class="small text-muted">مصروفات</div>
+      <h4 class="text-danger"><%= totalExpenses.toLocaleString() %> ج</h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center shadow-sm">
+      <div class="small text-muted">مرتبات</div>
+      <h4 class="text-danger"><%= (totalSalaries + totalAssistantSalaries).toLocaleString() %> ج</h4>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h6 class="mb-3">📈 تطور الإيراد وعدد الطلاب (آخر 6 شهور)</h6>
+    <canvas id="trendChart" height="70"></canvas>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const trend = <%- JSON.stringify(monthlyTrend) %>;
+new Chart(document.getElementById('trendChart'), {
+  data: {
+    labels: trend.map(m => m.month),
+    datasets: [
+      { type:'line', label:'الإيراد', data: trend.map(m => m.revenue), borderColor:'#14B8A6', backgroundColor:'rgba(20,184,166,0.1)', yAxisID:'y', tension:0.3, fill:true },
+      { type:'bar', label:'عدد الطلاب', data: trend.map(m => m.students), backgroundColor:'rgba(67,56,202,0.3)', yAxisID:'y1' },
+    ],
+  },
+  options: {
+    responsive:true,
+    plugins:{ legend:{ position:'bottom' } },
+    scales:{
+      y:{ position:'right', title:{ display:true, text:'الإيراد (ج)' } },
+      y1:{ position:'left', title:{ display:true, text:'الطلاب' } },
+    },
+  },
+});
+</script>
+
+<%- include('../partials/footer') %>

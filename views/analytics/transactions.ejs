@@ -1,0 +1,50 @@
+<%- include('../partials/header') %>
+<% const currentPath = '/analytics/transactions'; %>
+<%- include('_tabs') %>
+
+<h4 class="mb-3">📱 المعاملات - <%= currentMonth %></h4>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #059669;"><div class="small text-muted">إجمالي الوارد</div><h5 class="text-success mb-0"><%= totalIn.toLocaleString() %> ج</h5></div></div>
+  <div class="col-md-3"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;"><div class="small text-muted">إجمالي الصادر</div><h5 class="text-danger mb-0"><%= Math.abs(totalOut).toLocaleString() %> ج</h5></div></div>
+  <div class="col-md-3"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #4338CA;"><div class="small text-muted">شحن رصيد</div><h5 style="color:#4338CA;" class="mb-0"><%= rechargeTotal.toLocaleString() %> ج</h5></div></div>
+  <div class="col-md-3"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #D97706;"><div class="small text-muted">بوكليتس</div><h5 class="text-warning mb-0"><%= bookletTotal.toLocaleString() %> ج</h5></div></div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between mb-3">
+      <h6 class="mb-0">آخر 200 معاملة</h6>
+      <form method="GET" class="d-flex gap-1">
+        <input type="hidden" name="month" value="<%= currentMonth %>">
+        <select name="type" class="form-select form-select-sm" style="width:130px;" onchange="this.form.submit()">
+          <option value="">الكل</option>
+          <option value="recharge" <%= filters.type==='recharge'?'selected':'' %>>شحن رصيد</option>
+          <option value="booklet" <%= filters.type==='booklet'?'selected':'' %>>بوكليتس</option>
+          <option value="refund" <%= filters.type==='refund'?'selected':'' %>>مرتجعات</option>
+        </select>
+      </form>
+    </div>
+    <div class="table-responsive" style="max-height:500px;overflow-y:auto;">
+      <table class="table table-sm">
+        <thead class="table-light" style="position:sticky;top:0;">
+          <tr><th>الطالب</th><th>السبب</th><th>المبلغ</th><th>التوقيت</th></tr>
+        </thead>
+        <tbody>
+          <% transactions.forEach(t => { %>
+            <tr>
+              <td class="small"><%= t.Student?.name || '-' %><br><span class="text-muted" style="font-size:0.65rem;"><%= t.Student?.student_code || '' %></span></td>
+              <td class="small"><%= t.reason || '-' %></td>
+              <td class="fw-bold" style="color:<%= t.amount >= 0 ? '#059669' : '#DC2626' %>;">
+                <%= t.amount >= 0 ? '+' : '' %><%= t.amount %> ج
+              </td>
+              <td class="small text-muted"><%= new Date(t.createdAt).toLocaleString('ar-EG', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

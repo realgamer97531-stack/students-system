@@ -1,0 +1,25 @@
+<div class="d-flex gap-1 flex-wrap mb-4">
+  <% const tabs = [
+    { href: '/analytics', label: '📊 الملخص' },
+    { href: '/analytics/groups', label: '👥 المجموعات' },
+    { href: '/analytics/centers', label: '🏫 السناتر' },
+    { href: '/analytics/transactions', label: '📱 المعاملات' },
+    { href: '/analytics/expenses', label: '💸 المصروفات' },
+    { href: '/analytics/booklets', label: '📚 البوكليتس' },
+  ]; %>
+  <% tabs.forEach(tab => { %>
+    <a href="<%= tab.href %>?month=<%= currentMonth %>"
+      class="btn btn-sm <%= currentPath === tab.href ? 'btn-primary' : 'btn-outline-secondary' %>"
+      style="border-radius:8px;">
+      <%= tab.label %>
+    </a>
+  <% }) %>
+
+  <div class="me-auto d-flex gap-2 align-items-center">
+    <form method="GET" class="d-flex gap-1">
+      <input type="month" name="month" class="form-control form-control-sm" value="<%= currentMonth %>" style="width:140px;">
+      <button class="btn btn-sm btn-outline-primary">تطبيق</button>
+    </form>
+    <a href="/analytics/lock" class="btn btn-sm btn-outline-danger">🔒 قفل</a>
+  </div>
+</div>

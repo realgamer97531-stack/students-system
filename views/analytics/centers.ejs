@@ -1,0 +1,70 @@
+<%- include('../partials/header') %>
+<% const currentPath = '/analytics/centers'; %>
+<%- include('_tabs') %>
+
+<h4 class="mb-4">🏫 إحصائيات السناتر - <%= currentMonth %></h4>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead class="table-light">
+          <tr><th>السنتر</th><th>الطلاب</th><th>الحصص</th><th>الحضور %</th><th>خارجيين</th><th>إيراد حصص</th><th>إيراد بوكليتس</th><th>الإجمالي</th></tr>
+        </thead>
+        <tbody>
+          <% centerStats.forEach(c => { %>
+            <tr>
+              <td><strong><%= c.centerName %></strong></td>
+              <td><%= c.totalStudents %></td>
+              <td><%= c.totalSessions %></td>
+              <td>
+                <div class="d-flex align-items-center gap-1">
+                  <div class="progress flex-grow-1" style="height:5px;">
+                    <div class="progress-bar" style="width:<%= c.attendanceRate %>%;background:<%= c.attendanceRate>=75?'#14B8A6':c.attendanceRate>=60?'#D97706':'#DC2626' %>;"></div>
+                  </div>
+                  <span style="font-size:0.72rem;"><%= c.attendanceRate %>%</span>
+                </div>
+              </td>
+              <td><% if (c.outsideAttendance > 0) { %><span class="badge" style="background:#FEF3C7;color:#92400E;"><%= c.outsideAttendance %></span><% } else { %>-<% } %></td>
+              <td class="text-success fw-bold"><%= c.sessionRevenue.toLocaleString() %> ج</td>
+              <td style="color:#4338CA;"><%= c.bookletRevenue.toLocaleString() %> ج</td>
+              <td class="fw-bold"><%= c.totalRevenue.toLocaleString() %> ج</td>
+            </tr>
+          <% }) %>
+          <% const totals = { students: centerStats.reduce((s,c)=>s+c.totalStudents,0), sessions: centerStats.reduce((s,c)=>s+c.totalSessions,0), sessRev: centerStats.reduce((s,c)=>s+c.sessionRevenue,0), bookRev: centerStats.reduce((s,c)=>s+c.bookletRevenue,0), totalRev: centerStats.reduce((s,c)=>s+c.totalRevenue,0) }; %>
+          <tr class="table-primary fw-bold">
+            <td>الإجمالي</td><td><%= totals.students %></td><td><%= totals.sessions %></td><td>-</td><td>-</td>
+            <td class="text-success"><%= totals.sessRev.toLocaleString() %> ج</td>
+            <td style="color:#4338CA;"><%= totals.bookRev.toLocaleString() %> ج</td>
+            <td><%= totals.totalRev.toLocaleString() %> ج</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h6 class="mb-3">مقارنة بصرية</h6>
+    <canvas id="centerChart" height="80"></canvas>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const centerStats = <%- JSON.stringify(centerStats) %>;
+new Chart(document.getElementById('centerChart'), {
+  type:'bar',
+  data:{
+    labels: centerStats.map(c => c.centerName),
+    datasets:[
+      { label:'إيراد الحصص', data: centerStats.map(c=>c.sessionRevenue), backgroundColor:'#14B8A650', borderColor:'#14B8A6', borderWidth:2 },
+      { label:'إيراد البوكليتس', data: centerStats.map(c=>c.bookletRevenue), backgroundColor:'#4338CA50', borderColor:'#4338CA', borderWidth:2 },
+    ],
+  },
+  options:{ responsive:true, plugins:{ legend:{ position:'bottom' } }, scales:{ y:{ beginAtZero:true } } },
+});
+</script>
+
+<%- include('../partials/footer') %>

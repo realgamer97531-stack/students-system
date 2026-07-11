@@ -1,0 +1,40 @@
+<%- include('../partials/header') %>
+<% const currentPath = '/analytics/booklets'; %>
+<%- include('_tabs') %>
+
+<h4 class="mb-4">📚 إحصائيات البوكليتس - <%= currentMonth %></h4>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;"><div class="small text-muted">إيراد البوكليتس (الشهر)</div><h5 class="text-success"><%= totalBookletRevenue.toLocaleString() %> ج</h5></div></div>
+  <div class="col-md-4"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;"><div class="small text-muted">تكلفة الطباعة (الإجمالي)</div><h5 class="text-danger"><%= totalCost.toLocaleString() %> ج</h5></div></div>
+  <div class="col-md-4"><div class="card p-3 text-center shadow-sm" style="border-top:4px solid #059669;"><div class="small text-muted">هامش الربح المتوقع</div><h5 class="text-success"><%= totalProfit.toLocaleString() %> ج</h5></div></div>
+</div>
+
+<div class="row g-3">
+  <% bookletStats.forEach(b => { %>
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-1"><%= b.name %></h6>
+          <p class="small text-muted mb-3">📚 <%= b.subjectName %></p>
+          <div class="row g-1 text-center mb-2">
+            <div class="col-4"><div class="p-1 rounded" style="background:#EEF0FB;"><div style="font-size:0.65rem;color:#6B7280;">سعر الطباعة</div><div class="fw-bold small" style="color:#4338CA;"><%= b.printPrice %> ج</div></div></div>
+            <div class="col-4"><div class="p-1 rounded" style="background:#D1FAE5;"><div style="font-size:0.65rem;color:#6B7280;">سعر البيع</div><div class="fw-bold small text-success"><%= b.sellPrice %> ج</div></div></div>
+            <div class="col-4"><div class="p-1 rounded" style="background:#FEF3C7;"><div style="font-size:0.65rem;color:#6B7280;">هامش الربح</div><div class="fw-bold small text-warning"><%= (b.sellPrice - b.printPrice).toFixed(0) %> ج</div></div></div>
+          </div>
+          <div class="d-flex justify-content-between small text-muted mb-1">
+            <span>المخزون: <strong><%= b.stock %></strong></span>
+            <span>مباع: <strong class="text-success"><%= b.totalSold %></strong></span>
+            <span>متبقي: <strong style="color:<%= b.remainingStock < 10 ? '#DC2626' : '#6B7280' %>;"><%= b.remainingStock %></strong></span>
+          </div>
+          <div class="d-flex justify-content-between small">
+            <span>تم التسليم: <strong><%= b.totalDelivered %></strong></span>
+            <span>الإيراد: <strong class="text-success"><%= b.totalRevenue.toLocaleString() %> ج</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<%- include('../partials/footer') %>
