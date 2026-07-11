@@ -1,6 +1,7 @@
 const multer = require('multer');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
+const ensureBookletReservationSchema = require('../utils/ensureBookletReservationSchema');
 
 // ===== الإعدادات =====
 
@@ -134,6 +135,8 @@ module.exports = function (app, deps) {
       if (from && to) {
         whereClause.createdAt = { [Op.between]: [from + ' 00:00:00', to + ' 23:59:59'] };
       }
+
+      await ensureBookletReservationSchema(sequelize);
 
       const reservations = await BookletReservation.findAll({
         where: whereClause,

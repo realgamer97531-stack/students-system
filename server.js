@@ -41,6 +41,7 @@ const Warning = require('./models/Warning');
 const Booklet = require('./models/Booklet');
 const StudentBooklet = require('./models/StudentBooklet');
 const BookletReservation = require('./models/BookletReservation');
+const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
 
@@ -4019,6 +4020,7 @@ const reservationUpload = multer({ storage: multer.memoryStorage(), limits: { fi
 app.post('/api/portal/booklets/:id/reserve', verifyPortalToken('student'), reservationUpload.single('transfer_image'), async (req, res) => {
   try {
     const { payment_method } = req.body;
+    await ensureBookletReservationSchema(sequelize);
     const student = await Student.findByPk(req.portalStudentId);
     const booklet = await Booklet.findByPk(req.params.id);
     if (!booklet) return res.status(404).json({ success: false, message: 'البوكليت غير موجود' });
@@ -4160,7 +4162,7 @@ async function startServer() {
     // await sequelize.sync();
     await RechargeCode.sync();
     await PaymentVerification.sync();
-    await sequelize.query("ALTER TABLE bookletreservations ADD COLUMN IF NOT EXISTS transaction_reference VARCHAR(255) NULL UNIQUE");
+    await ensureBookletReservationSchema(sequelize);
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
 
