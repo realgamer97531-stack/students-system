@@ -36,6 +36,13 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <label class="form-label small mb-2">🔎 البحث عن طالب في الحصص أو البوكليتس</label>
+    <input type="search" id="financialSearch" class="form-control form-control-sm" placeholder="اكتب اسم الطالب أو الكود أو اسم البوكليت...">
+  </div>
+</div>
+
 <!-- ملخص -->
 <div class="row g-3 mb-4">
   <div class="col-md-4">
@@ -98,7 +105,7 @@
         </thead>
         <tbody>
           <% rows.filter(r => r.sessionPayment > 0).forEach(r => { %>
-            <tr>
+            <tr data-search="<%= (r.studentName + ' ' + r.studentCode + ' ' + r.assistantName).toLowerCase() %>">
               <td><%= r.studentName %></td>
               <td><%= r.studentCode %></td>
               <td class="text-success fw-bold"><%= r.sessionPayment %> ج</td>
@@ -130,7 +137,7 @@
         </thead>
         <tbody>
           <% bookletTransactions.forEach(t => { %>
-            <tr>
+            <tr data-search="<%= ((t.Student?.name || '') + ' ' + (t.Student?.student_code || '') + ' ' + (t.reason || '')).toLowerCase() %>">
               <td><%= t.Student?.name || '-' %></td>
               <td class="small"><%= t.reason.replace('دفع بوكليت: ','') %></td>
               <td class="fw-bold" style="color:#4338CA;"><%= t.amount %> ج</td>
@@ -148,5 +155,23 @@
   </div>
 </div>
 <% } %>
+
+<script>
+  (function () {
+    const searchInput = document.getElementById('financialSearch');
+    if (!searchInput) return;
+
+    const filterRows = () => {
+      const term = searchInput.value.trim().toLowerCase();
+      document.querySelectorAll('tr[data-search]').forEach(row => {
+        const matches = !term || row.dataset.search.includes(term);
+        row.style.display = matches ? '' : 'none';
+      });
+    };
+
+    searchInput.addEventListener('input', filterRows);
+    filterRows();
+  })();
+</script>
 
 <%- include('partials/footer') %>
