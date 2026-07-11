@@ -98,6 +98,7 @@
   const pendingBox = document.getElementById('pendingBox');
   const canDeliverBooklets = <%= userRole === 'admin' ? 'true' : 'false' %>;
   let isProcessing = false;
+  let scanBookletDelivered = false;
 
   // ===== إدارة قائمة العمليات المعلّقة (المخزّنة محليًا) =====
   function getPending() {
@@ -213,6 +214,7 @@
       noteBox.style.display = 'none';
     }
 
+    scanBookletDelivered = false;
     const bookletDeliveredBox = document.getElementById('bookletDeliveredBox');
     if (bookletDeliveredBox) {
       if (!data.student.bookletStatus && canDeliverBooklets) {
@@ -225,7 +227,7 @@
                 استلم البوكليت
               </label>
             </div>
-            <div class="small text-muted mt-1">اضغط هنا لو الطالب استلم البوكليت قبل تسجيل الحضور.</div>
+            <div class="small text-muted mt-1">سيتم حفظ الحالة عند تأكيد تسجيل الحضور.</div>
           </div>`;
       } else {
         bookletDeliveredBox.innerHTML = '';
@@ -305,23 +307,10 @@
   document.addEventListener('change', async function (event) {
     if (event.target.id === 'scanBookletDeliveredCheckbox') {
       const checkbox = event.target;
-      if (!checkbox.checked) return;
-
-      try {
-        const response = await fetch('/attendance/scan/booklet-deliver', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            studentId: checkbox.dataset.studentId,
-          }),
-        });
-        const data = await response.json();
-        if (data.success) {
-          checkbox.disabled = true;
-          checkbox.closest('.form-check').querySelector('label').textContent = '✓ تم تسجيل الاستلام';
-        }
-      } catch (err) {
-        console.error(err);
+      scanBookletDelivered = checkbox.checked;
+      const label = checkbox.closest('.form-check').querySelector('label');
+      if (label) {
+        label.textContent = checkbox.checked ? '✓ تم تعليم الاستلام (سيتحفظ عند التأكيد)' : 'استلم البوكليت';
       }
       return;
     }
@@ -381,6 +370,7 @@
         comment,
         payment_collected: payment,
         booklet_payments: bookletPayments,
+        booklet_delivered: scanBookletDelivered,
       }),
     })
       .then(res => res.json())

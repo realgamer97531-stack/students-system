@@ -1210,7 +1210,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
 
 app.post('/attendance/scan', async (req, res) => {
   try {
-    const { student_code, comment, payment_collected } = req.body;
+    const { student_code, comment, payment_collected, booklet_delivered } = req.body;
     const sessionId = req.session.activeSessionId;
 
     if (!sessionId) {
@@ -1263,6 +1263,9 @@ app.post('/attendance/scan', async (req, res) => {
     }
 
     student.balance -= student.price_per_session;
+    if (booklet_delivered && !student.booklet_status) {
+      student.booklet_status = true;
+    }
     await student.save();
 
     await Attendance.create({
