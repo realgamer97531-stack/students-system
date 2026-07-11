@@ -50,6 +50,36 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+async function analyzeImageWithAI(buffer, mimeType) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
+
+  const base64 = buffer.toString('base64');
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: 'استخرج فقط transaction_reference و is_successful_transaction من صورة إيصال دفع Vodafone Cash بصيغة JSON.' },
+          { inline_data: { mime_type: mimeType || 'image/jpeg', data: base64 } },
+        ],
+      }],
+      generationConfig: { responseMimeType: 'application/json' },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('AI did not return a readable response');
+
+  return JSON.parse(text.trim());
+}
+
 Booklet.belongsTo(Subject, { foreignKey: 'SubjectId' });
 Subject.hasMany(Booklet, { foreignKey: 'SubjectId' });
 StudentBooklet.belongsTo(Student, { foreignKey: 'StudentId' });
@@ -4000,9 +4030,24 @@ app.post('/api/portal/booklets/:id/reserve', verifyPortalToken('student'), reser
     if (existing) return res.json({ success: false, message: 'عندك حجز موجود بالفعل لهذا البوكليت' });
 
     let transferImageUrl = null;
+    let transactionReference = null;
 
     // رفع الصورة على Cloudinary لو فودافون كاش
     if (payment_method === 'vodafone' && req.file) {
+      const aiAnalysis = await analyzeImageWithAI(req.file.buffer, req.file.mimetype);
+      if (!aiAnalysis || !aiAnalysis.is_successful_transaction || !aiAnalysis.transaction_reference) {
+        return res.status(400).json({ success: false, message: 'الصورة غير واضحة أو ليست إيصال فودافون كاش صالح.' });
+      }
+
+      transactionReference = String(aiAnalysis.transaction_reference).trim();
+
+      const reused = await BookletReservation.findOne({
+        where: { transaction_reference: transactionReference },
+      });
+      if (reused) {
+        return res.status(400).json({ success: false, message: '❌ عذراً، هذا الإيصال تم استخدامه مسبقاً! يرجى مراجعة الإدارة.' });
+      }
+
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           { folder: 'booklet_reservations', resource_type: 'image' },
@@ -4021,6 +4066,7 @@ app.post('/api/portal/booklets/:id/reserve', verifyPortalToken('student'), reser
       BookletId: booklet.id,
       payment_method,
       transfer_image_url: transferImageUrl,
+      transaction_reference: transactionReference,
       status: 'pending',
     });
 
@@ -4114,6 +4160,7 @@ async function startServer() {
     // await sequelize.sync();
     await RechargeCode.sync();
     await PaymentVerification.sync();
+    await sequelize.query("ALTER TABLE bookletreservations ADD COLUMN IF NOT EXISTS transaction_reference VARCHAR(255) NULL UNIQUE");
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
 
