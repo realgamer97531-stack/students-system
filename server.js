@@ -54,24 +54,33 @@ function normalizePhoneForWhatsApp(phone) {
   const cleaned = String(phone).trim().replace(/\s+/g, '');
   if (!cleaned) return null;
 
-  const digits = cleaned.replace(/[^\d]/g, '');
+  let digits = cleaned.replace(/[^\d]/g, '');
   if (!digits) return null;
 
-  let normalized = digits;
-  if (normalized.startsWith('00')) normalized = normalized.slice(2);
-  if (normalized.startsWith('+')) normalized = normalized.slice(1);
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('+')) digits = digits.slice(1);
 
-  if (normalized.startsWith('20') && normalized.length > 10) {
-    return normalized;
+  if (digits.startsWith('20') && digits.length > 10) {
+    return digits;
   }
 
-  if (normalized.startsWith('0')) {
-    normalized = '2' + normalized.slice(1);
-  } else if (!normalized.startsWith('2')) {
-    normalized = '2' + normalized;
+  if (digits.startsWith('201')) {
+    return digits;
   }
 
-  return normalized;
+  if (digits.startsWith('0')) {
+    return '2' + digits.slice(1);
+  }
+
+  if (digits.startsWith('2') && digits.length === 11) {
+    return digits;
+  }
+
+  if (digits.length === 10) {
+    return '2' + digits;
+  }
+
+  return digits;
 }
 
 async function getFollowUpAssistantForStudent(studentId) {
