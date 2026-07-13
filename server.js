@@ -69,7 +69,7 @@ function normalizePhoneForWhatsApp(phone) {
   }
 
   if (digits.startsWith('0')) {
-    return '2' + digits.slice(1);
+    return '20' + digits.slice(1);
   }
 
   if (digits.startsWith('2') && digits.length === 11) {
@@ -77,7 +77,7 @@ function normalizePhoneForWhatsApp(phone) {
   }
 
   if (digits.length === 10) {
-    return '2' + digits;
+    return '20' + digits;
   }
 
   return digits;
@@ -1865,7 +1865,12 @@ app.post('/users/:id/delete', requireAdmin, async (req, res) => {
     if (String(req.params.id) === String(req.session.userId)) {
       return res.status(400).send('❌ مينفعش تحذف حسابك بنفسك');
     }
-    await User.destroy({ where: { id: req.params.id } });
+
+    const targetUserId = Number(req.params.id);
+
+    await FollowUpAssignment.destroy({ where: { AssistantId: targetUserId } });
+    await User.destroy({ where: { id: targetUserId } });
+
     res.redirect('/users');
   } catch (error) {
     console.error(error);

@@ -576,6 +576,12 @@ span.text-muted {
         <span class="en-only" style="display:none;">📅 Weekly Schedule</span>
       </a>
     <% } %>
+    <% if (userRole === 'admin' || userRole === 'follow_up' || (userPermissions && userPermissions.includes('follow_up')) || canShow('students_view')) { %>
+      <a href="/follow-up-dashboard">
+        <span class="ar-only">🎯 متابعة الطلاب</span>
+        <span class="en-only" style="display:none;">🎯 Follow-up Dashboard</span>
+      </a>
+    <% } %>
     <% if (canShow('students_view')) { %>
       <a href="/follow-up">
         <span class="ar-only">⚠️ يحتاجون متابعة</span>
