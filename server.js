@@ -2245,8 +2245,8 @@ async function buildStudentData(studentId) {
       warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
       followUpAssistant: await FollowUpAssignment.findOne({
         where: { StudentId: student.id },
-        include: [{ model: User, as: 'Assistant', attributes: ['name', 'phone'] }],
-      }).then(a => a ? { name: a.Assistant?.name, phone: a.Assistant?.phone } : null),
+        include: [{ model: User, as: 'Assistant', attributes: ['name', 'username'] }],
+      }).then(a => a ? { name: a.Assistant?.name, phone: a.Assistant?.username } : null),
     },
     sessions,
     videos: videosData,

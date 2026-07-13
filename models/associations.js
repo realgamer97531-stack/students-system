@@ -15,6 +15,8 @@ const WatchProgress = require('./WatchProgress');
 const VideoAccessGrant = require('./VideoAccessGrant');
 const Warning = require('./Warning');
 const PaymentVerification = require('./PaymentVerification');
+const FollowUpAssignment = require('./FollowUpAssignment');
+
 Student.hasMany(PaymentVerification, { foreignKey: 'StudentId' });
 PaymentVerification.belongsTo(Student, { foreignKey: 'StudentId' });
 
@@ -98,6 +100,11 @@ Subject.hasMany(Exam);
   Warning.belongsTo(Student);
   User.hasMany(Warning);
   Warning.belongsTo(User);
+
+  FollowUpAssignment.belongsTo(User, { foreignKey: 'AssistantId', as: 'Assistant' });
+  FollowUpAssignment.belongsTo(Student, { foreignKey: 'StudentId' });
+  Student.hasOne(FollowUpAssignment, { foreignKey: 'StudentId' });
+  User.hasMany(FollowUpAssignment, { foreignKey: 'AssistantId', as: 'AssignedStudents' });
 }
 
 module.exports = setupAssociations;
