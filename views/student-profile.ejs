@@ -84,8 +84,11 @@
       <strong><%= followUpAssistant.name %></strong>
       <% if (followUpAssistant.phone) { %>
         <br><span class="small text-muted"><%= followUpAssistant.phone %></span>
-        <a href="https://wa.me/2<%= followUpAssistant.phone.replace(/^0/,'') %>" target="_blank"
-          class="btn btn-sm ms-2" style="background:#25D366;color:#fff;font-size:0.65rem;padding:2px 6px;">💬 واتساب</a>
+        <% const whatsappPhone = followUpAssistant.whatsappPhone || followUpAssistant.phone; %>
+        <% if (whatsappPhone) { %>
+          <a href="https://wa.me/<%= whatsappPhone %>" target="_blank"
+            class="btn btn-sm ms-2" style="background:#25D366;color:#fff;font-size:0.65rem;padding:2px 6px;">💬 واتساب</a>
+        <% } %>
       <% } %>
     </div>
   </div>

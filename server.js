@@ -48,18 +48,48 @@ const { Readable } = require('stream');
 const FollowUpAssignment = require('./models/FollowUpAssignment');
 const SessionComment = require('./models/SessionComment');
 
+function normalizePhoneForWhatsApp(phone) {
+  if (!phone) return null;
+
+  const cleaned = String(phone).trim().replace(/\s+/g, '');
+  if (!cleaned) return null;
+
+  const digits = cleaned.replace(/[^\d]/g, '');
+  if (!digits) return null;
+
+  let normalized = digits;
+  if (normalized.startsWith('00')) normalized = normalized.slice(2);
+  if (normalized.startsWith('+')) normalized = normalized.slice(1);
+
+  if (normalized.startsWith('20') && normalized.length > 10) {
+    return normalized;
+  }
+
+  if (normalized.startsWith('0')) {
+    normalized = '2' + normalized.slice(1);
+  } else if (!normalized.startsWith('2')) {
+    normalized = '2' + normalized;
+  }
+
+  return normalized;
+}
+
 async function getFollowUpAssistantForStudent(studentId) {
   try {
     const assignment = await FollowUpAssignment.findOne({
       where: { StudentId: studentId },
-      include: [{ model: User, as: 'Assistant', attributes: ['id', 'name', 'username'] }],
+      include: [{ model: User, as: 'Assistant', attributes: ['id', 'name', 'username', 'phone'] }],
     });
 
     if (!assignment?.Assistant) return null;
 
+    const assistantPhone = assignment.Assistant.phone || assignment.Assistant.username || null;
+    const whatsappPhone = normalizePhoneForWhatsApp(assistantPhone);
+
     return {
       name: assignment.Assistant.name || null,
-      phone: assignment.Assistant.username || null,
+      phone: assistantPhone || null,
+      whatsappPhone,
     };
   } catch (error) {
     console.error('Failed to load follow-up assistant:', error.message);
