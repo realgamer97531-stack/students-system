@@ -14,9 +14,13 @@ setupAssociations();
 
     const assignment = await FollowUpAssignment.findOne({
       where: { StudentId: student ? student.id : 0 },
-      include: [{ model: User, as: 'Assistant', attributes: ['name', 'phone'] }],
+      include: [{ model: User, as: 'Assistant', attributes: ['name', 'username'] }],
     });
-    console.log('Assignment', assignment ? assignment.toJSON() : 'none');
+    const assistant = assignment?.Assistant ? {
+      name: assignment.Assistant.name,
+      phone: assignment.Assistant.username || assignment.Assistant.phone || null,
+    } : null;
+    console.log('Assignment', assignment ? { ...assignment.toJSON(), Assistant: assistant } : 'none');
   } catch (err) {
     console.error('ERROR', err);
     if (err.original) console.error('original', err.original.sqlMessage || err.original.message || err.original);

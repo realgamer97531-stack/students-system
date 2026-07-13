@@ -53,6 +53,25 @@ FollowUpAssignment.belongsTo(Student, { foreignKey: 'StudentId' });
 Student.hasOne(FollowUpAssignment, { foreignKey: 'StudentId' });
 User.hasMany(FollowUpAssignment, { foreignKey: 'AssistantId', as: 'AssignedStudents' });
 
+async function getFollowUpAssistantForStudent(studentId) {
+  try {
+    const assignment = await FollowUpAssignment.findOne({
+      where: { StudentId: studentId },
+      include: [{ model: User, as: 'Assistant', attributes: ['id', 'name', 'username'] }],
+    });
+
+    if (!assignment?.Assistant) return null;
+
+    return {
+      name: assignment.Assistant.name || null,
+      phone: assignment.Assistant.username || null,
+    };
+  } catch (error) {
+    console.error('Failed to load follow-up assistant:', error.message);
+    return null;
+  }
+}
+
 SessionComment.belongsTo(Student, { foreignKey: 'StudentId' });
 SessionComment.belongsTo(Session, { foreignKey: 'SessionId' });
 SessionComment.belongsTo(User, { foreignKey: 'UserId' });
@@ -531,11 +550,7 @@ app.get('/students/:id', async (req, res) => {
       where: { SubjectId: student.SubjectId, is_active: true },
     });
 
-    const followUpAssignment = await FollowUpAssignment.findOne({
-      where: { StudentId: student.id },
-      include: [{ model: User, as: 'Assistant' }],
-    });
-    const followUpAssistant = followUpAssignment?.Assistant || null;
+    const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
 
     res.render('student-profile', {
       student,
@@ -1267,10 +1282,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     Object.keys(attByLesson).forEach(n => lessonNumbersSet.add(parseInt(n)));
     const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
 
-    const followUpAss = await FollowUpAssignment.findOne({
-      where: { StudentId: student.id },
-      include: [{ model: User, as: 'Assistant' }],
-    });
+    const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
 
     const videos = await Video.findAll({
       where: { SubjectId: student.SubjectId },
@@ -1350,7 +1362,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       summary,
       bookletStatuses,
       pendingBooklets: bookletStatuses.filter(b => !b.isFullyPaid && !b.isDelivered),
-      followUpAssistant: followUpAss ? { name: followUpAss.Assistant?.name, phone: followUpAss.Assistant?.phone } : null,
+      followUpAssistant,
     });
   } catch (error) {
     console.error(error);
@@ -2243,10 +2255,7 @@ async function buildStudentData(studentId) {
       isBlocked: student.is_blocked,
       points: student.points,
       warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
-      followUpAssistant: await FollowUpAssignment.findOne({
-        where: { StudentId: student.id },
-        include: [{ model: User, as: 'Assistant', attributes: ['name', 'username'] }],
-      }).then(a => a ? { name: a.Assistant?.name, phone: a.Assistant?.username } : null),
+      followUpAssistant: await getFollowUpAssistantForStudent(student.id),
     },
     sessions,
     videos: videosData,
@@ -4604,10 +4613,7 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
     const student = await Student.findByPk(req.params.id, { include: [Center, Subject] });
     if (!student) return res.status(404).send('❌');
 
-    const assignment = await FollowUpAssignment.findOne({
-      where: { StudentId: student.id },
-      include: [{ model: User, as: 'Assistant' }],
-    });
+    const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
 
     const ownSessions = await Session.findAll({
       where: { SubjectId: student.SubjectId },
