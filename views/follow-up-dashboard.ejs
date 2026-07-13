@@ -1,0 +1,185 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-1">🎯 لوحة متابعة الطلاب</h3>
+    <p class="text-muted small mb-0">
+      <%= students.length %> طالب مُسند إليك
+      <% if (selectedSession) { %> | حصة رقم <%= selectedSession.lesson_number %> - <%= selectedSession.Subject?.name %> - <%= selectedSession.Center?.name %><% } %>
+    </p>
+  </div>
+
+  <!-- اختيار الحصة -->
+  <form method="GET" class="d-flex gap-2 flex-wrap">
+    <select name="session_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
+      <option value="">-- اختر الحصة --</option>
+      <% sessions.forEach(s => { %>
+        <option value="<%= s.id %>" <%= String(s.id) === String(filters.session_id) ? 'selected':'' %>>
+          <%= s.Subject?.name %> - <%= s.Center?.name %> (حصة <%= s.lesson_number %>)
+        </option>
+      <% }) %>
+    </select>
+  </form>
+</div>
+
+<!-- الفلاتر -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" class="row g-2 align-items-end">
+      <input type="hidden" name="session_id" value="<%= filters.session_id %>">
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">نوع الفيديو</label>
+        <select name="filter_video_type" class="form-select form-select-sm">
+          <option value="">-- اختر --</option>
+          <option value="explanation" <%= filters.filter_video_type==='explanation'?'selected':'' %>>شرح</option>
+          <option value="questions" <%= filters.filter_video_type==='questions'?'selected':'' %>>أسئلة</option>
+          <option value="homework_solution" <%= filters.filter_video_type==='homework_solution'?'selected':'' %>>حل واجب</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">أقل من (دقيقة)</label>
+        <input type="number" name="filter_video_max" class="form-control form-control-sm" value="<%= filters.filter_video_max || '' %>" placeholder="مثال: 5">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">حالة الواجب</label>
+        <select name="filter_hw_status" class="form-select form-select-sm">
+          <option value="">الكل</option>
+          <option value="complete" <%= filters.filter_hw_status==='complete'?'selected':'' %>>كامل</option>
+          <option value="incomplete" <%= filters.filter_hw_status==='incomplete'?'selected':'' %>>مش كامل</option>
+          <option value="no_steps" <%= filters.filter_hw_status==='no_steps'?'selected':'' %>>من غير خطوات</option>
+          <option value="not_done" <%= filters.filter_hw_status==='not_done'?'selected':'' %>>مش معمول</option>
+          <option value="not_checked" <%= filters.filter_hw_status==='not_checked'?'selected':'' %>>لم يصحح</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">درجة الامتحان أقل من</label>
+        <input type="number" name="filter_exam_max" class="form-control form-control-sm" value="<%= filters.filter_exam_max || '' %>" placeholder="مثال: 50">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-primary btn-sm w-100">تطبيق</button>
+      </div>
+      <div class="col-md-2">
+        <a href="/follow-up-dashboard?session_id=<%= filters.session_id %>" class="btn btn-outline-secondary btn-sm w-100">إلغاء الفلاتر</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% const hwLabels = { complete:'✅ كامل', incomplete:'⚠️ مش كامل', no_steps:'📝 بلا خطوات', not_done:'❌ مش معمول' }; %>
+<% const hwColors = { complete:'#D1FAE5', incomplete:'#FEF3C7', no_steps:'#F3F4F6', not_done:'#FEE2E2' }; %>
+
+<% if (hasFilters) { %>
+  <div class="alert alert-info small mb-3">🔍 يظهر <%= sessionRows.length %> طالب بعد تطبيق الفلاتر</div>
+<% } %>
+
+<!-- جدول الطلاب -->
+<% if (selectedSession && sessionRows.length > 0) { %>
+<div class="card shadow-sm mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:180px;">الطالب</th>
+            <th>الحضور</th>
+            <th>الواجب</th>
+            <th>الامتحان</th>
+            <th>📖 شرح</th>
+            <th>❓ أسئلة</th>
+            <th>✅ واجب</th>
+            <th>كومنت</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% sessionRows.forEach(row => { %>
+            <tr>
+              <td>
+                <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="fw-bold d-block"><%= row.student.name %></a>
+                <span class="text-muted" style="font-size:0.7rem;"><%= row.student.student_code %></span><br>
+                <span class="text-muted" style="font-size:0.65rem;"><%= row.student.Center?.name %> | <%= row.student.Subject?.name %></span>
+              </td>
+              <td>
+                <% if (row.attended) { %>
+                  <span class="badge" style="background:#D1FAE5;color:#047857;">✓ <%= row.attendedWhere %></span>
+                  <% if (row.attendanceTime) { %><br><span style="font-size:0.65rem;color:#6B7280;"><%= new Date(row.attendanceTime).toLocaleTimeString('ar-EG', {hour:'2-digit',minute:'2-digit'}) %></span><% } %>
+                <% } else { %>
+                  <span class="badge" style="background:#FEE2E2;color:#B91C1C;">غائب</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (row.hwStatus) { %>
+                  <span class="badge" style="background:<%= hwColors[row.hwStatus] %>;color:#1F2937;font-size:0.7rem;"><%= hwLabels[row.hwStatus] %></span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <td>
+                <% if (row.examScore !== null) { %>
+                  <span class="fw-bold" style="color:<%= (row.examScore/row.examMax*100)>=60?'#059669':'#DC2626' %>;">
+                    <%= row.examScore %>/<%= row.examMax %>
+                  </span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <td>
+                <% const expMin = Math.floor((row.videoWatch.explanation||0)/60); %>
+                <% const expTotal = Math.floor((row.videoWatch.explanationTotal||0)/60); %>
+                <% if (expTotal > 0) { %>
+                  <span style="color:<%= expMin/expTotal>=0.7?'#059669':'#D97706' %>;font-size:0.8rem;font-weight:600;"><%= expMin %>/<%= expTotal %>د</span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <td>
+                <% const qMin = Math.floor((row.videoWatch.questions||0)/60); %>
+                <% const qTotal = Math.floor((row.videoWatch.questionsTotal||0)/60); %>
+                <% if (qTotal > 0) { %>
+                  <span style="color:<%= qMin/qTotal>=0.7?'#059669':'#D97706' %>;font-size:0.8rem;font-weight:600;"><%= qMin %>/<%= qTotal %>د</span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <td>
+                <% const hwMin = Math.floor((row.videoWatch.homework_solution||0)/60); %>
+                <% const hwTotal = Math.floor((row.videoWatch.hwTotal||0)/60); %>
+                <% if (hwTotal > 0) { %>
+                  <span style="color:<%= hwMin/hwTotal>=0.7?'#059669':'#D97706' %>;font-size:0.8rem;font-weight:600;"><%= hwMin %>/<%= hwTotal %>د</span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <td style="min-width:160px;">
+                <form action="/follow-up-dashboard/comment" method="POST" class="d-flex gap-1">
+                  <input type="hidden" name="student_id" value="<%= row.student.id %>">
+                  <input type="hidden" name="session_id" value="<%= selectedSession.id %>">
+                  <input type="hidden" name="redirect_to" value="/follow-up-dashboard?session_id=<%= selectedSession.id %>">
+                  <input type="text" name="comment" class="form-control form-control-sm" style="font-size:0.75rem;" value="<%= row.sessionComment || '' %>" placeholder="كومنت...">
+                  <button class="btn btn-sm" style="padding:2px 8px;background:#EEF0FB;color:#4338CA;white-space:nowrap;font-size:0.7rem;">حفظ</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<% } else if (selectedSession) { %>
+  <div class="alert alert-secondary">لا يوجد طلاب مطابقين للفلاتر المختارة</div>
+<% } else { %>
+  <div class="alert alert-secondary">اختر حصة من القائمة بالأعلى لعرض بيانات الطلاب</div>
+<% } %>
+
+<!-- قائمة الغائبين -->
+<% if (absentStudents.length > 0 && !hasFilters) { %>
+<div class="card shadow-sm" style="border-right:4px solid #DC2626;">
+  <div class="card-body">
+    <h6 class="mb-3">🔴 الغائبون (<%= absentStudents.length %>)</h6>
+    <div class="row g-2">
+      <% absentStudents.forEach(row => { %>
+        <div class="col-md-3">
+          <div class="p-2 rounded" style="background:#FEE2E2;">
+            <div class="small fw-bold"><%= row.student.name %></div>
+            <div style="font-size:0.7rem;color:#6B7280;"><%= row.student.student_code %></div>
+            <div style="font-size:0.7rem;color:#6B7280;"><%= row.student.Center?.name %></div>
+            <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="btn btn-sm mt-1" style="font-size:0.65rem;padding:2px 8px;background:#FCA5A5;color:#7F1D1D;">عرض الملف</a>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,96 @@
+<%- include('partials/header') %>
+
+<h3 class="mb-4">🎯 إدارة توزيع المتابعة</h3>
+
+<!-- الأسيستانتس وإحصائياتهم -->
+<div class="row g-3 mb-4">
+  <% Object.values(assistantStats).forEach(stat => { %>
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <strong><%= stat.user.name %></strong>
+            <span class="badge" style="background:#EEF0FB;color:#4338CA;"><%= stat.count %> طالب</span>
+          </div>
+          <form action="/admin/follow-up-management/settings" method="POST" class="d-flex gap-1 mb-2">
+            <input type="number" name="max_<%= stat.user.id %>" class="form-control form-control-sm"
+              value="<%= settings['max_' + stat.user.id] || 50 %>" placeholder="الحد الأقصى">
+            <button class="btn btn-sm btn-outline-primary">حفظ</button>
+          </form>
+          <div style="max-height:150px;overflow-y:auto;">
+            <% stat.students.forEach(s => { %>
+              <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <span style="font-size:0.78rem;"><%= s?.name %></span>
+                <form action="/admin/follow-up-management/unassign/<%= s?.id %>" method="POST">
+                  <button class="btn btn-sm" style="padding:1px 6px;background:#FEE2E2;font-size:0.65rem;">إلغاء</button>
+                </form>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<!-- تعيين يدوي -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">تعيين طالب يدوياً</h6>
+    <form action="/admin/follow-up-management/assign" method="POST" class="row g-2">
+      <div class="col-md-4">
+        <select name="student_id" class="form-select form-select-sm" required>
+          <option value="">-- اختر الطالب --</option>
+          <% unassignedStudents.forEach(s => { %>
+            <option value="<%= s.id %>"><%= s.name %> - <%= s.student_code %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <select name="assistant_id" class="form-select form-select-sm" required>
+          <option value="">-- اختر الأسيستانت --</option>
+          <% followUpEligible.forEach(u => { %>
+            <option value="<%= u.id %>"><%= u.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-primary btn-sm w-100">تعيين</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- توزيع تلقائي -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-1">توزيع تلقائي (Round-Robin)</h6>
+      <p class="small text-muted mb-0">سيوزع <%= unassignedStudents.length %> طالب غير مُعيَّن على الأسيستانتس المتاحين</p>
+    </div>
+    <form action="/admin/follow-up-management/auto-assign" method="POST">
+      <button class="btn btn-success" onclick="return confirm('سيتم التوزيع التلقائي. متأكد؟')">⚡ توزيع تلقائي</button>
+    </form>
+  </div>
+</div>
+
+<!-- الطلاب غير المُعيَّنين -->
+<% if (unassignedStudents.length > 0) { %>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h6 class="mb-3">⚠️ طلاب بدون أسيستانت متابعة (<%= unassignedStudents.length %>)</h6>
+    <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
+      <table class="table table-sm">
+        <thead class="table-light"><tr><th>الاسم</th><th>الكود</th><th>المادة</th><th>السنتر</th></tr></thead>
+        <tbody>
+          <% unassignedStudents.forEach(s => { %>
+            <tr><td><%= s.name %></td><td><%= s.student_code %></td><td><%= s.Subject?.name %></td><td><%= s.Center?.name %></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<%- include('partials/footer') %>

@@ -77,6 +77,19 @@
                 <label class="form-label small">تليفون ولي الأمر</label>
                 <input type="text" name="parent_phone" class="form-control form-control-sm" value="<%= student.parent_phone %>" required>
               </div>
+              <% if (typeof followUpAssistant !== 'undefined' && followUpAssistant) { %>
+  <div class="mb-2">
+    <label class="form-label small">أسيستانت المتابعة</label>
+    <div class="p-2 rounded" style="background:#EEF0FB;">
+      <strong><%= followUpAssistant.name %></strong>
+      <% if (followUpAssistant.phone) { %>
+        <br><span class="small text-muted"><%= followUpAssistant.phone %></span>
+        <a href="https://wa.me/2<%= followUpAssistant.phone.replace(/^0/,'') %>" target="_blank"
+          class="btn btn-sm ms-2" style="background:#25D366;color:#fff;font-size:0.65rem;padding:2px 6px;">💬 واتساب</a>
+      <% } %>
+    </div>
+  </div>
+<% } %>
               <div class="mb-2">
                 <label class="form-label small">المادة</label>
                 <select name="subject_id" class="form-select form-select-sm" required>

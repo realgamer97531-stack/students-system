@@ -214,6 +214,15 @@
       noteBox.style.display = 'none';
     }
 
+    // ضيف ده في showSummary بعد adminNoteBox
+if (data.followUpAssistant) {
+  const fuBox = document.createElement('div');
+  fuBox.className = 'alert mb-2 small';
+  fuBox.style.background = '#EEF0FB';
+  fuBox.innerHTML = `🎯 أسيستانت المتابعة: <strong>${data.followUpAssistant.name}</strong>`;
+  document.getElementById('summaryBox').insertBefore(fuBox, document.getElementById('summaryStudentName'));
+}
+
     scanBookletDelivered = false;
     const bookletDeliveredBox = document.getElementById('bookletDeliveredBox');
     if (bookletDeliveredBox) {

@@ -45,6 +45,17 @@ const ensureBookletReservationSchema = require('./utils/ensureBookletReservation
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
+const FollowUpAssignment = require('./models/FollowUpAssignment');
+const SessionComment = require('./models/SessionComment');
+
+FollowUpAssignment.belongsTo(User, { foreignKey: 'AssistantId', as: 'Assistant' });
+FollowUpAssignment.belongsTo(Student, { foreignKey: 'StudentId' });
+Student.hasOne(FollowUpAssignment, { foreignKey: 'StudentId' });
+User.hasMany(FollowUpAssignment, { foreignKey: 'AssistantId', as: 'AssignedStudents' });
+
+SessionComment.belongsTo(Student, { foreignKey: 'StudentId' });
+SessionComment.belongsTo(Session, { foreignKey: 'SessionId' });
+SessionComment.belongsTo(User, { foreignKey: 'UserId' });
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -225,6 +236,7 @@ app.use(async (req, res, next) => {
 function requirePermission(key) {
   return (req, res, next) => {
     if (req.session.userRole === 'admin') return next();
+    if (req.session.userRole === 'follow_up' && key === 'follow_up') return next();
     const perms = req.session.userPermissions || [];
     if (!perms.includes(key)) {
       return res.status(403).send('⛔ لا تملك صلاحية الوصول لهذه الصفحة');
@@ -519,6 +531,12 @@ app.get('/students/:id', async (req, res) => {
       where: { SubjectId: student.SubjectId, is_active: true },
     });
 
+    const followUpAssignment = await FollowUpAssignment.findOne({
+      where: { StudentId: student.id },
+      include: [{ model: User, as: 'Assistant' }],
+    });
+    const followUpAssistant = followUpAssignment?.Assistant || null;
+
     res.render('student-profile', {
       student,
       centers,
@@ -530,6 +548,7 @@ app.get('/students/:id', async (req, res) => {
       warnings,
       studentBooklets,
       availableBooklets,
+      followUpAssistant,
     });
   } catch (error) {
     console.error(error);
@@ -1248,6 +1267,11 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     Object.keys(attByLesson).forEach(n => lessonNumbersSet.add(parseInt(n)));
     const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
 
+    const followUpAss = await FollowUpAssignment.findOne({
+      where: { StudentId: student.id },
+      include: [{ model: User, as: 'Assistant' }],
+    });
+
     const videos = await Video.findAll({
       where: { SubjectId: student.SubjectId },
       include: [Session, VideoPart],
@@ -1326,6 +1350,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       summary,
       bookletStatuses,
       pendingBooklets: bookletStatuses.filter(b => !b.isFullyPaid && !b.isDelivered),
+      followUpAssistant: followUpAss ? { name: followUpAss.Assistant?.name, phone: followUpAss.Assistant?.phone } : null,
     });
   } catch (error) {
     console.error(error);
@@ -2218,6 +2243,10 @@ async function buildStudentData(studentId) {
       isBlocked: student.is_blocked,
       points: student.points,
       warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
+      followUpAssistant: await FollowUpAssignment.findOne({
+        where: { StudentId: student.id },
+        include: [{ model: User, as: 'Assistant', attributes: ['name', 'phone'] }],
+      }).then(a => a ? { name: a.Assistant?.name, phone: a.Assistant?.phone } : null),
     },
     sessions,
     videos: videosData,
@@ -4432,6 +4461,399 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
       filters: { filter_user, filter_type: filter_type || 'all' },
     });
   } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
+// ===== نظام أسيستانت المتابعة (مستقل تماماً) =====
+
+// Middleware خاص بأسيستانت المتابعة
+function requireFollowUp(req, res, next) {
+  if (req.session.userRole === 'admin' || req.session.userRole === 'follow_up' || 
+      (req.session.userPermissions && req.session.userPermissions.includes('follow_up'))) {
+    return next();
+  }
+  res.status(403).send('⛔ غير مسموح');
+}
+
+// ===== الصفحة الرئيسية لأسيستانت المتابعة =====
+app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
+  try {
+    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id } = req.query;
+
+    // جلب الطلاب المُسندين لهذا الأسيستانت
+    const assignments = await FollowUpAssignment.findAll({
+      where: req.session.userRole !== 'admin' ? { AssistantId: req.session.userId } : {},
+      include: [{
+        model: Student,
+        include: [Center, Subject],
+      }],
+    });
+
+    const students = assignments.map(a => a.Student).filter(Boolean);
+    const sessions = await Session.findAll({
+      order: [['lesson_number', 'DESC']],
+      include: [Center, Subject],
+    });
+
+    // لو مفيش session مختار، اختار أحدث حصة
+    const selectedSession = session_id 
+      ? sessions.find(s => String(s.id) === String(session_id))
+      : sessions[0];
+
+    if (!selectedSession || students.length === 0) {
+      return res.render('follow-up-dashboard', {
+        students: [], sessionRows: [], sessions, selectedSession: null,
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id },
+        absentStudents: [],
+      });
+    }
+
+    // بيانات كل طالب في الحصة المختارة
+    const watchRecords = await WatchProgress.findAll({
+      where: { StudentId: students.map(s => s.id) },
+      include: [VideoPart],
+    });
+    const watchMap = {};
+    watchRecords.forEach(w => { watchMap[`${w.StudentId}_${w.VideoPartId}`] = w.watched_seconds; });
+
+    const video = await Video.findOne({
+      where: { SessionId: selectedSession.id },
+      include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
+    });
+
+    const sessionRows = [];
+    const absentStudents = [];
+
+    for (const student of students) {
+      const attendance = await Attendance.findOne({
+        where: { StudentId: student.id, SessionId: selectedSession.id },
+        include: [User],
+      });
+      const hw = await HomeworkCheck.findOne({
+        where: { StudentId: student.id, SessionId: selectedSession.id },
+      });
+      const examResult = await ExamResult.findOne({
+        where: { StudentId: student.id },
+        include: [{ model: Exam, where: { SessionId: selectedSession.id }, required: true }],
+      }).catch(() => null);
+
+      const sessionComment = await SessionComment.findOne({
+        where: { StudentId: student.id, SessionId: selectedSession.id },
+      });
+
+      // مدد المشاهدة حسب نوع الفيديو
+      let videoWatch = { explanation: 0, questions: 0, homework_solution: 0, explanationTotal: 0, questionsTotal: 0, hwTotal: 0 };
+      if (video && video.VideoParts) {
+        video.VideoParts.forEach(part => {
+          const watched = watchMap[`${student.id}_${part.id}`] || 0;
+          videoWatch[part.category] = (videoWatch[part.category] || 0) + watched;
+          videoWatch[`${part.category}Total`] = (videoWatch[`${part.category}Total`] || 0) + part.duration_seconds;
+        });
+      }
+
+      const row = {
+        student,
+        attended: !!attendance,
+        attendedWhere: attendance ? (await Session.findByPk(attendance.SessionId, { include: [Center] }))?.Center?.name : null,
+        attendanceTime: attendance ? attendance.attended_at : null,
+        attendedBy: attendance ? attendance.User?.name : null,
+        hwStatus: hw ? hw.status : null,
+        examScore: examResult ? examResult.score : null,
+        examMax: examResult ? examResult.Exam?.max_score : null,
+        videoWatch,
+        sessionComment: sessionComment ? sessionComment.comment : null,
+      };
+
+      if (!attendance) absentStudents.push(row);
+      sessionRows.push(row);
+    }
+
+    // تطبيق الفلاتر
+    let filteredRows = [...sessionRows];
+
+    if (filter_video_type && filter_video_max) {
+      const maxMin = parseFloat(filter_video_max);
+      filteredRows = filteredRows.filter(r => {
+        const watchedMin = r.videoWatch[filter_video_type] / 60;
+        return watchedMin <= maxMin;
+      });
+    }
+
+    if (filter_hw_status) {
+      filteredRows = filteredRows.filter(r => r.hwStatus === filter_hw_status || (!r.hwStatus && filter_hw_status === 'not_checked'));
+    }
+
+    if (filter_exam_max) {
+      filteredRows = filteredRows.filter(r => r.examScore !== null && r.examScore <= parseFloat(filter_exam_max));
+    }
+
+    res.render('follow-up-dashboard', {
+      students, sessionRows: filteredRows, sessions, selectedSession,
+      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id },
+      absentStudents: absentStudents,
+      hasFilters: !!(filter_video_type || filter_hw_status || filter_exam_max),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// ===== ملف طالب من منظور المتابعة =====
+app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.params.id, { include: [Center, Subject] });
+    if (!student) return res.status(404).send('❌');
+
+    const assignment = await FollowUpAssignment.findOne({
+      where: { StudentId: student.id },
+      include: [{ model: User, as: 'Assistant' }],
+    });
+
+    const ownSessions = await Session.findAll({
+      where: { SubjectId: student.SubjectId },
+      include: [Center],
+      order: [['lesson_number', 'ASC']],
+    });
+
+    const attendances = await Attendance.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Session, include: [Center] }, User],
+    });
+    const attMap = {};
+    attendances.forEach(a => { if (a.Session.SubjectId === student.SubjectId) attMap[a.Session.lesson_number] = a; });
+
+    const hwChecks = await HomeworkCheck.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Session }],
+    });
+    const hwMap = {};
+    hwChecks.forEach(h => { if (h.Session.SubjectId === student.SubjectId) hwMap[h.Session.lesson_number] = h; });
+
+    const examResults = await ExamResult.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Exam, include: [Session] }],
+    });
+    const examMap = {};
+    examResults.forEach(r => { if (r.Exam?.Session) examMap[r.Exam.Session.lesson_number] = r; });
+
+    const sessionComments = await SessionComment.findAll({
+      where: { StudentId: student.id },
+      include: [Session, User],
+    });
+    const commentMap = {};
+    sessionComments.forEach(c => { commentMap[c.Session.lesson_number] = c; });
+
+    const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
+    const watchMap = {};
+    watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
+
+    const videos = await Video.findAll({
+      where: { SubjectId: student.SubjectId },
+      include: [{ model: VideoPart }, Session],
+    });
+    const videoByLesson = {};
+    videos.forEach(v => { if (v.Session) videoByLesson[v.Session.lesson_number] = v; });
+
+    const lessonData = ownSessions.map(s => {
+      const att = attMap[s.lesson_number];
+      const hw = hwMap[s.lesson_number];
+      const exam = examMap[s.lesson_number];
+      const comment = commentMap[s.lesson_number];
+      const video = videoByLesson[s.lesson_number];
+
+      let videoWatch = {};
+      if (video && video.VideoParts) {
+        video.VideoParts.forEach(p => {
+          const cat = p.category;
+          videoWatch[cat] = (videoWatch[cat] || 0) + (watchMap[p.id] || 0);
+          videoWatch[`${cat}Total`] = (videoWatch[`${cat}Total`] || 0) + p.duration_seconds;
+        });
+      }
+
+      return {
+        session: s,
+        attended: !!att,
+        attendedWhere: att ? att.Session?.Center?.name : null,
+        attendanceTime: att ? att.attended_at : null,
+        attendedBy: att ? att.User?.name : null,
+        hwStatus: hw ? hw.status : null,
+        examScore: exam ? exam.score : null,
+        examMax: exam ? exam.Exam?.max_score : null,
+        videoWatch,
+        comment: comment ? comment.comment : null,
+        commentUser: comment ? comment.User?.name : null,
+      };
+    });
+
+    res.render('follow-up-student', { student, assignment, lessonData });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// ===== إضافة/تعديل كومنت الحصة =====
+app.post('/follow-up-dashboard/comment', requireFollowUp, async (req, res) => {
+  try {
+    const { student_id, session_id, comment, redirect_to } = req.body;
+    const [sc] = await SessionComment.findOrCreate({
+      where: { StudentId: student_id, SessionId: session_id },
+      defaults: { UserId: req.session.userId, comment },
+    });
+    if (sc.comment !== comment) {
+      sc.comment = comment;
+      sc.UserId = req.session.userId;
+      await sc.save();
+    }
+    res.redirect(redirect_to || '/follow-up-dashboard');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// ===== إدارة التوزيع (أدمن بس) =====
+app.get('/admin/follow-up-management', requireAdmin, async (req, res) => {
+  try {
+    const followUpUsers = await User.findAll({
+      where: {
+        [Op.or]: [
+          { role: 'follow_up' },
+          // أو اللي عندهم صلاحية follow_up
+        ]
+      },
+    });
+
+    // لو مفيش follow_up role، جيب من الصلاحيات
+    const allUsers = await User.findAll({ order: [['name', 'ASC']] });
+    const followUpEligible = allUsers.filter(u =>
+      u.role === 'follow_up' ||
+      (u.permissions && JSON.parse(u.permissions || '[]').includes('follow_up'))
+    );
+
+    const assignments = await FollowUpAssignment.findAll({
+      include: [
+        { model: User, as: 'Assistant' },
+        { model: Student, include: [Subject, Center] },
+      ],
+      order: [['AssistantId', 'ASC']],
+    });
+
+    const unassignedStudents = await Student.findAll({
+      where: {
+        id: {
+          [Op.notIn]: assignments.map(a => a.StudentId).length > 0
+            ? assignments.map(a => a.StudentId)
+            : [0],
+        },
+      },
+      include: [Subject, Center],
+      order: [['name', 'ASC']],
+    });
+
+    // إحصائيات كل أسيستانت
+    const assistantStats = {};
+    followUpEligible.forEach(u => {
+      assistantStats[u.id] = {
+        user: u,
+        count: assignments.filter(a => a.AssistantId === u.id).length,
+        students: assignments.filter(a => a.AssistantId === u.id).map(a => a.Student).filter(Boolean),
+      };
+    });
+
+    const settings = await getFollowUpSettings();
+
+    res.render('follow-up-management', {
+      followUpEligible, assignments, unassignedStudents, assistantStats, allUsers, settings,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// إعدادات الحد الأقصى لكل أسيستانت
+const followUpSettingsCache = {};
+async function getFollowUpSettings() {
+  // نخزنهم في جدول settings لو موجود، أو نرجع defaults
+  return followUpSettingsCache;
+}
+
+app.post('/admin/follow-up-management/settings', requireAdmin, async (req, res) => {
+  const settings = req.body;
+  Object.assign(followUpSettingsCache, settings);
+  res.redirect('/admin/follow-up-management');
+});
+
+// توزيع تلقائي
+app.post('/admin/follow-up-management/auto-assign', requireAdmin, async (req, res) => {
+  try {
+    const followUpEligible = await User.findAll({
+      where: {
+        [Op.or]: [
+          { role: 'follow_up' },
+        ],
+      },
+    });
+
+    const allUsers = await User.findAll();
+    const eligible = allUsers.filter(u =>
+      u.role === 'follow_up' ||
+      (u.permissions && JSON.parse(u.permissions || '[]').includes('follow_up'))
+    );
+
+    if (eligible.length === 0) return res.redirect('/admin/follow-up-management');
+
+    const unassigned = await Student.findAll({
+      where: {
+        id: {
+          [Op.notIn]: (await FollowUpAssignment.findAll()).map(a => a.StudentId).length > 0
+            ? (await FollowUpAssignment.findAll()).map(a => a.StudentId)
+            : [0],
+        },
+      },
+    });
+
+    // توزيع round-robin
+    for (let i = 0; i < unassigned.length; i++) {
+      const assistant = eligible[i % eligible.length];
+      const maxStudents = followUpSettingsCache[`max_${assistant.id}`] || 50;
+      const currentCount = await FollowUpAssignment.count({ where: { AssistantId: assistant.id } });
+      if (currentCount < maxStudents) {
+        await FollowUpAssignment.create({
+          AssistantId: assistant.id,
+          StudentId: unassigned[i].id,
+        });
+      }
+    }
+
+    res.redirect('/admin/follow-up-management');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// تعيين يدوي
+app.post('/admin/follow-up-management/assign', requireAdmin, async (req, res) => {
+  try {
+    const { student_id, assistant_id } = req.body;
+    await FollowUpAssignment.upsert({
+      StudentId: student_id,
+      AssistantId: assistant_id,
+      assignedAt: new Date(),
+    });
+    res.redirect('/admin/follow-up-management');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// إلغاء تعيين
+app.post('/admin/follow-up-management/unassign/:studentId', requireAdmin, async (req, res) => {
+  await FollowUpAssignment.destroy({ where: { StudentId: req.params.studentId } });
+  res.redirect('/admin/follow-up-management');
 });
 
 

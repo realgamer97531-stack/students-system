@@ -9,4 +9,5 @@ module.exports = [
   { key: 'door_scan', label: 'سكان الباب', path: '/door/scan' },
   { key: 'exams', label: 'الامتحانات والدرجات', path: '/exams' },
   { key: 'admin_videos', label: 'إدارة الفيديوهات', path: '/admin/videos' },
+  { key: 'follow_up', label: 'متابعة الطلاب', path: '/follow-up-dashboard' },
 ];

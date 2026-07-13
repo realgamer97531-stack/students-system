@@ -1,0 +1,121 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between mb-4">
+  <div>
+    <a href="/follow-up-dashboard" class="btn btn-sm btn-outline-secondary mb-2">⬅ رجوع</a>
+    <h3 class="mb-1"><%= student.name %></h3>
+    <p class="text-muted small mb-0"><%= student.student_code %> | <%= student.Subject?.name %> | <%= student.Center?.name %></p>
+  </div>
+</div>
+
+<!-- بيانات الطالب -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="small text-muted">رقم الطالب</div>
+        <div class="fw-bold"><%= student.phone || '-' %></div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-muted">رقم ولي الأمر</div>
+        <div class="fw-bold"><%= student.parent_phone || '-' %></div>
+        <% if (student.parent_phone) { %>
+          <a href="https://wa.me/2<%= student.parent_phone.replace(/^0/,'') %>" target="_blank"
+            class="btn btn-sm mt-1" style="background:#25D366;color:#fff;font-size:0.7rem;padding:2px 8px;">
+            💬 واتساب
+          </a>
+        <% } %>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-muted">أسيستانت المتابعة</div>
+        <div class="fw-bold"><%= assignment?.Assistant?.name || 'غير محدد' %></div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-muted">الرصيد</div>
+        <div class="fw-bold text-success"><%= student.balance %> ج</div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-muted">النقاط</div>
+        <div class="fw-bold" style="color:#D97706;"><%= student.points || 0 %> ⭐</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- جدول الحصص التفصيلي -->
+<% const hwLabels = { complete:'✅ كامل', incomplete:'⚠️ مش كامل', no_steps:'📝 بلا خطوات', not_done:'❌ مش معمول' }; %>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>الحضور</th>
+            <th>الواجب</th>
+            <th>الامتحان</th>
+            <th>📖 شرح</th>
+            <th>❓ أسئلة</th>
+            <th>✅ واجب</th>
+            <th>كومنت</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% lessonData.forEach(row => { %>
+            <tr style="background:<%= !row.attended ? '#FFF8F8' : 'transparent' %>">
+              <td class="fw-bold"><%= row.session.lesson_number %></td>
+              <td>
+                <% if (row.attended) { %>
+                  <span class="badge" style="background:#D1FAE5;color:#047857;font-size:0.7rem;">✓ <%= row.attendedWhere %></span>
+                  <% if (row.attendanceTime) { %><br><span style="font-size:0.65rem;color:#6B7280;"><%= new Date(row.attendanceTime).toLocaleString('ar-EG',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) %></span><% } %>
+                  <% if (row.attendedBy) { %><br><span style="font-size:0.62rem;color:#9CA3AF;"><%= row.attendedBy %></span><% } %>
+                <% } else { %>
+                  <span class="badge" style="background:#FEE2E2;color:#B91C1C;font-size:0.7rem;">غائب</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (row.hwStatus) { %>
+                  <span style="font-size:0.75rem;"><%= hwLabels[row.hwStatus] || row.hwStatus %></span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <td>
+                <% if (row.examScore !== null) { %>
+                  <span class="fw-bold" style="color:<%= (row.examScore/row.examMax*100)>=60?'#059669':'#DC2626' %>;">
+                    <%= row.examScore %>/<%= row.examMax %>
+                  </span>
+                <% } else { %><span class="text-muted small">-</span><% } %>
+              </td>
+              <% ['explanation','questions','homework_solution'].forEach((cat, ci) => { %>
+                <td>
+                  <% const watched = Math.floor((row.videoWatch[cat]||0)/60); %>
+                  <% const total = Math.floor((row.videoWatch[`${cat}Total`]||0)/60); %>
+                  <% if (total > 0) { %>
+                    <span style="font-size:0.8rem;font-weight:600;color:<%= watched/total>=0.7?'#059669':watched/total>=0.4?'#D97706':'#DC2626' %>;">
+                      <%= watched %>/<%= total %>د
+                    </span>
+                  <% } else { %><span class="text-muted small">-</span><% } %>
+                </td>
+              <% }) %>
+              <td style="min-width:150px;">
+                <% if (row.comment) { %>
+                  <div class="p-1 rounded mb-1" style="background:#EEF0FB;font-size:0.72rem;"><%= row.comment %></div>
+                  <div style="font-size:0.62rem;color:#9CA3AF;"><%= row.commentUser %></div>
+                <% } %>
+                <form action="/follow-up-dashboard/comment" method="POST" class="d-flex gap-1 mt-1">
+                  <input type="hidden" name="student_id" value="<%= student.id %>">
+                  <input type="hidden" name="session_id" value="<%= row.session.id %>">
+                  <input type="hidden" name="redirect_to" value="/follow-up-dashboard/student/<%= student.id %>">
+                  <input type="text" name="comment" class="form-control form-control-sm" style="font-size:0.72rem;" value="<%= row.comment || '' %>" placeholder="كومنت...">
+                  <button class="btn btn-sm" style="padding:2px 6px;background:#EEF0FB;color:#4338CA;font-size:0.7rem;white-space:nowrap;">💾</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
