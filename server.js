@@ -4681,6 +4681,10 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
     if (!student) return res.status(404).send('❌');
 
     const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
+    const assignment = await FollowUpAssignment.findOne({
+      where: { StudentId: student.id },
+      include: [{ model: User, as: 'Assistant', attributes: ['id', 'name', 'username', 'phone'] }],
+    });
 
     const ownSessions = await Session.findAll({
       where: { SubjectId: student.SubjectId },
@@ -4758,7 +4762,7 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       };
     });
 
-    res.render('follow-up-student', { student, assignment, lessonData });
+    res.render('follow-up-student', { student, assignment, followUpAssistant, lessonData });
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
