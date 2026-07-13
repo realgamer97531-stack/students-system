@@ -48,11 +48,6 @@ const { Readable } = require('stream');
 const FollowUpAssignment = require('./models/FollowUpAssignment');
 const SessionComment = require('./models/SessionComment');
 
-FollowUpAssignment.belongsTo(User, { foreignKey: 'AssistantId', as: 'Assistant' });
-FollowUpAssignment.belongsTo(Student, { foreignKey: 'StudentId' });
-Student.hasOne(FollowUpAssignment, { foreignKey: 'StudentId' });
-User.hasMany(FollowUpAssignment, { foreignKey: 'AssistantId', as: 'AssignedStudents' });
-
 async function getFollowUpAssistantForStudent(studentId) {
   try {
     const assignment = await FollowUpAssignment.findOne({
