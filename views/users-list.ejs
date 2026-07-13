@@ -11,10 +11,13 @@
       <div class="col-md-3">
         <input type="text" name="name" class="form-control" placeholder="الاسم بالكامل" required>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <input type="text" name="username" class="form-control" placeholder="اليوزرنيم" required>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
+        <input type="tel" name="phone" class="form-control" placeholder="رقم الهاتف" autocomplete="tel">
+      </div>
+      <div class="col-md-2">
         <input type="password" name="password" class="form-control" placeholder="الباسورد" required>
       </div>
       <div class="col-md-2">
@@ -36,6 +39,7 @@
       <tr>
         <th>الاسم</th>
         <th>اليوزرنيم</th>
+        <th>الهاتف</th>
         <th>الصلاحية</th>
         <th>تاريخ الإنشاء</th>
         <th></th>
@@ -46,6 +50,7 @@
         <tr>
           <td><%= u.name %></td>
           <td><%= u.username %></td>
+          <td><%= u.phone || '-' %></td>
           <td>
             <% if (u.role === 'admin') { %>
               <span class="badge bg-danger">أدمن</span>

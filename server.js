@@ -93,6 +93,28 @@ require('./models/associations')();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+
+async function ensureUserPhoneColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('users');
+    if (!tableInfo.phone) {
+      await queryInterface.addColumn('users', 'phone', {
+        type: sequelize.Sequelize.STRING,
+        allowNull: true,
+      });
+      console.log('✅ Added phone column to users table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure users.phone column:', error.message);
+  }
+}
+
+ensureUserPhoneColumn();
+
 app.use(cors()); // يسمح لأي موقع يتواصل مع الـ API بتاعنا
 app.use(compression());
 app.use(cors({
@@ -1774,7 +1796,7 @@ app.get('/users', requireAdmin, async (req, res) => {
 
 app.post('/users', requireAdmin, async (req, res) => {
   try {
-    const { name, username, password, role } = req.body;
+    const { name, username, password, role, phone } = req.body;
 
     const existing = await User.findOne({ where: { username } });
     if (existing) {
@@ -1783,7 +1805,13 @@ app.post('/users', requireAdmin, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await User.create({ name, username, password: hashedPassword, role });
+    await User.create({
+      name,
+      username,
+      phone: phone || null,
+      password: hashedPassword,
+      role,
+    });
 
     res.redirect('/users');
   } catch (error) {
