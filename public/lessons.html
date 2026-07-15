@@ -70,8 +70,8 @@
     let ytInterval = null;
 
     const translations = {
-      ar: { pageTitle: 'مشاهدة الدرس', btnBack: '⬅ رجوع للدروس', btnLogout: 'خروج', catExplanation: '📖 الشرح', catQuestions: '❓ الأسئلة', catHomework: '✅ حل الواجب', noPartsMsg: 'لا يوجد فيديو من هذا النوع لهذا الدرس', prevPart: '⬅ السابق', nextPart: 'التالي ➡', driveWarning: '⚠️ لا يمكن تتبع وقت المشاهدة لفيديوهات Google Drive بدقة', formatError: "<div class='alert alert-warning'>صيغة الرابط غير مدعومة</div>", loading: 'جاري التحميل...', alertError: 'لا يمكن فتح هذا الدرس' },
-      en: { pageTitle: 'Watch Lesson', btnBack: '⬅ Back to Lessons', btnLogout: 'Logout', catExplanation: '📖 Explanation', catQuestions: '❓ Questions', catHomework: '✅ HW Solution', noPartsMsg: 'There is no video of this type for this lesson', prevPart: '⬅ Previous', nextPart: 'Next ➡', driveWarning: '⚠️ Watch time cannot be tracked accurately for Google Drive videos', formatError: "<div class='alert alert-warning'>Unsupported video link format</div>", loading: 'Loading...', alertError: 'Cannot open this lesson' }
+      ar: { pageTitle: 'مشاهدة الدرس', btnBack: '⬅ رجوع للدروس', btnLogout: 'خروج', catExplanation: '📖 الشرح', catQuestions: '❓ الأسئلة', catHomework: '✅ حل الواجب', noPartsMsg: 'لا يوجد فيديو من هذا النوع لهذا الدرس', prevPart: '⬅ السابق', nextPart: 'التالي ➡', driveWarning: '⚠️ لا يمكن تتبع وقت المشاهدة لفيديوهات Google Drive بدقة', formatError: "<div class='alert alert-warning'>صيغة الرابط غير مدعومة</div>", loading: 'جاري التحميل...', alertError: 'لا يمكن فتح هذا الدرس', iframePlaybackNote: 'إذا لم يبدأ الفيديو تلقائياً، اضغط تشغيل داخل الإطار وفك كتم الصوت إذا كان مطلوباً.' },
+      en: { pageTitle: 'Watch Lesson', btnBack: '⬅ Back to Lessons', btnLogout: 'Logout', catExplanation: '📖 Explanation', catQuestions: '❓ Questions', catHomework: '✅ HW Solution', noPartsMsg: 'There is no video of this type for this lesson', prevPart: '⬅ Previous', nextPart: 'Next ➡', driveWarning: '⚠️ Watch time cannot be tracked accurately for Google Drive videos', formatError: "<div class='alert alert-warning'>Unsupported video link format</div>", loading: 'Loading...', alertError: 'Cannot open this lesson', iframePlaybackNote: 'If the video does not start automatically, click play inside the frame and unmute it if needed.' }
     };
 
     function normalizeCategory(category) {
@@ -143,6 +143,21 @@
       document.getElementById('playerContainer').innerHTML = '';
     }
 
+    function normalizeMediaDeliveryUrl(url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.hostname.toLowerCase().includes('mediadelivery.net')) {
+          parsed.searchParams.set('autoplay', 'true');
+          parsed.searchParams.set('muted', 'true');
+          parsed.searchParams.set('responsive', 'true');
+          return parsed.toString();
+        }
+      } catch (_) {
+        return url;
+      }
+      return url;
+    }
+
     function detectVideoSource(url) {
       if (!url) return { type: 'unknown' };
       const trimmedUrl = String(url).trim();
@@ -151,7 +166,7 @@
       const driveMatch = trimmedUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
       if (driveMatch) return { type: 'drive', id: driveMatch[1] };
       const mediaMatch = trimmedUrl.match(/mediadelivery\.net/i);
-      if (mediaMatch) return { type: 'mediadelivery', url: trimmedUrl };
+      if (mediaMatch) return { type: 'mediadelivery', url: normalizeMediaDeliveryUrl(trimmedUrl) };
       if (/^https?:\/\//i.test(trimmedUrl)) return { type: 'iframe', url: trimmedUrl };
       return { type: 'direct', url: trimmedUrl };
     }
@@ -280,9 +295,16 @@
       } else if (source.type === 'mediadelivery' || source.type === 'iframe') {
         const iframe = document.createElement('iframe');
         iframe.src = source.url;
-        iframe.width = '100%'; iframe.height = '600'; iframe.allow = 'autoplay; fullscreen'; iframe.style.border = 'none';
+        iframe.width = '100%'; iframe.height = '600';
+        iframe.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write';
+        iframe.style.border = 'none';
         iframe.setAttribute('allowfullscreen', 'true');
         container.appendChild(iframe);
+
+        const note = document.createElement('p');
+        note.className = 'text-muted small mt-2';
+        note.textContent = translations[currentLang].iframePlaybackNote || 'If the player does not start automatically, click the play button inside the video frame.';
+        container.appendChild(note);
       } else {
         container.innerHTML = translations[currentLang].formatError;
       }
