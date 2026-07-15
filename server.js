@@ -173,7 +173,32 @@ async function ensureStudentBookletCustomPriceColumn() {
   }
 }
 
+function getEffectiveBookletPrice(booklet, studentBooklet) {
+  if (studentBooklet && studentBooklet.custom_price !== null && studentBooklet.custom_price !== undefined) {
+    const customPrice = parseFloat(studentBooklet.custom_price);
+    if (!Number.isNaN(customPrice) && customPrice >= 0) {
+      return customPrice;
+    }
+  }
+
+  if (booklet && booklet.sell_price !== null && booklet.sell_price !== undefined) {
+    const basePrice = parseFloat(booklet.sell_price);
+    if (!Number.isNaN(basePrice) && basePrice >= 0) {
+      return basePrice;
+    }
+  }
+
+  return 0;
+}
+
+function getBookletRemainingAmount(booklet, studentBooklet) {
+  const effectivePrice = getEffectiveBookletPrice(booklet, studentBooklet);
+  const paidAmount = studentBooklet ? parseFloat(studentBooklet.paid_amount || 0) : 0;
+  return Math.max(0, effectivePrice - paidAmount);
+}
+
 ensureUserPhoneColumn();
+ensureStudentBookletCustomPriceColumn();
 
 app.use(cors()); // يسمح لأي موقع يتواصل مع الـ API بتاعنا
 app.use(compression());
@@ -1409,12 +1434,13 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       });
 
       const paidAmount = studentBooklet ? studentBooklet.paid_amount : 0;
-      const remaining = Math.max(0, (booklet.sell_price || 0) - paidAmount);
+      const effectivePrice = getEffectiveBookletPrice(booklet, studentBooklet);
+      const remaining = Math.max(0, effectivePrice - paidAmount);
 
       return {
         id: booklet.id,
         name: booklet.name,
-        sellPrice: booklet.sell_price,
+        sellPrice: effectivePrice,
         paidAmount,
         remaining,
         studentBookletId: studentBooklet ? studentBooklet.id : null,
@@ -4209,11 +4235,12 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     const bookletStatus = await Promise.all(booklets.map(async b => {
       const sb = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: b.id } });
       const paidAmount = sb ? sb.paid_amount : 0;
-      const remaining = b.sell_price - paidAmount;
+      const effectivePrice = getEffectiveBookletPrice(b, sb);
+      const remaining = effectivePrice - paidAmount;
       const isDelivered = sb ? sb.is_delivered : false;
       return {
         id: b.id, name: b.name,
-        sellPrice: b.sell_price,
+        sellPrice: effectivePrice,
         paidAmount, remaining,
         isDelivered,
         isFullyPaid: remaining <= 0,
@@ -4404,10 +4431,11 @@ app.get('/api/portal/booklets', verifyPortalToken('student'), async (req, res) =
       const reservation = await BookletReservation.findOne({
         where: { StudentId: student.id, BookletId: b.id, status: { [Op.ne]: 'rejected' } },
       });
+      const effectivePrice = getEffectiveBookletPrice(b, sb);
       return {
-        id: b.id, name: b.name, sellPrice: b.sell_price,
+        id: b.id, name: b.name, sellPrice: effectivePrice,
         paidAmount: sb ? sb.paid_amount : 0,
-        remaining: b.sell_price - (sb ? sb.paid_amount : 0),
+        remaining: effectivePrice - (sb ? sb.paid_amount : 0),
         isDelivered: sb ? sb.is_delivered : false,
         reservation: reservation ? { status: reservation.status, method: reservation.payment_method, isDelivered: reservation.is_delivered } : null,
       };
@@ -4985,12 +5013,23 @@ app.post('/students/:id/delete', requireAdmin, async (req, res) => {
 app.post('/students/:studentId/booklet-custom-price', requireAdmin, async (req, res) => {
   try {
     const { booklet_id, custom_price } = req.body;
-    await StudentBooklet.upsert({
-      StudentId: req.params.studentId,
-      BookletId: booklet_id,
-      custom_price: parseFloat(custom_price),
-      paid_amount: 0,
+    let normalizedCustomPrice = null;
+
+    if (custom_price !== undefined && custom_price !== null && custom_price !== '') {
+      normalizedCustomPrice = parseFloat(custom_price);
+      if (Number.isNaN(normalizedCustomPrice)) {
+        normalizedCustomPrice = null;
+      }
+    }
+
+    const [studentBooklet] = await StudentBooklet.findOrCreate({
+      where: { StudentId: req.params.studentId, BookletId: booklet_id },
+      defaults: { paid_amount: 0, custom_price: normalizedCustomPrice },
     });
+
+    studentBooklet.custom_price = normalizedCustomPrice;
+    await studentBooklet.save();
+
     res.redirect('/students/' + req.params.studentId);
   } catch (e) {
     console.error(e);

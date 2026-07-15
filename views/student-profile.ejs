@@ -223,12 +223,13 @@
                   </div>
                 </div>
                 <%
-  const effectivePrice = sb && sb.custom_price ? sb.custom_price : b.sell_price;
+  const hasCustomPrice = sb && sb.custom_price !== null && sb.custom_price !== undefined && sb.custom_price !== '';
+  const effectivePrice = hasCustomPrice ? parseFloat(sb.custom_price) : b.sell_price;
   const bookletRemaining = effectivePrice - paid;
 %>
 <div class="d-flex justify-content-between small text-muted mb-2">
   <span>السعر: 
-    <% if (sb && sb.custom_price) { %>
+    <% if (hasCustomPrice) { %>
       <span class="text-decoration-line-through text-muted"><%= b.sell_price %></span>
       <strong class="text-warning"><%= sb.custom_price %> ج</strong> (مخصص)
     <% } else { %>
