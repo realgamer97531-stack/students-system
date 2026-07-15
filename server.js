@@ -47,6 +47,8 @@ const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
 const FollowUpAssignment = require('./models/FollowUpAssignment');
 const SessionComment = require('./models/SessionComment');
+const XLSX = require('xlsx');
+const bulkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 function normalizePhoneForWhatsApp(phone) {
   if (!phone) return null;
@@ -4839,9 +4841,14 @@ app.get('/admin/follow-up-management', requireAdmin, async (req, res) => {
     });
 
     const settings = await getFollowUpSettings();
+    const allStudentsForBulk = await Student.findAll({
+      include: [Subject, Center],
+      order: [['name', 'ASC']],
+    });
 
     res.render('follow-up-management', {
       followUpEligible, assignments, unassignedStudents, assistantStats, allUsers, settings,
+      allStudentsForBulk,
     });
   } catch (e) {
     console.error(e);
@@ -4931,6 +4938,171 @@ app.post('/admin/follow-up-management/assign', requireAdmin, async (req, res) =>
 app.post('/admin/follow-up-management/unassign/:studentId', requireAdmin, async (req, res) => {
   await FollowUpAssignment.destroy({ where: { StudentId: req.params.studentId } });
   res.redirect('/admin/follow-up-management');
+});
+
+app.post('/students/:id/delete', requireAdmin, async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    // حذف كل البيانات المرتبطة بالطالب
+    await Attendance.destroy({ where: { StudentId: studentId } });
+    await HomeworkCheck.destroy({ where: { StudentId: studentId } });
+    await ExamResult.destroy({ where: { StudentId: studentId } });
+    await BalanceTransaction.destroy({ where: { StudentId: studentId } });
+    await WatchProgress.destroy({ where: { StudentId: studentId } });
+    await VideoAccessGrant.destroy({ where: { StudentId: studentId } });
+    await FollowUpAssignment.destroy({ where: { StudentId: studentId } });
+    await SessionComment.destroy({ where: { StudentId: studentId } });
+    await StudentBooklet.destroy({ where: { StudentId: studentId } });
+    await BookletReservation.destroy({ where: { StudentId: studentId } });
+    await Warning.destroy({ where: { StudentId: studentId } });
+    await Student.destroy({ where: { id: studentId } });
+    res.redirect('/students');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/students/:studentId/booklet-custom-price', requireAdmin, async (req, res) => {
+  try {
+    const { booklet_id, custom_price } = req.body;
+    await StudentBooklet.upsert({
+      StudentId: req.params.studentId,
+      BookletId: booklet_id,
+      custom_price: parseFloat(custom_price),
+      paid_amount: 0,
+    });
+    res.redirect('/students/' + req.params.studentId);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// تحميل التيمبليت
+app.get('/students/bulk-template', requireAdmin, (req, res) => {
+  const wb = XLSX.utils.book_new();
+  const wsData = [
+    ['name', 'phone', 'parent_phone', 'subject_name', 'center_name', 'price_per_session', 'initial_balance', 'booklet_name', 'booklet_paid'],
+    ['محمد أحمد', '01012345678', '01198765432', 'Math Senior 1', 'جلوري', '80', '0', 'بوكليت أول ثانوي', '0'],
+    ['فاطمة علي', '01023456789', '01187654321', 'Math Senior 1', 'الرياض ميامي', '80', '160', '', ''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [
+    {wch:20},{wch:15},{wch:15},{wch:20},{wch:15},{wch:15},{wch:15},{wch:20},{wch:15}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, 'طلاب جدد');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=students_template.xlsx');
+  res.send(buf);
+});
+
+// رفع وتحليل الملف
+app.post('/students/bulk-upload', requireAdmin, bulkUpload.single('excel_file'), async (req, res) => {
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    const results = { success: [], errors: [] };
+
+    for (const [i, row] of rows.entries()) {
+      try {
+        // تجاهل صف المثال
+        if (!row.name || !row.phone || !row.subject_name || !row.center_name) {
+          results.errors.push(`صف ${i + 2}: بيانات ناقصة`);
+          continue;
+        }
+
+        const subject = await Subject.findOne({ where: { name: row.subject_name.trim() } });
+        const center = await Center.findOne({ where: { name: row.center_name.trim() } });
+
+        if (!subject) { results.errors.push(`صف ${i + 2}: المادة "${row.subject_name}" غير موجودة`); continue; }
+        if (!center) { results.errors.push(`صف ${i + 2}: السنتر "${row.center_name}" غير موجود`); continue; }
+
+        // تحقق من التكرار
+        const existing = await Student.findOne({ where: { phone: row.phone.toString().trim() } });
+        if (existing) { results.errors.push(`صف ${i + 2}: رقم التليفون ${row.phone} موجود بالفعل (${existing.name})`); continue; }
+
+        const student = await Student.create({
+          name: row.name.toString().trim(),
+          phone: row.phone.toString().trim(),
+          parent_phone: row.parent_phone?.toString().trim() || null,
+          price_per_session: parseFloat(row.price_per_session) || 0,
+          balance: parseFloat(row.initial_balance) || 0,
+          SubjectId: subject.id,
+          CenterId: center.id,
+          UserId: req.session.userId,
+        });
+
+        // إضافة معاملة الرصيد الأولي لو موجود
+        if (parseFloat(row.initial_balance) > 0) {
+          await BalanceTransaction.create({
+            StudentId: student.id,
+            amount: parseFloat(row.initial_balance),
+            reason: 'رصيد أولي (bulk upload)',
+            UserId: req.session.userId,
+          });
+        }
+
+        // إضافة دفع بوكليت لو موجود
+        if (row.booklet_name && parseFloat(row.booklet_paid) > 0) {
+          const booklet = await Booklet.findOne({ where: { name: row.booklet_name.toString().trim() } });
+          if (booklet) {
+            await StudentBooklet.create({
+              StudentId: student.id,
+              BookletId: booklet.id,
+              paid_amount: parseFloat(row.booklet_paid),
+            });
+            await BalanceTransaction.create({
+              StudentId: student.id,
+              amount: parseFloat(row.booklet_paid),
+              reason: `دفع بوكليت: ${booklet.name} (bulk upload)`,
+              UserId: req.session.userId,
+            });
+          }
+        }
+
+        results.success.push(student.name);
+      } catch (rowErr) {
+        results.errors.push(`صف ${i + 2}: ${rowErr.message}`);
+      }
+    }
+
+    res.render('bulk-upload-result', { results });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/admin/follow-up-management/bulk-assign', requireAdmin, async (req, res) => {
+  try {
+    const { student_ids, assistant_id, action } = req.body;
+    if (!student_ids) return res.redirect('/admin/follow-up-management');
+
+    const ids = Array.isArray(student_ids) ? student_ids : [student_ids];
+
+    if (action === 'assign' && assistant_id) {
+      for (const sid of ids) {
+        await FollowUpAssignment.upsert({
+          StudentId: parseInt(sid),
+          AssistantId: parseInt(assistant_id),
+          assignedAt: new Date(),
+        });
+      }
+    } else if (action === 'unassign') {
+      await FollowUpAssignment.destroy({
+        where: { StudentId: ids.map(id => parseInt(id)) },
+      });
+    }
+
+    res.redirect('/admin/follow-up-management');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
 });
 
 

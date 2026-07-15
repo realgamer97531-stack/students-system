@@ -222,8 +222,19 @@
                     <% } %>
                   </div>
                 </div>
-                <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem; margin-bottom: 5px;">
-                  <span>السعر: <%= b.sell_price %> ج</span>
+                <%
+  const effectivePrice = sb && sb.custom_price ? sb.custom_price : b.sell_price;
+  const remaining = effectivePrice - paid;
+%>
+<div class="d-flex justify-content-between small text-muted mb-2">
+  <span>السعر: 
+    <% if (sb && sb.custom_price) { %>
+      <span class="text-decoration-line-through text-muted"><%= b.sell_price %></span>
+      <strong class="text-warning"><%= sb.custom_price %> ج</strong> (مخصص)
+    <% } else { %>
+      <%= b.sell_price %> ج
+    <% } %>
+  </span>
                   <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
                   <span>متبقي: <span class="<%= remaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= remaining %> ج</span></span>
                 </div>
@@ -233,6 +244,13 @@
                     <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ" min="1" max="<%= remaining %>" required style="font-size: 0.75rem; padding: 2px 5px;">
                     <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة" style="font-size: 0.75rem; padding: 2px 5px;">
                     <button class="btn btn-sm btn-primary" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">دفع</button>
+                  </form>
+                <% } %>
+                <% if (userRole === 'admin') { %>
+                  <form action="/students/<%= student.id %>/booklet-custom-price" method="POST" class="d-flex gap-1 mt-1">
+                    <input type="hidden" name="booklet_id" value="<%= b.id %>">
+                    <input type="number" name="custom_price" class="form-control form-control-sm" placeholder="سعر مخصص لهذا الطالب" step="0.5">
+                    <button class="btn btn-sm btn-warning" style="white-space:nowrap;">تسعير خاص</button>
                   </form>
                 <% } %>
               </div>

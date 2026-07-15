@@ -1,0 +1,44 @@
+<%- include('partials/header') %>
+
+<h3 class="mb-4">📊 نتيجة رفع الطلاب</h3>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;">
+      <div class="small text-muted">تم إضافتهم بنجاح</div>
+      <h4 class="text-success"><%= results.success.length %></h4>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;">
+      <div class="small text-muted">أخطاء</div>
+      <h4 class="text-danger"><%= results.errors.length %></h4>
+    </div>
+  </div>
+</div>
+
+<% if (results.success.length > 0) { %>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="text-success mb-3">✅ تمت إضافتهم</h6>
+    <ul class="list-unstyled mb-0">
+      <% results.success.forEach(name => { %><li class="small py-1 border-bottom"><%= name %></li><% }) %>
+    </ul>
+  </div>
+</div>
+<% } %>
+
+<% if (results.errors.length > 0) { %>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="text-danger mb-3">❌ أخطاء</h6>
+    <ul class="list-unstyled mb-0">
+      <% results.errors.forEach(err => { %><li class="small py-1 border-bottom text-danger"><%= err %></li><% }) %>
+    </ul>
+  </div>
+</div>
+<% } %>
+
+<a href="/students" class="btn btn-primary">رجوع لقائمة الطلاب</a>
+
+<%- include('partials/footer') %>

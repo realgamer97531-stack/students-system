@@ -98,6 +98,12 @@
       <span class="ar-only">+ تسجيل طالب جديد</span>
       <span class="en-only" style="display:none;">+ Add Student</span>
     </a>
+    <% if (userRole === 'admin') { %>
+      <a href="/students/bulk-template" class="btn btn-outline-success btn-sm">⬇ تحميل التيمبليت</a>
+      <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkUploadModal">
+        📤 رفع Excel
+      </button>
+    <% } %>
   </div>
 </div>
 
@@ -179,11 +185,41 @@
                 <span class="en-only" style="display:none;">Pending</span>
               </span>
             <% } %>
+            <% if (userRole === 'admin') { %>
+              <form action="/students/<%= student.id %>/delete" method="POST" class="d-inline ms-2"
+                onsubmit="return confirm('متأكد من حذف الطالب <%= student.name %>؟ سيتم حذف كل بياناته نهائياً.')">
+                <button class="btn btn-sm btn-outline-danger">🗑 حذف</button>
+              </form>
+            <% } %>
           </td>
         </tr>
       <% }) %>
     </tbody>
   </table>
+</div>
+
+<div class="modal fade" id="bulkUploadModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">📤 رفع طلاب من Excel</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/students/bulk-upload" method="POST" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="alert alert-info small">
+            تأكد إن الملف على نفس شكل التيمبليت بالظبط.<br>
+            <a href="/students/bulk-template">⬇ تحميل التيمبليت</a>
+          </div>
+          <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xls" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+          <button type="submit" class="btn btn-primary">رفع وإضافة</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <%- include('partials/footer') %>

@@ -74,23 +74,93 @@
   </div>
 </div>
 
-<!-- الطلاب غير المُعيَّنين -->
-<% if (unassignedStudents.length > 0) { %>
-<div class="card shadow-sm">
+<!-- كل الطلاب -->
+<div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">⚠️ طلاب بدون أسيستانت متابعة (<%= unassignedStudents.length %>)</h6>
-    <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
-      <table class="table table-sm">
-        <thead class="table-light"><tr><th>الاسم</th><th>الكود</th><th>المادة</th><th>السنتر</th></tr></thead>
-        <tbody>
-          <% unassignedStudents.forEach(s => { %>
-            <tr><td><%= s.name %></td><td><%= s.student_code %></td><td><%= s.Subject?.name %></td><td><%= s.Center?.name %></td></tr>
+    <h6 class="mb-3">👥 كل الطلاب</h6>
+
+    <form action="/admin/follow-up-management/bulk-assign" method="POST" id="bulkForm">
+      <div class="d-flex gap-2 mb-3 align-items-center flex-wrap p-2 rounded" style="background:#EEF0FB;">
+        <div class="form-check mb-0">
+          <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleAll(this)">
+          <label class="form-check-label small fw-bold" for="selectAll">تحديد الكل</label>
+        </div>
+        <select name="assistant_id" class="form-select form-select-sm" style="width:180px;">
+          <option value="">-- اختر أسيستانت --</option>
+          <% followUpEligible.forEach(u => { %>
+            <option value="<%= u.id %>"><%= u.name %></option>
           <% }) %>
-        </tbody>
-      </table>
-    </div>
+        </select>
+        <button type="submit" name="action" value="assign" class="btn btn-sm btn-primary">تعيين للمختارين</button>
+        <button type="submit" name="action" value="unassign" class="btn btn-sm btn-outline-danger"
+          onclick="return confirm('إلغاء تعيين كل المحددين؟')">إلغاء تعيين المختارين</button>
+        <span class="small text-muted ms-auto" id="selectedCount">0 محدد</span>
+      </div>
+
+      <input type="text" id="studentBulkSearch" class="form-control form-control-sm mb-3" placeholder="🔍 بحث...">
+
+      <div class="table-responsive" style="max-height:500px;overflow-y:auto;">
+        <table class="table table-sm table-hover" id="bulkTable">
+          <thead class="table-light" style="position:sticky;top:0;">
+            <tr>
+              <th style="width:40px;"></th>
+              <th>الطالب</th>
+              <th>المادة</th>
+              <th>السنتر</th>
+              <th>الأسيستانت الحالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            <%
+              const assignedMap = {};
+              assignments.forEach(a => { assignedMap[a.StudentId] = a.Assistant; });
+            %>
+            <% allStudentsForBulk.forEach(s => { %>
+              <tr data-search="<%= (s.name + ' ' + s.student_code + ' ' + (s.Subject?.name||'') + ' ' + (s.Center?.name||'')).toLowerCase() %>">
+                <td>
+                  <input type="checkbox" name="student_ids" value="<%= s.id %>"
+                    class="form-check-input student-checkbox" onchange="updateCount()">
+                </td>
+                <td>
+                  <span class="small fw-bold"><%= s.name %></span><br>
+                  <span class="text-muted" style="font-size:0.68rem;"><%= s.student_code %></span>
+                </td>
+                <td><span class="small"><%= s.Subject?.name || '-' %></span></td>
+                <td><span class="small"><%= s.Center?.name || '-' %></span></td>
+                <td>
+                  <% const currentAss = assignedMap[s.id]; %>
+                  <% if (currentAss) { %>
+                    <span class="badge" style="background:#EEF0FB;color:#4338CA;font-size:0.7rem;"><%= currentAss.name %></span>
+                  <% } else { %>
+                    <span class="badge bg-secondary" style="font-size:0.65rem;">غير محدد</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </form>
   </div>
 </div>
-<% } %>
+
+<script>
+function toggleAll(master) {
+  document.querySelectorAll('.student-checkbox').forEach(cb => cb.checked = master.checked);
+  updateCount();
+}
+
+function updateCount() {
+  const count = document.querySelectorAll('.student-checkbox:checked').length;
+  document.getElementById('selectedCount').textContent = count + ' محدد';
+}
+
+document.getElementById('studentBulkSearch').addEventListener('input', function() {
+  const term = this.value.toLowerCase();
+  document.querySelectorAll('#bulkTable tbody tr').forEach(row => {
+    row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+  });
+});
+</script>
 
 <%- include('partials/footer') %>
