@@ -2632,7 +2632,15 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
 
     const grouped = { explanation: [], questions: [], homework_solution: [] };
     parts.forEach(p => {
-      grouped[p.category].push({
+      const normalizedCategory = ['explanation', 'questions', 'homework_solution'].includes(p.category)
+        ? p.category
+        : (p.category === 'homework' || p.category === 'homework_solution' ? 'homework_solution' : 'explanation');
+
+      if (!grouped[normalizedCategory]) {
+        grouped[normalizedCategory] = [];
+      }
+
+      grouped[normalizedCategory].push({
         id: p.id,
         orderIndex: p.order_index,
         sourceType: p.source_type,
@@ -2643,7 +2651,9 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
       });
     });
 
-    res.json({ success: true, title: video.title, parts: grouped });
+    const availableCategories = Object.keys(grouped).filter(category => grouped[category].length > 0);
+
+    res.json({ success: true, title: video.title, parts: grouped, availableCategories });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });

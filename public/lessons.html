@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">مشاهدة الدرس</title>
+  <link id="bootstrap-link" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --dark-bg: #0b0f19;
+      --dark-card: #141b2d;
+      --dark-text: #f1f5f9;
+      --dark-muted: #94a3b8;
+      --dark-border: #1f293d;
+      --dark-accent: #6366f1;
+    }
+    body.dark-theme { background-color: var(--dark-bg) !important; color: var(--dark-text); }
+    body.dark-theme .card { background-color: var(--dark-card); border-color: var(--dark-border); color: var(--dark-text); }
+    body.dark-theme .text-muted { color: var(--dark-muted) !important; }
+    .theme-controls { position: fixed; bottom: 20px; left: 20px; z-index: 1050; display: flex; gap: 10px; }
+    html[dir="ltr"] .theme-controls { left: auto; right: 20px; }
+    .control-btn { background: rgba(255,255,255,0.9); border: 1px solid #E2E4F3; padding: 8px 14px; border-radius: 30px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+    body.dark-theme .control-btn { background: var(--dark-card); border-color: var(--dark-border); color: var(--dark-text); }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="theme-controls">
+    <button class="control-btn" id="lang-toggle-btn" onclick="toggleLanguage()">English</button>
+    <button class="control-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <nav class="navbar navbar-dark bg-dark px-3">
+    <a href="lessons.html" class="btn btn-sm btn-outline-light" id="btn-back">⬅ رجوع للدروس</a>
+    <span class="navbar-brand" id="lessonTitle">جاري التحميل...</span>
+    <button class="btn btn-sm btn-outline-light" onclick="logout()" id="btn-logout">خروج</button>
+  </nav>
+
+  <div class="container py-4">
+    <div class="btn-group mb-3 w-100" role="group">
+      <button class="btn btn-outline-primary" id="catExplanation" onclick="switchCategory('explanation')">📖 الشرح</button>
+      <button class="btn btn-outline-primary" id="catQuestions" onclick="switchCategory('questions')">❓ الأسئلة</button>
+      <button class="btn btn-outline-primary" id="catHomework" onclick="switchCategory('homework_solution')">✅ حل الواجب</button>
+    </div>
+
+    <div id="noPartsMsg" class="alert alert-secondary" style="display:none;">لا يوجد فيديو من هذا النوع لهذا الدرس</div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div id="playerContainer"></div>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <button class="btn btn-outline-secondary" id="prevPartBtn" onclick="changePart(-1)">⬅ السابق</button>
+          <span class="text-muted" id="partIndicator"></span>
+          <button class="btn btn-outline-secondary" id="nextPartBtn" onclick="changePart(1)">التالي ➡</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="shared.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoId = urlParams.get('videoId');
+    if (!videoId) window.location.href = 'lessons.html';
+
+    let currentParts = {};
+    let currentCategory = 'explanation';
+    let currentIndex = 0;
+    let ytPlayer = null;
+    let ytInterval = null;
+
+    const translations = {
+      ar: { pageTitle: 'مشاهدة الدرس', btnBack: '⬅ رجوع للدروس', btnLogout: 'خروج', catExplanation: '📖 الشرح', catQuestions: '❓ الأسئلة', catHomework: '✅ حل الواجب', noPartsMsg: 'لا يوجد فيديو من هذا النوع لهذا الدرس', prevPart: '⬅ السابق', nextPart: 'التالي ➡', driveWarning: '⚠️ لا يمكن تتبع وقت المشاهدة لفيديوهات Google Drive بدقة', formatError: "<div class='alert alert-warning'>صيغة الرابط غير مدعومة</div>", loading: 'جاري التحميل...', alertError: 'لا يمكن فتح هذا الدرس' },
+      en: { pageTitle: 'Watch Lesson', btnBack: '⬅ Back to Lessons', btnLogout: 'Logout', catExplanation: '📖 Explanation', catQuestions: '❓ Questions', catHomework: '✅ HW Solution', noPartsMsg: 'There is no video of this type for this lesson', prevPart: '⬅ Previous', nextPart: 'Next ➡', driveWarning: '⚠️ Watch time cannot be tracked accurately for Google Drive videos', formatError: "<div class='alert alert-warning'>Unsupported video link format</div>", loading: 'Loading...', alertError: 'Cannot open this lesson' }
+    };
+
+    function normalizeCategory(category) {
+      if (category === 'questions') return 'questions';
+      if (category === 'homework' || category === 'homework_solution') return 'homework_solution';
+      return 'explanation';
+    }
+
+    function getCategoryParts(category) {
+      const normalized = normalizeCategory(category);
+      return Array.isArray(currentParts[normalized]) ? currentParts[normalized] : [];
+    }
+
+    function resolveCategory(category) {
+      const categories = ['explanation', 'questions', 'homework_solution'];
+      if (category && getCategoryParts(category).length > 0) return normalizeCategory(category);
+      return categories.find(cat => getCategoryParts(cat).length > 0) || 'explanation';
+    }
+
+    function applyLanguage(lang) {
+      const isEn = lang === 'en';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+      const bootstrapLink = document.getElementById('bootstrap-link');
+      bootstrapLink.href = isEn ? 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' : 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css';
+      document.title = translations[lang].pageTitle;
+      document.getElementById('btn-back').innerText = translations[lang].btnBack;
+      document.getElementById('btn-logout').innerText = translations[lang].btnLogout;
+      document.getElementById('catExplanation').innerText = translations[lang].catExplanation;
+      document.getElementById('catQuestions').innerText = translations[lang].catQuestions;
+      document.getElementById('catHomework').innerText = translations[lang].catHomework;
+      document.getElementById('noPartsMsg').innerText = translations[lang].noPartsMsg;
+      document.getElementById('prevPartBtn').innerText = translations[lang].prevPart;
+      document.getElementById('nextPartBtn').innerText = translations[lang].nextPart;
+      if (document.getElementById('lessonTitle').textContent === 'جاري التحميل...' || document.getElementById('lessonTitle').textContent === 'Loading...') {
+        document.getElementById('lessonTitle').textContent = translations[lang].loading;
+      }
+      document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
+      if (Object.keys(currentParts).length > 0) renderCurrentPart();
+    }
+
+    function toggleLanguage() {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const newLang = currentLang === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('portal_lang', newLang);
+      applyLanguage(newLang);
+    }
+
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '☀️';
+      } else {
+        document.body.classList.remove('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '🌙';
+      }
+    }
+
+    function toggleTheme() {
+      const currentTheme = localStorage.getItem('portal_theme') || 'light';
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('portal_theme', newTheme);
+      applyTheme(newTheme);
+    }
+
+    function clearPlayer() {
+      if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
+      if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
+      document.getElementById('playerContainer').innerHTML = '';
+    }
+
+    function detectVideoSource(url) {
+      if (!url) return { type: 'unknown' };
+      const trimmedUrl = String(url).trim();
+      const ytMatch = trimmedUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+      if (ytMatch) return { type: 'youtube', id: ytMatch[1] };
+      const driveMatch = trimmedUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+      if (driveMatch) return { type: 'drive', id: driveMatch[1] };
+      const mediaMatch = trimmedUrl.match(/mediadelivery\.net/i);
+      if (mediaMatch) return { type: 'mediadelivery', url: trimmedUrl };
+      if (/^https?:\/\//i.test(trimmedUrl)) return { type: 'iframe', url: trimmedUrl };
+      return { type: 'direct', url: trimmedUrl };
+    }
+
+    function sendProgress(partId, seconds) {
+      apiPost('/api/portal/watch-progress', { video_part_id: partId, watched_seconds: seconds });
+    }
+
+    function loadYouTubeAPI(callback) {
+      if (window.YT && window.YT.Player) { callback(); return; }
+      window.onYouTubeIframeAPIReady = callback;
+      if (!document.getElementById('youtubeAPIScript')) {
+        const tag = document.createElement('script');
+        tag.id = 'youtubeAPIScript';
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      }
+    }
+
+    async function loadLesson() {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const result = await apiGet(`/api/portal/student/lessons/${videoId}/parts`);
+      if (!result.success) {
+        alert(result.message || translations[currentLang].alertError);
+        window.location.href = 'lessons.html';
+        return;
+      }
+      const normalizedParts = { explanation: [], questions: [], homework_solution: [] };
+      const incomingParts = result.parts || {};
+      ['explanation', 'questions', 'homework_solution'].forEach(category => {
+        normalizedParts[category] = Array.isArray(incomingParts[category]) ? incomingParts[category] : [];
+      });
+      currentParts = normalizedParts;
+      document.getElementById('lessonTitle').textContent = result.title || 'Lesson';
+      switchCategory('explanation');
+    }
+
+    function switchCategory(category) {
+      currentCategory = resolveCategory(category);
+      currentIndex = 0;
+      ['catExplanation', 'catQuestions', 'catHomework'].forEach(id => document.getElementById(id).classList.remove('active'));
+      const btnId = currentCategory === 'explanation' ? 'catExplanation' : currentCategory === 'questions' ? 'catQuestions' : 'catHomework';
+      document.getElementById(btnId).classList.add('active');
+      renderCurrentPart();
+    }
+
+    function changePart(direction) {
+      const parts = getCategoryParts(currentCategory);
+      const newIndex = currentIndex + direction;
+      if (newIndex >= 0 && newIndex < parts.length) {
+        currentIndex = newIndex;
+        renderCurrentPart();
+      }
+    }
+
+    function renderCurrentPart() {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const parts = getCategoryParts(currentCategory);
+      const noPartsMsg = document.getElementById('noPartsMsg');
+      const container = document.getElementById('playerContainer');
+      clearPlayer();
+
+      if (parts.length === 0) {
+        container.style.display = 'none';
+        noPartsMsg.style.display = 'block';
+        document.getElementById('partIndicator').textContent = '';
+        document.getElementById('prevPartBtn').style.display = 'none';
+        document.getElementById('nextPartBtn').style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'block';
+      noPartsMsg.style.display = 'none';
+      const part = parts[currentIndex] || parts[0];
+      currentIndex = parts.indexOf(part);
+      document.getElementById('partIndicator').textContent = parts.length > 1 ? `${currentIndex + 1} / ${parts.length}` : '';
+      document.getElementById('prevPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
+      document.getElementById('nextPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
+
+      const rawUrl = part.sourceType === 'upload' ? `${API_BASE_URL}${part.filePath}` : (part.videoUrl || part.filePath || '');
+      const source = part.sourceType === 'upload' ? { type: 'direct', url: rawUrl } : detectVideoSource(rawUrl);
+
+      if (source.type === 'direct') {
+        const video = document.createElement('video');
+        video.className = 'w-100';
+        video.controls = true;
+        video.style.maxHeight = '600px';
+        video.src = source.url;
+        container.appendChild(video);
+        video.currentTime = part.watchedSeconds || 0;
+        let lastSent = 0;
+        video.ontimeupdate = () => {
+          const current = Math.floor(video.currentTime);
+          if (current - lastSent >= 5) { lastSent = current; sendProgress(part.id, current); }
+        };
+        video.onpause = () => sendProgress(part.id, Math.floor(video.currentTime));
+      } else if (source.type === 'youtube') {
+        const div = document.createElement('div');
+        div.id = 'ytPlayerDiv';
+        container.appendChild(div);
+        loadYouTubeAPI(() => {
+          ytPlayer = new YT.Player('ytPlayerDiv', {
+            height: '600', width: '100%', videoId: source.id,
+            events: {
+              onReady: (e) => { if (part.watchedSeconds) e.target.seekTo(part.watchedSeconds, true); },
+              onStateChange: (e) => {
+                if (e.data === YT.PlayerState.PLAYING) {
+                  ytInterval = setInterval(() => sendProgress(part.id, Math.floor(ytPlayer.getCurrentTime())), 5000);
+                } else {
+                  if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
+                  if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
+                    sendProgress(part.id, Math.floor(ytPlayer.getCurrentTime()));
+                  }
+                }
+              }
+            }
+          });
+        });
+      } else if (source.type === 'drive') {
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://drive.google.com/file/d/${source.id}/preview`;
+        iframe.width = '100%'; iframe.height = '600'; iframe.allow = 'autoplay'; iframe.style.border = 'none';
+        container.appendChild(iframe);
+        const note = document.createElement('p');
+        note.className = 'text-muted small mt-1'; note.textContent = translations[currentLang].driveWarning; container.appendChild(note);
+      } else if (source.type === 'mediadelivery' || source.type === 'iframe') {
+        const iframe = document.createElement('iframe');
+        iframe.src = source.url;
+        iframe.width = '100%'; iframe.height = '600'; iframe.allow = 'autoplay; fullscreen'; iframe.style.border = 'none';
+        iframe.setAttribute('allowfullscreen', 'true');
+        container.appendChild(iframe);
+      } else {
+        container.innerHTML = translations[currentLang].formatError;
+      }
+    }
+
+    (function init() {
+      const savedLang = localStorage.getItem('portal_lang') || 'ar';
+      applyLanguage(savedLang);
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      applyTheme(savedTheme);
+      loadLesson();
+    })();
+  </script>
+</body>
+</html>
