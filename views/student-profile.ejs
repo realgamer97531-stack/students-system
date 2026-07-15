@@ -203,7 +203,7 @@
             <% availableBooklets.forEach(b => { %>
               <% const sb = studentBooklets.find(s => s.BookletId === b.id); %>
               <% const paid = sb ? sb.paid_amount : 0; %>
-              <% const remaining = b.sell_price - paid; %>
+              <% const baseRemaining = b.sell_price - paid; %>
               <div class="border rounded p-2 mb-2 bg-light">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <strong class="small"><%= b.name %></strong>
@@ -224,7 +224,7 @@
                 </div>
                 <%
   const effectivePrice = sb && sb.custom_price ? sb.custom_price : b.sell_price;
-  const remaining = effectivePrice - paid;
+  const bookletRemaining = effectivePrice - paid;
 %>
 <div class="d-flex justify-content-between small text-muted mb-2">
   <span>السعر: 
@@ -236,9 +236,9 @@
     <% } %>
   </span>
                   <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
-                  <span>متبقي: <span class="<%= remaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= remaining %> ج</span></span>
+                  <span>متبقي: <span class="<%= bookletRemaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= bookletRemaining %> ج</span></span>
                 </div>
-                <% if (remaining > 0 && userRole === 'admin') { %>
+                <% if (bookletRemaining > 0 && userRole === 'admin') { %>
                   <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1 mt-1">
                     <input type="hidden" name="booklet_id" value="<%= b.id %>">
                     <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ" min="1" max="<%= remaining %>" required style="font-size: 0.75rem; padding: 2px 5px;">
