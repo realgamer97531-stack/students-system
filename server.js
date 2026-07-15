@@ -154,6 +154,25 @@ async function ensureUserPhoneColumn() {
   }
 }
 
+async function ensureStudentBookletCustomPriceColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('StudentBooklets');
+    if (!tableInfo.custom_price) {
+      await queryInterface.addColumn('StudentBooklets', 'custom_price', {
+        type: sequelize.Sequelize.FLOAT,
+        allowNull: true,
+      });
+      console.log('✅ Added custom_price column to StudentBooklets table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure StudentBooklets.custom_price column:', error.message);
+  }
+}
+
 ensureUserPhoneColumn();
 
 app.use(cors()); // يسمح لأي موقع يتواصل مع الـ API بتاعنا
@@ -5114,6 +5133,7 @@ async function startServer() {
     // await sequelize.sync();
     await RechargeCode.sync();
     await PaymentVerification.sync();
+    await ensureStudentBookletCustomPriceColumn();
     await ensureBookletReservationSchema(sequelize);
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
