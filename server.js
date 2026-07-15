@@ -1943,12 +1943,10 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
   try {
     // الحدود الثابتة للتنبيهات
     const THRESHOLDS = {
-      absent_sessions: 2,        // غياب في حصتين متتاليتين
-      poor_homework_sessions: 2, // واجبات ضعيفة في حصتين
-      exam_final_attempts: 3,    // امتحان لم يُصحح في 3 محاولات
-      low_balance: 100,          // رصيد منخفض (ج)
-      active_warnings: 2,        // عدد التنبيهات المعلقة
-      low_exam_score: 50,        // علامة امتحان منخفضة (%)
+      consecutive_absent_sessions: 3,
+      consecutive_poor_homework_sessions: 3,
+      consecutive_low_exam_attempts: 3,
+      low_exam_score: 50,
     };
 
     const students = await Student.findAll({
@@ -1965,16 +1963,16 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
       attributes: ['StudentId', 'SessionId', 'status'],
     });
     const allExamResults = await ExamResult.findAll({
-  include: [{ 
-    model: Exam, 
-    attributes: ['id', 'max_score'],
-    include: [{ 
-      model: Session, 
-      attributes: ['lesson_number', 'SubjectId']
-    }]
-  }],
-  attributes: ['StudentId', 'score', 'createdAt', 'ExamId'],
-});
+      include: [{
+        model: Exam,
+        attributes: ['id', 'max_score'],
+        include: [{
+          model: Session,
+          attributes: ['lesson_number', 'SubjectId'],
+        }],
+      }],
+      attributes: ['StudentId', 'score', 'createdAt', 'ExamId'],
+    });
     const allWarnings = await Warning.findAll({
       attributes: ['StudentId', 'reason', 'createdAt'],
     });
@@ -2008,114 +2006,79 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
       const reasons = [];
       const flags = {};
 
-      // 1️⃣ فحص الرصيد المنخفض
-      if (student.balance < THRESHOLDS.low_balance) {
-        reasons.push(`💳 رصيد منخفض: ${student.balance} ج`);
-        flags.lowBalance = true;
-        riskScore += 15;
-      }
-
-      // 2️⃣ فحص الغياب في آخر حصتين
-      const ownGroupSessions = allSessions
-        .filter(sess => sess.CenterId === student.CenterId && sess.SubjectId === student.SubjectId && sess.status === 'normal')
-        .sort((a, b) => b.lesson_number - a.lesson_number)
-        .slice(0, 2);
-
       const studentAttendance = (attendanceByStudent[student.id] || [])
         .filter(a => a.Session.SubjectId === student.SubjectId)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-      const attendedLessonNumbers = new Set(studentAttendance.map(a => a.Session.lesson_number));
-      const absentInLast2 = ownGroupSessions.filter(gs => !attendedLessonNumbers.has(gs.lesson_number)).length;
+      const ownGroupSessions = allSessions
+        .filter(sess => sess.CenterId === student.CenterId && sess.SubjectId === student.SubjectId && sess.status === 'normal')
+        .sort((a, b) => b.lesson_number - a.lesson_number);
 
-      if (ownGroupSessions.length >= 2 && absentInLast2 === 2) {
-        reasons.push(`🔴 غياب في آخر ${THRESHOLDS.absent_sessions} حصص`);
+      const recentSessionsForAbsence = ownGroupSessions.slice(0, THRESHOLDS.consecutive_absent_sessions);
+      const attendedSessionIds = new Set(studentAttendance.map(a => a.SessionId));
+
+      const absent3 = recentSessionsForAbsence.length === THRESHOLDS.consecutive_absent_sessions &&
+        recentSessionsForAbsence.every(sess => !attendedSessionIds.has(sess.id));
+
+      if (absent3) {
+        reasons.push(`🔴 غياب في آخر ${THRESHOLDS.consecutive_absent_sessions} حصص متتالية`);
         flags.absentSessions = true;
-        riskScore += 30;
-      } else if (absentInLast2 === 1) {
-        reasons.push(`🟡 غياب في حصة واحدة من آخر حصتين`);
-        flags.absentSessions = 'warning';
-        riskScore += 15;
+        riskScore += 50;
       }
 
-      // 3️⃣ فحص جودة الواجبات
-      const recentAttendance = studentAttendance.slice(0, 3);
-      let poorHomeworkCount = 0;
-      const homeworkStatuses = [];
-      recentAttendance.forEach(att => {
-        const status = homeworkByKey[`${student.id}_${att.SessionId}`];
-        homeworkStatuses.push(status);
-        if (!status || status === 'not_done' || status === 'incomplete' || status === 'no_steps') {
-          poorHomeworkCount++;
-        }
-      });
+      const recentSessionsForHomework = ownGroupSessions.slice(0, THRESHOLDS.consecutive_poor_homework_sessions);
+      const poorHomework3 = recentSessionsForHomework.length === THRESHOLDS.consecutive_poor_homework_sessions &&
+        recentSessionsForHomework.every(sess => {
+          const status = homeworkByKey[`${student.id}_${sess.id}`];
+          return status !== 'complete';
+        });
 
-      if (poorHomeworkCount >= THRESHOLDS.poor_homework_sessions) {
-        reasons.push(`🟠 واجبات ضعيفة في ${poorHomeworkCount} من آخر حصص`);
+      if (poorHomework3) {
+        reasons.push(`🟠 واجبات غير مكتملة في آخر ${THRESHOLDS.consecutive_poor_homework_sessions} حصص`);
         flags.poorHomework = true;
-        riskScore += 25;
-      } else if (poorHomeworkCount >= 1) {
-        reasons.push(`🟡 واجب واحد ضعيف في آخر حصص`);
-        flags.poorHomework = 'warning';
-        riskScore += 10;
+        riskScore += 40;
       }
 
-      // 4️⃣ فحص الامتحانات غير المصححة
       const studentExams = (examResultsByStudent[student.id] || [])
         .filter(e => e.Exam && e.Exam.Session && e.Exam.Session.SubjectId === student.SubjectId)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-      const unfinalizedExams = studentExams.filter(e => !e.Exam.status || e.Exam.status !== 'finalized').length;
-      if (unfinalizedExams >= THRESHOLDS.exam_final_attempts) {
-        reasons.push(`📝 ${unfinalizedExams} امتحانات لم تُصحح بعد`);
-        flags.unfinalizedExams = true;
-        riskScore += 20;
-      }
+      const recentExamResults = studentExams.slice(0, THRESHOLDS.consecutive_low_exam_attempts);
+      const lowExam3 = recentExamResults.length === THRESHOLDS.consecutive_low_exam_attempts &&
+        recentExamResults.every(e => ((e.score / e.Exam.max_score) * 100) < THRESHOLDS.low_exam_score);
 
-      // 5️⃣ فحص علامات الامتحانات المنخفضة
-      const lowScoreExams = studentExams.filter(e => {
-        const percentage = (e.score / e.Exam.max_score) * 100;
-        return percentage < THRESHOLDS.low_exam_score;
-      }).length;
-      if (lowScoreExams >= 2) {
-        reasons.push(`📊 ${lowScoreExams} امتحانات برتب منخفضة (أقل من 50%)`);
+      if (lowExam3) {
+        reasons.push(`📉 آخر ${THRESHOLDS.consecutive_low_exam_attempts} امتحانات أقل من ${THRESHOLDS.low_exam_score}%`);
         flags.lowExamScores = true;
-        riskScore += 20;
+        riskScore += 40;
       }
 
-      // 6️⃣ فحص التنبيهات المعلقة
-      const activeWarnings = (warningsByStudent[student.id] || [])
-        .filter(w => {
-          const daysSince = (Date.now() - new Date(w.createdAt)) / (1000 * 60 * 60 * 24);
-          return daysSince < 30; // تنبيهات في آخر 30 يوم
-        });
-
-      if (activeWarnings.length >= THRESHOLDS.active_warnings) {
-        reasons.push(`⚠️ ${activeWarnings.length} تنبيهات معلقة`);
-        flags.warnings = true;
-        riskScore += 25;
-      }
-
-      // تحديد مستوى الخطورة
       let severity = 'safe';
       if (riskScore >= 75) severity = 'critical';
       else if (riskScore >= 50) severity = 'warning';
       else if (riskScore >= 25) severity = 'caution';
 
-      // إضافة بيانات إحصائية
       const statistics = {
-        attendanceRate: ownGroupSessions.length > 0 ? Math.round(((ownGroupSessions.length - absentInLast2) / ownGroupSessions.length) * 100) : 0,
-        homeworkQuality: recentAttendance.length > 0 ? Math.round(((recentAttendance.length - poorHomeworkCount) / recentAttendance.length) * 100) : 0,
-        averageExamScore: studentExams.length > 0 
+        attendanceRate: ownGroupSessions.length > 0 ? Math.round(((ownGroupSessions.length - recentSessionsForAbsence.filter(sess => !attendedSessionIds.has(sess.id)).length) / ownGroupSessions.length) * 100) : 0,
+        homeworkQuality: recentSessionsForHomework.length > 0
+          ? Math.round(((recentSessionsForHomework.filter(sess => homeworkByKey[`${student.id}_${sess.id}`] === 'complete').length) / recentSessionsForHomework.length) * 100)
+          : 0,
+        averageExamScore: studentExams.length > 0
           ? Math.round((studentExams.reduce((sum, e) => sum + e.score, 0) / studentExams.length / (studentExams[0]?.Exam?.max_score || 100)) * 100)
           : 0,
         recentExams: studentExams.slice(0, 3).map(e => ({
-  lesson: e.Exam.Session?.lesson_number || 'N/A',
-  score: e.score,
-  maxScore: e.Exam.max_score,
-  percentage: Math.round((e.score / e.Exam.max_score) * 100),
-})),
+          lesson: e.Exam.Session?.lesson_number || 'N/A',
+          score: e.score,
+          maxScore: e.Exam.max_score,
+          percentage: Math.round((e.score / e.Exam.max_score) * 100),
+        })),
       };
+
+      const activeWarnings = (warningsByStudent[student.id] || [])
+        .filter(w => {
+          const daysSince = (Date.now() - new Date(w.createdAt)) / (1000 * 60 * 60 * 24);
+          return daysSince < 30;
+        });
 
       if (reasons.length > 0) {
         result.push({

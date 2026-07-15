@@ -68,6 +68,11 @@
     let currentIndex = 0;
     let ytPlayer = null;
     let ytInterval = null;
+    let iframeWatchInterval = null;
+    let iframeWatchLastSent = 0;
+    let iframeWatchPartId = null;
+    let iframeWatchStart = 0;
+    let iframeWatchBase = 0;
 
     const translations = {
       ar: { pageTitle: 'مشاهدة الدرس', btnBack: '⬅ رجوع للدروس', btnLogout: 'خروج', catExplanation: '📖 الشرح', catQuestions: '❓ الأسئلة', catHomework: '✅ حل الواجب', noPartsMsg: 'لا يوجد فيديو من هذا النوع لهذا الدرس', prevPart: '⬅ السابق', nextPart: 'التالي ➡', driveWarning: '⚠️ لا يمكن تتبع وقت المشاهدة لفيديوهات Google Drive بدقة', formatError: "<div class='alert alert-warning'>صيغة الرابط غير مدعومة</div>", loading: 'جاري التحميل...', alertError: 'لا يمكن فتح هذا الدرس', iframePlaybackNote: 'إذا لم يبدأ الفيديو تلقائياً، اضغط تشغيل داخل الإطار وفك كتم الصوت إذا كان مطلوباً.' },
@@ -140,6 +145,14 @@
     function clearPlayer() {
       if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
       if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
+      if (iframeWatchInterval) {
+        clearInterval(iframeWatchInterval);
+        iframeWatchInterval = null;
+        if (iframeWatchPartId && iframeWatchLastSent > 0) {
+          sendProgress(iframeWatchPartId, iframeWatchLastSent);
+        }
+        iframeWatchPartId = null;
+      }
       document.getElementById('playerContainer').innerHTML = '';
     }
 
@@ -174,6 +187,20 @@
     function sendProgress(partId, seconds) {
       apiPost('/api/portal/watch-progress', { video_part_id: partId, watched_seconds: seconds });
     }
+
+    function flushIframeProgress() {
+      if (iframeWatchPartId && iframeWatchLastSent > 0) {
+        sendProgress(iframeWatchPartId, iframeWatchLastSent);
+      }
+    }
+
+    window.addEventListener('beforeunload', () => {
+      flushIframeProgress();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) flushIframeProgress();
+    });
 
     function loadYouTubeAPI(callback) {
       if (window.YT && window.YT.Player) { callback(); return; }
@@ -242,6 +269,10 @@
       noPartsMsg.style.display = 'none';
       const part = parts[currentIndex] || parts[0];
       currentIndex = parts.indexOf(part);
+      iframeWatchLastSent = 0;
+      iframeWatchPartId = null;
+      iframeWatchStart = 0;
+      iframeWatchBase = 0;
       document.getElementById('partIndicator').textContent = parts.length > 1 ? `${currentIndex + 1} / ${parts.length}` : '';
       document.getElementById('prevPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
       document.getElementById('nextPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
@@ -300,6 +331,28 @@
         iframe.style.border = 'none';
         iframe.setAttribute('allowfullscreen', 'true');
         container.appendChild(iframe);
+
+        iframeWatchPartId = part.id;
+        iframeWatchBase = part.watchedSeconds || 0;
+        iframeWatchLastSent = iframeWatchBase;
+        iframeWatchStart = Date.now();
+
+        const updateIframeProgress = () => {
+          const elapsed = Math.floor((Date.now() - iframeWatchStart) / 1000);
+          const total = part.durationSeconds
+            ? Math.min(part.durationSeconds, iframeWatchBase + elapsed)
+            : iframeWatchBase + elapsed;
+          if (total > iframeWatchLastSent) {
+            iframeWatchLastSent = total;
+            sendProgress(part.id, total);
+          }
+        };
+
+        if (iframeWatchBase > 0) {
+          sendProgress(part.id, iframeWatchBase);
+        }
+        updateIframeProgress();
+        iframeWatchInterval = setInterval(updateIframeProgress, 5000);
 
         const note = document.createElement('p');
         note.className = 'text-muted small mt-2';
