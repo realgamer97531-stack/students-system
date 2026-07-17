@@ -197,6 +197,26 @@ function getBookletRemainingAmount(booklet, studentBooklet) {
   return Math.max(0, effectivePrice - paidAmount);
 }
 
+async function recordAttendanceCharge(student, userId, reason = 'رسوم الحضور', transaction = null) {
+  if (!student) return 0;
+
+  const amount = parseFloat(student.price_per_session || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  const signedAmount = -amount;
+  student.balance += signedAmount;
+  await student.save({ transaction });
+
+  await BalanceTransaction.create({
+    StudentId: student.id,
+    amount: signedAmount,
+    reason,
+    UserId: userId,
+  }, { transaction });
+
+  return amount;
+}
+
 ensureUserPhoneColumn();
 ensureStudentBookletCustomPriceColumn();
 
@@ -802,8 +822,7 @@ app.post('/students', async (req, res) => {
           } else if (student.balance < student.price_per_session) {
             attendanceNote = `⚠️ رصيد الطالب غير كافٍ لتسجيل الحضور (الرصيد: ${student.balance} ج).`;
           } else {
-            student.balance -= student.price_per_session;
-            await student.save();
+            await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
 
             await Attendance.create({
               StudentId: student.id,
@@ -1321,8 +1340,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
           } else if (student.balance < student.price_per_session) {
             attendanceNote = `⚠️ رصيد الطالب غير كافٍ لتسجيل الحضور (الرصيد: ${student.balance} ج).`;
           } else {
-            student.balance -= student.price_per_session;
-            await student.save();
+            await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
             await Attendance.create({
               StudentId: student.id,
               SessionId: sessionId,
@@ -1527,7 +1545,7 @@ app.post('/attendance/scan', async (req, res) => {
       });
     }
 
-    student.balance -= student.price_per_session;
+    await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
     if (booklet_delivered && !student.booklet_status) {
       student.booklet_status = true;
     }
@@ -1585,8 +1603,7 @@ app.post('/attendance/scan/force', async (req, res) => {
       return res.json({ success: false, message: 'الطالب مسجل حضوره من قبل' });
     }
 
-    student.balance -= student.price_per_session; // يسمح بالسالب هنا بدون فحص
-    await student.save();
+    await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور (قوة)');
 
     await Attendance.create({
       StudentId: student.id,
