@@ -217,6 +217,12 @@ async function recordAttendanceCharge(student, userId, reason = 'رسوم الح
   return amount;
 }
 
+function getEffectiveSessionPayment(attendance) {
+  const manualAmount = parseFloat(attendance?.payment_collected || 0);
+  const sessionFee = parseFloat(attendance?.Student?.price_per_session || 0);
+  return Math.max(manualAmount, sessionFee);
+}
+
 ensureUserPhoneColumn();
 ensureStudentBookletCustomPriceColumn();
 
@@ -971,7 +977,7 @@ app.get('/sessions/:id/report', async (req, res) => {
         attendanceUser: a.User ? a.User.name : '-',
         attendanceTime: a.attended_at,
         comment: a.comment,
-        payment: a.payment_collected,
+        payment: getEffectiveSessionPayment(a),
         homeworkStatus: hw ? hw.status : null,
         homeworkUser: hw ? hw.user : null,
         homeworkTime: hw ? hw.time : null,
@@ -1011,7 +1017,7 @@ app.get('/sessions/:id/report', async (req, res) => {
     }
 
     const totalCost = (session.cost_per_normal || 0) * normalCount + (session.cost_per_reduced || 0) * reducedCount;
-    const totalCashCollected = attendances.reduce((sum, a) => sum + (a.payment_collected || 0), 0);
+    const totalCashCollected = attendances.reduce((sum, a) => sum + getEffectiveSessionPayment(a), 0);
 
     const assistantAttendances = await AssistantAttendance.findAll({
       where: { SessionId: session.id },
@@ -4523,7 +4529,7 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
       studentCode: a.Student?.student_code || '-',
       assistantName: a.User?.name || '-',
       assistantId: a.UserId,
-      sessionPayment: a.payment_collected || 0,
+      sessionPayment: getEffectiveSessionPayment(a),
       attendedAt: a.attended_at,
     }));
 
@@ -4558,7 +4564,7 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
 
     attendances.forEach(a => {
       const bucket = ensureAssistantBucket(a.User);
-      bucket.sessionTotal += a.payment_collected || 0;
+      bucket.sessionTotal += getEffectiveSessionPayment(a);
     });
 
     bookletTransactions.forEach(t => {
