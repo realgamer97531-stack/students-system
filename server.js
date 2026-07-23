@@ -2884,15 +2884,67 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
   const video = await Video.findOne({ where: { id: req.params.id }, include: [Session] });
   if (!video) return res.status(404).send('❌ غير موجود');
 
-  const students = await Student.findAll({ where: { SubjectId: video.SubjectId }, order: [['name', 'ASC']] });
-  const grants = await VideoAccessGrant.findAll({ where: { SessionId: video.SessionId } });
-  const grantsMap = {};
-  grants.forEach(g => { grantsMap[g.StudentId] = g; });
-
   const videoSessions = await VideoSession.findAll({
     where: { VideoId: video.id },
     include: [{ model: Session, include: [Center, Subject] }],
   });
+
+  const sessionPairs = new Map();
+  if (video.Session) {
+    sessionPairs.set(`${video.Session.SubjectId}-${video.Session.CenterId}`, {
+      SubjectId: video.Session.SubjectId,
+      CenterId: video.Session.CenterId,
+    });
+  }
+
+  videoSessions.forEach(vs => {
+    const session = vs.Session;
+    if (session) {
+      sessionPairs.set(`${session.SubjectId}-${session.CenterId}`, {
+        SubjectId: session.SubjectId,
+        CenterId: session.CenterId,
+      });
+    }
+  });
+
+  const sessionConditions = Array.from(sessionPairs.values());
+  const sessionStudents = sessionConditions.length > 0
+    ? await Student.findAll({
+        where: { [Op.or]: sessionConditions },
+        include: [Subject, Center],
+        order: [['name', 'ASC']],
+      })
+    : [];
+
+  const manualAccesses = await VideoStudentAccess.findAll({
+    where: { VideoId: video.id },
+    include: [{ model: Student, include: [Subject, Center] }],
+  });
+
+  const manualAccessMap = {};
+  const studentIds = new Set(sessionStudents.map(s => s.id));
+  manualAccesses.forEach(access => {
+    if (access.Student) {
+      studentIds.add(access.Student.id);
+      manualAccessMap[access.Student.id] = true;
+    }
+  });
+
+  const students = studentIds.size > 0
+    ? await Student.findAll({
+        where: { id: [...studentIds] },
+        include: [Subject, Center],
+        order: [['name', 'ASC']],
+      })
+    : [];
+
+  const grants = await VideoAccessGrant.findAll({
+    where: {
+      SessionId: videoSessions.map(vs => vs.SessionId).concat(video.SessionId).filter(Boolean),
+    },
+  });
+  const grantsMap = {};
+  grants.forEach(g => { grantsMap[g.StudentId] = g; });
 
   const allSessions = await Session.findAll({
     include: [Center, Subject],
@@ -2900,12 +2952,14 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
     limit: 200,
   });
 
-  const studentAccesses = await VideoStudentAccess.findAll({
-    where: { VideoId: video.id },
-    include: [{ model: Student, include: [Subject, Center] }],
+  res.render('video-access-control', {
+    video,
+    students,
+    grantsMap,
+    manualAccessMap,
+    videoSessions,
+    allSessions,
   });
-
-  res.render('video-access-control', { video, students, grantsMap, videoSessions, allSessions, studentAccesses });
 });
 
 app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_videos'), async (req, res) => {

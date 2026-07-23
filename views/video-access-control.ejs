@@ -67,8 +67,8 @@
       <input id="studentSearch" type="text" class="form-control" placeholder="🔍 بحث بالاسم أو الكود"> 
     </div>
 
-    <% if (studentAccesses.length === 0) { %>
-      <p class="text-muted small">لا يوجد طلاب بوصول فردي حتى الآن.</p>
+    <% if (students.length === 0) { %>
+      <p class="text-muted small">لا يوجد طالب لديه وصول لهذا الفيديو حتى الآن.</p>
     <% } else { %>
       <div class="table-responsive mb-3">
         <table class="table table-sm align-middle" id="studentsTable">
@@ -77,32 +77,33 @@
               <th>الكود</th>
               <th>الاسم</th>
               <th>الفرقة / السنتر</th>
-              <th>طريقة الوصول</th>
+              <th>مصدر الوصول</th>
               <th>المتبقي</th>
               <th>تعديل</th>
               <th>إلغاء</th>
             </tr>
           </thead>
           <tbody>
-            <% studentAccesses.forEach(sa => { %>
-              <tr data-search="<%= (sa.Student?.name + ' ' + sa.Student?.student_code).toLowerCase() %>">
-                <td><%= sa.Student?.student_code %></td>
-                <td><%= sa.Student?.name %></td>
-                <td class="small text-muted"><%= sa.Student?.Subject?.name %> - <%= sa.Student?.Center?.name %></td>
-                <td><%= sa.method %></td>
-                <td><%= Math.max(sa.max_views - sa.views_used, 0) %> من <%= sa.max_views %></td>
+            <% students.forEach(student => { %>
+              <% const grant = grantsMap[student.id]; %>
+              <% const accessSource = manualAccessMap[student.id] ? 'وصول فردي' : 'من الحصة'; %>
+              <% const remaining = grant ? (grant.method === 'admin_free' ? 'غير محدود' : Math.max(grant.max_views - grant.views_used, 0) + ' من ' + grant.max_views) : (video.Session.is_free_for_all ? 'غير محدود' : 'لم يتم فتح بعد'); %>
+              <tr data-search="<%= (student.name + ' ' + student.student_code).toLowerCase() %>">
+                <td><%= student.student_code %></td>
+                <td><%= student.name %></td>
+                <td class="small text-muted"><%= student.Subject?.name %> - <%= student.Center?.name %></td>
+                <td><%= accessSource %><%= grant ? ' (' + grant.method + ')' : '' %></td>
+                <td><%= remaining %></td>
                 <td>
-                  <form action="/admin/videos/<%= video.id %>/grant/<%= sa.Student.id %>" method="POST" class="row g-1 align-items-center">
+                  <form action="/admin/videos/<%= video.id %>/grant/<%= student.id %>" method="POST" class="row g-1 align-items-center">
                     <div class="col-auto">
                       <select name="method" class="form-select form-select-sm">
-                        <option value="attended" <%= sa.method === 'attended' ? 'selected' : '' %>>حضور</option>
-                        <option value="paid" <%= sa.method === 'paid' ? 'selected' : '' %>>دفع</option>
-                        <option value="admin_free" <%= sa.method === 'admin_free' ? 'selected' : '' %>>مجاني</option>
-                        <option value="admin_paid" <%= sa.method === 'admin_paid' ? 'selected' : '' %>>مدفوع</option>
+                        <option value="admin_free" <%= grant && grant.method === 'admin_free' ? 'selected' : '' %>>اجعله يحضر مجانًا</option>
+                        <option value="admin_paid" <%= grant && grant.method === 'admin_paid' ? 'selected' : '' %>>اجعله يحضر بعدد مرات</option>
                       </select>
                     </div>
                     <div class="col-auto">
-                      <input type="number" name="max_views" class="form-control form-control-sm" style="width:100px;" value="<%= sa.max_views %>" min="0">
+                      <input type="number" name="max_views" class="form-control form-control-sm" style="width:100px;" value="<%= grant ? grant.max_views : 1 %>" min="1">
                     </div>
                     <div class="col-auto">
                       <button class="btn btn-sm btn-outline-primary">حفظ</button>
@@ -110,7 +111,7 @@
                   </form>
                 </td>
                 <td>
-                  <form action="/admin/videos/<%= video.id %>/remove-student-access/<%= sa.id %>" method="POST">
+                  <form action="/admin/videos/<%= video.id %>/remove-student-access/<%= student.id %>" method="POST">
                     <button class="btn btn-sm btn-outline-danger">إلغاء</button>
                   </form>
                 </td>
