@@ -50,6 +50,17 @@ const SessionComment = require('./models/SessionComment');
 const XLSX = require('xlsx');
 const bulkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const VideoSession = require('./models/VideoSession');
+const VideoStudentAccess = require('./models/VideoStudentAccess');
+
+VideoSession.belongsTo(Video, { foreignKey: 'VideoId' });
+VideoSession.belongsTo(Session, { foreignKey: 'SessionId' });
+Video.hasMany(VideoSession, { foreignKey: 'VideoId' });
+
+VideoStudentAccess.belongsTo(Video, { foreignKey: 'VideoId' });
+VideoStudentAccess.belongsTo(Student, { foreignKey: 'StudentId' });
+Video.hasMany(VideoStudentAccess, { foreignKey: 'VideoId' });
+
 function normalizePhoneForWhatsApp(phone) {
   if (!phone) return null;
 
@@ -2420,9 +2431,38 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
   try {
     const student = await Student.findByPk(req.portalStudentId);
 
+    // نجيب الفيديوهات المتاحة للطالب:
+    // 1) فيديوهات مرتبطة بحصة من مجموعته (عبر VideoSession)
+    // 2) فيديوهات له وصول فردي فيها
+
+    // حصص مجموعة الطالب
+    const studentSessions = await Session.findAll({
+      where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
+    });
+    const studentSessionIds = studentSessions.map(s => s.id);
+
+    // الفيديوهات المرتبطة بحصص مجموعته
+    const groupVideoSessions = await VideoSession.findAll({
+      where: { SessionId: studentSessionIds },
+      attributes: ['VideoId'],
+    });
+    const groupVideoIds = [...new Set(groupVideoSessions.map(vs => vs.VideoId))];
+
+    // الفيديوهات التي له وصول فردي
+    const individualAccesses = await VideoStudentAccess.findAll({
+      where: { StudentId: student.id },
+      attributes: ['VideoId'],
+    });
+    const individualVideoIds = individualAccesses.map(a => a.VideoId);
+
+    // دمج الاتنين بدون تكرار
+    const allAccessibleVideoIds = [...new Set([...groupVideoIds, ...individualVideoIds])];
+
+    if (allAccessibleVideoIds.length === 0) return res.json({ success: true, lessons: [] });
+
     const videos = await Video.findAll({
-      where: { SubjectId: student.SubjectId },
-      include: [{ model: Session, required: true, include: [Center] }],
+      where: { id: allAccessibleVideoIds },
+      include: [{ model: Session, required: false, include: [Center] }],
       order: [['createdAt', 'DESC']],
     });
 
@@ -2500,6 +2540,22 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       return res.json({ success: true, viewsUsed: grant.views_used, maxViews: grant.max_views });
     }
 
+    // تحقق من الوصول الفردي (student-specific access)
+    const individualAccess = await VideoStudentAccess.findOne({
+      where: { VideoId: req.params.videoId, StudentId: student.id },
+    });
+    if (individualAccess && !grant) {
+      grant = await VideoAccessGrant.create({
+        StudentId: student.id,
+        SessionId: video.SessionId,
+        method: 'admin_free',
+        max_views: 999,
+        views_used: 1,
+      });
+      await ensureAttendance(student.id, video.SessionId, '📹 وصول فردي مخصص من الأدمن');
+      return res.json({ success: true, viewsUsed: 1, maxViews: 999 });
+    }
+    
     // 3) مفيش صلاحية - نتحقق هل حضر هذه الحصة في أي سنتر فعلي (غير أونلاين)
     const attendedInCenter = await Attendance.findOne({
       where: { StudentId: student.id },
@@ -2657,11 +2713,28 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
   res.render('manage-videos', { allSessions, videos });
 });
 
-app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), imageUpload.single('session_image'), async (req, res) => {
   try {
-    const { session_id, title } = req.body;
-    const session = await Session.findByPk(session_id);
-    await Video.create({ title, SubjectId: session.SubjectId, SessionId: session_id });
+    const { session_ids, title } = req.body;
+    // session_ids ممكن يكون string واحد أو array
+    const sessionIdList = Array.isArray(session_ids) ? session_ids : (session_ids ? [session_ids] : []);
+    if (sessionIdList.length === 0) return res.status(400).send('❌ اختر حصة واحدة على الأقل');
+
+    // SubjectId من أول حصة
+    const firstSession = await Session.findByPk(sessionIdList[0]);
+    if (!firstSession) return res.status(404).send('❌ الحصة غير موجودة');
+
+    if (req.file) {
+      await Session.update({ image_path: `/uploads/session-images/${req.file.filename}` }, { where: { id: sessionIdList[0] } });
+    }
+
+    const video = await Video.create({ title, SubjectId: firstSession.SubjectId, SessionId: sessionIdList[0] });
+
+    // ربط الفيديو بكل الحصص المختارة
+    for (const sid of sessionIdList) {
+      await VideoSession.create({ VideoId: video.id, SessionId: parseInt(sid) });
+    }
+
     res.redirect('/admin/videos');
   } catch (error) {
     console.error(error);
@@ -2669,11 +2742,77 @@ app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), async
   }
 });
 
+
+// إضافة حصة لفيديو موجود
+app.post('/admin/videos/:id/add-session', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const { session_id } = req.body;
+    await VideoSession.findOrCreate({
+      where: { VideoId: req.params.id, SessionId: parseInt(session_id) },
+    });
+    res.redirect('/admin/videos/' + req.params.id);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// حذف حصة من فيديو
+app.post('/admin/videos/:videoId/remove-session/:sessionId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  await VideoSession.destroy({ where: { VideoId: req.params.videoId, SessionId: req.params.sessionId } });
+  res.redirect('/admin/videos/' + req.params.videoId);
+});
+
+// إضافة وصول فردي لطالب بكوده
+app.post('/admin/videos/:id/add-student-access', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const { student_code } = req.body;
+    const student = await Student.findOne({ where: { student_code: student_code.trim().toUpperCase() } });
+    if (!student) return res.status(404).send('❌ الطالب غير موجود');
+    await VideoStudentAccess.findOrCreate({ where: { VideoId: req.params.id, StudentId: student.id } });
+    res.redirect('/admin/videos/' + req.params.id);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// حذف وصول فردي
+app.post('/admin/videos/:videoId/remove-student-access/:accessId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  await VideoStudentAccess.destroy({ where: { id: req.params.accessId } });
+  res.redirect('/admin/videos/' + req.params.videoId);
+});
+
+
 app.get('/admin/videos/:id', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const video = await Video.findOne({ where: { id: req.params.id }, include: [{ model: Session, include: [Center, Subject] }] });
+  const video = await Video.findOne({
+    where: { id: req.params.id },
+    include: [{ model: Session, include: [Center, Subject] }],
+  });
   if (!video) return res.status(404).send('❌ غير موجود');
+
   const videoParts = await VideoPart.findAll({ where: { VideoId: video.id }, order: [['order_index', 'ASC']] });
-  res.render('manage-video-parts', { video, videoParts });
+
+  // كل الحصص المرتبطة بالفيديو
+  const videoSessions = await VideoSession.findAll({
+    where: { VideoId: video.id },
+    include: [{ model: Session, include: [Center, Subject] }],
+  });
+
+  // الوصول الفردي
+  const studentAccesses = await VideoStudentAccess.findAll({
+    where: { VideoId: video.id },
+    include: [{ model: Student, include: [Subject, Center] }],
+  });
+
+  // كل الحصص للاختيار منها
+  const allSessions = await Session.findAll({
+    include: [Center, Subject],
+    order: [['lesson_number', 'ASC']],
+    limit: 200,
+  });
+
+  res.render('manage-video-parts', { video, videoParts, videoSessions, studentAccesses, allSessions });
 });
 
 app.post('/admin/videos/:id/add-part', requirePermissionOrAdmin('admin_videos'), videoUpload.single('video_file'), async (req, res) => {

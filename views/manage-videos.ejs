@@ -7,14 +7,14 @@
     <h5 class="mb-3 fw-bold">إنشاء درس جديد مرتبط بحصة</h5>
     <form action="/admin/videos/create" method="POST" class="row g-2">
       <div class="col-md-4">
-        <select name="session_id" class="form-select" required>
-          <option value="">-- اختر الحصة --</option>
-          <% allSessions.forEach(s => { %>
-            <option value="<%= s.id %>">
-              <%= s.Subject.name %> - <%= s.Center.name %> (رقم <%= s.lesson_number %> / سيريال <%= s.serial_number %>)
-            </option>
-          <% }) %>
-        </select>
+        <select name="session_ids" class="form-select" multiple required style="height:120px;">
+  <% allSessions.forEach(s => { %>
+    <option value="<%= s.id %>">
+      <%= s.Subject.name %> - <%= s.Center.name %> (حصة <%= s.lesson_number %> | سيريال <%= s.serial_number %>)
+    </option>
+  <% }) %>
+</select>
+<small class="text-muted">اضغط Ctrl للاختيار من أكثر من حصة في نفس الوقت</small>
       </div>
       <div class="col-md-6">
         <input type="text" name="title" class="form-control" placeholder="اسم الدرس (مثال: التفاضل - الجزء الأول)" required>
