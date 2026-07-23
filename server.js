@@ -2763,7 +2763,7 @@ app.post('/admin/videos/:id/add-session', requirePermissionOrAdmin('admin_videos
     await VideoSession.findOrCreate({
       where: { VideoId: req.params.id, SessionId: parseInt(session_id) },
     });
-    res.redirect('/admin/videos/' + req.params.id);
+    res.redirect('/admin/videos/' + req.params.id + '/access');
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
@@ -2773,7 +2773,7 @@ app.post('/admin/videos/:id/add-session', requirePermissionOrAdmin('admin_videos
 // حذف حصة من فيديو
 app.post('/admin/videos/:videoId/remove-session/:sessionId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   await VideoSession.destroy({ where: { VideoId: req.params.videoId, SessionId: req.params.sessionId } });
-  res.redirect('/admin/videos/' + req.params.videoId);
+  res.redirect('/admin/videos/' + req.params.videoId + '/access');
 });
 
 // إضافة وصول فردي لطالب بكوده
@@ -2783,7 +2783,7 @@ app.post('/admin/videos/:id/add-student-access', requirePermissionOrAdmin('admin
     const student = await Student.findOne({ where: { student_code: student_code.trim().toUpperCase() } });
     if (!student) return res.status(404).send('❌ الطالب غير موجود');
     await VideoStudentAccess.findOrCreate({ where: { VideoId: req.params.id, StudentId: student.id } });
-    res.redirect('/admin/videos/' + req.params.id);
+    res.redirect('/admin/videos/' + req.params.id + '/access');
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
@@ -2793,7 +2793,7 @@ app.post('/admin/videos/:id/add-student-access', requirePermissionOrAdmin('admin
 // حذف وصول فردي
 app.post('/admin/videos/:videoId/remove-student-access/:accessId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   await VideoStudentAccess.destroy({ where: { id: req.params.accessId } });
-  res.redirect('/admin/videos/' + req.params.videoId);
+  res.redirect('/admin/videos/' + req.params.videoId + '/access');
 });
 
 
@@ -2812,20 +2812,7 @@ app.get('/admin/videos/:id', requirePermissionOrAdmin('admin_videos'), async (re
     include: [{ model: Session, include: [Center, Subject] }],
   });
 
-  // الوصول الفردي
-  const studentAccesses = await VideoStudentAccess.findAll({
-    where: { VideoId: video.id },
-    include: [{ model: Student, include: [Subject, Center] }],
-  });
-
-  // كل الحصص للاختيار منها
-  const allSessions = await Session.findAll({
-    include: [Center, Subject],
-    order: [['lesson_number', 'ASC']],
-    limit: 200,
-  });
-
-  res.render('manage-video-parts', { video, videoParts, videoSessions, studentAccesses, allSessions });
+  res.render('manage-video-parts', { video, videoParts, videoSessions });
 });
 
 app.post('/admin/videos/:id/add-part', requirePermissionOrAdmin('admin_videos'), videoUpload.single('video_file'), async (req, res) => {
@@ -2876,7 +2863,23 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
   const grantsMap = {};
   grants.forEach(g => { grantsMap[g.StudentId] = g; });
 
-  res.render('video-access-control', { video, students, grantsMap });
+  const videoSessions = await VideoSession.findAll({
+    where: { VideoId: video.id },
+    include: [{ model: Session, include: [Center, Subject] }],
+  });
+
+  const allSessions = await Session.findAll({
+    include: [Center, Subject],
+    order: [['lesson_number', 'ASC']],
+    limit: 200,
+  });
+
+  const studentAccesses = await VideoStudentAccess.findAll({
+    where: { VideoId: video.id },
+    include: [{ model: Student, include: [Subject, Center] }],
+  });
+
+  res.render('video-access-control', { video, students, grantsMap, videoSessions, allSessions, studentAccesses });
 });
 
 app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
