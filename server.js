@@ -2812,7 +2812,20 @@ app.get('/admin/videos/:id', requirePermissionOrAdmin('admin_videos'), async (re
     include: [{ model: Session, include: [Center, Subject] }],
   });
 
-  res.render('manage-video-parts', { video, videoParts, videoSessions });
+  // الوصول الفردي
+  const studentAccesses = await VideoStudentAccess.findAll({
+    where: { VideoId: video.id },
+    include: [{ model: Student, include: [Subject, Center] }],
+  });
+
+  // كل الحصص للاختيار منها
+  const allSessions = await Session.findAll({
+    include: [Center, Subject],
+    order: [['lesson_number', 'ASC']],
+    limit: 200,
+  });
+
+  res.render('manage-video-parts', { video, videoParts, videoSessions, studentAccesses, allSessions });
 });
 
 app.post('/admin/videos/:id/add-part', requirePermissionOrAdmin('admin_videos'), videoUpload.single('video_file'), async (req, res) => {

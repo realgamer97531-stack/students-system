@@ -87,6 +87,66 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="mb-3">🏫 الحصص المسموح لها بمشاهدة هذا الفيديو</h6>
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <% if (videoSessions.length === 0) { %>
+        <span class="text-muted small">لا توجد حصص مرتبطة (الفيديو مرئي للجميع!)</span>
+      <% } %>
+      <% videoSessions.forEach(vs => { %>
+        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:#EEF0FB;font-size:0.8rem;">
+          <span><strong><%= vs.Session?.Subject?.name %></strong> - <%= vs.Session?.Center?.name %> (حصة <%= vs.Session?.lesson_number %>)</span>
+          <form action="/admin/videos/<%= video.id %>/remove-session/<%= vs.SessionId %>" method="POST">
+            <button class="btn btn-sm" style="padding:1px 6px;background:#FEE2E2;color:#B91C1C;font-size:0.65rem;">✕</button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+
+    <form action="/admin/videos/<%= video.id %>/add-session" method="POST" class="d-flex gap-2">
+      <select name="session_id" class="form-select form-select-sm" style="max-width:350px;" required>
+        <option value="">-- إضافة حصة جديدة --</option>
+        <% allSessions.forEach(s => { %>
+          <% const alreadyAdded = videoSessions.some(vs => vs.SessionId === s.id); %>
+          <% if (!alreadyAdded) { %>
+            <option value="<%= s.id %>"><%= s.Subject?.name %> - <%= s.Center?.name %> (حصة <%= s.lesson_number %> | سيريال <%= s.serial_number %>)</option>
+          <% } %>
+        <% }) %>
+      </select>
+      <button class="btn btn-sm btn-primary">+ إضافة</button>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="mb-3">👤 وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</h6>
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <% if (studentAccesses.length === 0) { %>
+        <span class="text-muted small">لا يوجد طلاب بوصول فردي</span>
+      <% } %>
+      <% studentAccesses.forEach(sa => { %>
+        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:#D1FAE5;font-size:0.8rem;">
+          <span><strong><%= sa.Student?.name %></strong> (<%= sa.Student?.student_code %>)</span>
+          <span class="text-muted" style="font-size:0.7rem;"> - <%= sa.Student?.Subject?.name %> - <%= sa.Student?.Center?.name %></span>
+          <form action="/admin/videos/<%= video.id %>/remove-student-access/<%= sa.id %>" method="POST">
+            <button class="btn btn-sm" style="padding:1px 6px;background:#FEE2E2;color:#B91C1C;font-size:0.65rem;">✕</button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+
+    <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex gap-2">
+      <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:200px;"
+        placeholder="كود الطالب (STU-XXXXX)" required>
+      <button class="btn btn-sm btn-success">+ إضافة طالب</button>
+    </form>
+  </div>
+</div>
+
 <script>
   function toggleSource() {
     const type = document.getElementById('sourceType').value;
