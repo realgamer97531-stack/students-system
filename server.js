@@ -145,6 +145,7 @@ require('./models/associations')();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+let dbReady = false;
 
 async function ensureUserPhoneColumn() {
   try {
@@ -5396,8 +5397,10 @@ app.post('/admin/follow-up-management/bulk-assign', requireAdmin, async (req, re
 
 
 async function startServer() {
+  // Attempt initial DB connection; if it fails, still start the HTTP server
   try {
     await connectWithRetry(5, 5000);
+    dbReady = true;
     // IMPORTANT: منع sync المؤقتًا لتجنب Duplicate keys أثناء تشغيل السيرفر
     // await sequelize.sync();
     await RechargeCode.sync();
@@ -5407,32 +5410,55 @@ async function startServer() {
     await ensureBookletReservationSchema(sequelize);
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
-
-    if (process.env.NODE_ENV === 'production') {
-      // على Render: HTTP عادي (Render بيعمل HTTPS تلقائياً)
-      app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 السيرفر شغال على البورت ${PORT}`);
-      });
-    } else {
-      // محلياً: HTTPS بشهادة self-signed
-      const https = require('https');
-      const sslOptions = {
-        key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-        cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
-      };
-      const httpsServer = https.createServer(sslOptions, app);
-      httpsServer.listen(PORT, '0.0.0.0', () => {
-        const localIP = getLocalIP();
-        const networkUrl = `https://${localIP}:${PORT}`;
-        console.log('🚀 السيرفر شغال بنجاح!');
-        console.log(`💻 من جهازك: https://localhost:${PORT}`);
-        console.log(`📍 من الشبكة: ${networkUrl}`);
-        qrcodeTerminal.generate(networkUrl, { small: true });
-      });
-    }
   } catch (error) {
-    console.error('❌ فشل الاتصال بقاعدة البيانات:', error.message);
-    process.exit(1);
+    console.error('❌ فشل الاتصال بقاعدة البيانات أثناء التشغيل الابتدائي:', error.message);
+    console.error('السيرفر سيبدأ بدون اتصال قاعدة البيانات. سأحاول إعادة الاتصال في الخلفية.');
+  }
+
+  // start HTTP/HTTPS server regardless of DB readiness so pages can load
+  if (process.env.NODE_ENV === 'production') {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 السيرفر شغال على البورت ${PORT}`);
+    });
+  } else {
+    // محلياً: HTTPS بشهادة self-signed
+    const https = require('https');
+    const sslOptions = {
+      key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
+    };
+    const httpsServer = https.createServer(sslOptions, app);
+    httpsServer.listen(PORT, '0.0.0.0', () => {
+      const localIP = getLocalIP();
+      const networkUrl = `https://${localIP}:${PORT}`;
+      console.log('🚀 السيرفر شغال بنجاح!');
+      console.log(`💻 من جهازك: https://localhost:${PORT}`);
+      console.log(`📍 من الشبكة: ${networkUrl}`);
+      qrcodeTerminal.generate(networkUrl, { small: true });
+    });
+  }
+
+  // If DB wasn't ready, keep retrying in the background and apply schema fixes when it comes up
+  if (!dbReady) {
+    (async function backgroundReconnect() {
+      while (!dbReady) {
+        try {
+          console.log('🔁 محاولة إعادة الاتصال بقاعدة البيانات في الخلفية...');
+          await connectWithRetry(5, 10000);
+          dbReady = true;
+          await RechargeCode.sync();
+          await PaymentVerification.sync();
+          await ensureUserPhoneColumn();
+          await ensureStudentBookletCustomPriceColumn();
+          await ensureBookletReservationSchema(sequelize);
+          console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
+          break;
+        } catch (e) {
+          console.error('خلفية: فشل إعادة الاتصال بقاعدة البيانات:', e.message);
+          await new Promise(r => setTimeout(r, 10000));
+        }
+      }
+    })();
   }
 }
 
