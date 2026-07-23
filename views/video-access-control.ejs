@@ -59,24 +59,67 @@
   </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm mb-3">
   <div class="card-body">
     <h6 class="mb-3">👤 وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</h6>
 
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <% if (studentAccesses.length === 0) { %>
-        <span class="text-muted small">لا يوجد طلاب بوصول فردي</span>
-      <% } %>
-      <% studentAccesses.forEach(sa => { %>
-        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:#D1FAE5;font-size:0.8rem;">
-          <span><strong><%= sa.Student?.name %></strong> (<%= sa.Student?.student_code %>)</span>
-          <span class="text-muted" style="font-size:0.7rem;"> - <%= sa.Student?.Subject?.name %> - <%= sa.Student?.Center?.name %></span>
-          <form action="/admin/videos/<%= video.id %>/remove-student-access/<%= sa.id %>" method="POST">
-            <button class="btn btn-sm" style="padding:1px 6px;background:#FEE2E2;color:#B91C1C;font-size:0.65rem;">✕</button>
-          </form>
-        </div>
-      <% }) %>
+    <div class="mb-3">
+      <input id="studentSearch" type="text" class="form-control" placeholder="🔍 بحث بالاسم أو الكود"> 
     </div>
+
+    <% if (studentAccesses.length === 0) { %>
+      <p class="text-muted small">لا يوجد طلاب بوصول فردي حتى الآن.</p>
+    <% } else { %>
+      <div class="table-responsive mb-3">
+        <table class="table table-sm align-middle" id="studentsTable">
+          <thead class="table-light">
+            <tr>
+              <th>الكود</th>
+              <th>الاسم</th>
+              <th>الفرقة / السنتر</th>
+              <th>طريقة الوصول</th>
+              <th>المتبقي</th>
+              <th>تعديل</th>
+              <th>إلغاء</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% studentAccesses.forEach(sa => { %>
+              <tr data-search="<%= (sa.Student?.name + ' ' + sa.Student?.student_code).toLowerCase() %>">
+                <td><%= sa.Student?.student_code %></td>
+                <td><%= sa.Student?.name %></td>
+                <td class="small text-muted"><%= sa.Student?.Subject?.name %> - <%= sa.Student?.Center?.name %></td>
+                <td><%= sa.method %></td>
+                <td><%= Math.max(sa.max_views - sa.views_used, 0) %> من <%= sa.max_views %></td>
+                <td>
+                  <form action="/admin/videos/<%= video.id %>/grant/<%= sa.Student.id %>" method="POST" class="row g-1 align-items-center">
+                    <div class="col-auto">
+                      <select name="method" class="form-select form-select-sm">
+                        <option value="attended" <%= sa.method === 'attended' ? 'selected' : '' %>>حضور</option>
+                        <option value="paid" <%= sa.method === 'paid' ? 'selected' : '' %>>دفع</option>
+                        <option value="admin_free" <%= sa.method === 'admin_free' ? 'selected' : '' %>>مجاني</option>
+                        <option value="admin_paid" <%= sa.method === 'admin_paid' ? 'selected' : '' %>>مدفوع</option>
+                      </select>
+                    </div>
+                    <div class="col-auto">
+                      <input type="number" name="max_views" class="form-control form-control-sm" style="width:100px;" value="<%= sa.max_views %>" min="0">
+                    </div>
+                    <div class="col-auto">
+                      <button class="btn btn-sm btn-outline-primary">حفظ</button>
+                    </div>
+                  </form>
+                </td>
+                <td>
+                  <form action="/admin/videos/<%= video.id %>/remove-student-access/<%= sa.id %>" method="POST">
+                    <button class="btn btn-sm btn-outline-danger">إلغاء</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
 
     <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex gap-2">
       <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:200px;"
@@ -85,7 +128,6 @@
     </form>
   </div>
 </div>
-
 
 <script>
   document.getElementById('studentSearch').addEventListener('input', function () {
