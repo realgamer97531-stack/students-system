@@ -106,7 +106,7 @@
     </div>
 
     <form action="/admin/videos/<%= video.id %>/add-session" method="POST" class="d-flex gap-2">
-      <select name="session_id" class="form-select form-select-sm" style="max-width:350px;" required>
+      <select name="session_id" class="form-select session-select" placeholder="إضافة حصة جديدة" required>
         <option value="">-- إضافة حصة جديدة --</option>
         <% allSessions.forEach(s => { %>
           <% const alreadyAdded = videoSessions.some(vs => vs.SessionId === s.id); %>

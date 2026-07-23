@@ -11,7 +11,7 @@
 
   <!-- اختيار الحصة -->
   <form method="GET" class="d-flex gap-2 flex-wrap">
-    <select name="session_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
+    <select name="session_id" class="form-select session-select" style="max-width: 350px;">
       <option value="">-- اختر الحصة --</option>
       <% sessions.forEach(s => { %>
         <option value="<%= s.id %>" <%= String(s.id) === String(filters.session_id) ? 'selected':'' %>>
@@ -181,5 +181,17 @@
   </div>
 </div>
 <% } %>
+
+<script>
+  // Auto-submit form when session is changed
+  document.addEventListener('DOMContentLoaded', function() {
+    const sessionSelect = document.querySelector('form.d-flex select[name="session_id"]');
+    if (sessionSelect) {
+      $(sessionSelect).on('change', function() {
+        this.form.submit();
+      });
+    }
+  });
+</script>
 
 <%- include('partials/footer') %>

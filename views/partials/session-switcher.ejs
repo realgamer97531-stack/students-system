@@ -1,7 +1,7 @@
 <div class="alert alert-light border d-flex align-items-center gap-2 mb-3 flex-wrap">
   <strong class="small">الحصة الشغالة على جهازك دلوقتي:</strong>
   <form action="/sessions/switch" method="POST" class="d-flex gap-2 flex-grow-1">
-    <select name="session_id" class="form-select form-select-sm" style="max-width: 350px;">
+    <select name="session_id" class="form-select session-select" style="max-width: 350px;">
       <% recentSessions.forEach(s => { %>
         <option value="<%= s.id %>" <%= String(s.id) === String(currentSessionId) ? 'selected' : '' %>>
           <%= s.Subject.name %> - <%= s.Center.name %> (سيريال <%= s.serial_number %>)

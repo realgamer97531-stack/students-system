@@ -1,9 +1,118 @@
 </div>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Select2 Library -->
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.bundle.min.js"></script>
+  
   <script>
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('open');
       document.getElementById('sidebarOverlay').classList.toggle('show');
+    }
+
+    // Initialize Session Dropdowns with Select2
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize all session select elements
+      const sessionSelects = document.querySelectorAll('select[name="session_id"], select[name="session_ids"]');
+      
+      sessionSelects.forEach(function(select) {
+        // Get current theme
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        
+        $(select).select2({
+          theme: 'bootstrap-5',
+          language: 'ar',
+          dir: 'rtl',
+          allowClear: !select.required, // Allow clear only if not required
+          placeholder: select.getAttribute('placeholder') || 'ابحث أو اختر...',
+          minimumResultsForSearch: 0, // Show search even with few options
+          width: '100%',
+          dropdownParent: $(select).closest('form').length ? $(select).closest('form') : undefined,
+          templateResult: formatSessionOption,
+          templateSelection: formatSessionSelection,
+          matcher: customMatcher,
+          sorter: customSorter,
+          escapeMarkup: function(markup) { return markup; } // Don't escape HTML
+        });
+
+        // Handle theme changes
+        const observer = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'data-theme') {
+              $(select).select2('destroy');
+              const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+              initializeSessionSelect(select, isDarkMode);
+            }
+          });
+        });
+
+        observer.observe(document.documentElement, { attributes: true });
+      });
+    });
+
+    // Format session options in dropdown with better styling
+    function formatSessionOption(state) {
+      if (!state.id) return state.text;
+      
+      const text = state.text;
+      // Parse the option text to extract parts
+      const parts = text.split('(');
+      const mainText = parts[0].trim();
+      const details = parts.length > 1 ? '(' + parts.slice(1).join('(') : '';
+      
+      return $('<span class="session-option-text">' + mainText + '</span>' + 
+               (details ? '<span class="session-option-details ms-2 small text-muted" style="float: left;">' + details + '</span>' : ''));
+    }
+
+    // Format selected session text
+    function formatSessionSelection(state) {
+      if (!state.id) return state.text;
+      const text = state.text;
+      const parts = text.split('(');
+      const mainText = parts[0].trim();
+      return mainText;
+    }
+
+    // Custom matcher for better search (search in all parts)
+    function customMatcher(params, data) {
+      if (!params.term) return data;
+      
+      const term = params.term.toLowerCase();
+      const text = data.text.toLowerCase();
+      
+      if (text.indexOf(term) > -1) {
+        return data;
+      }
+      
+      return null;
+    }
+
+    // Custom sorter to show exact matches first
+    function customSorter(results) {
+      return results.sort(function(a, b) {
+        const aText = a.text.toLowerCase();
+        const bText = b.text.toLowerCase();
+        return aText.localeCompare(bText, 'ar');
+      });
+    }
+
+    // Function to reinitialize Select2 for individual select
+    function initializeSessionSelect(select, isDark) {
+      $(select).select2({
+        theme: 'bootstrap-5',
+        language: 'ar',
+        dir: 'rtl',
+        allowClear: !select.required,
+        placeholder: select.getAttribute('placeholder') || 'ابحث أو اختر...',
+        minimumResultsForSearch: 0,
+        width: '100%',
+        templateResult: formatSessionOption,
+        templateSelection: formatSessionSelection,
+        matcher: customMatcher,
+        sorter: customSorter,
+        escapeMarkup: function(markup) { return markup; }
+      });
     }
   </script>
 </body>

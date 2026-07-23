@@ -7,7 +7,7 @@
     <h5 class="mb-3 fw-bold">إنشاء درس جديد مرتبط بحصة</h5>
     <form action="/admin/videos/create" method="POST" class="row g-2">
       <div class="col-md-4">
-        <select name="session_ids" class="form-select" multiple required style="height:120px;">
+        <select name="session_ids" class="form-select session-select" multiple required style="height:auto;">
   <% allSessions.forEach(s => { %>
     <option value="<%= s.id %>">
       <%= s.Subject.name %> - <%= s.Center.name %> (حصة <%= s.lesson_number %> | سيريال <%= s.serial_number %>)
