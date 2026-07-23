@@ -278,6 +278,19 @@ const videoStorage = multer.diskStorage({
 });
 const videoUpload = multer({ storage: videoStorage, limits: { fileSize: 500 * 1024 * 1024 } }); // حد أقصى 500 ميجا
 
+// تجهيز رفع صور الحصص وحفظها في فولدر public/uploads/session-images
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, 'public', 'uploads', 'session-images');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}_${file.originalname}`);
+  },
+});
+const imageUpload = multer({ storage: imageStorage, limits: { fileSize: 10 * 1024 * 1024 } });
+
 // إعداد نظام الجلسات (تسجيل الدخول)
 app.use(session({
   secret: sessionSecret,
@@ -2555,7 +2568,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       await ensureAttendance(student.id, video.SessionId, '📹 وصول فردي مخصص من الأدمن');
       return res.json({ success: true, viewsUsed: 1, maxViews: 999 });
     }
-    
+
     // 3) مفيش صلاحية - نتحقق هل حضر هذه الحصة في أي سنتر فعلي (غير أونلاين)
     const attendedInCenter = await Attendance.findOne({
       where: { StudentId: student.id },
