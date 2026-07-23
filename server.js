@@ -184,6 +184,22 @@ async function ensureStudentBookletCustomPriceColumn() {
   }
 }
 
+async function connectWithRetry(maxAttempts = 5, delayMs = 5000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await sequelize.authenticate();
+      console.log(`✅ تم الاتصال بقاعدة البيانات بنجاح (attempt ${attempt})`);
+      return;
+    } catch (error) {
+      console.error(`⚠️ محاولة الاتصال بقاعدة البيانات فشلت (${attempt}/${maxAttempts}):`, error.message);
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 function getEffectiveBookletPrice(booklet, studentBooklet) {
   if (studentBooklet && studentBooklet.custom_price !== null && studentBooklet.custom_price !== undefined) {
     const customPrice = parseFloat(studentBooklet.custom_price);
@@ -233,9 +249,6 @@ function getEffectiveSessionPayment(attendance) {
   const sessionFee = parseFloat(attendance?.Student?.price_per_session || 0);
   return Math.max(manualAmount, sessionFee);
 }
-
-ensureUserPhoneColumn();
-ensureStudentBookletCustomPriceColumn();
 
 app.use(cors()); // يسمح لأي موقع يتواصل مع الـ API بتاعنا
 app.use(compression());
@@ -5330,12 +5343,12 @@ app.post('/admin/follow-up-management/bulk-assign', requireAdmin, async (req, re
 
 async function startServer() {
   try {
-    await sequelize.authenticate();
-    console.log('✅ تم الاتصال بقاعدة البيانات بنجاح');
+    await connectWithRetry(5, 5000);
     // IMPORTANT: منع sync المؤقتًا لتجنب Duplicate keys أثناء تشغيل السيرفر
     // await sequelize.sync();
     await RechargeCode.sync();
     await PaymentVerification.sync();
+    await ensureUserPhoneColumn();
     await ensureStudentBookletCustomPriceColumn();
     await ensureBookletReservationSchema(sequelize);
     console.log('RechargeCode table is ready');
