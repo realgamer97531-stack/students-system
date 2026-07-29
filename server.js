@@ -683,12 +683,30 @@ app.get('/students/:id', async (req, res) => {
       order: [['createdAt', 'ASC']],
     });
 
-    // بيانات مشاهدة الفيديوهات الخاصة بمادة الطالب
-    const studentVideos = await Video.findAll({
-      where: { SubjectId: student.SubjectId },
+    // بيانات مشاهدة الفيديوهات المتاحة لهذا الطالب فقط
+    const studentSessions = await Session.findAll({
+      where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
+    });
+    const studentSessionIds = studentSessions.map(s => s.id);
+
+    const groupVideoSessions = studentSessionIds.length > 0 ? await VideoSession.findAll({
+      where: { SessionId: studentSessionIds },
+      attributes: ['VideoId'],
+    }) : [];
+    const groupVideoIds = [...new Set(groupVideoSessions.map(vs => vs.VideoId))];
+
+    const individualAccesses = await VideoStudentAccess.findAll({
+      where: { StudentId: student.id },
+      attributes: ['VideoId'],
+    });
+    const individualVideoIds = individualAccesses.map(a => a.VideoId);
+
+    const accessibleVideoIds = [...new Set([...groupVideoIds, ...individualVideoIds])];
+    const studentVideos = accessibleVideoIds.length > 0 ? await Video.findAll({
+      where: { id: accessibleVideoIds },
       include: [{ model: Session, include: [Center] }, VideoPart],
       order: [['createdAt', 'ASC']],
-    });
+    }) : [];
 
     const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
     const watchMap = {};
