@@ -45,7 +45,6 @@ const ensureBookletReservationSchema = require('./utils/ensureBookletReservation
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
-const profilePhotoUrl = student.profile_photo_url || null;
 const FollowUpAssignment = require('./models/FollowUpAssignment');
 const SessionComment = require('./models/SessionComment');
 const XLSX = require('xlsx');
@@ -482,7 +481,6 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
     centers,
     subjects,
     filters: { search: search || '', center_id: center_id || '', subject_id: subject_id || '' },
-    profilePhotoUrl,
   });
 });
 
@@ -737,6 +735,7 @@ app.get('/students/:id', async (req, res) => {
     });
 
     const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
+    const profilePhotoUrl = student.profile_photo_url || null;
 
     res.render('student-profile', {
       student,
