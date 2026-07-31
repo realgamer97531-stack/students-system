@@ -65,6 +65,16 @@
           <div class="card-body">
             <h5 class="card-title mb-3 border-bottom pb-2 text-primary">بيانات الطالب</h5>
             <form action="/students/<%= student.id %>/edit" method="POST">
+              <div class="text-center mb-3">
+                <% if (profilePhotoUrl) { %>
+                  <img src="<%= profilePhotoUrl %>" 
+                    style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #4338CA;">
+                <% } else { %>
+                  <div style="width:80px;height:80px;border-radius:50%;background:#EEF0FB;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto;">
+                    👤
+                  </div>
+                <% } %>
+              </div>
               <div class="mb-2">
                 <label class="form-label small">الاسم</label>
                 <input type="text" name="name" class="form-control form-control-sm" value="<%= student.name %>" required>

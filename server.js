@@ -45,6 +45,7 @@ const ensureBookletReservationSchema = require('./utils/ensureBookletReservation
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
+const profilePhotoUrl = student.profile_photo_url || null;
 const FollowUpAssignment = require('./models/FollowUpAssignment');
 const SessionComment = require('./models/SessionComment');
 const XLSX = require('xlsx');
@@ -481,6 +482,7 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
     centers,
     subjects,
     filters: { search: search || '', center_id: center_id || '', subject_id: subject_id || '' },
+    profilePhotoUrl,
   });
 });
 
@@ -748,6 +750,7 @@ app.get('/students/:id', async (req, res) => {
       studentBooklets,
       availableBooklets,
       followUpAssistant,
+      profilePhotoUrl,
     });
   } catch (error) {
     console.error(error);
@@ -2408,6 +2411,7 @@ async function buildStudentData(studentId) {
       centerName: student.Center.name,
       balance: student.balance,
       bookletStatus: student.booklet_status,
+      profilePhotoUrl: student.profile_photo_url,
       isBlocked: student.is_blocked,
       points: student.points,
       warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
@@ -5412,6 +5416,21 @@ app.post('/admin/follow-up-management/bulk-assign', requireAdmin, async (req, re
     res.status(500).send('❌ ' + e.message);
   }
 });
+
+// API: save/get student profile photo
+app.post('/api/portal/student/profile-photo', verifyPortalToken('student'), async (req, res) => {
+  try {
+    const { photo_url } = req.body;
+    if (!photo_url) return res.json({ success: false, message: 'No URL provided' });
+    await Student.update({ profile_photo_url: photo_url }, { where: { id: req.portalStudentId } });
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false });
+  }
+});
+
+
 
 
 async function startServer() {

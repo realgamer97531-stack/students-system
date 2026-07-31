@@ -52,6 +52,10 @@ const Student = sequelize.define('Student', {
     allowNull: false,
     defaultValue: false, // false = لسه ماشتراهوش
   },
+  profile_photo_url: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
 }, {
   tableName: 'students',
   hooks: {
