@@ -225,6 +225,59 @@ function getBookletRemainingAmount(booklet, studentBooklet) {
   return Math.max(0, effectivePrice - paidAmount);
 }
 
+async function syncStudentBookletStatus(student) {
+  if (!student) return;
+  const hasStudentBooklet = await StudentBooklet.count({ where: { StudentId: student.id } }) > 0;
+  if (hasStudentBooklet && !student.booklet_status) {
+    student.booklet_status = true;
+    await student.save();
+  }
+}
+
+async function ensureStudentBookletPlaceholder(student, booklets = null) {
+  if (!student || !student.booklet_status) return;
+  const activeBooklets = booklets || await Booklet.findAll({
+    where: { SubjectId: student.SubjectId, is_active: true },
+    order: [['order_index', 'ASC']],
+  });
+  if (!activeBooklets || activeBooklets.length === 0) return;
+
+  const defaultBooklet = activeBooklets[0];
+  const existing = await StudentBooklet.findOne({
+    where: { StudentId: student.id, BookletId: defaultBooklet.id },
+  });
+  if (!existing) {
+    await StudentBooklet.create({
+      StudentId: student.id,
+      BookletId: defaultBooklet.id,
+      paid_amount: 0,
+    });
+  }
+}
+
+async function markDefaultBookletDelivered(student) {
+  if (!student) return null;
+  const booklets = await Booklet.findAll({ where: { SubjectId: student.SubjectId, is_active: true }, order: [['order_index', 'ASC']] });
+  if (!booklets.length) return null;
+
+  const defaultBooklet = booklets[0];
+  const [sb] = await StudentBooklet.findOrCreate({
+    where: { StudentId: student.id, BookletId: defaultBooklet.id },
+    defaults: { paid_amount: 0 },
+  });
+
+  sb.is_delivered = true;
+  sb.delivered_at = new Date();
+  await sb.save();
+
+  if (!student.booklet_status) {
+    student.booklet_status = true;
+    await student.save();
+  }
+
+  return sb;
+}
+
 async function recordAttendanceCharge(student, userId, reason = 'رسوم الحضور', transaction = null) {
   if (!student) return 0;
 
@@ -731,6 +784,12 @@ app.get('/students/:id', async (req, res) => {
       where: { StudentId: student.id },
       include: [Booklet],
     });
+    await syncStudentBookletStatus(student);
+    if (!student.booklet_status && studentBooklets.length > 0) {
+      student.booklet_status = true;
+      await student.save();
+    }
+
     const availableBooklets = await Booklet.findAll({
       where: { SubjectId: student.SubjectId, is_active: true },
     });
@@ -1284,6 +1343,11 @@ app.post('/students/:id/edit', async (req, res) => {
       admin_note,
     }, { where: { id: req.params.id } });
 
+    if (booklet_status === 'on') {
+      const updatedStudent = await Student.findByPk(req.params.id);
+      await ensureStudentBookletPlaceholder(updatedStudent);
+    }
+
     res.redirect('/students/' + req.params.id);
   } catch (error) {
     console.error(error);
@@ -1385,6 +1449,8 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
       if (booklet) {
         await processBookletPayments(student.id, [{ booklet_id: booklet.id, amount: paidAmount }], req.session.userId);
       }
+    } else if (shouldHaveBookletStatus) {
+      await ensureStudentBookletPlaceholder(student);
     }
 
     let attendanceNote = null;
@@ -1436,6 +1502,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
 
     const student = await Student.findOne({ where: { student_code }, include: [Center, Subject] });
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
+    await syncStudentBookletStatus(student);
 
     const activeSession = await Session.findByPk(sessionId);
     if (!activeSession) return res.json({ success: false, message: '⚠️ مفيش حصة شغالة' });
@@ -1507,6 +1574,10 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       where: { SubjectId: student.SubjectId, is_active: true },
       order: [['order_index', 'ASC']],
     });
+    await syncStudentBookletStatus(student);
+    if (student.booklet_status) {
+      await ensureStudentBookletPlaceholder(student, booklets);
+    }
 
     const bookletStatuses = await Promise.all(booklets.map(async (booklet) => {
       const studentBooklet = await StudentBooklet.findOne({
@@ -1534,6 +1605,8 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       };
     }));
 
+    const resolvedBookletStatus = student.booklet_status || bookletStatuses.some(b => b.studentBookletId !== null);
+
     res.json({
       success: true,
       student: {
@@ -1543,7 +1616,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         balance: student.balance,
         pricePerSession: student.price_per_session,
         adminNote: student.admin_note,
-        bookletStatus: student.booklet_status,
+        bookletStatus: resolvedBookletStatus,
       },
       summary,
       bookletStatuses,
@@ -1611,8 +1684,8 @@ app.post('/attendance/scan', async (req, res) => {
     }
 
     await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
-    if (booklet_delivered && !student.booklet_status) {
-      student.booklet_status = true;
+    if (booklet_delivered) {
+      await markDefaultBookletDelivered(student);
     }
     await student.save();
 
@@ -3950,6 +4023,11 @@ app.post('/students/:studentId/booklet-payment', requireAdmin, async (req, res) 
       await StudentBooklet.create({ StudentId: student.id, BookletId: booklet_id, paid_amount: parseFloat(paid_amount), notes });
     }
 
+    if (!student.booklet_status) {
+      student.booklet_status = true;
+      await student.save();
+    }
+
     await BalanceTransaction.create({
       StudentId: student.id,
       amount: parseFloat(paid_amount),
@@ -4004,6 +4082,8 @@ app.post('/attendance/scan/booklet-deliver', requireAdmin, async (req, res) => {
       sb.is_delivered = true;
       sb.delivered_at = new Date();
       await sb.save();
+    } else {
+      await markDefaultBookletDelivered(student);
     }
 
     if (!student.booklet_status) {
@@ -4015,119 +4095,6 @@ app.post('/attendance/scan/booklet-deliver', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة في تحديث حالة التسليم' });
-  }
-});
-
-// ===== Lookup: جلب بيانات الطالب مع البوكليتس (للصفحة اللي تظهر بعد السكان) =====
-
-app.post('/attendance/scan/lookup', async (req, res) => {
-  try {
-    const { student_code } = req.body;
-    const sessionId = req.session.activeSessionId;
-
-    const student = await Student.findOne({
-      where: { student_code },
-      include: [Center, Subject],
-    });
-    if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
-
-    if (student.is_blocked) return res.json({ success: false, message: '⛔ الطالب محظور من النظام' });
-
-    const activeSession = await Session.findByPk(sessionId);
-    if (!activeSession) return res.json({ success: false, message: '⚠️ مفيش حصة شغالة' });
-    if (activeSession.status === 'cancelled') return res.json({ success: false, message: '⚠️ هذه الحصة ملغية' });
-
-    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
-    if (existing) return res.json({ success: false, message: `${student.name} مسجل حضوره من قبل` });
-
-    // بوكليتس المادة بتاعة الطالب
-    const booklets = await Booklet.findAll({
-      where: { SubjectId: student.SubjectId, is_active: true },
-      order: [['order_index', 'ASC']],
-    });
-
-    const bookletStatus = await Promise.all(booklets.map(async b => {
-      const sb = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: b.id } });
-      const paidAmount = sb ? sb.paid_amount : 0;
-      const effectivePrice = getEffectiveBookletPrice(b, sb);
-      const remaining = effectivePrice - paidAmount;
-      const isDelivered = sb ? sb.is_delivered : false;
-      return {
-        id: b.id, name: b.name,
-        sellPrice: effectivePrice,
-        paidAmount, remaining,
-        isDelivered,
-        isFullyPaid: remaining <= 0,
-        studentBookletId: sb ? sb.id : null,
-      };
-    }));
-
-    const pendingBooklets = bookletStatus.filter(b => !b.isFullyPaid && !b.isDelivered);
-
-    // حصص متابعة الطالب
-    const ownSessions = await Session.findAll({
-      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
-      order: [['lesson_number', 'ASC']],
-    });
-    const attendanceRecords = await Attendance.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session, include: [Center] }],
-    });
-    const attByLesson = {};
-    attendanceRecords.forEach(a => {
-      if (a.Session.SubjectId === student.SubjectId) attByLesson[a.Session.lesson_number] = a.Session;
-    });
-
-    const videos = await Video.findAll({ where: { SubjectId: student.SubjectId }, include: [Session, VideoPart] });
-    const videoBySessionId = {};
-    videos.forEach(v => { videoBySessionId[v.SessionId] = v; });
-    const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
-    const watchMap = {};
-    watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
-    const categoryLabels = { explanation: 'شرح', questions: 'أسئلة', homework_solution: 'حل واجب' };
-
-    const lessonNumbersSet = new Set();
-    ownSessions.forEach(s => lessonNumbersSet.add(s.lesson_number));
-    Object.keys(attByLesson).forEach(n => lessonNumbersSet.add(parseInt(n)));
-    const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
-
-    const summary = lessonNumbers.map(lessonNumber => {
-      const att = attByLesson[lessonNumber];
-      let parts = [];
-      if (att) {
-        const video = videoBySessionId[att.id];
-        if (video && video.VideoParts) {
-          parts = video.VideoParts.map(p => ({
-            category: categoryLabels[p.category] || p.category,
-            watchedSeconds: watchMap[p.id] || 0,
-            durationSeconds: p.duration_seconds,
-          }));
-        }
-      }
-      return {
-        lessonNumber,
-        attended: !!att,
-        attendedWhere: att ? att.Center.name : null,
-        parts,
-      };
-    });
-
-    res.json({
-      success: true,
-      student: {
-        id: student.id, name: student.name,
-        code: student.student_code,
-        balance: student.balance,
-        pricePerSession: student.price_per_session,
-        adminNote: student.admin_note,
-      },
-      bookletStatuses: bookletStatus,
-      pendingBooklets,
-      summary,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
   }
 });
 
@@ -4208,6 +4175,12 @@ app.post('/admin/payment-verifications/:id/verify', requireAdmin, async (req, re
     sb.paid_amount += reservation.paid_amount;
     await sb.save();
 
+    const reservationStudent = await Student.findByPk(reservation.StudentId);
+    if (reservationStudent && !reservationStudent.booklet_status) {
+      reservationStudent.booklet_status = true;
+      await reservationStudent.save();
+    }
+
     await BalanceTransaction.create({
       StudentId: reservation.StudentId,
       amount: reservation.paid_amount,
@@ -4235,6 +4208,7 @@ app.post('/admin/payment-verifications/:id/deliver', requireAdmin, async (req, r
 app.get('/api/portal/booklets', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
+    await syncStudentBookletStatus(student);
     const booklets = await Booklet.findAll({
       where: { SubjectId: student.SubjectId, is_active: true },
       order: [['order_index', 'ASC']],
@@ -4844,6 +4818,12 @@ app.post('/students/:studentId/booklet-custom-price', requireAdmin, async (req, 
     studentBooklet.custom_price = normalizedCustomPrice;
     await studentBooklet.save();
 
+    const student = await Student.findByPk(req.params.studentId);
+    if (student && !student.booklet_status) {
+      student.booklet_status = true;
+      await student.save();
+    }
+
     res.redirect('/students/' + req.params.studentId);
   } catch (e) {
     console.error(e);
@@ -4927,6 +4907,10 @@ app.post('/students/bulk-upload', requireAdmin, bulkUpload.single('excel_file'),
               BookletId: booklet.id,
               paid_amount: parseFloat(row.booklet_paid),
             });
+            if (!student.booklet_status) {
+              student.booklet_status = true;
+              await student.save();
+            }
             await BalanceTransaction.create({
               StudentId: student.id,
               amount: parseFloat(row.booklet_paid),
