@@ -34,9 +34,11 @@
             <% JSON.parse(sub.images || '[]').forEach((img, i) => { %>
               <%
   const PLATFORM = 'https://studyisfunny.online/study';
+  const ALT_PLATFORM = 'https://shadyelsharkawy.com/study';
   const imgUrl = img.startsWith('http') ? img : PLATFORM + '/' + img;
+  const altImgUrl = img.startsWith('http') ? img : ALT_PLATFORM + '/' + img;
 %>
-<img src="<%= imgUrl %>" onclick="openImg('<%= imgUrl %>')"
+<img src="<%= imgUrl %>" data-alt-src="<%= altImgUrl %>" onclick="openImg('<%= imgUrl %>')"
                 style="width:60px;height:60px;object-fit:cover;border-radius:8px;cursor:pointer;">
             <% }) %>
           </div>
