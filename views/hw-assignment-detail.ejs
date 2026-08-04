@@ -1,7 +1,15 @@
 <%- include('partials/header') %>
 
 <h3 class="mb-1">📝 <%= assignment.title %></h3>
-<p class="text-muted mb-4">واجب رقم <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
+<p class="text-muted mb-2">واجب رقم <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
+<p class="text-muted mb-3">
+  <% if (assignment.Subject) { %>📚 <%= assignment.Subject.name %><br><% } %>
+  <% if (assignment.Session) { %>🔗 الحصة الرئيسية: <%= assignment.Session.Subject.name %> - <%= assignment.Session.Center.name %> - حصة <%= assignment.Session.lesson_number %><br><% } %>
+  <% const linkedSessions = (assignment.LinkedSessions || []).filter(s => String(s.id) !== String(assignment.SessionId)); %>
+  <% if (linkedSessions.length) { %>
+    🔗 حصص مرتبطة: <%= linkedSessions.map(s => `${s.Subject.name} - ${s.Center.name} (حصة ${s.lesson_number})`).join('، ') %>
+  <% } %>
+</p>
 <% if (assistantOnlyView) { %>
   <div class="alert alert-info py-2">
     هذا العرض يعرض طلابك المتابعين فقط.
@@ -12,6 +20,20 @@
     <% } %>
   </div>
 <% } %>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form action="/hw/assignments/<%= assignment.id %>" method="GET" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small">بحث عن طالب</label>
+        <input type="text" name="student_search" value="<%= student_search %>" class="form-control" placeholder="الاسم أو كود الطالب">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-outline-primary w-100">بحث</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <% const statusLabels = { submitted: 'تم التسليم', complete: 'كامل', incomplete: 'مش كامل', no_steps: 'من غير خطوات', not_done: 'مش معمول' }; %>
 <% const statusColors = { submitted: '#6B7280', complete: '#059669', incomplete: '#D97706', no_steps: '#6B7280', not_done: '#DC2626' }; %>

@@ -3316,6 +3316,7 @@ app.post('/api/portal/recharge', verifyPortalToken('student'), async (req, res) 
 
 const HomeworkAssignment = require('./models/HomeworkAssignment');
 const HomeworkSubmission = require('./models/HomeworkSubmission');
+const HomeworkAssignmentSession = require('./models/HomeworkAssignmentSession');
 
 // Multer لرفع صور الواجبات
 const hwStorage = multer.diskStorage({
@@ -3342,27 +3343,80 @@ sequelize.sync({ alter: false }).catch(() => {});
 // --- صفحة إدارة الواجبات (لوحة التحكم) ---
 
 app.get('/hw/assignments', requirePermission('homework_online'), async (req, res) => {
+  const { subject_id, center_id, session_id, q } = req.query;
   const assignments = await HomeworkAssignment.findAll({
     include: [
       { model: require('./models/Subject'), required: false },
-      { model: require('./models/Session'), required: false },
+      { model: require('./models/Session'), required: false, include: [Center, Subject] },
+      { model: Session, as: 'LinkedSessions', required: false, include: [Center, Subject] },
     ],
     order: [['order_number', 'ASC']],
   });
   const subjects = await Subject.findAll();
+  const centers = await Center.findAll({ order: [['name', 'ASC']] });
   const sessions = await Session.findAll({ include: [Center, Subject], order: [['lesson_number', 'ASC']], limit: 100 });
-  res.render('hw-assignments', { assignments, subjects, sessions });
+
+  const filteredAssignments = assignments.filter(a => {
+    if (subject_id && String(a.SubjectId) !== String(subject_id)) return false;
+
+    if (q) {
+      const term = q.toLowerCase();
+      const title = String(a.title || '').toLowerCase();
+      const desc = String(a.description || '').toLowerCase();
+      if (!title.includes(term) && !desc.includes(term)) return false;
+    }
+
+    if (center_id) {
+      const centersForAssignment = new Set();
+      if (a.Session && a.Session.CenterId) centersForAssignment.add(String(a.Session.CenterId));
+      if (a.LinkedSessions) a.LinkedSessions.forEach(s => s.CenterId && centersForAssignment.add(String(s.CenterId)));
+      if (!centersForAssignment.has(String(center_id))) return false;
+    }
+
+    if (session_id) {
+      const sessionIds = new Set();
+      if (a.SessionId) sessionIds.add(String(a.SessionId));
+      if (a.LinkedSessions) a.LinkedSessions.forEach(s => sessionIds.add(String(s.id)));
+      if (!sessionIds.has(String(session_id))) return false;
+    }
+
+    return true;
+  });
+
+  res.render('hw-assignments', {
+    assignments: filteredAssignments,
+    subjects,
+    sessions,
+    centers,
+    filters: { subject_id, center_id, session_id, q },
+  });
 });
 
 app.post('/hw/assignments/create', requirePermission('homework_online'), async (req, res) => {
   try {
-    const { title, description, order_number, start_date, end_date, subject_id, session_id } = req.body;
-    await HomeworkAssignment.create({
-      title, description, order_number,
-      start_date, end_date,
+    const { title, description, order_number, start_date, end_date, subject_id, session_ids } = req.body;
+    const sessionIdList = Array.isArray(session_ids)
+      ? session_ids.filter(Boolean)
+      : (session_ids ? [session_ids] : []);
+    const uniqueSessionIds = [...new Set(sessionIdList.map(id => Number(id)).filter(id => Number.isInteger(id)))];
+
+    const assignment = await HomeworkAssignment.create({
+      title,
+      description,
+      order_number,
+      start_date,
+      end_date,
       SubjectId: subject_id || null,
-      SessionId: session_id || null,
+      SessionId: uniqueSessionIds.length ? uniqueSessionIds[0] : null,
     });
+
+    const linkedSessionIds = uniqueSessionIds.filter(id => id !== assignment.SessionId);
+    if (linkedSessionIds.length) {
+      await HomeworkAssignmentSession.bulkCreate(
+        linkedSessionIds.map(sessionId => ({ HomeworkAssignmentId: assignment.id, SessionId: sessionId }))
+      );
+    }
+
     res.redirect('/hw/assignments');
   } catch (e) {
     console.error(e);
@@ -3379,10 +3433,12 @@ app.post('/hw/assignments/:id/delete', requireAdmin, async (req, res) => {
 // --- صفحة تفاصيل واجب (الطلاب الي سلموا + الي مسلموش) ---
 
 app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req, res) => {
+  const { student_search } = req.query;
   const assignment = await HomeworkAssignment.findByPk(req.params.id, {
     include: [
       { model: require('./models/Subject'), required: false },
       { model: require('./models/Session'), required: false },
+      { model: Session, as: 'LinkedSessions', required: false, include: [Center, Subject] },
     ],
   });
   if (!assignment) return res.status(404).send('❌ غير موجود');
@@ -3396,37 +3452,53 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
     assignedStudentIds = assistantAssignments.map(a => a.StudentId);
   }
 
+  const assignmentSessionIds = [
+    ...(assignment.SessionId ? [assignment.SessionId] : []),
+    ...(assignment.LinkedSessions || []).map(s => s.id),
+  ].filter(Boolean);
+
   const submissionsWhere = { HomeworkAssignmentId: req.params.id };
   if (assignedStudentIds !== null) {
     submissionsWhere.StudentId = assignedStudentIds.length ? assignedStudentIds : -1;
   }
 
-  const submissions = await HomeworkSubmission.findAll({
+  let submissions = await HomeworkSubmission.findAll({
     where: submissionsWhere,
     include: [{ model: Student, include: [Center, Subject] }],
   });
 
-  // الطلاب اللي مسلموش ومصححوش في السنتر
-  let notSubmittedAndNotGraded = [];
   const studentWhere = {};
   if (assignment.SubjectId) studentWhere.SubjectId = assignment.SubjectId;
-  if (assignment.SessionId && assignment.Session && assignment.Session.CenterId) {
-    studentWhere.CenterId = assignment.Session.CenterId;
+  if (assignmentSessionIds.length) {
+    const centerIds = [...new Set((assignment.Session ? [assignment.Session.CenterId] : []).concat((assignment.LinkedSessions || []).map(s => s.CenterId)).filter(Boolean))];
+    if (centerIds.length) studentWhere.CenterId = centerIds;
   }
   if (assignedStudentIds !== null) {
     studentWhere.id = assignedStudentIds.length ? assignedStudentIds : -1;
   }
 
-  if (assignment.SubjectId || assignedStudentIds !== null) {
-    const allStudents = await Student.findAll({ where: studentWhere, include: [Center] });
+  let notSubmittedAndNotGraded = [];
+  if (assignment.SubjectId || assignmentSessionIds.length || assignedStudentIds !== null) {
+    let allStudents = await Student.findAll({ where: studentWhere, include: [Center] });
     const submittedStudentIds = submissions.map(s => s.StudentId);
+
+    if (student_search) {
+      const searchTerm = student_search.toLowerCase();
+      allStudents = allStudents.filter(student =>
+        String(student.name || '').toLowerCase().includes(searchTerm) ||
+        String(student.student_code || '').toLowerCase().includes(searchTerm)
+      );
+      submissions = submissions.filter(submission =>
+        String(submission.Student.name || '').toLowerCase().includes(searchTerm) ||
+        String(submission.Student.student_code || '').toLowerCase().includes(searchTerm)
+      );
+    }
 
     for (const student of allStudents) {
       if (submittedStudentIds.includes(student.id)) continue;
-      // تحقق من حالة الواجب في السنتر
       let hwStatus = null;
-      if (assignment.SessionId) {
-        const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: assignment.SessionId } });
+      if (assignmentSessionIds.length) {
+        const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: assignmentSessionIds } });
         hwStatus = hw ? hw.status : null;
       }
       if (!hwStatus) notSubmittedAndNotGraded.push(student);
@@ -3439,6 +3511,7 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
     notSubmittedAndNotGraded,
     assistantOnlyView: assignedStudentIds !== null,
     assignedStudentCount: assignedStudentIds !== null ? assignedStudentIds.length : null,
+    student_search: student_search || '',
   });
 });
 
@@ -3485,11 +3558,19 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
     const student = await Student.findByPk(req.portalStudentId);
     let assignments = await HomeworkAssignment.findAll({
       where: { SubjectId: student.SubjectId },
-      include: [{ model: Session, required: false, attributes: ['CenterId'] }],
+      include: [
+        { model: Session, required: false, attributes: ['CenterId'] },
+        { model: Session, as: 'LinkedSessions', required: false, attributes: ['id', 'CenterId'] },
+      ],
       order: [['order_number', 'ASC']],
     });
 
-    assignments = assignments.filter(a => !a.SessionId || (a.Session && a.Session.CenterId === student.CenterId));
+    assignments = assignments.filter(a => {
+      const sessionCenterIds = new Set();
+      if (a.Session && a.Session.CenterId) sessionCenterIds.add(a.Session.CenterId);
+      if (a.LinkedSessions) a.LinkedSessions.forEach(s => s.CenterId && sessionCenterIds.add(s.CenterId));
+      return !sessionCenterIds.size || sessionCenterIds.has(student.CenterId);
+    });
 
     const result = await Promise.all(assignments.map(async a => {
       const submission = await HomeworkSubmission.findOne({
@@ -3498,8 +3579,12 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
 
       // حالة في السنتر
       let centerStatus = null;
-      if (a.SessionId) {
-        const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: a.SessionId } });
+      const assignmentSessionIds = [
+        ...(a.SessionId ? [a.SessionId] : []),
+        ...(a.LinkedSessions || []).map(s => s.id),
+      ].filter(Boolean);
+      if (assignmentSessionIds.length) {
+        const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: assignmentSessionIds } });
         centerStatus = hw ? hw.status : null;
       }
 

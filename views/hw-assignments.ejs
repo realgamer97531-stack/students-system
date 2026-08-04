@@ -4,6 +4,49 @@
   <h3>📋 الواجبات الأونلاين</h3>
 </div>
 
+<!-- فلترة الواجبات -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">🔎 فلتر الواجبات</h6>
+    <form action="/hw/assignments" method="GET" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small">بحث عام</label>
+        <input type="text" name="q" class="form-control" placeholder="عنوان أو وصف" value="<%= filters?.q || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">المادة</label>
+        <select name="subject_id" class="form-select">
+          <option value="">كل المواد</option>
+          <% subjects.forEach(s => { %>
+            <option value="<%= s.id %>" <%= filters?.subject_id == s.id ? 'selected' : '' %>><%= s.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">السنتر</label>
+        <select name="center_id" class="form-select">
+          <option value="">كل السنتر</option>
+          <% centers.forEach(c => { %>
+            <option value="<%= c.id %>" <%= filters?.center_id == c.id ? 'selected' : '' %>><%= c.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">الحصة</label>
+        <select name="session_id" class="form-select session-select">
+          <option value="">كل الحصص</option>
+          <% sessions.forEach(s => { %>
+            <option value="<%= s.id %>" <%= filters?.session_id == s.id ? 'selected' : '' %>><%= s.Subject.name %> - <%= s.Center.name %> - حصة <%= s.lesson_number %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-outline-primary w-100">تطبيق</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- إنشاء واجب جديد -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">
@@ -24,11 +67,11 @@
           <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
         </select>
       </div>
-      <div class="col-md-3">
-        <select name="session_id" class="form-select session-select">
-          <option value="">-- ربط بحصة (اختياري) --</option>
+      <div class="col-md-4">
+        <select name="session_ids" class="form-select session-select" multiple style="height:auto;">
           <% sessions.forEach(s => { %><option value="<%= s.id %>"><%= s.Subject.name %> - <%= s.Center.name %> - حصة <%= s.lesson_number %></option><% }) %>
         </select>
+        <small class="text-muted">اختر واحدة أو أكثر لربط الواجب بعدة حصص</small>
       </div>
       <div class="col-md-2">
         <label class="form-label small">بداية التسليم</label>
@@ -38,7 +81,7 @@
         <label class="form-label small">نهاية التسليم</label>
         <input type="date" name="end_date" class="form-control" required>
       </div>
-      <div class="col-md-2 d-flex align-items-end">
+      <div class="col-md-1 d-flex align-items-end">
         <button type="submit" class="btn btn-primary w-100">إنشاء</button>
       </div>
     </form>
@@ -61,7 +104,12 @@
           <p class="small text-muted mb-2"><%= a.description || '' %></p>
           <p class="small text-muted mb-3">
             📅 <%= a.start_date %> → <%= a.end_date %><br>
-            <% if (a.Subject) { %>📚 <%= a.Subject.name %><% } %>
+            <% if (a.Subject) { %>📚 <%= a.Subject.name %><br><% } %>
+            <% if (a.Session) { %>🔗 الحصة الرئيسية: <%= a.Session.Subject.name %> - <%= a.Session.Center.name %> - حصة <%= a.Session.lesson_number %><br><% } %>
+            <% const linkedSessions = (a.LinkedSessions || []).filter(s => String(s.id) !== String(a.SessionId)); %>
+            <% if (linkedSessions.length) { %>
+              🔗 حصص مرتبطة: <%= linkedSessions.map(s => `${s.Subject.name} - ${s.Center.name} (حصة ${s.lesson_number})`).join('، ') %>
+            <% } %>
           </p>
           <a href="/hw/assignments/<%= a.id %>" class="btn btn-outline-primary w-100 btn-sm">عرض التسليمات</a>
         </div>

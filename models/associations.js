@@ -16,6 +16,8 @@ const VideoAccessGrant = require('./VideoAccessGrant');
 const Warning = require('./Warning');
 const PaymentVerification = require('./PaymentVerification');
 const FollowUpAssignment = require('./FollowUpAssignment');
+const HomeworkAssignment = require('./HomeworkAssignment');
+const HomeworkAssignmentSession = require('./HomeworkAssignmentSession');
 
 Student.hasMany(PaymentVerification, { foreignKey: 'StudentId' });
 PaymentVerification.belongsTo(Student, { foreignKey: 'StudentId' });
@@ -105,6 +107,21 @@ Subject.hasMany(Exam);
   FollowUpAssignment.belongsTo(Student, { foreignKey: 'StudentId' });
   Student.hasOne(FollowUpAssignment, { foreignKey: 'StudentId' });
   User.hasMany(FollowUpAssignment, { foreignKey: 'AssistantId', as: 'AssignedStudents' });
+
+  HomeworkAssignment.belongsToMany(Session, {
+    through: HomeworkAssignmentSession,
+    foreignKey: 'HomeworkAssignmentId',
+    otherKey: 'SessionId',
+    as: 'LinkedSessions',
+  });
+  Session.belongsToMany(HomeworkAssignment, {
+    through: HomeworkAssignmentSession,
+    foreignKey: 'SessionId',
+    otherKey: 'HomeworkAssignmentId',
+    as: 'HomeworkAssignments',
+  });
+  HomeworkAssignmentSession.belongsTo(HomeworkAssignment, { foreignKey: 'HomeworkAssignmentId' });
+  HomeworkAssignmentSession.belongsTo(Session, { foreignKey: 'SessionId' });
 }
 
 module.exports = setupAssociations;
