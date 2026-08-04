@@ -3341,7 +3341,7 @@ sequelize.sync({ alter: false }).catch(() => {});
 
 // --- صفحة إدارة الواجبات (لوحة التحكم) ---
 
-app.get('/hw/assignments', requirePermission('homework_scan'), async (req, res) => {
+app.get('/hw/assignments', requirePermission('homework_online'), async (req, res) => {
   const assignments = await HomeworkAssignment.findAll({
     include: [
       { model: require('./models/Subject'), required: false },
@@ -3354,7 +3354,7 @@ app.get('/hw/assignments', requirePermission('homework_scan'), async (req, res) 
   res.render('hw-assignments', { assignments, subjects, sessions });
 });
 
-app.post('/hw/assignments/create', requirePermission('homework_scan'), async (req, res) => {
+app.post('/hw/assignments/create', requirePermission('homework_online'), async (req, res) => {
   try {
     const { title, description, order_number, start_date, end_date, subject_id, session_id } = req.body;
     await HomeworkAssignment.create({
@@ -3378,7 +3378,7 @@ app.post('/hw/assignments/:id/delete', requireAdmin, async (req, res) => {
 
 // --- صفحة تفاصيل واجب (الطلاب الي سلموا + الي مسلموش) ---
 
-app.get('/hw/assignments/:id', requirePermission('homework_scan'), async (req, res) => {
+app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req, res) => {
   const assignment = await HomeworkAssignment.findByPk(req.params.id, {
     include: [
       { model: require('./models/Subject'), required: false },
@@ -3444,7 +3444,7 @@ app.get('/hw/assignments/:id', requirePermission('homework_scan'), async (req, r
 
 // --- تصحيح الواجب ---
 
-app.post('/hw/submissions/:id/grade', requirePermission('homework_scan'), async (req, res) => {
+app.post('/hw/submissions/:id/grade', requirePermission('homework_online'), async (req, res) => {
   try {
     const { status, assignment_id } = req.body;
     const submission = await HomeworkSubmission.findByPk(req.params.id, { include: [Student] });

@@ -6,6 +6,7 @@ module.exports = [
   { key: 'sessions_create', label: 'بدء حصة جديدة', path: '/sessions/new' },
   { key: 'attendance_scan', label: 'تسجيل حضور', path: '/attendance/scan' },
   { key: 'homework_scan', label: 'تصحيح الواجب', path: '/homework/scan' },
+  { key: 'homework_online', label: 'الواجبات أونلاين', path: '/hw/assignments' },
   { key: 'door_scan', label: 'سكان الباب', path: '/door/scan' },
   { key: 'exams', label: 'الامتحانات والدرجات', path: '/exams' },
   { key: 'admin_videos', label: 'إدارة الفيديوهات', path: '/admin/videos' },
