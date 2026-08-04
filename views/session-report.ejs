@@ -14,6 +14,7 @@
   </a>
 </div>
 
+<% if (userRole === 'admin') { %>
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h6 class="mb-3">💰 تقفيل السنتر (حساب التكلفة)</h6>
@@ -44,6 +45,7 @@
   </div>
 </div>
 <a href="/sessions/<%= session.id %>/financial-report" class="btn btn-sm btn-outline-success">💰 التقرير المالي</a>
+<% } %>
 
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item">
@@ -76,7 +78,7 @@
             <th>تليفون ولي الأمر</th>
             <th>الواجب</th>
             <th>الامتحان</th>
-            <th>دفع وقت الحضور</th>
+            <% if (userRole === 'admin') { %><th>دفع وقت الحضور</th><% } %>
             <th>كومنت</th>
             <th>سجّل الحضور</th>
             <th>صحّح الواجب</th>
@@ -111,6 +113,7 @@
                   <span class="text-muted small">-</span>
                 <% } %>
               </td>
+              <% if (userRole === 'admin') { %>
               <td>
                 <% if (row.payment > 0) { %>
                   <span class="text-success"><%= row.payment %> ج</span>
@@ -118,6 +121,7 @@
                   <span class="text-muted small">-</span>
                 <% } %>
               </td>
+              <% } %>
               <td><span class="small"><%= row.comment || '-' %></span></td>
               <td>
                 <span class="small text-muted">
