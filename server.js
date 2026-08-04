@@ -3395,7 +3395,11 @@ app.get('/hw/assignments/:id', requirePermission('homework_scan'), async (req, r
   // الطلاب اللي مسلموش ومصححوش في السنتر
   let notSubmittedAndNotGraded = [];
   if (assignment.SubjectId) {
-    const allStudents = await Student.findAll({ where: { SubjectId: assignment.SubjectId }, include: [Center] });
+    const studentWhere = { SubjectId: assignment.SubjectId };
+    if (assignment.SessionId && assignment.Session && assignment.Session.CenterId) {
+      studentWhere.CenterId = assignment.Session.CenterId;
+    }
+    const allStudents = await Student.findAll({ where: studentWhere, include: [Center] });
     const submittedStudentIds = submissions.map(s => s.StudentId);
 
     for (const student of allStudents) {
@@ -3454,10 +3458,13 @@ app.post('/hw/submissions/:id/grade', requirePermission('homework_scan'), async 
 app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
-    const assignments = await HomeworkAssignment.findAll({
+    let assignments = await HomeworkAssignment.findAll({
       where: { SubjectId: student.SubjectId },
+      include: [{ model: Session, required: false, attributes: ['CenterId'] }],
       order: [['order_number', 'ASC']],
     });
+
+    assignments = assignments.filter(a => !a.SessionId || (a.Session && a.Session.CenterId === student.CenterId));
 
     const result = await Promise.all(assignments.map(async a => {
       const submission = await HomeworkSubmission.findOne({
