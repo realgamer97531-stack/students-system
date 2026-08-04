@@ -3387,18 +3387,37 @@ app.get('/hw/assignments/:id', requirePermission('homework_scan'), async (req, r
   });
   if (!assignment) return res.status(404).send('❌ غير موجود');
 
+  let assignedStudentIds = null;
+  if (req.session.userRole !== 'admin' && ['assistant', 'follow_up'].includes(req.session.userRole)) {
+    const assistantAssignments = await FollowUpAssignment.findAll({
+      where: { AssistantId: req.session.userId },
+      attributes: ['StudentId'],
+    });
+    assignedStudentIds = assistantAssignments.map(a => a.StudentId);
+  }
+
+  const submissionsWhere = { HomeworkAssignmentId: req.params.id };
+  if (assignedStudentIds !== null) {
+    submissionsWhere.StudentId = assignedStudentIds.length ? assignedStudentIds : -1;
+  }
+
   const submissions = await HomeworkSubmission.findAll({
-    where: { HomeworkAssignmentId: req.params.id },
+    where: submissionsWhere,
     include: [{ model: Student, include: [Center, Subject] }],
   });
 
   // الطلاب اللي مسلموش ومصححوش في السنتر
   let notSubmittedAndNotGraded = [];
-  if (assignment.SubjectId) {
-    const studentWhere = { SubjectId: assignment.SubjectId };
-    if (assignment.SessionId && assignment.Session && assignment.Session.CenterId) {
-      studentWhere.CenterId = assignment.Session.CenterId;
-    }
+  const studentWhere = {};
+  if (assignment.SubjectId) studentWhere.SubjectId = assignment.SubjectId;
+  if (assignment.SessionId && assignment.Session && assignment.Session.CenterId) {
+    studentWhere.CenterId = assignment.Session.CenterId;
+  }
+  if (assignedStudentIds !== null) {
+    studentWhere.id = assignedStudentIds.length ? assignedStudentIds : -1;
+  }
+
+  if (assignment.SubjectId || assignedStudentIds !== null) {
     const allStudents = await Student.findAll({ where: studentWhere, include: [Center] });
     const submittedStudentIds = submissions.map(s => s.StudentId);
 
@@ -3414,7 +3433,13 @@ app.get('/hw/assignments/:id', requirePermission('homework_scan'), async (req, r
     }
   }
 
-  res.render('hw-assignment-detail', { assignment, submissions, notSubmittedAndNotGraded });
+  res.render('hw-assignment-detail', {
+    assignment,
+    submissions,
+    notSubmittedAndNotGraded,
+    assistantOnlyView: assignedStudentIds !== null,
+    assignedStudentCount: assignedStudentIds !== null ? assignedStudentIds.length : null,
+  });
 });
 
 // --- تصحيح الواجب ---

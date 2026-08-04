@@ -2,6 +2,16 @@
 
 <h3 class="mb-1">📝 <%= assignment.title %></h3>
 <p class="text-muted mb-4">واجب رقم <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
+<% if (assistantOnlyView) { %>
+  <div class="alert alert-info py-2">
+    هذا العرض يعرض طلابك المتابعين فقط.
+    <% if (assignedStudentCount === 0) { %>
+      لا يوجد طلاب مسندين لك لهذا الواجب.
+    <% } else { %>
+      عدد الطلاب المتاحين: <strong><%= assignedStudentCount %></strong>.
+    <% } %>
+  </div>
+<% } %>
 
 <% const statusLabels = { submitted: 'تم التسليم', complete: 'كامل', incomplete: 'مش كامل', no_steps: 'من غير خطوات', not_done: 'مش معمول' }; %>
 <% const statusColors = { submitted: '#6B7280', complete: '#059669', incomplete: '#D97706', no_steps: '#6B7280', not_done: '#DC2626' }; %>
