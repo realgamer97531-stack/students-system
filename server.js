@@ -3437,7 +3437,7 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
   const assignment = await HomeworkAssignment.findByPk(req.params.id, {
     include: [
       { model: require('./models/Subject'), required: false },
-      { model: require('./models/Session'), required: false },
+      { model: require('./models/Session'), required: false, include: [Center, Subject] },
       { model: Session, as: 'LinkedSessions', required: false, include: [Center, Subject] },
     ],
   });

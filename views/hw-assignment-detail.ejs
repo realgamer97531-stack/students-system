@@ -4,10 +4,10 @@
 <p class="text-muted mb-2">واجب رقم <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
 <p class="text-muted mb-3">
   <% if (assignment.Subject) { %>📚 <%= assignment.Subject.name %><br><% } %>
-  <% if (assignment.Session) { %>🔗 الحصة الرئيسية: <%= assignment.Session.Subject.name %> - <%= assignment.Session.Center.name %> - حصة <%= assignment.Session.lesson_number %><br><% } %>
+  <% if (assignment.Session && assignment.Session.Subject && assignment.Session.Center) { %>🔗 الحصة الرئيسية: <%= assignment.Session.Subject.name %> - <%= assignment.Session.Center.name %> - حصة <%= assignment.Session.lesson_number %><br><% } %>
   <% const linkedSessions = (assignment.LinkedSessions || []).filter(s => String(s.id) !== String(assignment.SessionId)); %>
   <% if (linkedSessions.length) { %>
-    🔗 حصص مرتبطة: <%= linkedSessions.map(s => `${s.Subject.name} - ${s.Center.name} (حصة ${s.lesson_number})`).join('، ') %>
+    🔗 حصص مرتبطة: <%= linkedSessions.map(s => `${s.Subject?.name || 'غير معروف'} - ${s.Center?.name || 'غير معروف'} (حصة ${s.lesson_number})`).join('، ') %>
   <% } %>
 </p>
 <% if (assistantOnlyView) { %>
