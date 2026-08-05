@@ -608,7 +608,38 @@ app.get('/students/export', async (req, res) => {
   }
 });
 
-// عرض بروفايل طالب واحد بالتفصيل
+  // تحميل التيمبليت
+  app.get('/students/bulk-template', requireAdmin, async (req, res) => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('طلاب جدد');
+
+      sheet.columns = [
+        { header: 'name', key: 'name', width: 25 },
+        { header: 'phone', key: 'phone', width: 15 },
+        { header: 'parent_phone', key: 'parent_phone', width: 15 },
+        { header: 'subject_name', key: 'subject_name', width: 25 },
+        { header: 'center_name', key: 'center_name', width: 20 },
+        { header: 'price_per_session', key: 'price_per_session', width: 15 },
+        { header: 'initial_balance', key: 'initial_balance', width: 15 },
+        { header: 'booklet_name', key: 'booklet_name', width: 25 },
+        { header: 'booklet_paid', key: 'booklet_paid', width: 12 },
+      ];
+
+      sheet.addRow(['محمد أحمد', '01012345678', '01198765432', 'Math Senior 1', 'جلوري', '80', '0', 'بوكليت أول ثانوي', '0']);
+      sheet.addRow(['فاطمة علي', '01023456789', '01187654321', 'Math Senior 1', 'الرياض ميامي', '80', '160', '', '']);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=students_template.xlsx');
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (e) {
+      console.error('Failed to generate bulk template:', e);
+      res.status(500).send('❌ ' + e.message);
+    }
+  });
+
+  // عرض بروفايل طالب واحد بالتفصيل
 
 app.get('/students/:id', async (req, res) => {
   try {
@@ -4948,36 +4979,7 @@ app.post('/students/:studentId/booklet-custom-price', requireAdmin, async (req, 
   }
 });
 
-// تحميل التيمبليت
-app.get('/students/bulk-template', requireAdmin, async (req, res) => {
-  try {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('طلاب جدد');
-
-    sheet.columns = [
-      { header: 'name', key: 'name', width: 25 },
-      { header: 'phone', key: 'phone', width: 15 },
-      { header: 'parent_phone', key: 'parent_phone', width: 15 },
-      { header: 'subject_name', key: 'subject_name', width: 25 },
-      { header: 'center_name', key: 'center_name', width: 20 },
-      { header: 'price_per_session', key: 'price_per_session', width: 15 },
-      { header: 'initial_balance', key: 'initial_balance', width: 15 },
-      { header: 'booklet_name', key: 'booklet_name', width: 25 },
-      { header: 'booklet_paid', key: 'booklet_paid', width: 12 },
-    ];
-
-    sheet.addRow(['محمد أحمد', '01012345678', '01198765432', 'Math Senior 1', 'جلوري', '80', '0', 'بوكليت أول ثانوي', '0']);
-    sheet.addRow(['فاطمة علي', '01023456789', '01187654321', 'Math Senior 1', 'الرياض ميامي', '80', '160', '', '']);
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=students_template.xlsx');
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (e) {
-    console.error('Failed to generate bulk template:', e);
-    res.status(500).send('❌ ' + e.message);
-  }
-});
+// (moved earlier to avoid matching by /students/:id)
 
 // رفع وتحليل الملف
 app.post('/students/bulk-upload', requireAdmin, bulkUpload.single('excel_file'), async (req, res) => {
