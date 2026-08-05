@@ -4982,80 +4982,173 @@ app.post('/students/:studentId/booklet-custom-price', requireAdmin, async (req, 
 // (moved earlier to avoid matching by /students/:id)
 
 // رفع وتحليل الملف
+function normalizeBulkRow(raw) {
+  const getString = value => (value === undefined || value === null ? '' : String(value).trim());
+  return {
+    name: getString(raw.name),
+    phone: getString(raw.phone),
+    parent_phone: getString(raw.parent_phone),
+    subject_name: getString(raw.subject_name),
+    center_name: getString(raw.center_name),
+    price_per_session: getString(raw.price_per_session),
+    initial_balance: getString(raw.initial_balance),
+    booklet_name: getString(raw.booklet_name),
+    booklet_paid: getString(raw.booklet_paid),
+  };
+}
+
+function bulkRowKey(row) {
+  return [
+    row.name.toLowerCase(),
+    row.phone.toLowerCase(),
+    row.parent_phone.toLowerCase(),
+    row.subject_name.toLowerCase(),
+    row.center_name.toLowerCase(),
+    row.price_per_session.toLowerCase(),
+    row.initial_balance.toLowerCase(),
+    row.booklet_name.toLowerCase(),
+    row.booklet_paid.toLowerCase(),
+  ].join('||');
+}
+
+async function createStudentFromBulkRow(row, userId) {
+  const subject = await Subject.findOne({ where: { name: row.subject_name } });
+  const center = await Center.findOne({ where: { name: row.center_name } });
+  if (!subject) throw new Error(`المادة "${row.subject_name}" غير موجودة`);
+  if (!center) throw new Error(`السنتر "${row.center_name}" غير موجود`);
+
+  const student = await Student.create({
+    name: row.name,
+    phone: row.phone,
+    parent_phone: row.parent_phone || null,
+    price_per_session: parseFloat(row.price_per_session) || 0,
+    balance: parseFloat(row.initial_balance) || 0,
+    SubjectId: subject.id,
+    CenterId: center.id,
+    UserId: userId,
+  });
+
+  if (parseFloat(row.initial_balance) > 0) {
+    await BalanceTransaction.create({
+      StudentId: student.id,
+      amount: parseFloat(row.initial_balance),
+      reason: 'رصيد أولي (bulk upload)',
+      UserId: userId,
+    });
+  }
+
+  if (row.booklet_name && parseFloat(row.booklet_paid) > 0) {
+    const booklet = await Booklet.findOne({ where: { name: row.booklet_name } });
+    if (booklet) {
+      await StudentBooklet.create({
+        StudentId: student.id,
+        BookletId: booklet.id,
+        paid_amount: parseFloat(row.booklet_paid),
+      });
+      student.booklet_status = true;
+      await student.save();
+      await BalanceTransaction.create({
+        StudentId: student.id,
+        amount: parseFloat(row.booklet_paid),
+        reason: `دفع بوكليت: ${booklet.name} (bulk upload)`,
+        UserId: userId,
+      });
+    }
+  }
+
+  return student;
+}
+
 app.post('/students/bulk-upload', requireAdmin, bulkUpload.single('excel_file'), async (req, res) => {
   try {
     const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-    const results = { success: [], errors: [] };
+    const results = { success: [], errors: [], duplicateRows: [] };
+    const parsedRows = rows.map((row, i) => ({
+      rowNumber: i + 2,
+      ...normalizeBulkRow(row),
+    }));
 
-    for (const [i, row] of rows.entries()) {
-      try {
-        // تجاهل صف المثال
-        if (!row.name || !row.phone || !row.subject_name || !row.center_name) {
-          results.errors.push(`صف ${i + 2}: بيانات ناقصة`);
-          continue;
-        }
-
-        const subject = await Subject.findOne({ where: { name: row.subject_name.trim() } });
-        const center = await Center.findOne({ where: { name: row.center_name.trim() } });
-
-        if (!subject) { results.errors.push(`صف ${i + 2}: المادة "${row.subject_name}" غير موجودة`); continue; }
-        if (!center) { results.errors.push(`صف ${i + 2}: السنتر "${row.center_name}" غير موجود`); continue; }
-
-        // تحقق من التكرار
-        const existing = await Student.findOne({ where: { phone: row.phone.toString().trim() } });
-        if (existing) { results.errors.push(`صف ${i + 2}: رقم التليفون ${row.phone} موجود بالفعل (${existing.name})`); continue; }
-
-        const student = await Student.create({
-          name: row.name.toString().trim(),
-          phone: row.phone.toString().trim(),
-          parent_phone: row.parent_phone?.toString().trim() || null,
-          price_per_session: parseFloat(row.price_per_session) || 0,
-          balance: parseFloat(row.initial_balance) || 0,
-          SubjectId: subject.id,
-          CenterId: center.id,
-          UserId: req.session.userId,
-        });
-
-        // إضافة معاملة الرصيد الأولي لو موجود
-        if (parseFloat(row.initial_balance) > 0) {
-          await BalanceTransaction.create({
-            StudentId: student.id,
-            amount: parseFloat(row.initial_balance),
-            reason: 'رصيد أولي (bulk upload)',
-            UserId: req.session.userId,
-          });
-        }
-
-        // إضافة دفع بوكليت لو موجود
-        if (row.booklet_name && parseFloat(row.booklet_paid) > 0) {
-          const booklet = await Booklet.findOne({ where: { name: row.booklet_name.toString().trim() } });
-          if (booklet) {
-            await StudentBooklet.create({
-              StudentId: student.id,
-              BookletId: booklet.id,
-              paid_amount: parseFloat(row.booklet_paid),
-            });
-            if (!student.booklet_status) {
-              student.booklet_status = true;
-              await student.save();
-            }
-            await BalanceTransaction.create({
-              StudentId: student.id,
-              amount: parseFloat(row.booklet_paid),
-              reason: `دفع بوكليت: ${booklet.name} (bulk upload)`,
-              UserId: req.session.userId,
-            });
-          }
-        }
-
-        results.success.push(student.name);
-      } catch (rowErr) {
-        results.errors.push(`صف ${i + 2}: ${rowErr.message}`);
+    const validRows = [];
+    for (const row of parsedRows) {
+      if (!row.name || !row.phone || !row.subject_name || !row.center_name) {
+        results.errors.push(`صف ${row.rowNumber}: بيانات ناقصة`);
+      } else {
+        validRows.push(row);
       }
     }
+
+    const groups = new Map();
+    validRows.forEach(row => {
+      const key = bulkRowKey(row);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+
+    const duplicateRowNumbers = new Set();
+    for (const group of groups.values()) {
+      if (group.length > 1) {
+        group.slice(1).forEach(row => duplicateRowNumbers.add(row.rowNumber));
+      }
+    }
+
+    for (const row of validRows) {
+      if (duplicateRowNumbers.has(row.rowNumber)) {
+        results.duplicateRows.push(row);
+        continue;
+      }
+
+      try {
+        const student = await createStudentFromBulkRow(row, req.session.userId);
+        results.success.push({
+          text: `${student.name} — ${row.subject_name} — ${row.center_name}`,
+          rowNumber: row.rowNumber,
+        });
+      } catch (rowErr) {
+        results.errors.push(`صف ${row.rowNumber}: ${rowErr.message}`);
+      }
+    }
+
+    req.session.bulkUploadDuplicateRows = results.duplicateRows;
+    res.render('bulk-upload-result', { results });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/students/bulk-upload/force-add', requireAdmin, async (req, res) => {
+  try {
+    const selected = Array.isArray(req.body.selected) ? req.body.selected : req.body.selected ? [req.body.selected] : [];
+    const duplicateRows = req.session.bulkUploadDuplicateRows || [];
+    const results = { success: [], errors: [], duplicateRows: [] };
+
+    if (!selected.length) {
+      results.errors.push('لم يتم اختيار أي صفوف للإضافة الإضافية.');
+      results.duplicateRows = duplicateRows;
+      return res.render('bulk-upload-result', { results });
+    }
+
+    const selectedIndexes = selected.map(value => Number(value)).filter(idx => !Number.isNaN(idx));
+    for (const rowIndex of selectedIndexes) {
+      const row = duplicateRows[rowIndex];
+      if (!row) continue;
+      try {
+        const student = await createStudentFromBulkRow(row, req.session.userId);
+        results.success.push({
+          text: `${student.name} — ${row.subject_name} — ${row.center_name}`,
+          rowNumber: row.rowNumber,
+        });
+      } catch (rowErr) {
+        results.errors.push(`صف ${row.rowNumber}: ${rowErr.message}`);
+      }
+    }
+
+    const remainingDuplicates = duplicateRows.filter((_, index) => !selectedIndexes.includes(index));
+    req.session.bulkUploadDuplicateRows = remainingDuplicates.length ? remainingDuplicates : null;
+    results.duplicateRows = remainingDuplicates;
 
     res.render('bulk-upload-result', { results });
   } catch (e) {

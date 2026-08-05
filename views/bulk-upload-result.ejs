@@ -22,7 +22,11 @@
   <div class="card-body">
     <h6 class="text-success mb-3">✅ تمت إضافتهم</h6>
     <ul class="list-unstyled mb-0">
-      <% results.success.forEach(name => { %><li class="small py-1 border-bottom"><%= name %></li><% }) %>
+      <% results.success.forEach(item => { %>
+        <li class="small py-1 border-bottom">
+          <%= typeof item === 'string' ? item : `${item.text} (صف ${item.rowNumber})` %>
+        </li>
+      <% }) %>
     </ul>
   </div>
 </div>
@@ -37,6 +41,63 @@
     </ul>
   </div>
 </div>
+<% } %>
+
+<% if (results.duplicateRows && results.duplicateRows.length > 0) { %>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="text-warning mb-3">⚠️ تم اكتشاف صفوف مكررة</h6>
+    <form method="POST" action="/students/bulk-upload/force-add">
+      <div class="table-responsive">
+        <table class="table table-bordered align-middle">
+          <thead>
+            <tr>
+              <th class="text-center"><input type="checkbox" id="selectAllDuplicates"></th>
+              <th>صف</th>
+              <th>الاسم</th>
+              <th>التليفون</th>
+              <th>المادة</th>
+              <th>السنتر</th>
+              <th>السعر</th>
+              <th>الرصيد</th>
+              <th>البوكليت</th>
+              <th>دفع البوكليت</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% results.duplicateRows.forEach((row, index) => { %>
+            <tr>
+              <td class="text-center">
+                <input type="checkbox" name="selected" value="<%= index %>" class="duplicate-row-checkbox">
+              </td>
+              <td><%= row.rowNumber %></td>
+              <td><%= row.name %></td>
+              <td><%= row.phone %></td>
+              <td><%= row.subject_name %></td>
+              <td><%= row.center_name %></td>
+              <td><%= row.price_per_session %></td>
+              <td><%= row.initial_balance %></td>
+              <td><%= row.booklet_name %></td>
+              <td><%= row.booklet_paid %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <button type="submit" class="btn btn-success">إضافة الصفوف المختارة</button>
+    </form>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAllDuplicates');
+    const checkboxes = document.querySelectorAll('.duplicate-row-checkbox');
+    if (!selectAll || checkboxes.length === 0) return;
+    selectAll.addEventListener('change', function() {
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    });
+  });
+</script>
 <% } %>
 
 <a href="/students" class="btn btn-primary">رجوع لقائمة الطلاب</a>
