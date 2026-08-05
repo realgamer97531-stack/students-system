@@ -501,8 +501,121 @@ app.use((req, res, next) => {
 });
 
 // ===== Settings Route =====
-app.get('/settings', (req, res) => {
+app.get('/settings', requireAdmin, (req, res) => {
   res.render('settings');
+});
+
+async function verifyAdminPassword(userId, password) {
+  const adminUser = await User.findByPk(userId);
+  if (!adminUser) return false;
+  return bcrypt.compare(password, adminUser.password);
+}
+
+app.post('/settings/clear-db', requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const verified = await verifyAdminPassword(req.session.userId, password);
+    if (!verified) {
+      return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
+    }
+
+    await Promise.all([
+      Attendance.destroy({ where: {} }),
+      HomeworkCheck.destroy({ where: {} }),
+      BalanceTransaction.destroy({ where: {} }),
+      ExamResult.destroy({ where: {} }),
+      WatchProgress.destroy({ where: {} }),
+      VideoAccessGrant.destroy({ where: {} }),
+      Warning.destroy({ where: {} }),
+      StudentBooklet.destroy({ where: {} }),
+      BookletReservation.destroy({ where: {} }),
+      VideoSession.destroy({ where: {} }),
+      VideoStudentAccess.destroy({ where: {} }),
+      Session.destroy({ where: {} }),
+      Student.destroy({ where: {} }),
+      VideoPart.destroy({ where: {} }),
+      Video.destroy({ where: {} }),
+    ]);
+
+    res.render('settings', { successMessage: 'تم مسح قاعدة البيانات بالكامل بنجاح' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء المسح' });
+  }
+});
+
+app.post('/settings/clear-students', requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const verified = await verifyAdminPassword(req.session.userId, password);
+    if (!verified) {
+      return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
+    }
+
+    await Promise.all([
+      Attendance.destroy({ where: {} }),
+      HomeworkCheck.destroy({ where: {} }),
+      ExamResult.destroy({ where: {} }),
+      BalanceTransaction.destroy({ where: {} }),
+      WatchProgress.destroy({ where: {} }),
+      VideoAccessGrant.destroy({ where: {} }),
+      FollowUpAssignment.destroy({ where: {} }),
+      SessionComment.destroy({ where: {} }),
+      StudentBooklet.destroy({ where: {} }),
+      BookletReservation.destroy({ where: {} }),
+      Warning.destroy({ where: {} }),
+      Student.destroy({ where: {} }),
+    ]);
+
+    res.render('settings', { successMessage: 'تم مسح جميع الطلاب وبياناتهم بنجاح' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء مسح الطلاب' });
+  }
+});
+
+app.post('/settings/clear-sessions', requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const verified = await verifyAdminPassword(req.session.userId, password);
+    if (!verified) {
+      return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
+    }
+
+    await Promise.all([
+      Attendance.destroy({ where: {} }),
+      HomeworkCheck.destroy({ where: {} }),
+      SessionComment.destroy({ where: {} }),
+      Session.destroy({ where: {} }),
+    ]);
+
+    res.render('settings', { successMessage: 'تم مسح جميع الجلسات بنجاح' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء مسح الجلسات' });
+  }
+});
+
+app.post('/settings/clear-videos', requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const verified = await verifyAdminPassword(req.session.userId, password);
+    if (!verified) {
+      return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
+    }
+
+    await Promise.all([
+      VideoSession.destroy({ where: {} }),
+      VideoStudentAccess.destroy({ where: {} }),
+      VideoPart.destroy({ where: {} }),
+      Video.destroy({ where: {} }),
+    ]);
+
+    res.render('settings', { successMessage: 'تم مسح جميع الفيديوهات بنجاح' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء مسح الفيديوهات' });
+  }
 });
 
 // ===== Routes بتاعة الطلاب =====
