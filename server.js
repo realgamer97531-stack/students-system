@@ -41,6 +41,7 @@ const Warning = require('./models/Warning');
 const Booklet = require('./models/Booklet');
 const StudentBooklet = require('./models/StudentBooklet');
 const BookletReservation = require('./models/BookletReservation');
+const PaymentVerification = require('./models/PaymentVerification');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
@@ -2453,8 +2454,6 @@ app.post('/api/portal/parent-login', async (req, res) => {
   }
 });
 
-const PaymentVerification = require('./models/PaymentVerification');
-
 // Middleware يتأكد من الـ Token الموجود في الهيدر، ويحدد نوع الحساب المطلوب
 function verifyPortalToken(requiredType) {
   return (req, res, next) => {
@@ -2475,10 +2474,6 @@ function verifyPortalToken(requiredType) {
     }
   };
 }
-
-require('./routes/PaymentVerification')(app, {
-  Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize,
-});
 
 // جلب بيانات الطالب الكاملة (بيستخدمها الطالب وولي الأمر مع بعض)
 async function buildStudentData(studentId) {
@@ -4394,76 +4389,6 @@ async function processBookletPayments(studentId, bookletPayments, userId) {
   }
 }
 
-// ===== ADMIN: صفحة مراجعة المدفوعات والحجوزات =====
-
-app.get('/admin/payment-verifications', requireAdmin, async (req, res) => {
-  const { status, from, to, tab } = req.query;
-  const currentTab = tab || 'reservations';
-
-  const whereClause = {};
-  if (status) whereClause.status = status;
-  if (from && to) whereClause.createdAt = { [Op.between]: [from + ' 00:00:00', to + ' 23:59:59'] };
-
-  const reservations = await BookletReservation.findAll({
-    where: whereClause,
-    include: [
-      { model: Student, include: [Subject, Center] },
-      { model: Booklet },
-    ],
-    order: [['createdAt', 'DESC']],
-  });
-
-  res.render('payment-verifications', { reservations, currentTab, filters: { status, from, to } });
-});
-
-app.post('/admin/payment-verifications/:id/verify', requireAdmin, async (req, res) => {
-  try {
-    const { paid_amount, notes } = req.body;
-    const reservation = await BookletReservation.findByPk(req.params.id, { include: [Student, Booklet] });
-    if (!reservation) return res.status(404).send('❌');
-
-    reservation.status = 'verified';
-    reservation.paid_amount = parseFloat(paid_amount) || reservation.Booklet.sell_price;
-    reservation.verified_by = req.session.userId;
-    reservation.notes = notes;
-    await reservation.save();
-
-    // تسجيل الدفع في StudentBooklet
-    const [sb] = await StudentBooklet.findOrCreate({
-      where: { StudentId: reservation.StudentId, BookletId: reservation.BookletId },
-      defaults: { paid_amount: 0 },
-    });
-    sb.paid_amount += reservation.paid_amount;
-    await sb.save();
-
-    const reservationStudent = await Student.findByPk(reservation.StudentId);
-    if (reservationStudent && !reservationStudent.booklet_status) {
-      reservationStudent.booklet_status = true;
-      await reservationStudent.save();
-    }
-
-    await BalanceTransaction.create({
-      StudentId: reservation.StudentId,
-      amount: reservation.paid_amount,
-      reason: `حجز بوكليت محقق: ${reservation.Booklet.name}`,
-      UserId: req.session.userId,
-    });
-
-    res.redirect('/admin/payment-verifications?tab=reservations');
-  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
-});
-
-app.post('/admin/payment-verifications/:id/reject', requireAdmin, async (req, res) => {
-  await BookletReservation.update({ status: 'rejected' }, { where: { id: req.params.id } });
-  res.redirect('/admin/payment-verifications?tab=reservations');
-});
-
-app.post('/admin/payment-verifications/:id/deliver', requireAdmin, async (req, res) => {
-  const r = await BookletReservation.findByPk(req.params.id);
-  if (r) { r.is_delivered = true; r.delivered_at = new Date(); await r.save(); }
-  res.redirect('/admin/payment-verifications?tab=reservations');
-});
-
 // ===== API البوابة: قائمة البوكليتس للطالب =====
 
 app.get('/api/portal/booklets', verifyPortalToken('student'), async (req, res) => {
@@ -5322,7 +5247,6 @@ async function startServer() {
     // IMPORTANT: منع sync المؤقتًا لتجنب Duplicate keys أثناء تشغيل السيرفر
     // await sequelize.sync();
     await RechargeCode.sync();
-    await PaymentVerification.sync();
     await ensureUserPhoneColumn();
     await ensureStudentBookletCustomPriceColumn();
     await ensureBookletReservationSchema(sequelize);
@@ -5365,7 +5289,6 @@ async function startServer() {
           await connectWithRetry(5, 10000);
           dbReady = true;
           await RechargeCode.sync();
-          await PaymentVerification.sync();
           await ensureUserPhoneColumn();
           await ensureStudentBookletCustomPriceColumn();
           await ensureBookletReservationSchema(sequelize);

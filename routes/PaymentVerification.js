@@ -1,7 +1,5 @@
 const multer = require('multer');
 const crypto = require('crypto');
-const { Op } = require('sequelize');
-const ensureBookletReservationSchema = require('../utils/ensureBookletReservationSchema');
 const checkReceiptWithAI = require('../utils/checkReceiptWithAI');
 
 // ===== الإعدادات =====
@@ -58,55 +56,7 @@ async function uploadToCloudinary(base64, mediaType) {
 // deps: { Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize }
 module.exports = function (app, deps) {
   const { Student, BalanceTransaction, PaymentVerification, verifyPortalToken, sequelize } = deps;
-  const Booklet = require('../models/Booklet');
   const BookletReservation = require('../models/BookletReservation');
-
-  // ===== صفحة مراجعة منفصلة: بس بتعرض عمليات التحقق الناجحة (قراءة فقط) =====
-  app.get('/admin/payment-verifications', async (req, res) => {
-    try {
-      if (!req.session || req.session.userRole !== 'admin') {
-        return res.status(403).send('⛔ هذه الصفحة للأدمن فقط');
-      }
-
-      const { status, from, to, tab } = req.query;
-      const currentTab = tab || 'reservations';
-
-      const records = await PaymentVerification.findAll({
-        where: { status: 'approved' },
-        include: [Student],
-        order: [['createdAt', 'DESC']],
-        limit: 300,
-      });
-
-      const whereClause = {};
-      if (status) whereClause.status = status;
-      if (from && to) {
-        whereClause.createdAt = { [Op.between]: [from + ' 00:00:00', to + ' 23:59:59'] };
-      }
-
-      await ensureBookletReservationSchema(sequelize);
-
-      const reservations = await BookletReservation.findAll({
-        where: whereClause,
-        include: [
-          { model: Student },
-          { model: Booklet },
-        ],
-        order: [['createdAt', 'DESC']],
-        limit: 300,
-      });
-
-      res.render('payment-verifications', {
-        records,
-        reservations,
-        currentTab,
-        filters: { status, from, to },
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).send('❌ حصلت مشكلة: ' + error.message);
-    }
-  });
 
   app.post('/api/portal/verify-transfer', verifyPortalToken('student'), upload.single('receipt'), async (req, res) => {
     let ex = null;

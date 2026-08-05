@@ -29,7 +29,6 @@ const VideoStudentAccess = require('./models/VideoStudentAccess');
 const HomeworkAssignment = require('./models/HomeworkAssignment');
 const HomeworkAssignmentSession = require('./models/HomeworkAssignmentSession');
 const HomeworkSubmission = require('./models/HomeworkSubmission');
-const PaymentVerification = require('./models/PaymentVerification');
 const RechargeCode = require('./models/RechargeCode');
 const Salary = require('./models/Salary');
 const SalaryConfig = require('./models/SalaryConfig');
@@ -63,7 +62,6 @@ async function clearDatabase() {
     HomeworkCheck,
     BalanceTransaction,
     ExamResult,
-    PaymentVerification,
     SessionComment,
     FollowUpAssignment,
     StudentBooklet,
