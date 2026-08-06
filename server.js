@@ -4736,6 +4736,20 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   }
 });
 
+// Temporary debug endpoint: list follow-up assignments for current user
+app.get('/debug/followups', requireLogin, async (req, res) => {
+  try {
+    const assignments = await FollowUpAssignment.findAll({
+      where: { AssistantId: req.session.userId },
+      include: [{ model: Student, include: [Center, Subject] }],
+    });
+    res.json({ count: assignments.length, assignments });
+  } catch (e) {
+    console.error('Debug followups failed:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ===== ملف طالب من منظور المتابعة =====
 app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) => {
   try {
