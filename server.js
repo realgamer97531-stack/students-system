@@ -4892,6 +4892,7 @@ app.post('/follow-up-dashboard/comment', requireFollowUp, async (req, res) => {
 // ===== إدارة التوزيع (أدمن بس) =====
 app.get('/admin/follow-up-management', requireAdmin, async (req, res) => {
   try {
+    const { subject_id, center_id } = req.query;
     const followUpUsers = await User.findAll({
       where: {
         [Op.or]: [
@@ -4939,14 +4940,24 @@ app.get('/admin/follow-up-management', requireAdmin, async (req, res) => {
     });
 
     const settings = await getFollowUpSettings();
+    const [subjects, centers] = await Promise.all([
+      Subject.findAll({ order: [['name', 'ASC']] }),
+      Center.findAll({ order: [['name', 'ASC']] }),
+    ]);
+
+    const allStudentsFilter = {};
+    if (subject_id) allStudentsFilter.SubjectId = subject_id;
+    if (center_id) allStudentsFilter.CenterId = center_id;
+
     const allStudentsForBulk = await Student.findAll({
+      where: allStudentsFilter,
       include: [Subject, Center],
       order: [['name', 'ASC']],
     });
 
     res.render('follow-up-management', {
       followUpEligible, assignments, unassignedStudents, assistantStats, allUsers, settings,
-      allStudentsForBulk,
+      allStudentsForBulk, subjects, centers, selectedSubjectId: subject_id || '', selectedCenterId: center_id || '',
     });
   } catch (e) {
     console.error(e);

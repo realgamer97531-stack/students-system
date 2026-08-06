@@ -85,6 +85,19 @@
           <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleAll(this)">
           <label class="form-check-label small fw-bold" for="selectAll">تحديد الكل</label>
         </div>
+        <select name="subject_id" class="form-select form-select-sm" style="width:180px;">
+          <option value="">-- تصفية بالمادة --</option>
+          <% subjects.forEach(sub => { %>
+            <option value="<%= sub.id %>" <%= selectedSubjectId == sub.id ? 'selected' : '' %>><%= sub.name %></option>
+          <% }) %>
+        </select>
+        <select name="center_id" class="form-select form-select-sm" style="width:180px;">
+          <option value="">-- تصفية بالسنتر --</option>
+          <% centers.forEach(center => { %>
+            <option value="<%= center.id %>" <%= selectedCenterId == center.id ? 'selected' : '' %>><%= center.name %></option>
+          <% }) %>
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-primary">تطبيق التصفية</button>
         <select name="assistant_id" class="form-select form-select-sm" style="width:180px;">
           <option value="">-- اختر أسيستانت --</option>
           <% followUpEligible.forEach(u => { %>
@@ -146,7 +159,12 @@
 
 <script>
 function toggleAll(master) {
-  document.querySelectorAll('.student-checkbox').forEach(cb => cb.checked = master.checked);
+  document.querySelectorAll('#bulkTable tbody tr').forEach(row => {
+    const checkbox = row.querySelector('.student-checkbox');
+    if (!checkbox) return;
+    if (row.style.display === 'none') return;
+    checkbox.checked = master.checked;
+  });
   updateCount();
 }
 
