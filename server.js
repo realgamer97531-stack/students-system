@@ -1525,8 +1525,17 @@ app.post('/sessions/:id/delete', requireAdmin, async (req, res) => {
 
     const sessionToDelete = await Session.findOne({ where: { id: sessionId }, include: [Center] });
     if (!sessionToDelete) return res.status(404).send('❌ الحصة غير موجودة');
-    if (sessionToDelete.Center.name !== 'أونلاين') {
-      return res.status(400).send('❌ الحذف النهائي متاح فقط لحصص الأونلاين. استخدم "إلغاء" لحصص السنتر.');
+
+    const isOnlineSession = sessionToDelete.Center.name === 'أونلاين';
+    if (!isOnlineSession) {
+      const { admin_password } = req.body;
+      if (!admin_password) {
+        return res.status(400).send('❌ الحذف النهائي متاح فقط لحصص الأونلاين. أدخل كلمة المرور الإدارية لحذف هذه الحصة من السنتر.');
+      }
+      const verified = await verifyAdminPassword(req.session.userId, admin_password);
+      if (!verified) {
+        return res.status(403).send('❌ كلمة المرور الإدارية غير صحيحة.');
+      }
     }
 
     // نتأكد الأول إن مفيش حضور أو واجب أو امتحان مسجل عليها - عشان منمسحش بيانات مهمة بالغلط

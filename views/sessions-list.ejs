@@ -120,7 +120,7 @@
               </button>
 
               <form action="/sessions/<%= s.id %>/delete" method="POST" class="d-inline"
-                onsubmit="return confirm('متأكد من حذف الحصة دي بالكامل؟ ده غير قابل للتراجع.')">
+                onsubmit="return confirmSessionDelete(this, '<%= s.Center.name %>')">
                 <button type="submit" class="btn btn-sm btn-outline-danger">
                   <span class="ar-only">🗑️ حذف</span>
                   <span class="en-only" style="display:none;">🗑️ Delete</span>
@@ -201,6 +201,26 @@
     document.getElementById('editForm').action = `/sessions/${sessionId}/edit`;
     const modal = new bootstrap.Modal(document.getElementById('editModal'));
     modal.show();
+  }
+
+  function confirmSessionDelete(form, centerName) {
+    if (!confirm('متأكد من حذف الحصة دي بالكامل؟ ده غير قابل للتراجع.')) return false;
+    if (centerName !== 'أونلاين') {
+      const password = prompt('هذه الحصة ليست أونلاين. ادخل كلمة المرور الإدارية للتأكيد:');
+      if (!password || !password.trim()) {
+        alert('لم تُدخل كلمة المرور الإدارية. تم إلغاء الحذف.');
+        return false;
+      }
+      let hidden = form.querySelector('input[name="admin_password"]');
+      if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'admin_password';
+        form.appendChild(hidden);
+      }
+      hidden.value = password.trim();
+    }
+    return true;
   }
 </script>
 
