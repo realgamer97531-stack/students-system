@@ -3590,7 +3590,8 @@ app.post('/hw/assignments/:id/delete', requireAdmin, async (req, res) => {
 // --- صفحة تفاصيل واجب (الطلاب الي سلموا + الي مسلموش) ---
 
 app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req, res) => {
-  const { student_search } = req.query;
+  const { student_search, show_all_students, marked_filter } = req.query;
+  const showAllStudents = show_all_students === '1' || show_all_students === 'on';
   const assignment = await HomeworkAssignment.findByPk(req.params.id, {
     include: [
       { model: require('./models/Subject'), required: false },
@@ -3615,7 +3616,7 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
   ].filter(Boolean);
 
   const submissionsWhere = { HomeworkAssignmentId: req.params.id };
-  if (assignedStudentIds !== null) {
+  if (assignedStudentIds !== null && !showAllStudents) {
     submissionsWhere.StudentId = assignedStudentIds.length ? assignedStudentIds : -1;
   }
 
@@ -3630,7 +3631,7 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
     const centerIds = [...new Set((assignment.Session ? [assignment.Session.CenterId] : []).concat((assignment.LinkedSessions || []).map(s => s.CenterId)).filter(Boolean))];
     if (centerIds.length) studentWhere.CenterId = centerIds;
   }
-  if (assignedStudentIds !== null) {
+  if (assignedStudentIds !== null && !showAllStudents) {
     studentWhere.id = assignedStudentIds.length ? assignedStudentIds : -1;
   }
 
@@ -3662,13 +3663,22 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
     }
   }
 
+  if (marked_filter === 'marked') {
+    submissions = submissions.filter(sub => sub.status !== 'submitted');
+    notSubmittedAndNotGraded = [];
+  } else if (marked_filter === 'not_marked') {
+    submissions = submissions.filter(sub => sub.status === 'submitted');
+  }
+
   res.render('hw-assignment-detail', {
     assignment,
     submissions,
     notSubmittedAndNotGraded,
-    assistantOnlyView: assignedStudentIds !== null,
+    assistantOnlyView: assignedStudentIds !== null && !showAllStudents,
     assignedStudentCount: assignedStudentIds !== null ? assignedStudentIds.length : null,
     student_search: student_search || '',
+    show_all_students: showAllStudents,
+    marked_filter: marked_filter || 'all',
   });
 });
 

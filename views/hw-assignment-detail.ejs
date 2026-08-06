@@ -24,9 +24,24 @@
 <div class="card mb-4">
   <div class="card-body">
     <form action="/hw/assignments/<%= assignment.id %>" method="GET" class="row g-2 align-items-end">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label small">بحث عن طالب</label>
         <input type="text" name="student_search" value="<%= student_search %>" class="form-control" placeholder="الاسم أو كود الطالب">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">حالة التقييم</label>
+        <select name="marked_filter" class="form-select">
+          <option value="all" <%= marked_filter === 'all' ? 'selected' : '' %>>الكل</option>
+          <option value="marked" <%= marked_filter === 'marked' ? 'selected' : '' %>>المصحح</option>
+          <option value="not_marked" <%= marked_filter === 'not_marked' ? 'selected' : '' %>>غير مصحح</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">عرض جميع الطلاب</label>
+        <div class="form-check mt-1">
+          <input class="form-check-input" type="checkbox" id="showAllStudents" name="show_all_students" value="1" <%= show_all_students ? 'checked' : '' %>>
+          <label class="form-check-label" for="showAllStudents">عرض جميع الطلاب</label>
+        </div>
       </div>
       <div class="col-md-2 d-flex align-items-end">
         <button type="submit" class="btn btn-outline-primary w-100">بحث</button>
