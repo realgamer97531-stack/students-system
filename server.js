@@ -4639,6 +4639,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
         absentStudents: [],
         centers: centersList,
         subjects: subjectsList,
+        hasFilters: false,
       });
     }
 
