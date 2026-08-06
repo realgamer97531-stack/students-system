@@ -4594,18 +4594,34 @@ function requireFollowUp(req, res, next) {
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id } = req.query;
+    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, center_id, subject_id } = req.query;
 
-    // جلب الطلاب المُسندين لهذا الأسيستانت
-    const assignments = await FollowUpAssignment.findAll({
-      where: req.session.userRole !== 'admin' ? { AssistantId: req.session.userId } : {},
-      include: [{
-        model: Student,
-        include: [Center, Subject],
-      }],
-    });
+    // load centers & subjects for filters
+    const centersList = await Center.findAll({ order: [['name', 'ASC']] });
+    const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
 
-    const students = assignments.map(a => a.Student).filter(Boolean);
+    // Decide which students to show: either all (with optional center/subject filters) or only assigned
+    let students = [];
+    if (show_all) {
+      const where = {};
+      if (center_id) where.CenterId = center_id;
+      if (subject_id) where.SubjectId = subject_id;
+      students = await Student.findAll({ where, include: [Center, Subject], order: [['name', 'ASC']] });
+    } else {
+      // جلب الطلاب المُسندين لهذا الأسيستانت
+      const assignments = await FollowUpAssignment.findAll({
+        where: req.session.userRole !== 'admin' ? { AssistantId: req.session.userId } : {},
+        include: [{
+          model: Student,
+          include: [Center, Subject],
+        }],
+      });
+      students = assignments.map(a => a.Student).filter(Boolean);
+      // apply optional center/subject filters on assigned list
+      if (center_id) students = students.filter(s => String(s.CenterId) === String(center_id));
+      if (subject_id) students = students.filter(s => String(s.SubjectId) === String(subject_id));
+    }
+
     const sessions = await Session.findAll({
       order: [['lesson_number', 'DESC']],
       include: [Center, Subject],
@@ -4619,8 +4635,10 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     if (!selectedSession || students.length === 0) {
       return res.render('follow-up-dashboard', {
         students: [], sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', center_id: center_id || '', subject_id: subject_id || '' },
         absentStudents: [],
+        centers: centersList,
+        subjects: subjectsList,
       });
     }
 
@@ -4705,9 +4723,11 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
 
     res.render('follow-up-dashboard', {
       students, sessionRows: filteredRows, sessions, selectedSession,
-      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id },
+      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', center_id: center_id || '', subject_id: subject_id || '' },
       absentStudents: absentStudents,
       hasFilters: !!(filter_video_type || filter_hw_status || filter_exam_max),
+      centers: centersList,
+      subjects: subjectsList,
     });
   } catch (e) {
     console.error(e);

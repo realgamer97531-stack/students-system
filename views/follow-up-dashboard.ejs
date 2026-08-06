@@ -4,7 +4,7 @@
   <div>
     <h3 class="mb-1">🎯 لوحة متابعة الطلاب</h3>
     <p class="text-muted small mb-0">
-      <%= students.length %> طالب مُسند إليك
+      <%= filters.show_all ? (students.length + ' طالب') : (students.length + ' طالب مُسند إليك') %>
       <% if (selectedSession) { %> | حصة رقم <%= selectedSession.lesson_number %> - <%= selectedSession.Subject?.name %> - <%= selectedSession.Center?.name %><% } %>
     </p>
   </div>
@@ -27,6 +27,7 @@
   <div class="card-body">
     <form method="GET" class="row g-2 align-items-end">
       <input type="hidden" name="session_id" value="<%= filters.session_id %>">
+      <input type="hidden" name="show_all" value="<%= filters.show_all || '' %>">
       <div class="col-md-2">
         <label class="form-label small fw-bold">نوع الفيديو</label>
         <select name="filter_video_type" class="form-select form-select-sm">
@@ -54,6 +55,31 @@
       <div class="col-md-2">
         <label class="form-label small fw-bold">درجة الامتحان أقل من</label>
         <input type="number" name="filter_exam_max" class="form-control form-control-sm" value="<%= filters.filter_exam_max || '' %>" placeholder="مثال: 50">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">السنتر</label>
+        <select name="center_id" class="form-select form-select-sm">
+          <option value="">الكل</option>
+          <% (centers || []).forEach(c => { %>
+            <option value="<%= c.id %>" <%= String(c.id) === String(filters.center_id) ? 'selected':'' %>><%= c.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">المادة</label>
+        <select name="subject_id" class="form-select form-select-sm">
+          <option value="">الكل</option>
+          <% (subjects || []).forEach(s => { %>
+            <option value="<%= s.id %>" <%= String(s.id) === String(filters.subject_id) ? 'selected':'' %>><%= s.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">عرض كل الطلاب</label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="showAllCheckbox" <%= filters.show_all ? 'checked':'' %> >
+          <label class="form-check-label small" for="showAllCheckbox">اظهار جميع الطلاب</label>
+        </div>
       </div>
       <div class="col-md-2">
         <button class="btn btn-primary btn-sm w-100">تطبيق</button>
@@ -189,6 +215,13 @@
     if (sessionSelect) {
       $(sessionSelect).on('change', function() {
         this.form.submit();
+      });
+    }
+    const showAllCheckbox = document.getElementById('showAllCheckbox');
+    const showAllHidden = document.querySelector('form.row input[name="show_all"]');
+    if (showAllCheckbox && showAllHidden) {
+      showAllCheckbox.addEventListener('change', () => {
+        showAllHidden.value = showAllCheckbox.checked ? '1' : '';
       });
     }
   });
