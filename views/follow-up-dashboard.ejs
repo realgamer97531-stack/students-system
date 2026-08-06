@@ -93,6 +93,7 @@
 
 <% const hwLabels = { complete:'✅ كامل', incomplete:'⚠️ مش كامل', no_steps:'📝 بلا خطوات', not_done:'❌ مش معمول' }; %>
 <% const hwColors = { complete:'#D1FAE5', incomplete:'#FEF3C7', no_steps:'#F3F4F6', not_done:'#FEE2E2' }; %>
+<% const hasFilters = (typeof hasFilters !== 'undefined') ? hasFilters : false; %>
 
 <% if (hasFilters) { %>
   <div class="alert alert-info small mb-3">🔍 يظهر <%= sessionRows.length %> طالب بعد تطبيق الفلاتر</div>
