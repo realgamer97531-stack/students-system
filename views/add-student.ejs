@@ -42,8 +42,14 @@
               <div class="col-md-6">
                 <label class="form-label fw-semibold">المادة</label>
                 <select name="subject_id" id="subjectSelect" class="form-select" required>
-                  <% (subjects || []).forEach(subj => { %>
-                    <option value="<%= subj.id %>"><%= subj.name %></option>
+                  <% (subjects || []).forEach(subj => { 
+                       const _n = (subj.name || '').toString().toLowerCase();
+                       let _def = '';
+                       if (_n.includes('senior 1') || (_n.includes('ثانوي') && (_n.includes('أول') || _n.includes('1')))) _def = 80;
+                       else if (_n.includes('senior 2') || (_n.includes('ثانوي') && (_n.includes('ثاني') || _n.includes('2')))) _def = 90;
+                       else if (_n.includes('senior 3') || (_n.includes('ثانوي') && (_n.includes('ثالث') || _n.includes('3')))) _def = 90;
+                  %>
+                    <option value="<%= subj.id %>" data-price="<%= _def %>"><%= subj.name %></option>
                   <% }) %>
                 </select>
               </div>
@@ -115,6 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updatePriceFromSubject() {
     const opt = subjectSelect.options[subjectSelect.selectedIndex];
+    const dataPrice = opt ? opt.dataset.price : '';
+    if (dataPrice && (!priceInput.value || priceInput.value === '0')) {
+      priceInput.value = dataPrice;
+      return;
+    }
+    // fallback to name-based map
     const text = opt ? opt.text : '';
     const def = findDefaultPriceForSubject(text);
     if (def !== null && (!priceInput.value || priceInput.value === '0')) {
