@@ -85,19 +85,21 @@
           <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleAll(this)">
           <label class="form-check-label small fw-bold" for="selectAll">تحديد الكل</label>
         </div>
-        <select name="subject_id" class="form-select form-select-sm" style="width:180px;">
-          <option value="">-- تصفية بالمادة --</option>
-          <% subjects.forEach(sub => { %>
-            <option value="<%= sub.id %>" <%= selectedSubjectId == sub.id ? 'selected' : '' %>><%= sub.name %></option>
-          <% }) %>
-        </select>
-        <select name="center_id" class="form-select form-select-sm" style="width:180px;">
-          <option value="">-- تصفية بالسنتر --</option>
-          <% centers.forEach(center => { %>
-            <option value="<%= center.id %>" <%= selectedCenterId == center.id ? 'selected' : '' %>><%= center.name %></option>
-          <% }) %>
-        </select>
-        <button type="submit" class="btn btn-sm btn-outline-primary">تطبيق التصفية</button>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <select id="filterSubject" name="subject_id" class="form-select form-select-sm" style="width:180px;">
+            <option value="">-- تصفية بالمادة --</option>
+            <% subjects.forEach(sub => { %>
+              <option value="<%= sub.id %>" <%= selectedSubjectId == sub.id ? 'selected' : '' %>><%= sub.name %></option>
+            <% }) %>
+          </select>
+          <select id="filterCenter" name="center_id" class="form-select form-select-sm" style="width:180px;">
+            <option value="">-- تصفية بالسنتر --</option>
+            <% centers.forEach(center => { %>
+              <option value="<%= center.id %>" <%= selectedCenterId == center.id ? 'selected' : '' %>><%= center.name %></option>
+            <% }) %>
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyFollowUpFilters()">تطبيق التصفية</button>
+        </div>
         <select name="assistant_id" class="form-select form-select-sm" style="width:180px;">
           <option value="">-- اختر أسيستانت --</option>
           <% followUpEligible.forEach(u => { %>
@@ -178,7 +180,20 @@ document.getElementById('studentBulkSearch').addEventListener('input', function(
   document.querySelectorAll('#bulkTable tbody tr').forEach(row => {
     row.style.display = row.dataset.search.includes(term) ? '' : 'none';
   });
+  document.getElementById('selectAll').checked = false;
+  updateCount();
 });
+
+function applyFollowUpFilters() {
+  const subjectId = document.getElementById('filterSubject').value;
+  const centerId = document.getElementById('filterCenter').value;
+  const params = new URLSearchParams(window.location.search);
+  if (subjectId) params.set('subject_id', subjectId);
+  else params.delete('subject_id');
+  if (centerId) params.set('center_id', centerId);
+  else params.delete('center_id');
+  window.location.search = params.toString();
+}
 </script>
 
 <%- include('partials/footer') %>
