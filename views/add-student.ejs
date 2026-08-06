@@ -8,7 +8,11 @@
           <h3 class="text-primary mb-3">➕ تسجيل طالب جديد</h3>
           <p class="text-muted mb-4">أدخل بيانات الطالب وسيتم حفظها في النظام.</p>
 
-          <form action="/students" method="POST">
+          <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
+            <div class="alert alert-danger"><%= errorMessage %></div>
+          <% } %>
+
+          <form action="/students" method="POST" id="addStudentForm">
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label fw-semibold">اسم الطالب</label>
@@ -27,7 +31,7 @@
 
               <div class="col-md-6">
                 <label class="form-label fw-semibold">سعر الحصة (ج)</label>
-                <input type="number" name="price_per_session" class="form-control" min="0" step="0.01" required>
+                <input type="number" name="price_per_session" id="priceInput" class="form-control" min="0" step="0.01" required>
               </div>
 
               <div class="col-md-6">
@@ -37,7 +41,7 @@
 
               <div class="col-md-6">
                 <label class="form-label fw-semibold">المادة</label>
-                <select name="subject_id" class="form-select" required>
+                <select name="subject_id" id="subjectSelect" class="form-select" required>
                   <% (subjects || []).forEach(subj => { %>
                     <option value="<%= subj.id %>"><%= subj.name %></option>
                   <% }) %>
@@ -87,3 +91,68 @@
 </div>
 
 <%- include('partials/footer') %>
+
+<script>
+// Simple mapping of grade names to default prices. Update keys to match subject names.
+const gradePriceMap = {
+  'senior 1': 80,
+  'senior 2': 90,
+  'senior 3': 90,
+};
+
+function findDefaultPriceForSubject(subjectName) {
+  if (!subjectName) return null;
+  const key = subjectName.toString().toLowerCase();
+  return gradePriceMap[key] || null;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const subjectSelect = document.getElementById('subjectSelect');
+  const priceInput = document.getElementById('priceInput');
+  const form = document.getElementById('addStudentForm');
+  const phoneField = form.querySelector('input[name="phone"]');
+  const parentField = form.querySelector('input[name="parent_phone"]');
+
+  function updatePriceFromSubject() {
+    const opt = subjectSelect.options[subjectSelect.selectedIndex];
+    const text = opt ? opt.text : '';
+    const def = findDefaultPriceForSubject(text);
+    if (def !== null && (!priceInput.value || priceInput.value === '0')) {
+      priceInput.value = def;
+    }
+  }
+
+  subjectSelect.addEventListener('change', updatePriceFromSubject);
+  updatePriceFromSubject();
+
+  function isPhoneValid(v) {
+    if (!v) return false;
+    const digits = v.toString().replace(/[^0-9]/g, '');
+    return digits.length === 11;
+  }
+
+  form.addEventListener('submit', (e) => {
+    const phone = phoneField.value.trim();
+    const parent = parentField.value.trim();
+
+    if (!isPhoneValid(phone) || !isPhoneValid(parent)) {
+      e.preventDefault();
+      const pwd = prompt('أرقام التليفون ليست صحيحة. ادخل كلمة المرور الإدارية للموافقة على المتابعة:');
+      if (pwd && pwd.trim().length > 0) {
+        let hidden = form.querySelector('input[name="admin_password"]');
+        if (!hidden) {
+          hidden = document.createElement('input');
+          hidden.type = 'hidden';
+          hidden.name = 'admin_password';
+          form.appendChild(hidden);
+        }
+        hidden.value = pwd.trim();
+        form.submit();
+      } else {
+        alert('لم تُدخل كلمة المرور الإدارية. تم إلغاء الإضافة.');
+      }
+      return false;
+    }
+  });
+});
+</script>

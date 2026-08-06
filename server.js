@@ -1025,6 +1025,24 @@ app.post('/students', async (req, res) => {
       admin_password,
     } = req.body;
 
+    // Validate phone lengths (must be 11 digits). Admin password can override.
+    const cleanDigits = v => (v || '').toString().replace(/[^0-9]/g, '');
+    const phoneDigits = cleanDigits(phone);
+    const parentDigits = cleanDigits(parent_phone);
+    if (phoneDigits.length !== 11 || parentDigits.length !== 11) {
+      if (!admin_password) {
+        const centers = await Center.findAll();
+        const subjects = await Subject.findAll();
+        return res.status(400).render('add-student', { centers, subjects, errorMessage: 'أرقام التليفون غير صحيحة: يجب أن تكون مكونة من 11 رقمًا. يمكنك إدخال كلمة المرور الإدارية للموافقة.' });
+      }
+      const verified = await verifyAdminPassword(req.session.userId, admin_password);
+      if (!verified) {
+        const centers = await Center.findAll();
+        const subjects = await Subject.findAll();
+        return res.status(403).render('add-student', { centers, subjects, errorMessage: 'كلمة المرور الإدارية غير صحيحة.' });
+      }
+    }
+
     const existingStudent = await Student.findOne({
       where: {
         name: name,
