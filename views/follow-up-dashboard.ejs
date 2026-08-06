@@ -93,9 +93,9 @@
 
 <% const hwLabels = { complete:'✅ كامل', incomplete:'⚠️ مش كامل', no_steps:'📝 بلا خطوات', not_done:'❌ مش معمول' }; %>
 <% const hwColors = { complete:'#D1FAE5', incomplete:'#FEF3C7', no_steps:'#F3F4F6', not_done:'#FEE2E2' }; %>
-<% const hasFilters = (typeof hasFilters !== 'undefined') ? hasFilters : false; %>
+<% const _hasFilters = (typeof hasFilters !== 'undefined') ? hasFilters : false; %>
 
-<% if (hasFilters) { %>
+<% if (_hasFilters) { %>
   <div class="alert alert-info small mb-3">🔍 يظهر <%= sessionRows.length %> طالب بعد تطبيق الفلاتر</div>
 <% } %>
 
@@ -189,7 +189,7 @@
 <% } %>
 
 <!-- قائمة الغائبين -->
-<% if (absentStudents.length > 0 && !hasFilters) { %>
+<% if (absentStudents.length > 0 && !_hasFilters) { %>
 <div class="card shadow-sm" style="border-right:4px solid #DC2626;">
   <div class="card-body">
     <h6 class="mb-3">🔴 الغائبون (<%= absentStudents.length %>)</h6>
