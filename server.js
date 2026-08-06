@@ -186,6 +186,26 @@ async function ensureStudentBookletCustomPriceColumn() {
   }
 }
 
+async function ensureHomeworkAssignmentShowForAllColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('HomeworkAssignments');
+    if (!tableInfo.show_for_all) {
+      await queryInterface.addColumn('HomeworkAssignments', 'show_for_all', {
+        type: sequelize.Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      });
+      console.log('✅ Added show_for_all column to HomeworkAssignments table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure HomeworkAssignments.show_for_all column:', error.message);
+  }
+}
+
 async function connectWithRetry(maxAttempts = 5, delayMs = 5000) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -3560,11 +3580,12 @@ app.get('/hw/assignments', requirePermission('homework_online'), async (req, res
 
 app.post('/hw/assignments/create', requirePermission('homework_online'), async (req, res) => {
   try {
-    const { title, description, order_number, start_date, end_date, subject_id, session_ids } = req.body;
+    const { title, description, order_number, start_date, end_date, subject_id, session_ids, show_for_all } = req.body;
     const sessionIdList = Array.isArray(session_ids)
       ? session_ids.filter(Boolean)
       : (session_ids ? [session_ids] : []);
     const uniqueSessionIds = [...new Set(sessionIdList.map(id => Number(id)).filter(id => Number.isInteger(id)))];
+    const showForAll = show_for_all === '1' || show_for_all === 'on';
 
     const assignment = await HomeworkAssignment.create({
       title,
@@ -3574,6 +3595,7 @@ app.post('/hw/assignments/create', requirePermission('homework_online'), async (
       end_date,
       SubjectId: subject_id || null,
       SessionId: uniqueSessionIds.length ? uniqueSessionIds[0] : null,
+      show_for_all: showForAll,
     });
 
     const linkedSessionIds = uniqueSessionIds.filter(id => id !== assignment.SessionId);
@@ -3735,20 +3757,38 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
     let assignments = await HomeworkAssignment.findAll({
       where: { SubjectId: student.SubjectId },
       include: [
-        { model: Session, required: false, attributes: ['CenterId'] },
+        { model: Session, required: false, attributes: ['id', 'CenterId'] },
         { model: Session, as: 'LinkedSessions', required: false, attributes: ['id', 'CenterId'] },
       ],
       order: [['order_number', 'ASC']],
     });
 
-    assignments = assignments.filter(a => {
+    const studentAttendances = await Attendance.findAll({
+      where: { StudentId: student.id },
+      attributes: ['SessionId'],
+    });
+    const attendedSessionIds = new Set(studentAttendances.map(a => a.SessionId));
+
+    const visibleAssignments = [];
+    for (const a of assignments) {
       const sessionCenterIds = new Set();
       if (a.Session && a.Session.CenterId) sessionCenterIds.add(a.Session.CenterId);
       if (a.LinkedSessions) a.LinkedSessions.forEach(s => s.CenterId && sessionCenterIds.add(s.CenterId));
-      return !sessionCenterIds.size || sessionCenterIds.has(student.CenterId);
-    });
+      if (!sessionCenterIds.size || !sessionCenterIds.has(student.CenterId)) continue;
 
-    const result = await Promise.all(assignments.map(async a => {
+      const assignmentSessionIds = [
+        ...(a.SessionId ? [a.SessionId] : []),
+        ...(a.LinkedSessions || []).map(s => s.id),
+      ].filter(Boolean);
+      if (assignmentSessionIds.length && !a.show_for_all) {
+        const attended = assignmentSessionIds.some(id => attendedSessionIds.has(id));
+        if (!attended) continue;
+      }
+
+      visibleAssignments.push(a);
+    }
+
+    const result = await Promise.all(visibleAssignments.map(async a => {
       const submission = await HomeworkSubmission.findOne({
         where: { HomeworkAssignmentId: a.id, StudentId: student.id },
       });
@@ -5346,6 +5386,7 @@ async function startServer() {
     await RechargeCode.sync();
     await ensureUserPhoneColumn();
     await ensureStudentBookletCustomPriceColumn();
+    await ensureHomeworkAssignmentShowForAllColumn();
     await ensureBookletReservationSchema(sequelize);
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');

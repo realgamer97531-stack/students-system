@@ -10,6 +10,7 @@ const HomeworkAssignment = sequelize.define('HomeworkAssignment', {
   end_date: { type: DataTypes.DATEONLY, allowNull: false },
   SubjectId: { type: DataTypes.INTEGER, allowNull: true },
   SessionId: { type: DataTypes.INTEGER, allowNull: true },
+  show_for_all: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
 });
 
 module.exports = HomeworkAssignment;
