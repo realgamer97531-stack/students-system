@@ -4632,9 +4632,23 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       ? sessions.find(s => String(s.id) === String(session_id))
       : sessions[0];
 
-    if (!selectedSession || students.length === 0) {
+    // If there are no assigned students at all, render empty state immediately
+    if (students.length === 0) {
       return res.render('follow-up-dashboard', {
         students: [], sessionRows: [], sessions, selectedSession: null,
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', center_id: center_id || '', subject_id: subject_id || '' },
+        absentStudents: [],
+        centers: centersList,
+        subjects: subjectsList,
+        hasFilters: false,
+      });
+    }
+
+    // If there is no selected session but the assistant has assigned students,
+    // render the page with students list so the assistant can see how many they follow up.
+    if (!selectedSession) {
+      return res.render('follow-up-dashboard', {
+        students, sessionRows: [], sessions, selectedSession: null,
         filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', center_id: center_id || '', subject_id: subject_id || '' },
         absentStudents: [],
         centers: centersList,

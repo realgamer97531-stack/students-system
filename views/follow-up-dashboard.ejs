@@ -100,8 +100,26 @@
 <% } %>
 
 <!-- جدول الطلاب -->
-<% if (selectedSession && sessionRows.length > 0) { %>
-<div class="card shadow-sm mb-4">
+<% if (!selectedSession && students && students.length > 0) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h6 class="mb-3">الطلاب المسندين إليك (<%= students.length %>)</h6>
+      <div class="row g-2">
+        <% students.forEach(s => { %>
+          <div class="col-md-3">
+            <div class="p-2 rounded" style="background:#EEF2FF;">
+              <div class="small fw-bold"><%= s.name %></div>
+              <div style="font-size:0.7rem;color:#6B7280;"><%= s.student_code %></div>
+              <div style="font-size:0.7rem;color:#6B7280;"><%= s.Center?.name %> | <%= s.Subject?.name %></div>
+              <a href="/follow-up-dashboard/student/<%= s.id %>" class="btn btn-sm mt-1" style="font-size:0.65rem;padding:2px 8px;background:#6366F1;color:#fff;">عرض الملف</a>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+<% } else if (selectedSession && sessionRows.length > 0) { %>
+  <div class="card shadow-sm mb-4">
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-sm table-hover mb-0">
@@ -185,7 +203,7 @@
 <% } else if (selectedSession) { %>
   <div class="alert alert-secondary">لا يوجد طلاب مطابقين للفلاتر المختارة</div>
 <% } else { %>
-  <div class="alert alert-secondary">اختر حصة من القائمة بالأعلى لعرض بيانات الطلاب</div>
+  <div class="alert alert-secondary">لا يوجد طلاب مسندين إليك حالياً</div>
 <% } %>
 
 <!-- قائمة الغائبين -->
