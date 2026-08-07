@@ -3898,10 +3898,23 @@ app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), async 
     const today = new Date().toISOString().slice(0, 10);
     if (today > assignment.end_date) return res.json({ success: false, message: '⚠️ انتهى وقت التسليم' });
 
-    // بنستقبل المسارات بس (مش ملفات) - الصور اتخزنت على Hostinger بالفعل
-    const { imagePaths, comment } = req.body;
-    if (!imagePaths || imagePaths.length === 0) {
-      return res.json({ success: false, message: 'مفيش صور مرفوعة' });
+    // بنستقبل المسارات بس (مش ملفات) - الصور/الـ PDF اتخزنت على Hostinger بالفعل
+    const { imagePaths, pdfPaths, pdfPath, attachments, comment } = req.body;
+
+    const normalizedImagePaths = Array.isArray(imagePaths)
+      ? imagePaths.filter(Boolean)
+      : (imagePaths ? [imagePaths] : []);
+    const normalizedPdfPaths = Array.isArray(pdfPaths)
+      ? pdfPaths.filter(Boolean)
+      : (pdfPath ? [pdfPath] : []);
+    const normalizedAttachmentPaths = Array.isArray(attachments)
+      ? attachments.filter(Boolean)
+      : (attachments ? [attachments] : []);
+
+    const submissionPaths = [...normalizedImagePaths, ...normalizedPdfPaths, ...normalizedAttachmentPaths].filter(Boolean);
+
+    if (submissionPaths.length === 0) {
+      return res.json({ success: false, message: 'مفيش ملفات مرفوعة' });
     }
 
     const existing = await HomeworkSubmission.findOne({
@@ -3910,7 +3923,7 @@ app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), async 
 
     if (existing) {
       const oldPaths = JSON.parse(existing.images || '[]');
-      existing.images = JSON.stringify([...oldPaths, ...imagePaths]);
+      existing.images = JSON.stringify([...oldPaths, ...submissionPaths]);
       existing.student_comment = comment || existing.student_comment;
       existing.status = 'submitted';
       await existing.save();
@@ -3918,7 +3931,7 @@ app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), async 
       await HomeworkSubmission.create({
         HomeworkAssignmentId: req.params.id,
         StudentId: student.id,
-        images: JSON.stringify(imagePaths),
+        images: JSON.stringify(submissionPaths),
         student_comment: comment || null,
         status: 'submitted',
       });
