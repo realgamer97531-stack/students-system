@@ -642,24 +642,52 @@ app.post('/settings/clear-videos', requireAdmin, async (req, res) => {
 // ===== Routes بتاعة الطلاب =====
 
 app.get('/students', requirePermission('students_view'), async (req, res) => {
-  const { search, center_id, subject_id } = req.query;
+  const { search, center_id, subject_id, booklet_remaining_only, low_balance_only } = req.query;
+  const showBookletRemainingOnly = booklet_remaining_only === '1' || booklet_remaining_only === 'on';
+  const showLowBalanceOnly = low_balance_only === '1' || low_balance_only === 'on';
 
   const where = {};
-  if (search) {
-    where[Op.or] = [
-      { name: { [Op.like]: `%${search}%` } },
-      { student_code: { [Op.like]: `%${search}%` } },
-      { phone: { [Op.like]: `%${search}%` } },
-    ];
-  }
   if (center_id) where.CenterId = center_id;
   if (subject_id) where.SubjectId = subject_id;
 
-  const students = await Student.findAll({
+  let students = await Student.findAll({
     where,
     include: [Center, Subject],
     order: [['createdAt', 'DESC']],
   });
+
+  const normalizedSearch = String(search || '').trim().toLowerCase();
+  const normalizedDigits = normalizedSearch.replace(/\D/g, '');
+
+  if (normalizedSearch) {
+    students = students.filter((student) => {
+      const searchableValues = [student.name, student.student_code, student.phone, student.parent_phone];
+      return searchableValues.some((value) => {
+        if (!value) return false;
+        const text = String(value).toLowerCase();
+        return text.includes(normalizedSearch) || (normalizedDigits && String(value).replace(/\D/g, '').includes(normalizedDigits));
+      });
+    });
+  }
+
+  if (showBookletRemainingOnly) {
+    const studentBooklets = await StudentBooklet.findAll({
+      where: { StudentId: students.map((student) => student.id) },
+      include: [Booklet],
+    });
+
+    const studentsWithBookletRemaining = new Set(
+      studentBooklets
+        .filter((studentBooklet) => getBookletRemainingAmount(studentBooklet.Booklet, studentBooklet) > 0)
+        .map((studentBooklet) => studentBooklet.StudentId)
+    );
+
+    students = students.filter((student) => studentsWithBookletRemaining.has(student.id));
+  }
+
+  if (showLowBalanceOnly) {
+    students = students.filter((student) => Number(student.balance || 0) <= 90);
+  }
 
   const centers = await Center.findAll();
   const subjects = await Subject.findAll();
@@ -668,7 +696,13 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
     students,
     centers,
     subjects,
-    filters: { search: search || '', center_id: center_id || '', subject_id: subject_id || '' },
+    filters: {
+      search: search || '',
+      center_id: center_id || '',
+      subject_id: subject_id || '',
+      booklet_remaining_only: showBookletRemainingOnly ? '1' : '',
+      low_balance_only: showLowBalanceOnly ? '1' : '',
+    },
   });
 });
 
@@ -681,24 +715,52 @@ app.get('/students/new', requirePermission('students_add'), async (req, res) => 
 // تصدير قائمة الطلاب (بنفس الفلتر المطبق) إلى إكسيل
 app.get('/students/export', async (req, res) => {
   try {
-    const { search, center_id, subject_id } = req.query;
+    const { search, center_id, subject_id, booklet_remaining_only, low_balance_only } = req.query;
+    const showBookletRemainingOnly = booklet_remaining_only === '1' || booklet_remaining_only === 'on';
+    const showLowBalanceOnly = low_balance_only === '1' || low_balance_only === 'on';
 
     const where = {};
-    if (search) {
-      where[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { student_code: { [Op.like]: `%${search}%` } },
-        { phone: { [Op.like]: `%${search}%` } },
-      ];
-    }
     if (center_id) where.CenterId = center_id;
     if (subject_id) where.SubjectId = subject_id;
 
-    const students = await Student.findAll({
+    let students = await Student.findAll({
       where,
       include: [Center, Subject],
       order: [['name', 'ASC']],
     });
+
+    const normalizedSearch = String(search || '').trim().toLowerCase();
+    const normalizedDigits = normalizedSearch.replace(/\D/g, '');
+
+    if (normalizedSearch) {
+      students = students.filter((student) => {
+        const searchableValues = [student.name, student.student_code, student.phone, student.parent_phone];
+        return searchableValues.some((value) => {
+          if (!value) return false;
+          const text = String(value).toLowerCase();
+          return text.includes(normalizedSearch) || (normalizedDigits && String(value).replace(/\D/g, '').includes(normalizedDigits));
+        });
+      });
+    }
+
+    if (showBookletRemainingOnly) {
+      const studentBooklets = await StudentBooklet.findAll({
+        where: { StudentId: students.map((student) => student.id) },
+        include: [Booklet],
+      });
+
+      const studentsWithBookletRemaining = new Set(
+        studentBooklets
+          .filter((studentBooklet) => getBookletRemainingAmount(studentBooklet.Booklet, studentBooklet) > 0)
+          .map((studentBooklet) => studentBooklet.StudentId)
+      );
+
+      students = students.filter((student) => studentsWithBookletRemaining.has(student.id));
+    }
+
+    if (showLowBalanceOnly) {
+      students = students.filter((student) => Number(student.balance || 0) <= 90);
+    }
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('الطلاب');

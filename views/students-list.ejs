@@ -111,7 +111,7 @@
   <div class="col-md-4">
     <input type="text" name="search" class="form-control" 
       placeholder="🔍 بحث بالاسم، الكود، أو التليفون"
-      value="<%= filters.search %>" title="Search by name, code, or phone">
+      value="<%= filters.search %>" title="Search by name, code, phone, or parent phone">
   </div>
   <div class="col-md-3">
     <select name="center_id" class="form-select">
@@ -144,6 +144,18 @@
       <span class="ar-only">بحث</span>
       <span class="en-only" style="display:none;">Search</span>
     </button>
+  </div>
+  <div class="col-12">
+    <div class="d-flex flex-wrap gap-3 mt-1">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="booklet_remaining_only" value="1" id="bookletRemainingOnly" <%= filters.booklet_remaining_only ? 'checked' : '' %>>
+        <label class="form-check-label small" for="bookletRemainingOnly">باقي له في البوكليت</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="low_balance_only" value="1" id="lowBalanceOnly" <%= filters.low_balance_only ? 'checked' : '' %>>
+        <label class="form-check-label small" for="lowBalanceOnly">رصيده 90 ج أو أقل</label>
+      </div>
+    </div>
   </div>
 </form>
 
