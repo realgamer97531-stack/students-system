@@ -762,32 +762,41 @@ app.get('/students/export', async (req, res) => {
       students = students.filter((student) => Number(student.balance || 0) <= 90);
     }
 
+    const studentBooklets = await StudentBooklet.findAll({
+      where: { StudentId: students.map(student => student.id) },
+    });
+
+    const bookletPaidTotals = {};
+    studentBooklets.forEach(studentBooklet => {
+      bookletPaidTotals[studentBooklet.StudentId] = (bookletPaidTotals[studentBooklet.StudentId] || 0) + Number(studentBooklet.paid_amount || 0);
+    });
+
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('الطلاب');
 
     sheet.columns = [
-      { header: 'الكود', key: 'code', width: 15 },
-      { header: 'الاسم', key: 'name', width: 25 },
-      { header: 'تليفون الطالب', key: 'phone', width: 18 },
-      { header: 'تليفون ولي الأمر', key: 'parent_phone', width: 18 },
-      { header: 'المادة', key: 'subject', width: 20 },
-      { header: 'السنتر', key: 'center', width: 20 },
-      { header: 'سعر الحصة', key: 'price', width: 12 },
-      { header: 'الرصيد', key: 'balance', width: 12 },
-      { header: 'البوكليت', key: 'booklet', width: 12 },
+      { header: 'id', key: 'id', width: 12 },
+      { header: 'name', key: 'name', width: 25 },
+      { header: 'phone', key: 'phone', width: 18 },
+      { header: 'parent phone', key: 'parent_phone', width: 18 },
+      { header: 'center', key: 'center', width: 20 },
+      { header: 'subject', key: 'subject', width: 20 },
+      { header: 'balance', key: 'balance', width: 12 },
+      { header: 'booklet paid balance', key: 'booklet_paid_balance', width: 20 },
+      { header: 'price of his session', key: 'price', width: 18 },
     ];
 
     students.forEach(s => {
       sheet.addRow({
-        code: s.student_code,
+        id: s.id,
         name: s.name,
         phone: s.phone,
         parent_phone: s.parent_phone,
-        subject: s.Subject ? s.Subject.name : '-',
         center: s.Center ? s.Center.name : '-',
-        price: s.price_per_session,
+        subject: s.Subject ? s.Subject.name : '-',
         balance: s.balance,
-        booklet: s.booklet_status ? 'تم الشراء' : 'لسه',
+        booklet_paid_balance: bookletPaidTotals[s.id] || 0,
+        price: s.price_per_session,
       });
     });
 
