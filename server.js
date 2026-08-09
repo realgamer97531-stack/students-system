@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const session = require('express-session');
 const sequelize = require('./config/database');
-const { Op } = require('sequelize');
+const { Op, QueryTypes } = require('sequelize');
 const https = require('https');
 const fs = require('fs');
 const qrcodeTerminal = require('qrcode-terminal');
@@ -522,66 +522,138 @@ app.use((req, res, next) => {
   next();
 });
 
+function escapeSqlValue(value) {
+  if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  if (value instanceof Date) return `'${value.toISOString().replace(/'/g, "\\'")}'`;
+  const normalized = String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `'${normalized}'`;
+}
+
+function splitSqlStatements(sql) {
+  const statements = [];
+  let current = '';
+  let quote = null;
+  let escapeNext = false;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+
+    if (quote) {
+      current += ch;
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      if (ch === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (ch === '\'' || ch === '"' || ch === '`') {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+
+    if (ch === ';') {
+      const statement = current.trim();
+      if (statement) statements.push(statement);
+      current = '';
+      continue;
+    }
+
+    current += ch;
+  }
+
+  const tail = current.trim();
+  if (tail) statements.push(tail);
+
+  return statements;
+}
+
+async function exportDatabaseSql() {
+  const databaseName = process.env.DB_NAME;
+  const tables = await sequelize.query(
+    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME',
+    { replacements: [databaseName], type: QueryTypes.SELECT }
+  );
+
+  const statements = [];
+
+  for (const tableRow of tables) {
+    const tableName = tableRow.TABLE_NAME;
+    const createResult = await sequelize.query(`SHOW CREATE TABLE \`${tableName}\``, { type: QueryTypes.SELECT });
+    const createSql = createResult[0] && (createResult[0]['Create Table'] || createResult[0]['Create table']);
+    if (createSql) {
+      statements.push(`${createSql};`);
+    }
+
+    const rows = await sequelize.query(`SELECT * FROM \`${tableName}\``, { type: QueryTypes.SELECT });
+    if (!rows.length) continue;
+
+    const columns = Object.keys(rows[0]);
+    if (!columns.length) continue;
+
+    for (const row of rows) {
+      const values = columns.map((column) => escapeSqlValue(row[column]));
+      statements.push(`INSERT INTO \`${tableName}\` (\`${columns.join('`, `')}\`) VALUES (${values.join(', ')});`);
+    }
+  }
+
+  return statements.join('\n');
+}
+
+async function importDatabaseSql(sqlText) {
+  const statements = splitSqlStatements(sqlText);
+  if (!statements.length) {
+    throw new Error('ملف النسخة الاحتياطية فارغ');
+  }
+
+  await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+  try {
+    for (const statement of statements) {
+      await sequelize.query(statement);
+    }
+  } finally {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  }
+}
+
 // ===== Settings Route =====
 app.get('/settings', requireAdmin, (req, res) => {
   res.render('settings');
 });
 
-app.get('/settings/export-database', requireAdmin, (req, res) => {
+app.get('/settings/export-database', requireAdmin, async (req, res) => {
   try {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `database_backup_${timestamp}.sql`;
-    const backupsDir = path.join(__dirname, 'backups');
-    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
-
-    const filePath = path.join(backupsDir, fileName);
-    const passwordArg = process.env.DB_PASSWORD ? `-p${process.env.DB_PASSWORD}` : '';
-    const command = `mysqldump -u ${process.env.DB_USER} ${passwordArg} ${process.env.DB_NAME} > "${filePath}"`;
-
-    exec(command, (error) => {
-      if (error) {
-        console.error('❌ فشل تصدير قاعدة البيانات:', error.message);
-        return res.status(500).render('settings', { errorMessage: 'فشل تصدير قاعدة البيانات' });
-      }
-
-      res.download(filePath, fileName, (downloadError) => {
-        if (downloadError) {
-          console.error('❌ فشل تحميل ملف النسخة الاحتياطية:', downloadError.message);
-        }
-
-        fs.unlink(filePath, () => {});
-      });
-    });
+    const filename = `database_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.sql`;
+    const sql = await exportDatabaseSql();
+    res.setHeader('Content-Type', 'application/sql');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(sql);
   } catch (error) {
-    console.error(error);
-    res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء تصدير قاعدة البيانات' });
+    console.error('❌ فشل تصدير قاعدة البيانات:', error.message);
+    res.status(500).render('settings', { errorMessage: 'فشل تصدير قاعدة البيانات' });
   }
 });
 
-app.post('/settings/import-database', requireAdmin, databaseBackupUpload.single('database_file'), (req, res) => {
+app.post('/settings/import-database', requireAdmin, databaseBackupUpload.single('database_file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).render('settings', { errorMessage: 'يرجى اختيار ملف النسخة الاحتياطية' });
     }
 
-    const tempFilePath = path.join(__dirname, 'backups', `restore_tmp_${Date.now()}.sql`);
-    fs.writeFileSync(tempFilePath, req.file.buffer);
-
-    const passwordArg = process.env.DB_PASSWORD ? `-p${process.env.DB_PASSWORD}` : '';
-    const command = `mysql -u ${process.env.DB_USER} ${passwordArg} ${process.env.DB_NAME} < "${tempFilePath}"`;
-
-    exec(command, (error) => {
-      fs.unlink(tempFilePath, () => {});
-
-      if (error) {
-        console.error('❌ فشل استيراد قاعدة البيانات:', error.message);
-        return res.status(500).render('settings', { errorMessage: 'فشل استيراد قاعدة البيانات' });
-      }
-
-      res.render('settings', { successMessage: 'تم استيراد قاعدة البيانات بنجاح' });
-    });
+    const sqlText = req.file.buffer.toString('utf8');
+    await importDatabaseSql(sqlText);
+    res.render('settings', { successMessage: 'تم استيراد قاعدة البيانات بنجاح' });
   } catch (error) {
-    console.error(error);
+    console.error('❌ فشل استيراد قاعدة البيانات:', error.message);
     res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء استيراد قاعدة البيانات' });
   }
 });
