@@ -5232,12 +5232,18 @@ app.post('/students/:studentId/booklet-custom-price', requireAdmin, async (req, 
 // (moved earlier to avoid matching by /students/:id)
 
 // رفع وتحليل الملف
+function normalizeBulkPhone(value) {
+  const str = value === undefined || value === null ? '' : String(value).trim();
+  if (!str) return '';
+  return str.startsWith('0') ? str : `0${str}`;
+}
+
 function normalizeBulkRow(raw) {
   const getString = value => (value === undefined || value === null ? '' : String(value).trim());
   return {
     name: getString(raw.name),
-    phone: getString(raw.phone),
-    parent_phone: getString(raw.parent_phone),
+    phone: normalizeBulkPhone(raw.phone),
+    parent_phone: normalizeBulkPhone(raw.parent_phone),
     subject_name: getString(raw.subject_name),
     center_name: getString(raw.center_name),
     price_per_session: getString(raw.price_per_session),
