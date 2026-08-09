@@ -50,6 +50,7 @@ const FollowUpAssignment = require('./models/FollowUpAssignment');
 const SessionComment = require('./models/SessionComment');
 const XLSX = require('xlsx');
 const bulkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const databaseBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 const VideoSession = require('./models/VideoSession');
 const VideoStudentAccess = require('./models/VideoStudentAccess');
@@ -524,6 +525,65 @@ app.use((req, res, next) => {
 // ===== Settings Route =====
 app.get('/settings', requireAdmin, (req, res) => {
   res.render('settings');
+});
+
+app.get('/settings/export-database', requireAdmin, (req, res) => {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `database_backup_${timestamp}.sql`;
+    const backupsDir = path.join(__dirname, 'backups');
+    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+
+    const filePath = path.join(backupsDir, fileName);
+    const passwordArg = process.env.DB_PASSWORD ? `-p${process.env.DB_PASSWORD}` : '';
+    const command = `mysqldump -u ${process.env.DB_USER} ${passwordArg} ${process.env.DB_NAME} > "${filePath}"`;
+
+    exec(command, (error) => {
+      if (error) {
+        console.error('❌ فشل تصدير قاعدة البيانات:', error.message);
+        return res.status(500).render('settings', { errorMessage: 'فشل تصدير قاعدة البيانات' });
+      }
+
+      res.download(filePath, fileName, (downloadError) => {
+        if (downloadError) {
+          console.error('❌ فشل تحميل ملف النسخة الاحتياطية:', downloadError.message);
+        }
+
+        fs.unlink(filePath, () => {});
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء تصدير قاعدة البيانات' });
+  }
+});
+
+app.post('/settings/import-database', requireAdmin, databaseBackupUpload.single('database_file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).render('settings', { errorMessage: 'يرجى اختيار ملف النسخة الاحتياطية' });
+    }
+
+    const tempFilePath = path.join(__dirname, 'backups', `restore_tmp_${Date.now()}.sql`);
+    fs.writeFileSync(tempFilePath, req.file.buffer);
+
+    const passwordArg = process.env.DB_PASSWORD ? `-p${process.env.DB_PASSWORD}` : '';
+    const command = `mysql -u ${process.env.DB_USER} ${passwordArg} ${process.env.DB_NAME} < "${tempFilePath}"`;
+
+    exec(command, (error) => {
+      fs.unlink(tempFilePath, () => {});
+
+      if (error) {
+        console.error('❌ فشل استيراد قاعدة البيانات:', error.message);
+        return res.status(500).render('settings', { errorMessage: 'فشل استيراد قاعدة البيانات' });
+      }
+
+      res.render('settings', { successMessage: 'تم استيراد قاعدة البيانات بنجاح' });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).render('settings', { errorMessage: 'حدث خطأ أثناء استيراد قاعدة البيانات' });
+  }
 });
 
 async function verifyAdminPassword(userId, password) {
