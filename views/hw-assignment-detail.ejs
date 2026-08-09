@@ -66,27 +66,40 @@
               <%= statusLabels[sub.status] %>
             </span>
           </div>
+          <% const submissionPaths = JSON.parse(sub.images || '[]'); %>
           <p class="small text-muted mb-1">
             🎓 <%= sub.Student.Subject ? sub.Student.Subject.name : '-' %> | <%= sub.Student.Center ? sub.Student.Center.name : '-' %><br>
             🔖 <%= sub.Student.student_code %><br>
-            📸 <%= JSON.parse(sub.images || '[]').length %> صورة | 
+            📁 <%= submissionPaths.length %> ملف
+            <% if (submissionPaths.length === 1) { %>مرفق<% } else { %>مرفقات<% } %> | 
             🕐 <%= new Date(sub.createdAt).toLocaleString('ar-EG') %>
           </p>
           <% if (sub.student_comment) { %>
             <p class="small bg-light rounded p-2 mb-2">💬 <%= sub.student_comment %></p>
           <% } %>
 
-          <!-- عرض الصور -->
+          <!-- عرض الملفات -->
           <div class="d-flex flex-wrap gap-1 mb-3">
-            <% JSON.parse(sub.images || '[]').forEach((img, i) => { %>
-              <%
-  const PLATFORM = 'https://shadyelsharkawy.com';
-  const ALT_PLATFORM = 'https://shadyelsharkawy.com/';
-  const imgUrl = img.startsWith('http') ? img : PLATFORM + '/' + img;
-  const altImgUrl = img.startsWith('http') ? img : ALT_PLATFORM + '/' + img;
-%>
-<img src="<%= imgUrl %>" data-alt-src="<%= altImgUrl %>" onclick="openImg('<%= imgUrl %>')"
-                style="width:60px;height:60px;object-fit:cover;border-radius:8px;cursor:pointer;">
+            <% submissionPaths.forEach((filePath) => {
+                 const PLATFORM = 'https://shadyelsharkawy.com';
+                 const displayUrl = filePath.startsWith('http') ? filePath : PLATFORM + '/' + filePath;
+                 const isImage = /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(filePath);
+                 const isPdf = /\.pdf(\?.*)?$/i.test(filePath);
+            %>
+              <% if (isImage) { %>
+                <img src="<%= displayUrl %>" onclick="openImg('<%= displayUrl %>')"
+                  style="width:60px;height:60px;object-fit:cover;border-radius:8px;cursor:pointer;" />
+              <% } else if (isPdf) { %>
+                <a href="<%= displayUrl %>" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center"
+                  style="width:60px;height:60px;background:#F8FAFC;color:#0F172A;text-decoration:none;font-size:0.78rem;">
+                  📄<br><span style="font-size:0.65rem;line-height:1.1;"><%= filePath.split('/').pop() %></span>
+                </a>
+              <% } else { %>
+                <a href="<%= displayUrl %>" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center"
+                  style="width:60px;height:60px;background:#F8FAFC;color:#0F172A;text-decoration:none;font-size:0.78rem;">
+                  🔗<br><span style="font-size:0.65rem;line-height:1.1;">فتح</span>
+                </a>
+              <% } %>
             <% }) %>
           </div>
 
