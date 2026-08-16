@@ -273,6 +273,7 @@ async function ensureStudentBookletPlaceholder(student, booklets = null) {
       StudentId: student.id,
       BookletId: defaultBooklet.id,
       paid_amount: 0,
+      custom_price: defaultBooklet.sell_price,
     });
   }
 }
@@ -285,8 +286,15 @@ async function markDefaultBookletDelivered(student) {
   const defaultBooklet = booklets[0];
   const [sb] = await StudentBooklet.findOrCreate({
     where: { StudentId: student.id, BookletId: defaultBooklet.id },
-    defaults: { paid_amount: 0 },
+    defaults: {
+      paid_amount: 0,
+      custom_price: defaultBooklet.sell_price,
+    },
   });
+
+  if (sb.custom_price === null || sb.custom_price === undefined) {
+    sb.custom_price = defaultBooklet.sell_price;
+  }
 
   sb.is_delivered = true;
   sb.delivered_at = new Date();
@@ -4566,10 +4574,19 @@ app.post('/students/:studentId/booklet-payment', requireAdmin, async (req, res) 
     const existing = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: booklet_id } });
     if (existing) {
       existing.paid_amount += parseFloat(paid_amount);
+      if (existing.custom_price === null || existing.custom_price === undefined) {
+        existing.custom_price = booklet.sell_price;
+      }
       existing.notes = notes || existing.notes;
       await existing.save();
     } else {
-      await StudentBooklet.create({ StudentId: student.id, BookletId: booklet_id, paid_amount: parseFloat(paid_amount), notes });
+      await StudentBooklet.create({
+        StudentId: student.id,
+        BookletId: booklet_id,
+        paid_amount: parseFloat(paid_amount),
+        custom_price: booklet.sell_price,
+        notes,
+      });
     }
 
     if (!student.booklet_status) {
@@ -5441,6 +5458,7 @@ async function createStudentFromBulkRow(row, userId) {
         StudentId: student.id,
         BookletId: booklet.id,
         paid_amount: parseFloat(row.booklet_paid),
+        custom_price: booklet.sell_price,
       });
       student.booklet_status = true;
       await student.save();
