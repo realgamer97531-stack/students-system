@@ -170,6 +170,7 @@
         <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
         <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
         <th><span class="ar-only">السعر</span><span class="en-only" style="display:none;">Price</span></th>
+        <th><span class="ar-only">المدفوع للبوكليت</span><span class="en-only" style="display:none;">Paid Booklet</span></th>
         <th><span class="ar-only">الرصيد</span><span class="en-only" style="display:none;">Balance</span></th>
         <th><span class="ar-only">البوكليت</span><span class="en-only" style="display:none;">Booklet</span></th>
       </tr>
@@ -184,6 +185,7 @@
           <td><%= student.Subject ? student.Subject.name : '-' %></td>
           <td><%= student.Center ? student.Center.name : '-' %></td>
           <td><%= student.price_per_session %> ج</td>
+          <td><%= typeof bookletPaidTotals !== 'undefined' ? (bookletPaidTotals[student.id] || 0) + ' ج' : '0 ج' %></td>
           <td><%= student.balance %> ج</td>
           <td>
             <% if (student.booklet_status) { %>
