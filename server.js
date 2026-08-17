@@ -832,10 +832,21 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
   const centers = await Center.findAll();
   const subjects = await Subject.findAll();
 
+  // Compute total paid amounts for booklets per student so the list view can show "Paid Price for the Current Booklet"
+  const studentBooklets = await StudentBooklet.findAll({
+    where: { StudentId: students.map(student => student.id) },
+  });
+
+  const bookletPaidTotals = {};
+  studentBooklets.forEach(studentBooklet => {
+    bookletPaidTotals[studentBooklet.StudentId] = (bookletPaidTotals[studentBooklet.StudentId] || 0) + Number(studentBooklet.paid_amount || 0);
+  });
+
   res.render('students-list', {
     students,
     centers,
     subjects,
+    bookletPaidTotals,
     filters: {
       search: search || '',
       center_id: center_id || '',
@@ -919,6 +930,7 @@ app.get('/students/export', async (req, res) => {
       { header: 'name', key: 'name', width: 25 },
       { header: 'phone', key: 'phone', width: 18 },
       { header: 'parent phone', key: 'parent_phone', width: 18 },
+      { header: 'has_comment', key: 'has_comment', width: 12 },
       { header: 'center', key: 'center', width: 20 },
       { header: 'subject', key: 'subject', width: 20 },
       { header: 'balance', key: 'balance', width: 12 },
@@ -932,6 +944,7 @@ app.get('/students/export', async (req, res) => {
         name: s.name,
         phone: s.phone,
         parent_phone: s.parent_phone,
+        has_comment: s.admin_note ? 'Yes' : 'No',
         center: s.Center ? s.Center.name : '-',
         subject: s.Subject ? s.Subject.name : '-',
         balance: s.balance,
