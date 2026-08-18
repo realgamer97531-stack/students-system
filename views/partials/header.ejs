@@ -66,11 +66,22 @@
 
     ::selection { background: var(--sf-primary); color: #fff; }
 
-    /* Slim, unobtrusive scrollbars */
-    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    /* Visible scrollbars with better colors */
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(120, 120, 160, 0.35); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(120, 120, 160, 0.55); }
+    ::-webkit-scrollbar-thumb { background: var(--sf-accent); border-radius: 10px; box-shadow: inset 0 0 0 3px var(--sf-bg); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--sf-primary); }
+    
+    /* Sidebar scrollbar on the right */
+    .sidebar::-webkit-scrollbar { width: 12px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--sf-accent); }
+    .sidebar::-webkit-scrollbar-thumb:hover { background: #FF6B6B; }
+    
+    /* Main content scrollbar on the left */
+    .main-content { direction: ltr; }
+    .main-content::-webkit-scrollbar { width: 12px; }
+    .main-content::-webkit-scrollbar-thumb { background: var(--sf-primary); }
+    .main-content::-webkit-scrollbar-thumb:hover { background: var(--sf-accent); }
 
     body {
       display: flex;
