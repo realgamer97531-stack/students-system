@@ -55,19 +55,30 @@
     color: var(--sf-muted) !important;
   }
 
-  /* Primary links matching your system accents */
-  .custom-adaptive-table td a {
-    color: var(--sf-primary) !important;
-    font-weight: 600;
-    text-decoration: none;
-  }
-  
-  [data-theme="dark"] .custom-adaptive-table td a {
-    color: #60a5fa !important; /* Slightly brighter blue for dark mode contrast */
+  /* Student row clickable styling */
+  .custom-adaptive-table tbody tr {
+    cursor: pointer;
   }
 
-  .custom-adaptive-table td a:hover {
-    text-decoration: underline;
+  .custom-adaptive-table tbody tr:hover {
+    background: var(--sf-primary-light) !important;
+    transform: translateX(-2px);
+  }
+
+  /* Student name styling - smooth and modern */
+  .student-name {
+    color: var(--sf-text) !important;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  
+  .student-name:hover {
+    color: var(--sf-primary) !important;
+  }
+
+  .custom-adaptive-table tbody tr:hover .student-name {
+    color: var(--sf-primary) !important;
   }
 
   /* Badge Customizations */
@@ -177,9 +188,9 @@
     </thead>
     <tbody>
       <% students.forEach(student => { %>
-        <tr>
+        <tr onclick="window.location.href='/students/<%= student.id %>'">
           <td><%= student.student_code %></td>
-          <td><a href="/students/<%= student.id %>"><%= student.name %></a></td>
+          <td><span class="student-name"><%= student.name %></span></td>
           <td><%= student.phone %></td>
           <td><%= student.parent_phone %></td>
           <td><%= student.Subject ? student.Subject.name : '-' %></td>
@@ -201,7 +212,7 @@
             <% } %>
             <% if (userRole === 'admin') { %>
               <form action="/students/<%= student.id %>/delete" method="POST" class="d-inline ms-2"
-                onsubmit="return confirm('متأكد من حذف الطالب <%= student.name %>؟ سيتم حذف كل بياناته نهائياً.')">
+                onsubmit="event.stopPropagation(); return confirm('متأكد من حذف الطالب <%= student.name %>؟ سيتم حذف كل بياناته نهائياً.')">
                 <button class="btn btn-sm btn-outline-danger">🗑 حذف</button>
               </form>
             <% } %>
