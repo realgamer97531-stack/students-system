@@ -663,7 +663,7 @@ span.text-muted {
       <div class="sf-logo-mark">S</div>
       <div class="sf-logo-text">Study<span>is</span>funny</div>
     </div>
-    <% if (userProfilePhoto) { %>
+    <% if (typeof userProfilePhoto !== 'undefined' && userProfilePhoto) { %>
       <a href="/user/profile" style="text-decoration: none; display: block; text-align: center;">
         <img src="<%= userProfilePhoto %>" alt="<%= userName %>" class="user-avatar" title="<span class='ar-only'>الذهاب لملفك الشخصي</span><span class='en-only' style='display:none;'>Go to profile</span>">
       </a>
@@ -682,7 +682,7 @@ span.text-muted {
       <span class="en-only" style="display:none;">Students</span>
     </div>
 
-    <% function canShow(key) { return userRole === 'admin' || userPermissions.includes(key); } %>
+    <% function canShow(key) { return userRole === 'admin' || (Array.isArray(userPermissions) && userPermissions.includes(key)); } %>
 
     <% if (canShow('students_view')) { %>
       <a href="/students">

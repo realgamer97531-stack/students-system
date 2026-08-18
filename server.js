@@ -482,9 +482,10 @@ app.use(requireLogin);
 
 // إتاحة بيانات المستخدم تلقائيًا في كل صفحة EJS
 app.use(async (req, res, next) => {
-  res.locals.userName = req.session.userName;
-  res.locals.userRole = req.session.userRole;
-  
+  res.locals.userName = req.session.userName || null;
+  res.locals.userRole = req.session.userRole || null;
+  res.locals.userProfilePhoto = null;
+
   // Fetch user profile photo if logged in
   if (req.session.userId) {
     try {
@@ -496,7 +497,7 @@ app.use(async (req, res, next) => {
       console.error('Error fetching user profile photo:', e);
     }
   }
-  
+
   next();
 });
 
@@ -561,7 +562,7 @@ function requirePermissionOrAdmin(key) {
 
 // إتاحة الصلاحيات وقائمتها لكل صفحة EJS (للسايد بار)
 app.use((req, res, next) => {
-  res.locals.userPermissions = req.session.userPermissions || [];
+  res.locals.userPermissions = Array.isArray(req.session.userPermissions) ? req.session.userPermissions : [];
   res.locals.PERMISSIONS_LIST = PERMISSIONS_LIST;
   next();
 });
