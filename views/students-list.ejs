@@ -44,15 +44,44 @@
     padding: 12px 8px !important;
   }
 
-  /* Secondary data dimming for better visual hierarchy */
-  .custom-adaptive-table td:nth-child(1), /* Code */
-  .custom-adaptive-table td:nth-child(3), /* Student Phone */
-  .custom-adaptive-table td:nth-child(4), /* Parent Phone */
-  .custom-adaptive-table td:nth-child(5), /* Subject */
-  .custom-adaptive-table td:nth-child(6), /* Center */
-  .custom-adaptive-table td:nth-child(7), /* Price */
-  .custom-adaptive-table td:nth-child(8)  /* Balance */ {
+  /* Code column - no wrapping */
+  .custom-adaptive-table td:nth-child(2) {
+    white-space: nowrap;
     color: var(--sf-muted) !important;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+  }
+
+  /* Secondary data dimming for better visual hierarchy */
+  .custom-adaptive-table td:nth-child(4), /* Student Phone */
+  .custom-adaptive-table td:nth-child(5), /* Parent Phone */
+  .custom-adaptive-table td:nth-child(6), /* Subject */
+  .custom-adaptive-table td:nth-child(7), /* Center */
+  .custom-adaptive-table td:nth-child(8), /* Price */
+  .custom-adaptive-table td:nth-child(9)  /* Balance */ {
+    color: var(--sf-muted) !important;
+  }
+
+  /* Profile photo styling */
+  .student-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 2px solid var(--sf-primary-light);
+    display: block;
+  }
+
+  .student-photo-placeholder {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--sf-primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    border: 2px solid var(--sf-input-border);
   }
 
   /* Student row clickable styling */
@@ -174,6 +203,7 @@
   <table class="table custom-adaptive-table align-middle m-0">
     <thead>
       <tr>
+        <th style="width: 80px;"><span class="ar-only">الصورة</span><span class="en-only" style="display:none;">Photo</span></th>
         <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
         <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
         <th><span class="ar-only">تليفون الطالب</span><span class="en-only" style="display:none;">Student Phone</span></th>
@@ -189,6 +219,13 @@
     <tbody>
       <% students.forEach(student => { %>
         <tr onclick="window.location.href='/students/<%= student.id %>'">
+          <td style="padding: 8px !important;">
+            <% if (student.profile_photo_url) { %>
+              <img src="<%= student.profile_photo_url %>" alt="<%= student.name %>" class="student-photo" loading="lazy">
+            <% } else { %>
+              <div class="student-photo-placeholder">👤</div>
+            <% } %>
+          </td>
           <td><%= student.student_code %></td>
           <td><span class="student-name"><%= student.name %></span></td>
           <td><%= student.phone %></td>
