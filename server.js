@@ -4618,6 +4618,64 @@ app.post('/students/:studentId/booklet-payment', requireAdmin, async (req, res) 
   } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
 });
 
+app.post('/students/:studentId/booklet-edit-paid', requireAdmin, async (req, res) => {
+  try {
+    const { booklet_id, paid_amount, notes } = req.body;
+    const student = await Student.findByPk(req.params.studentId);
+    const booklet = await Booklet.findByPk(booklet_id);
+    if (!student || !booklet) return res.status(404).send('❌');
+
+    const newPaidAmount = parseFloat(paid_amount) || 0;
+    const existing = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: booklet_id } });
+    
+    if (existing) {
+      const oldPaidAmount = existing.paid_amount;
+      const difference = newPaidAmount - oldPaidAmount;
+      
+      existing.paid_amount = newPaidAmount;
+      if (existing.custom_price === null || existing.custom_price === undefined) {
+        existing.custom_price = booklet.sell_price;
+      }
+      existing.notes = notes ? `${existing.notes ? existing.notes + ' | ' : ''}تعديل: ${notes}` : existing.notes;
+      await existing.save();
+
+      // Create a transaction record for the change
+      const transactionReason = notes 
+        ? `تعديل مبلغ بوكليت (${booklet.name}): ${notes}`
+        : `تعديل مبلغ بوكليت: ${booklet.name}`;
+      
+      await BalanceTransaction.create({
+        StudentId: student.id,
+        amount: difference,
+        reason: transactionReason,
+        UserId: req.session.userId,
+      });
+    } else {
+      await StudentBooklet.create({
+        StudentId: student.id,
+        BookletId: booklet_id,
+        paid_amount: newPaidAmount,
+        custom_price: booklet.sell_price,
+        notes: notes ? `تعديل: ${notes}` : null,
+      });
+
+      await BalanceTransaction.create({
+        StudentId: student.id,
+        amount: newPaidAmount,
+        reason: notes ? `تعديل بوكليت (${booklet.name}): ${notes}` : `تعديل بوكليت: ${booklet.name}`,
+        UserId: req.session.userId,
+      });
+    }
+
+    if (!student.booklet_status) {
+      student.booklet_status = true;
+      await student.save();
+    }
+
+    res.redirect('/students/' + req.params.studentId);
+  } catch (e) { console.error(e); res.status(500).send('❌ ' + e.message); }
+});
+
 app.post('/students/:studentId/booklet-deliver/:sbId', requireAdmin, async (req, res) => {
   const sb = await StudentBooklet.findByPk(req.params.sbId);
   if (sb) {
