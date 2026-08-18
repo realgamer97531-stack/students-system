@@ -207,6 +207,25 @@ async function ensureHomeworkAssignmentShowForAllColumn() {
   }
 }
 
+async function ensureUserProfilePhotoColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('users');
+    if (!tableInfo.profile_photo_url) {
+      await queryInterface.addColumn('users', 'profile_photo_url', {
+        type: sequelize.Sequelize.STRING,
+        allowNull: true,
+      });
+      console.log('✅ Added profile_photo_url column to users table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure users.profile_photo_url column:', error.message);
+  }
+}
+
 async function connectWithRetry(maxAttempts = 5, delayMs = 5000) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -350,6 +369,10 @@ app.use(cors({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Middleware for file uploads
+const fileUpload = require('express-fileupload');
+app.use(fileUpload());
+
 // عشان نقدر نستخدم ملفات CSS / JS / صور من فولدر public
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -458,9 +481,22 @@ function requireLogin(req, res, next) {
 app.use(requireLogin);
 
 // إتاحة بيانات المستخدم تلقائيًا في كل صفحة EJS
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   res.locals.userName = req.session.userName;
   res.locals.userRole = req.session.userRole;
+  
+  // Fetch user profile photo if logged in
+  if (req.session.userId) {
+    try {
+      const user = await User.findByPk(req.session.userId);
+      if (user && user.profile_photo_url) {
+        res.locals.userProfilePhoto = user.profile_photo_url;
+      }
+    } catch (e) {
+      console.error('Error fetching user profile photo:', e);
+    }
+  }
+  
   next();
 });
 
@@ -5684,8 +5720,80 @@ app.post('/api/portal/student/profile-photo', verifyPortalToken('student'), asyn
   }
 });
 
+// User Profile Page
+app.get('/user/profile', requireLogin, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.session.userId);
+    if (!user) return res.status(404).send('User not found');
+    
+    res.render('user-profile', { 
+      user,
+      profilePhotoUrl: user.profile_photo_url || null
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('Error loading profile');
+  }
+});
 
+// User Profile Photo Upload
+app.post('/user/profile-photo', requireLogin, async (req, res) => {
+  try {
+    if (!req.files || !req.files.photo) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
 
+    const file = req.files.photo;
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    
+    if (!allowedMimes.includes(file.mimetype)) {
+      return res.status(400).json({ success: false, message: 'Invalid file type. Only JPEG, PNG, and WebP are allowed.' });
+    }
+
+    if (file.size > maxFileSize) {
+      return res.status(400).json({ success: false, message: 'File size exceeds 5MB limit' });
+    }
+
+    // Upload to Cloudinary
+    const stream = cloudinary.uploader.upload_stream(
+      { 
+        folder: 'studyisfunny/user-profiles',
+        resource_type: 'auto',
+        quality: 'auto:best'
+      },
+      async (error, result) => {
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          return res.status(500).json({ success: false, message: 'Upload failed' });
+        }
+
+        try {
+          // Save photo URL to user
+          await User.update(
+            { profile_photo_url: result.secure_url },
+            { where: { id: req.session.userId } }
+          );
+
+          res.json({ 
+            success: true, 
+            photoUrl: result.secure_url,
+            message: 'تم تحديث صورة الملف الشخصي بنجاح'
+          });
+        } catch (e) {
+          console.error(e);
+          res.status(500).json({ success: false, message: 'Database error' });
+        }
+      }
+    );
+
+    const bufferStream = require('stream').Readable.from(file.data);
+    bufferStream.pipe(stream);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 async function startServer() {
   // Attempt initial DB connection; if it fails, still start the HTTP server
@@ -5698,6 +5806,7 @@ async function startServer() {
     await ensureUserPhoneColumn();
     await ensureStudentBookletCustomPriceColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
+    await ensureUserProfilePhotoColumn();
     await ensureBookletReservationSchema(sequelize);
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
@@ -5740,6 +5849,7 @@ async function startServer() {
           await RechargeCode.sync();
           await ensureUserPhoneColumn();
           await ensureStudentBookletCustomPriceColumn();
+          await ensureUserProfilePhotoColumn();
           await ensureBookletReservationSchema(sequelize);
           console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
           break;

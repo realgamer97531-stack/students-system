@@ -1,0 +1,319 @@
+<%- include('partials/header') %>
+
+<style>
+  .profile-container {
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .profile-photo-section {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .profile-photo {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--sf-primary);
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .profile-photo-placeholder {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: var(--sf-primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    margin: 0 auto 20px;
+    border: 4px solid var(--sf-primary);
+  }
+
+  .upload-area {
+    border: 2px dashed var(--sf-primary);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    background: var(--sf-primary-light);
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .upload-area:hover {
+    border-color: var(--sf-accent);
+    background: rgba(20, 184, 166, 0.1);
+  }
+
+  .upload-area.drag-over {
+    border-color: var(--sf-accent);
+    background: rgba(20, 184, 166, 0.2);
+  }
+
+  .upload-area input[type="file"] {
+    display: none;
+  }
+
+  .upload-text {
+    color: var(--sf-muted);
+    font-size: 0.9rem;
+    margin: 10px 0 0 0;
+  }
+
+  .file-name {
+    color: var(--sf-primary);
+    font-weight: 600;
+    margin-top: 10px;
+  }
+
+  .upload-button {
+    width: 100%;
+    margin-top: 15px;
+  }
+
+  .profile-info {
+    background: var(--sf-card-bg);
+    border: 1px solid var(--sf-input-border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--sf-input-border);
+  }
+
+  .info-item:last-child {
+    border-bottom: none;
+  }
+
+  .info-label {
+    color: var(--sf-muted);
+    font-weight: 600;
+  }
+
+  .info-value {
+    color: var(--sf-text);
+    font-weight: 500;
+  }
+
+  .success-message {
+    display: none;
+    background: rgba(20, 184, 166, 0.1);
+    border: 1px solid var(--sf-accent);
+    color: var(--sf-accent);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+
+  .success-message.show {
+    display: block;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--sf-primary);
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<div class="profile-container">
+  <!-- Header -->
+  <div class="mb-4">
+    <h3><span class="ar-only">👤 ملفي الشخصي</span><span class="en-only" style="display:none;">👤 My Profile</span></h3>
+    <p class="text-muted"><span class="ar-only">أدر معلومات حسابك وصورتك الشخصية</span><span class="en-only" style="display:none;">Manage your account and profile photo</span></p>
+  </div>
+
+  <!-- Success Message -->
+  <div id="successMessage" class="success-message">
+    <span id="successText">✓ تم تحديث الصورة بنجاح</span>
+  </div>
+
+  <!-- Profile Info -->
+  <div class="profile-info">
+    <div class="info-item">
+      <span class="info-label"><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></span>
+      <span class="info-value"><%= user.name %></span>
+    </div>
+    <div class="info-item">
+      <span class="info-label"><span class="ar-only">اسم المستخدم</span><span class="en-only" style="display:none;">Username</span></span>
+      <span class="info-value"><%= user.username %></span>
+    </div>
+    <div class="info-item">
+      <span class="info-label"><span class="ar-only">الدور</span><span class="en-only" style="display:none;">Role</span></span>
+      <span class="info-value">
+        <% if (user.role === 'admin') { %>
+          <span class="badge bg-danger">مدير النظام</span>
+        <% } else { %>
+          <span class="badge bg-primary">أسيستانت</span>
+        <% } %>
+      </span>
+    </div>
+    <% if (user.phone) { %>
+      <div class="info-item">
+        <span class="info-label"><span class="ar-only">الهاتف</span><span class="en-only" style="display:none;">Phone</span></span>
+        <span class="info-value"><%= user.phone %></span>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Profile Photo Section -->
+  <div class="profile-photo-section">
+    <div id="photoPreview">
+      <% if (profilePhotoUrl) { %>
+        <img src="<%= profilePhotoUrl %>" alt="<%= user.name %>" class="profile-photo">
+      <% } else { %>
+        <div class="profile-photo-placeholder">👤</div>
+      <% } %>
+    </div>
+
+    <!-- Upload Area -->
+    <form id="photoForm" class="upload-area" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+      <input type="file" id="photoInput" name="photo" accept="image/jpeg,image/png,image/webp" onchange="previewPhoto(event)">
+      <div>
+        <span class="ar-only">📸 اضغط أو اسحب صورة هنا</span>
+        <span class="en-only" style="display:none;">📸 Click or drag photo here</span>
+      </div>
+      <div class="upload-text">
+        <span class="ar-only">الصيغ المدعومة: JPG, PNG, WebP (أقصى حجم: 5MB)</span>
+        <span class="en-only" style="display:none;">Supported formats: JPG, PNG, WebP (Max size: 5MB)</span>
+      </div>
+      <div id="fileName" class="file-name"></div>
+    </form>
+
+    <button type="button" id="uploadBtn" class="btn btn-primary upload-button" onclick="uploadPhoto()" style="display:none;">
+      <span class="ar-only">رفع الصورة</span>
+      <span class="en-only" style="display:none;">Upload Photo</span>
+    </button>
+  </div>
+</div>
+
+<script>
+  let selectedFile = null;
+
+  function previewPhoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('<span class="ar-only">حجم الملف كبير جداً (أقصى حد: 5MB)</span><span class="en-only" style="display:none;">File is too large (Max: 5MB)</span>');
+      return;
+    }
+
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      document.getElementById('photoPreview').innerHTML = `<img src="${e.target.result}" alt="Preview" class="profile-photo">`;
+    };
+    reader.readAsDataURL(file);
+
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('uploadBtn').style.display = 'block';
+  }
+
+  function handleDragOver(event) {
+    event.preventDefault();
+    document.getElementById('photoForm').classList.add('drag-over');
+  }
+
+  function handleDragLeave(event) {
+    event.preventDefault();
+    document.getElementById('photoForm').classList.remove('drag-over');
+  }
+
+  function handleDrop(event) {
+    event.preventDefault();
+    document.getElementById('photoForm').classList.remove('drag-over');
+    
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      document.getElementById('photoInput').files = files;
+      previewPhoto({ target: { files } });
+    }
+  }
+
+  async function uploadPhoto() {
+    if (!selectedFile) {
+      alert('<span class="ar-only">يرجى اختيار صورة أولاً</span><span class="en-only" style="display:none;">Please select a photo first</span>');
+      return;
+    }
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.innerHTML = '<span class="loading-spinner"></span> جاري الرفع...';
+    uploadBtn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('photo', selectedFile);
+
+    try {
+      const response = await fetch('/user/profile-photo', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Show success message
+        const successMsg = document.getElementById('successMessage');
+        document.getElementById('successText').textContent = data.message || '✓ تم تحديث الصورة بنجاح';
+        successMsg.classList.add('show');
+        
+        setTimeout(() => {
+          successMsg.classList.remove('show');
+        }, 3000);
+
+        // Reset form
+        selectedFile = null;
+        document.getElementById('photoInput').value = '';
+        document.getElementById('fileName').textContent = '';
+        uploadBtn.style.display = 'none';
+      } else {
+        alert(data.message || 'حدث خطأ أثناء رفع الصورة');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('خطأ: ' + error.message);
+    } finally {
+      uploadBtn.innerHTML = originalText;
+      uploadBtn.disabled = false;
+    }
+  }
+
+  // Make upload area clickable
+  document.getElementById('photoForm').addEventListener('click', () => {
+    document.getElementById('photoInput').click();
+  });
+</script>
+
+<%- include('partials/footer') %>

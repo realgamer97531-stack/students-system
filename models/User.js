@@ -33,6 +33,10 @@ const User = sequelize.define('User', {
     type: DataTypes.TEXT,
     allowNull: true, // هنخزن فيه JSON array من أسماء الصلاحيات
   },
+  profile_photo_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 }, {
   tableName: 'users',
 });
