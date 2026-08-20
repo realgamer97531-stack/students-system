@@ -51,6 +51,7 @@ const SessionComment = require('./models/SessionComment');
 const XLSX = require('xlsx');
 const bulkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const databaseBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const profilePhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const VideoSession = require('./models/VideoSession');
 const VideoStudentAccess = require('./models/VideoStudentAccess');
@@ -368,10 +369,6 @@ app.use(cors({
 // Middleware عشان السيرفر يقدر يقرا بيانات الفورمز
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
-// Middleware for file uploads
-const fileUpload = require('express-fileupload');
-app.use(fileUpload());
 
 // عشان نقدر نستخدم ملفات CSS / JS / صور من فولدر public
 app.use(express.static(path.join(__dirname, 'public')));
@@ -5584,6 +5581,10 @@ async function createStudentFromBulkRow(row, userId) {
 
 app.post('/students/bulk-upload', requireAdmin, bulkUpload.single('excel_file'), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).send('يرجى اختيار ملف Excel');
+    }
+
     const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -5738,13 +5739,13 @@ app.get('/user/profile', requireLogin, async (req, res) => {
 });
 
 // User Profile Photo Upload
-app.post('/user/profile-photo', requireLogin, async (req, res) => {
+app.post('/user/profile-photo', requireLogin, profilePhotoUpload.single('photo'), async (req, res) => {
   try {
-    if (!req.files || !req.files.photo) {
+    if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const file = req.files.photo;
+    const file = req.file;
     const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
     const maxFileSize = 5 * 1024 * 1024; // 5MB
     
