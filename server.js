@@ -188,6 +188,25 @@ async function ensureStudentBookletCustomPriceColumn() {
   }
 }
 
+async function ensureBalanceTransactionSessionColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('balancetransactions');
+    if (!tableInfo.SessionId) {
+      await queryInterface.addColumn('balancetransactions', 'SessionId', {
+        type: sequelize.Sequelize.INTEGER,
+        allowNull: true,
+      });
+      console.log('✅ Added SessionId column to balancetransactions table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure balancetransactions.SessionId column:', error.message);
+  }
+}
+
 async function ensureHomeworkAssignmentShowForAllColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -352,6 +371,10 @@ function getEffectiveSessionPayment(attendance) {
   const manualAmount = parseFloat(attendance?.payment_collected || 0);
   const sessionFee = parseFloat(attendance?.Student?.price_per_session || 0);
   return Math.max(manualAmount, sessionFee);
+}
+
+function getActualSessionPayment(attendance) {
+  return parseFloat(attendance?.payment_collected || 0);
 }
 
 app.use(cors()); // يسمح لأي موقع يتواصل مع الـ API بتاعنا
@@ -1366,7 +1389,7 @@ app.post('/students', async (req, res) => {
         order: [['order_index', 'ASC']],
       });
       if (booklet) {
-        await processBookletPayments(student.id, [{ booklet_id: booklet.id, amount: paidAmount }], req.session.userId);
+        await processBookletPayments(student.id, [{ booklet_id: booklet.id, amount: paidAmount }], req.session.userId, register_attendance === 'on' ? req.session.activeSessionId : null);
       }
     } else if (shouldHaveBookletStatus) {
       await ensureStudentBookletPlaceholder(student);
@@ -1396,7 +1419,7 @@ app.post('/students', async (req, res) => {
               SessionId: sessionId,
               UserId: req.session.userId,
               comment: null,
-              payment_collected: student.price_per_session,
+              payment_collected: initialBalance,
             });
             await addPoints(student.id, 2);
             attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
@@ -1538,7 +1561,7 @@ app.get('/sessions/:id/report', async (req, res) => {
         attendanceUser: a.User ? a.User.name : '-',
         attendanceTime: a.attended_at,
         comment: a.comment,
-        payment: getEffectiveSessionPayment(a),
+        payment: getActualSessionPayment(a),
         homeworkStatus: hw ? hw.status : null,
         homeworkUser: hw ? hw.user : null,
         homeworkTime: hw ? hw.time : null,
@@ -1578,7 +1601,7 @@ app.get('/sessions/:id/report', async (req, res) => {
     }
 
     const totalCost = (session.cost_per_normal || 0) * normalCount + (session.cost_per_reduced || 0) * reducedCount;
-    const totalCashCollected = attendances.reduce((sum, a) => sum + getEffectiveSessionPayment(a), 0);
+    const totalCashCollected = attendances.reduce((sum, a) => sum + getActualSessionPayment(a), 0);
 
     const assistantAttendances = await AssistantAttendance.findAll({
       where: { SessionId: session.id },
@@ -1899,7 +1922,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
         order: [['order_index', 'ASC']],
       });
       if (booklet) {
-        await processBookletPayments(student.id, [{ booklet_id: booklet.id, amount: paidAmount }], req.session.userId);
+        await processBookletPayments(student.id, [{ booklet_id: booklet.id, amount: paidAmount }], req.session.userId, register_attendance === 'on' ? req.session.activeSessionId : null);
       }
     } else if (shouldHaveBookletStatus) {
       await ensureStudentBookletPlaceholder(student);
@@ -1929,7 +1952,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
               SessionId: sessionId,
               UserId: req.session.userId,
               comment: null,
-              payment_collected: student.price_per_session,
+              payment_collected: initialBalance,
             });
             await addPoints(student.id, 2);
             attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
@@ -2150,7 +2173,7 @@ app.post('/attendance/scan', async (req, res) => {
     });
     // معالجة مدفوعات البوكليتس
     if (req.body.booklet_payments && req.body.booklet_payments.length > 0) {
-      await processBookletPayments(student.id, req.body.booklet_payments, req.session.userId);
+      await processBookletPayments(student.id, req.body.booklet_payments, req.session.userId, sessionId);
     }
 
     await addPoints(student.id, 2);
@@ -4776,7 +4799,7 @@ app.post('/attendance/scan/booklet-deliver', requireAdmin, async (req, res) => {
 // تأكد إن route الـ /attendance/scan POST بيستقبل booklet_payments
 // ضيف الكود ده بعد حفظ الـ Attendance:
 
-async function processBookletPayments(studentId, bookletPayments, userId) {
+async function processBookletPayments(studentId, bookletPayments, userId, sessionId = null) {
   if (!bookletPayments) return;
   const student = await Student.findByPk(studentId);
   const payments = Array.isArray(bookletPayments) ? bookletPayments : [bookletPayments];
@@ -4800,6 +4823,7 @@ async function processBookletPayments(studentId, bookletPayments, userId) {
     await BalanceTransaction.create({
       StudentId: studentId,
       amount: parseFloat(payment.amount),
+      SessionId: sessionId || null,
       reason: `دفع بوكليت: ${booklet.name}`,
       UserId: userId,
     });
@@ -4924,16 +4948,15 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
       studentCode: a.Student?.student_code || '-',
       assistantName: a.User?.name || '-',
       assistantId: a.UserId,
-      sessionPayment: getEffectiveSessionPayment(a),
+      sessionPayment: getActualSessionPayment(a),
       attendedAt: a.attended_at,
     }));
 
-    // مدفوعات البوكليتس في نفس اليوم (بناءً على التاريخ)
-    const sessionDate = session.session_date;
+    // مدفوعات البوكليتس المرتبطة بهذه الحصة فقط
     const bookletTransactions = await BalanceTransaction.findAll({
       where: {
+        SessionId: session.id,
         reason: { [Op.like]: 'دفع بوكليت:%' },
-        createdAt: { [Op.between]: [sessionDate + ' 00:00:00', sessionDate + ' 23:59:59'] },
       },
       include: [Student, User],
     });
@@ -4959,7 +4982,7 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
 
     attendances.forEach(a => {
       const bucket = ensureAssistantBucket(a.User);
-      bucket.sessionTotal += getEffectiveSessionPayment(a);
+      bucket.sessionTotal += getActualSessionPayment(a);
     });
 
     bookletTransactions.forEach(t => {
@@ -5809,6 +5832,7 @@ async function startServer() {
     await RechargeCode.sync();
     await ensureUserPhoneColumn();
     await ensureStudentBookletCustomPriceColumn();
+    await ensureBalanceTransactionSessionColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
     await ensureUserProfilePhotoColumn();
     await ensureBookletReservationSchema(sequelize);

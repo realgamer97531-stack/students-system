@@ -11,6 +11,10 @@ const BalanceTransaction = sequelize.define('BalanceTransaction', {
     type: DataTypes.FLOAT,
     allowNull: false, // ممكن تكون رقم سالب (خصم) أو موجب (إضافة)
   },
+  SessionId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   reason: {
     type: DataTypes.STRING,
     allowNull: true,

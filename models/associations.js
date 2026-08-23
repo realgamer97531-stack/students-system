@@ -48,6 +48,8 @@ function setupAssociations() {
 
 Student.hasMany(BalanceTransaction);
   BalanceTransaction.belongsTo(Student);
+  Session.hasMany(BalanceTransaction);
+  BalanceTransaction.belongsTo(Session);
 
 Subject.hasMany(Exam);
   Exam.belongsTo(Subject);
