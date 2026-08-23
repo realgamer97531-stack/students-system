@@ -1368,6 +1368,8 @@ app.post('/students', async (req, res) => {
       if (booklet) {
         await processBookletPayments(student.id, [{ booklet_id: booklet.id, amount: paidAmount }], req.session.userId);
       }
+    } else if (shouldHaveBookletStatus) {
+      await ensureStudentBookletPlaceholder(student);
     }
 
     if (register_attendance === 'on') {
@@ -1394,7 +1396,7 @@ app.post('/students', async (req, res) => {
               SessionId: sessionId,
               UserId: req.session.userId,
               comment: null,
-              payment_collected: 0,
+              payment_collected: student.price_per_session,
             });
             await addPoints(student.id, 2);
             attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
@@ -1927,7 +1929,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
               SessionId: sessionId,
               UserId: req.session.userId,
               comment: null,
-              payment_collected: 0,
+              payment_collected: student.price_per_session,
             });
             await addPoints(student.id, 2);
             attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
