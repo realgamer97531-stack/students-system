@@ -1642,6 +1642,17 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
     const homeworkMap = {};
     homeworkRecords.forEach(h => { homeworkMap[h.StudentId] = h.status; });
 
+    const bookletTransactions = await BalanceTransaction.findAll({
+      where: {
+        SessionId: session.id,
+        reason: { [Op.like]: 'دفع بوكليت:%' },
+      },
+    });
+    const bookletPaymentMap = {};
+    bookletTransactions.forEach(t => {
+      bookletPaymentMap[t.StudentId] = (bookletPaymentMap[t.StudentId] || 0) + Number(t.amount || 0);
+    });
+
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('الحاضرين');
 
@@ -1653,6 +1664,8 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
       { header: 'الواجب', key: 'homework', width: 15 },
       { header: 'كومنت', key: 'comment', width: 25 },
       { header: 'دفع وقت الحضور', key: 'payment', width: 15 },
+      { header: 'دفع البوكليت', key: 'booklet_payment', width: 15 },
+      { header: 'إجمالي دفع البوكليت والحصة', key: 'total_payment', width: 25 },
       { header: 'سجّل الحضور', key: 'user', width: 18 },
     ];
 
@@ -1669,6 +1682,8 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
         homework: homeworkLabels[homeworkMap[a.StudentId]] || '-',
         comment: a.comment || '-',
         payment: a.payment_collected || 0,
+        booklet_payment: bookletPaymentMap[a.StudentId] || 0,
+        total_payment: Number(a.payment_collected || 0) + (bookletPaymentMap[a.StudentId] || 0),
         user: a.User ? a.User.name : '-',
       });
     });
