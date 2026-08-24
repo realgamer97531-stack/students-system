@@ -1321,6 +1321,7 @@ app.post('/students', async (req, res) => {
       booklet_status,
       booklet_paid_amount,
       register_attendance,
+      comment,
       center_id,
       subject_id,
       admin_password,
@@ -1418,7 +1419,7 @@ app.post('/students', async (req, res) => {
               StudentId: student.id,
               SessionId: sessionId,
               UserId: req.session.userId,
-              comment: null,
+              comment: comment || null,
               payment_collected: initialBalance,
             });
             await addPoints(student.id, 2);
@@ -1898,6 +1899,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
       booklet_status,
       booklet_paid_amount,
       register_attendance,
+      comment,
     } = req.body;
 
     const initialBalance = parseFloat(balance) || 0;
@@ -1951,7 +1953,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
               StudentId: student.id,
               SessionId: sessionId,
               UserId: req.session.userId,
-              comment: null,
+              comment: comment || null,
               payment_collected: initialBalance,
             });
             await addPoints(student.id, 2);
