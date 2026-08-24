@@ -65,11 +65,6 @@
               <span class="badge bg-primary"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></span>
             </div>
             <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes || 'N/A' %> دقيقة</p>
-            <% if (canShow && canShow('sessions_create')) { %>
-              <form action="/schedule/<%= entry.id %>/start-session" method="POST">
-                <button class="btn btn-success btn-sm w-100">▶ تشغيل الحصة الآن</button>
-              </form>
-            <% } %>
           </div>
         </div>
         <% } %>
