@@ -3451,9 +3451,22 @@ app.post('/admin/videos/part/:id/delete', requirePermissionOrAdmin('admin_videos
 
 app.post('/admin/videos/delete/:id', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
-    await VideoPart.destroy({ where: { VideoId: req.params.id } });
-    await VideoAccessGrant.destroy({ where: { SessionId: (await Video.findByPk(req.params.id)).SessionId } });
-    await WatchProgress.destroy({ where: { VideoPartId: null } }); // تنظيف احتياطي، آمن
+    const video = await Video.findByPk(req.params.id);
+    if (!video) return res.status(404).send('❌ الفيديو غير موجود');
+
+    const videoParts = await VideoPart.findAll({
+      attributes: ['id'],
+      where: { VideoId: video.id },
+    });
+    const videoPartIds = videoParts.map(part => part.id);
+
+    if (videoPartIds.length > 0) {
+      await WatchProgress.destroy({ where: { VideoPartId: videoPartIds } });
+    }
+    await VideoPart.destroy({ where: { VideoId: video.id } });
+    await VideoSession.destroy({ where: { VideoId: video.id } });
+    await VideoStudentAccess.destroy({ where: { VideoId: video.id } });
+    await VideoAccessGrant.destroy({ where: { SessionId: video.SessionId } });
     await Video.destroy({ where: { id: req.params.id } });
     res.redirect('/admin/videos');
   } catch (error) {
