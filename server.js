@@ -3986,7 +3986,13 @@ app.post('/hw/submissions/:id/delete', requireAdmin, async (req, res) => {
       },
       body: JSON.stringify({ action: 'delete', paths: deletablePaths }),
     });
-    const deleteResult = await deleteResponse.json();
+    const deleteBody = await deleteResponse.text();
+    let deleteResult;
+    try {
+      deleteResult = JSON.parse(deleteBody);
+    } catch {
+      throw new Error(`الاستضافة لم ترجع JSON (HTTP ${deleteResponse.status})`);
+    }
     if (!deleteResponse.ok || !deleteResult.success) {
       throw new Error(deleteResult.message || 'فشل حذف الملفات من الاستضافة');
     }
@@ -3995,7 +4001,7 @@ app.post('/hw/submissions/:id/delete', requireAdmin, async (req, res) => {
     res.redirect(`/hw/assignments/${submission.HomeworkAssignmentId}`);
   } catch (e) {
     console.error(e);
-    res.status(500).send('❌ حصلت مشكلة في حذف التسليم');
+    res.status(500).send(`❌ حصلت مشكلة في حذف التسليم: ${e.message}`);
   }
 });
 
