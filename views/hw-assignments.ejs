@@ -98,7 +98,10 @@
 <div class="row g-3">
   <% assignments.forEach(a => { %>
     <div class="col-md-4">
-      <div class="card shadow-sm h-100">
+      <div class="card shadow-sm h-100" role="button" tabindex="0"
+        onclick="openAssignment(event, '<%= a.id %>')"
+        onkeydown="if (event.key === 'Enter' || event.key === ' ') openAssignment(event, '<%= a.id %>')"
+        style="cursor:pointer;">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <span class="badge" style="background:#EEF0FB;color:#4338CA;">واجب رقم <%= a.order_number %></span>
@@ -117,11 +120,17 @@
               🔗 حصص مرتبطة: <%= linkedSessions.map(s => `${s.Subject.name} - ${s.Center.name} (حصة ${s.lesson_number})`).join('، ') %>
             <% } %>
           </p>
-          <a href="/hw/assignments/<%= a.id %>" class="btn btn-outline-primary w-100 btn-sm">عرض التسليمات</a>
         </div>
       </div>
     </div>
   <% }) %>
 </div>
+
+<script>
+function openAssignment(event, assignmentId) {
+  if (event.target.closest('form, button, a, input, select, textarea')) return;
+  window.location.href = `/hw/assignments/${assignmentId}`;
+}
+</script>
 
 <%- include('partials/footer') %>
