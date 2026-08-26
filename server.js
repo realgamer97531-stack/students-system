@@ -3957,6 +3957,38 @@ app.post('/hw/assignments/:id/delete', requireAdmin, async (req, res) => {
   res.redirect('/hw/assignments');
 });
 
+app.post('/hw/submissions/:id/delete', requireAdmin, async (req, res) => {
+  try {
+    const submission = await HomeworkSubmission.findByPk(req.params.id);
+    if (!submission) return res.status(404).send('❌ غير موجود');
+
+    const homeworkUploadDir = path.resolve(__dirname, 'public', 'uploads', 'homework');
+    const submissionPaths = JSON.parse(submission.images || '[]');
+    const otherSubmissions = await HomeworkSubmission.findAll({
+      where: { id: { [Op.ne]: submission.id } },
+      attributes: ['images'],
+    });
+    const sharedPaths = new Set(
+      otherSubmissions.flatMap(other => JSON.parse(other.images || '[]'))
+    );
+    for (const submissionPath of submissionPaths) {
+      if (typeof submissionPath !== 'string' || sharedPaths.has(submissionPath) || /^https?:\/\//i.test(submissionPath)) continue;
+
+      const relativePath = submissionPath.replace(/^\/+/, '').split('?')[0];
+      const filePath = path.resolve(__dirname, 'public', relativePath);
+      if (filePath.startsWith(`${homeworkUploadDir}${path.sep}`) && fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+      }
+    }
+
+    await submission.destroy();
+    res.redirect(`/hw/assignments/${submission.HomeworkAssignmentId}`);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ حصلت مشكلة في حذف التسليم');
+  }
+});
+
 // --- صفحة تفاصيل واجب (الطلاب الي سلموا + الي مسلموش) ---
 
 app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req, res) => {
