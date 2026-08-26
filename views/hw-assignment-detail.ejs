@@ -99,8 +99,8 @@
                      const isPdf = /\.pdf(\?.*)?$/i.test(filePath);
                 %>
                   <% if (isImage) { %>
-                    <img src="<%= displayUrl %>" onclick="openImg('<%= displayUrl %>')"
-                      style="width:90px;height:90px;object-fit:cover;border-radius:8px;cursor:pointer;" />
+                    <img data-src="<%= displayUrl %>" alt="صورة الواجب" onclick="openImg(this.src)"
+                      style="width:90px;height:90px;object-fit:cover;border-radius:8px;cursor:pointer;background:#F3F4F6;" />
                   <% } else if (isPdf) { %>
                     <a href="<%= displayUrl %>" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center"
                       style="width:90px;height:90px;background:#F8FAFC;color:#0F172A;text-decoration:none;font-size:0.78rem;">
@@ -188,6 +188,14 @@ function openImg(src) {
   document.getElementById('modalImg').src = src;
   new bootstrap.Modal(document.getElementById('imgModal')).show();
 }
+
+document.querySelectorAll('[id^="submissionModal"]').forEach(modal => {
+  modal.addEventListener('shown.bs.modal', () => {
+    modal.querySelectorAll('img[data-src]').forEach(image => {
+      if (!image.getAttribute('src')) image.src = image.dataset.src;
+    });
+  }, { once: true });
+});
 
 async function gradeSubmission(subId, status, assignmentId) {
   const statusLabels = { complete:'كامل', incomplete:'مش كامل', no_steps:'من غير خطوات', not_done:'مش معمول' };
