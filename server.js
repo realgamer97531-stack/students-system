@@ -3962,7 +3962,6 @@ app.post('/hw/submissions/:id/delete', requireAdmin, async (req, res) => {
     const submission = await HomeworkSubmission.findByPk(req.params.id);
     if (!submission) return res.status(404).send('❌ غير موجود');
 
-    const homeworkUploadDir = path.resolve(__dirname, 'public', 'uploads', 'homework');
     const submissionPaths = JSON.parse(submission.images || '[]');
     const otherSubmissions = await HomeworkSubmission.findAll({
       where: { id: { [Op.ne]: submission.id } },
@@ -3971,14 +3970,25 @@ app.post('/hw/submissions/:id/delete', requireAdmin, async (req, res) => {
     const sharedPaths = new Set(
       otherSubmissions.flatMap(other => JSON.parse(other.images || '[]'))
     );
-    for (const submissionPath of submissionPaths) {
-      if (typeof submissionPath !== 'string' || sharedPaths.has(submissionPath) || /^https?:\/\//i.test(submissionPath)) continue;
+    const deletablePaths = submissionPaths.filter(submissionPath =>
+      typeof submissionPath === 'string' &&
+      !sharedPaths.has(submissionPath) &&
+      /^homework_images\/[A-Za-z0-9._-]+$/i.test(submissionPath)
+    );
+    const deleteToken = process.env.HOMEWORK_UPLOAD_DELETE_TOKEN;
+    if (!deleteToken) throw new Error('HOMEWORK_UPLOAD_DELETE_TOKEN غير مضبوط');
 
-      const relativePath = submissionPath.replace(/^\/+/, '').split('?')[0];
-      const filePath = path.resolve(__dirname, 'public', relativePath);
-      if (filePath.startsWith(`${homeworkUploadDir}${path.sep}`) && fs.existsSync(filePath)) {
-        await fs.promises.unlink(filePath);
-      }
+    const deleteResponse = await fetch('https://shadyelsharkawy.com/upload.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Homework-Delete-Token': deleteToken,
+      },
+      body: JSON.stringify({ action: 'delete', paths: deletablePaths }),
+    });
+    const deleteResult = await deleteResponse.json();
+    if (!deleteResponse.ok || !deleteResult.success) {
+      throw new Error(deleteResult.message || 'فشل حذف الملفات من الاستضافة');
     }
 
     await submission.destroy();
