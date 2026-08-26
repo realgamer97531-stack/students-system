@@ -2001,6 +2001,13 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     if (activeSession.status === 'cancelled') {
       return res.json({ success: false, message: '⚠️ هذه الحصة ملغية' });
     }
+    if (student.SubjectId !== activeSession.SubjectId) {
+      return res.json({
+        success: false,
+        subjectMismatch: true,
+        message: `🚨 هذا الطالب تابع لمادة ${student.Subject?.name || 'مختلفة'}، والحصة الحالية لمادة مختلفة`,
+      });
+    }
 
     const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
     if (existing) return res.json({ success: false, message: `${student.name} مسجل حضوره من قبل` });
@@ -2139,6 +2146,13 @@ app.post('/attendance/scan', async (req, res) => {
     if (activeSession.status === 'cancelled') {
       return res.json({ success: false, message: '⚠️ هذه الحصة ملغية، لا يمكن تسجيل حضور فيها' });
     }
+    if (student.SubjectId !== activeSession.SubjectId) {
+      return res.json({
+        success: false,
+        subjectMismatch: true,
+        message: '🚨 كود الطالب يخص مادة مختلفة عن مادة الحصة الحالية، لم يتم تسجيل الحضور',
+      });
+    }
 
     if (student.is_blocked) {
       return res.json({ success: false, message: `⛔ الطالب ${student.name} محظور من النظام. تواصل مع الأدمن.` });
@@ -2226,6 +2240,18 @@ app.post('/attendance/scan/force', async (req, res) => {
     const student = await Student.findOne({ where: { student_code } });
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
+    }
+
+    const activeSession = await Session.findByPk(sessionId);
+    if (!activeSession || activeSession.status === 'cancelled') {
+      return res.json({ success: false, message: '⚠️ الحصة الحالية غير متاحة للتسجيل' });
+    }
+    if (student.SubjectId !== activeSession.SubjectId) {
+      return res.json({
+        success: false,
+        subjectMismatch: true,
+        message: '🚨 كود الطالب يخص مادة مختلفة عن مادة الحصة الحالية، لم يتم تسجيل الحضور',
+      });
     }
 
     const existingAttendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
