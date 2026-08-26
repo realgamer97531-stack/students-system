@@ -4100,6 +4100,29 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
   });
 });
 
+app.get('/hw/submissions/:id', requirePermission('homework_online'), async (req, res) => {
+  const submission = await HomeworkSubmission.findByPk(req.params.id, {
+    include: [{ model: Student, include: [Center, Subject] }],
+  });
+  if (!submission) return res.status(404).json({ success: false, message: 'غير موجود' });
+
+  res.json({
+    success: true,
+    submission: {
+      id: submission.id,
+      assignmentId: submission.HomeworkAssignmentId,
+      studentName: submission.Student.name,
+      subjectName: submission.Student.Subject ? submission.Student.Subject.name : '-',
+      centerName: submission.Student.Center ? submission.Student.Center.name : '-',
+      studentCode: submission.Student.student_code,
+      paths: JSON.parse(submission.images || '[]'),
+      comment: submission.student_comment,
+      status: submission.status,
+      createdAt: submission.createdAt,
+    },
+  });
+});
+
 // --- تصحيح الواجب ---
 
 app.post('/hw/submissions/:id/grade', requirePermission('homework_online'), async (req, res) => {

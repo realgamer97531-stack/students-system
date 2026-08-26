@@ -60,7 +60,7 @@
     <div class="col-md-4">
       <% const submissionPaths = JSON.parse(sub.images || '[]'); %>
       <div class="card shadow-sm h-100" role="button" tabindex="0"
-        data-bs-toggle="modal" data-bs-target="#submissionModal<%= sub.id %>"
+        data-submission-id="<%= sub.id %>"
         style="border-right: 4px solid <%= statusColors[sub.status] %>;cursor:pointer;">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
@@ -70,65 +70,6 @@
             </span>
           </div>
           <p class="small text-muted mb-0 mt-2"><%= submissionPaths.length %> ملف مرفق</p>
-        </div>
-      </div>
-
-      <div class="modal fade" id="submissionModal<%= sub.id %>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title"><%= sub.Student.name %></h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-              <p class="small text-muted mb-1">
-                🎓 <%= sub.Student.Subject ? sub.Student.Subject.name : '-' %> | <%= sub.Student.Center ? sub.Student.Center.name : '-' %><br>
-                🔖 <%= sub.Student.student_code %><br>
-                📁 <%= submissionPaths.length %> ملف مرفق |
-                🕐 <%= new Date(sub.createdAt).toLocaleString('ar-EG') %>
-              </p>
-              <% if (sub.student_comment) { %>
-                <p class="small bg-light rounded p-2 mb-3">💬 <%= sub.student_comment %></p>
-              <% } %>
-
-              <div class="d-flex flex-wrap gap-1 mb-3">
-                <% submissionPaths.forEach((filePath) => {
-                     const PLATFORM = 'https://shadyelsharkawy.com';
-                     const displayUrl = filePath.startsWith('http') ? filePath : PLATFORM + '/' + filePath;
-                     const isImage = /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(filePath);
-                     const isPdf = /\.pdf(\?.*)?$/i.test(filePath);
-                %>
-                  <% if (isImage) { %>
-                    <img data-src="<%= displayUrl %>" alt="صورة الواجب" onclick="openImg(this.src)"
-                      style="width:90px;height:90px;object-fit:cover;border-radius:8px;cursor:pointer;background:#F3F4F6;" />
-                  <% } else if (isPdf) { %>
-                    <a href="<%= displayUrl %>" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center"
-                      style="width:90px;height:90px;background:#F8FAFC;color:#0F172A;text-decoration:none;font-size:0.78rem;">
-                      📄<br><span style="font-size:0.65rem;line-height:1.1;"><%= filePath.split('/').pop() %></span>
-                    </a>
-                  <% } else { %>
-                    <a href="<%= displayUrl %>" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center"
-                      style="width:90px;height:90px;background:#F8FAFC;color:#0F172A;text-decoration:none;font-size:0.78rem;">
-                      🔗<br><span style="font-size:0.65rem;line-height:1.1;">فتح</span>
-                    </a>
-                  <% } %>
-                <% }) %>
-              </div>
-
-              <div class="d-flex gap-1 flex-wrap">
-                <% ['complete','incomplete','no_steps','not_done'].forEach(s => { %>
-                  <button onclick="gradeSubmission(<%= sub.id %>, '<%= s %>', <%= assignment.id %>)"
-                    class="btn btn-sm"
-                    style="font-size:0.72rem;padding:4px 8px;background:<%= sub.status===s ? statusColors[s] : '#F3F4F6' %>;color:<%= sub.status===s ? '#fff' : '#374151' %>;">
-                    <%= statusLabels[s] %>
-                  </button>
-                <% }) %>
-              </div>
-              <form action="/hw/submissions/<%= sub.id %>/delete" method="POST" class="mt-3" onsubmit="return confirm('سيتم حذف تسليم هذا الطالب وملفاته من الاستضافة نهائياً. هل أنت متأكد؟')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ حذف التسليم والملفات</button>
-              </form>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -169,6 +110,18 @@
   </div>
 <% } %>
 
+<div class="modal fade" id="submissionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="submissionModalTitle">تفاصيل التسليم</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="submissionModalBody"></div>
+    </div>
+  </div>
+</div>
+
 <!-- مودال عرض الصور -->
 <div class="modal fade" id="imgModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -189,12 +142,65 @@ function openImg(src) {
   new bootstrap.Modal(document.getElementById('imgModal')).show();
 }
 
-document.querySelectorAll('[id^="submissionModal"]').forEach(modal => {
-  modal.addEventListener('shown.bs.modal', () => {
-    modal.querySelectorAll('img[data-src]').forEach(image => {
-      if (!image.getAttribute('src')) image.src = image.dataset.src;
-    });
-  }, { once: true });
+const submissionModal = new bootstrap.Modal(document.getElementById('submissionModal'));
+const statusLabels = { complete:'كامل', incomplete:'مش كامل', no_steps:'من غير خطوات', not_done:'مش معمول' };
+const statusColors = { complete:'#059669', incomplete:'#D97706', no_steps:'#6B7280', not_done:'#DC2626' };
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, character => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+  }[character]));
+}
+
+async function openSubmission(card) {
+  const modalBody = document.getElementById('submissionModalBody');
+  modalBody.innerHTML = '<p class="text-center text-muted my-4">جاري تحميل تفاصيل التسليم...</p>';
+  submissionModal.show();
+
+  try {
+    const response = await fetch(`/hw/submissions/${card.dataset.submissionId}`);
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'فشل تحميل التسليم');
+
+    const submission = data.submission;
+    document.getElementById('submissionModalTitle').textContent = submission.studentName;
+    const files = submission.paths.map(filePath => {
+      const displayUrl = filePath.startsWith('http') ? filePath : `https://shadyelsharkawy.com/${filePath}`;
+      const safeUrl = escapeHtml(displayUrl);
+      const fileName = escapeHtml(filePath.split('/').pop());
+      if (/\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(filePath)) {
+        return `<img src="${safeUrl}" alt="صورة الواجب" onclick="openImg(this.src)" style="width:90px;height:90px;object-fit:cover;border-radius:8px;cursor:pointer;background:#F3F4F6;">`;
+      }
+      return `<a href="${safeUrl}" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center" style="width:90px;height:90px;background:#F8FAFC;color:#0F172A;text-decoration:none;font-size:0.78rem;">${/\.pdf(\?.*)?$/i.test(filePath) ? '📄' : '🔗'}<br><span style="font-size:0.65rem;line-height:1.1;">${fileName}</span></a>`;
+    }).join('');
+    const gradingButtons = ['complete','incomplete','no_steps','not_done'].map(status =>
+      `<button onclick="gradeSubmission(${submission.id}, '${status}', ${submission.assignmentId})" class="btn btn-sm" style="font-size:0.72rem;padding:4px 8px;background:${submission.status === status ? statusColors[status] : '#F3F4F6'};color:${submission.status === status ? '#fff' : '#374151'};">${statusLabels[status]}</button>`
+    ).join('');
+
+    modalBody.innerHTML = `
+      <p class="small text-muted mb-1">🎓 ${escapeHtml(submission.subjectName)} | ${escapeHtml(submission.centerName)}<br>
+        🔖 ${escapeHtml(submission.studentCode)}<br>
+        📁 ${submission.paths.length} ملف مرفق | 🕐 ${new Date(submission.createdAt).toLocaleString('ar-EG')}
+      </p>
+      ${submission.comment ? `<p class="small bg-light rounded p-2 mb-3">💬 ${escapeHtml(submission.comment)}</p>` : ''}
+      <div class="d-flex flex-wrap gap-1 mb-3">${files}</div>
+      <div class="d-flex gap-1 flex-wrap">${gradingButtons}</div>
+      <form action="/hw/submissions/${submission.id}/delete" method="POST" class="mt-3" onsubmit="return confirm('سيتم حذف تسليم هذا الطالب وملفاته من الاستضافة نهائياً. هل أنت متأكد؟')">
+        <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ حذف التسليم والملفات</button>
+      </form>`;
+  } catch (error) {
+    modalBody.innerHTML = `<p class="text-danger">❌ ${escapeHtml(error.message)}</p>`;
+  }
+}
+
+document.querySelectorAll('[data-submission-id]').forEach(card => {
+  card.addEventListener('click', () => openSubmission(card));
+  card.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openSubmission(card);
+    }
+  });
 });
 
 async function gradeSubmission(subId, status, assignmentId) {
