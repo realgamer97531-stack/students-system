@@ -1693,6 +1693,13 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
     const homeworkMap = {};
     homeworkRecords.forEach(h => { homeworkMap[h.StudentId] = h.status; });
 
+    const linkedExam = await Exam.findOne({ where: { SessionId: session.id } });
+    const examMap = {};
+    if (linkedExam) {
+      const examResults = await ExamResult.findAll({ where: { ExamId: linkedExam.id } });
+      examResults.forEach(result => { examMap[result.StudentId] = result.score; });
+    }
+
     const bookletTransactions = await BalanceTransaction.findAll({
       where: {
         SessionId: session.id,
@@ -1713,6 +1720,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
       { header: 'تليفون الطالب', key: 'phone', width: 18 },
       { header: 'تليفون ولي الأمر', key: 'parent_phone', width: 18 },
       { header: 'الواجب', key: 'homework', width: 15 },
+      { header: 'درجة الامتحان', key: 'exam_score', width: 15 },
       { header: 'كومنت', key: 'comment', width: 25 },
       { header: 'دفع وقت الحضور', key: 'payment', width: 15 },
       { header: 'دفع البوكليت', key: 'booklet_payment', width: 15 },
@@ -1731,6 +1739,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
         phone: a.Student.phone,
         parent_phone: a.Student.parent_phone,
         homework: homeworkLabels[homeworkMap[a.StudentId]] || '-',
+        exam_score: examMap[a.StudentId] ?? '-',
         comment: a.comment || '-',
         payment: a.payment_collected || 0,
         booklet_payment: bookletPaymentMap[a.StudentId] || 0,
