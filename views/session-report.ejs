@@ -68,8 +68,14 @@
 <div class="tab-content">
   
   <div class="tab-pane fade show active" id="attendedTab">
+    <div class="card shadow-sm mb-3">
+      <div class="card-body py-3">
+        <label for="attendedStudentSearch" class="form-label small mb-1">البحث في الحاضرين</label>
+        <input type="search" id="attendedStudentSearch" class="form-control" placeholder="ابحث بالاسم أو الكود أو رقم الهاتف">
+      </div>
+    </div>
     <div class="table-responsive bg-white rounded shadow-sm p-3">
-      <table class="table table-sm table-hover align-middle">
+      <table id="attendedStudentsTable" class="table table-sm table-hover align-middle">
         <thead class="table-light">
           <tr>
             <th>الكود</th>
@@ -88,7 +94,7 @@
         </thead>
         <tbody>
           <% attendedRows.forEach(row => { %>
-            <tr>
+            <tr data-student-search="<%= `${row.student.student_code} ${row.student.name} ${row.student.phone} ${row.student.parent_phone}` %>">
               <td><a href="/students/<%= row.student.id %>"><%= row.student.student_code %></a></td>
               <td><a href="/students/<%= row.student.id %>"><%= row.student.name %></a></td>
               <td><%= row.student.phone %></td>
@@ -330,5 +336,32 @@
   </div>
 
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('attendedStudentSearch');
+    const table = document.getElementById('attendedStudentsTable');
+    if (!searchInput || !table) return;
+
+    const rows = Array.from(table.querySelectorAll('tbody tr[data-student-search]'));
+    const emptyRow = document.createElement('tr');
+    emptyRow.innerHTML = '<td colspan="12" class="text-muted text-center small">لا يوجد طالب مطابق للبحث</td>';
+    emptyRow.hidden = true;
+    table.querySelector('tbody').appendChild(emptyRow);
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLocaleLowerCase();
+      let visibleRows = 0;
+
+      rows.forEach(row => {
+        const matches = !query || row.dataset.studentSearch.toLocaleLowerCase().includes(query);
+        row.hidden = !matches;
+        if (matches) visibleRows += 1;
+      });
+
+      emptyRow.hidden = visibleRows !== 0;
+    });
+  });
+</script>
 
 <%- include('partials/footer') %>
