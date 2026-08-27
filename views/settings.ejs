@@ -103,6 +103,37 @@
       <% if (typeof errorMessage !== 'undefined') { %>
       <div class="alert alert-danger"> <%= errorMessage %> </div>
       <% } %>
+      <% if (typeof sessionToolsOutput !== 'undefined') { %>
+      <div class="alert alert-secondary">
+        <h6 class="mb-2">نتيجة العملية</h6>
+        <pre class="small mb-0" style="max-height: 360px; overflow: auto; white-space: pre-wrap;"><%= sessionToolsOutput %></pre>
+      </div>
+      <% } %>
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-2">🛠️ أدوات الحصة</h5>
+          <p class="text-muted small mb-3">اختر السيريال لتنفيذ إجراء على هذه الحصة فقط. الحذف نهائي.</p>
+          <% const availableSessions = typeof sessions !== 'undefined' ? sessions : []; %>
+          <form action="/settings/session-tools" method="POST" class="row g-2 align-items-end">
+            <div class="col-md-5">
+              <label for="sessionSerial" class="form-label">الحصة</label>
+              <select id="sessionSerial" name="session_serial" class="form-select" required>
+                <option value="">اختر الحصة</option>
+                <% availableSessions.forEach(session => { %>
+                <option value="<%= session.serial_number %>">
+                  سيريال <%= session.serial_number %> | حصة <%= session.lesson_number %> | <%= session.session_date %> | <%= session.status === 'cancelled' ? 'ملغاة' : 'عادية' %>
+                </option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-7 d-flex flex-wrap gap-2">
+              <button type="submit" name="action" value="preview-delete" class="btn btn-outline-secondary">معاينة حذف الحصة</button>
+              <button type="submit" name="action" value="mark-complete" class="btn btn-success" onclick="return confirm('سيتم جعل واجب كل طالب حاضر في هذه الحصة كاملًا. هل تريد المتابعة؟');">تحديد واجب الحاضرين ككامل</button>
+              <button type="submit" name="action" value="delete" class="btn btn-danger" onclick="return confirm('تحذير: سيتم حذف الحصة وكل سجلاتها وتسجيلاتها نهائيًا. هل تريد المتابعة؟');">حذف الحصة نهائيًا</button>
+            </div>
+          </form>
+        </div>
+      </div>
       <div class="card mb-4 shadow-sm">
         <div class="card-body">
           <h5 class="mb-2">📚 البوكليتس</h5>

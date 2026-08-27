@@ -12,10 +12,12 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const PERMISSIONS_LIST = require('./permissions');
 const cron = require('node-cron');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
+const { promisify } = require('util');
 const compression = require('compression');
 const RechargeCode = require('./models/RechargeCode');
 const crypto = require('crypto');
+const execFileAsync = promisify(execFile);
 
 // استدعاء الجداول
 const Center = require('./models/Center');
@@ -691,8 +693,57 @@ async function importDatabaseSql(sqlText) {
 }
 
 // ===== Settings Route =====
-app.get('/settings', requireAdmin, (req, res) => {
-  res.render('settings');
+app.get('/settings', requireAdmin, async (req, res) => {
+  const sessions = await Session.findAll({
+    attributes: ['id', 'serial_number', 'lesson_number', 'session_date', 'status'],
+    order: [['serial_number', 'DESC']],
+  });
+  res.render('settings', { sessions });
+});
+
+app.post('/settings/session-tools', requireAdmin, async (req, res) => {
+  const serial = String(req.body.session_serial || '').trim();
+  const action = req.body.action;
+  const sessions = await Session.findAll({
+    attributes: ['id', 'serial_number', 'lesson_number', 'session_date', 'status'],
+    order: [['serial_number', 'DESC']],
+  });
+
+  if (!/^\d+$/.test(serial) || !['preview-delete', 'delete', 'mark-complete'].includes(action)) {
+    return res.status(400).render('settings', { sessions, errorMessage: 'اختر حصة وعملية صحيحة.' });
+  }
+
+  const target = sessions.find(session => String(session.serial_number) === serial);
+  if (!target) {
+    return res.status(404).render('settings', { sessions, errorMessage: 'الحصة المختارة غير موجودة.' });
+  }
+
+  const script = action === 'mark-complete'
+    ? 'mark_session_homework_complete.js'
+    : 'delete_session_6001.js';
+  const args = [path.join(__dirname, 'scripts', script), serial];
+  if (action === 'delete') args.push('--apply', '--confirm');
+  if (action === 'mark-complete') args.push('--apply', '--confirm');
+
+  try {
+    const result = await execFileAsync(process.execPath, args, {
+      cwd: __dirname,
+      timeout: 120000,
+      maxBuffer: 1024 * 1024 * 8,
+      windowsHide: true,
+    });
+    return res.render('settings', {
+      sessions,
+      successMessage: action === 'preview-delete' ? 'تم إنشاء المعاينة بدون أي تعديل.' : 'تم تنفيذ العملية بنجاح.',
+      sessionToolsOutput: result.stdout || result.stderr,
+    });
+  } catch (error) {
+    return res.status(500).render('settings', {
+      sessions,
+      errorMessage: 'فشلت العملية ولم يتم ضمان إكمالها. راجع التفاصيل أدناه.',
+      sessionToolsOutput: [error.stdout, error.stderr, error.message].filter(Boolean).join('\n'),
+    });
+  }
 });
 
 app.get('/settings/export-database', requireAdmin, async (req, res) => {
