@@ -3402,7 +3402,7 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
     res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
   }
 });
-
+//comment
 // ===== إدارة الفيديوهات (أدمن بس) =====
 
 app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
