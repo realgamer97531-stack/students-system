@@ -3140,7 +3140,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       where: { SessionId: studentSessionIds },
       attributes: ['VideoId'],
     });
-    const groupVideoIds = [...new Set(groupVideoSessions.map(vs => vs.VideoId))];
+    const directlyLinkedVideos = studentSessionIds.length > 0 ? await Video.findAll({
+      where: { SessionId: studentSessionIds },
+      attributes: ['id'],
+    }) : [];
+    const groupVideoIds = [...new Set([
+      ...groupVideoSessions.map(vs => vs.VideoId),
+      ...directlyLinkedVideos.map(video => video.id),
+    ])];
 
     // الفيديوهات التي له وصول فردي
     const individualAccesses = await VideoStudentAccess.findAll({
@@ -3408,29 +3415,45 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
 });
 
 app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), imageUpload.single('session_image'), async (req, res) => {
+  let transaction;
   try {
-    const { session_ids, title } = req.body;
-    // session_ids ممكن يكون string واحد أو array
-    const sessionIdList = Array.isArray(session_ids) ? session_ids : (session_ids ? [session_ids] : []);
+    const { title } = req.body;
+    const submittedSessionIds = req.body.session_ids ?? req.body['session_ids[]'];
+    const sessionIdList = (Array.isArray(submittedSessionIds)
+      ? submittedSessionIds
+      : (submittedSessionIds ? [submittedSessionIds] : []))
+      .map(sessionId => Number(sessionId))
+      .filter(sessionId => Number.isInteger(sessionId) && sessionId > 0);
     if (sessionIdList.length === 0) return res.status(400).send('❌ اختر حصة واحدة على الأقل');
 
-    // SubjectId من أول حصة
-    const firstSession = await Session.findByPk(sessionIdList[0]);
+    const uniqueSessionIds = [...new Set(sessionIdList)];
+    const selectedSessions = await Session.findAll({ where: { id: uniqueSessionIds } });
+    if (selectedSessions.length !== uniqueSessionIds.length) {
+      return res.status(400).send('❌ إحدى الحصص المختارة غير موجودة');
+    }
+
+    const firstSession = selectedSessions.find(session => session.id === uniqueSessionIds[0]);
     if (!firstSession) return res.status(404).send('❌ الحصة غير موجودة');
 
+    transaction = await sequelize.transaction();
     if (req.file) {
-      await Session.update({ image_path: `/uploads/session-images/${req.file.filename}` }, { where: { id: sessionIdList[0] } });
+      await Session.update({ image_path: `/uploads/session-images/${req.file.filename}` }, { where: { id: firstSession.id }, transaction });
     }
 
-    const video = await Video.create({ title, SubjectId: firstSession.SubjectId, SessionId: sessionIdList[0] });
+    const video = await Video.create({ title, SubjectId: firstSession.SubjectId, SessionId: firstSession.id }, { transaction });
 
     // ربط الفيديو بكل الحصص المختارة
-    for (const sid of sessionIdList) {
-      await VideoSession.create({ VideoId: video.id, SessionId: parseInt(sid) });
-    }
+    await VideoSession.bulkCreate(
+      uniqueSessionIds.map(SessionId => ({ VideoId: video.id, SessionId })),
+      { transaction },
+    );
+
+    await transaction.commit();
+    transaction = null;
 
     res.redirect('/admin/videos');
   } catch (error) {
+    if (transaction) await transaction.rollback();
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
   }
