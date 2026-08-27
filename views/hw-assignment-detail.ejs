@@ -142,7 +142,7 @@ function openImg(src) {
   new bootstrap.Modal(document.getElementById('imgModal')).show();
 }
 
-const submissionModal = new bootstrap.Modal(document.getElementById('submissionModal'));
+let submissionModal;
 const statusLabels = { complete:'كامل', incomplete:'مش كامل', no_steps:'من غير خطوات', not_done:'مش معمول' };
 const statusColors = { complete:'#059669', incomplete:'#D97706', no_steps:'#6B7280', not_done:'#DC2626' };
 
@@ -193,13 +193,16 @@ async function openSubmission(card) {
   }
 }
 
-document.querySelectorAll('[data-submission-id]').forEach(card => {
-  card.addEventListener('click', () => openSubmission(card));
-  card.addEventListener('keydown', event => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      openSubmission(card);
-    }
+document.addEventListener('DOMContentLoaded', () => {
+  submissionModal = new bootstrap.Modal(document.getElementById('submissionModal'));
+  document.querySelectorAll('[data-submission-id]').forEach(card => {
+    card.addEventListener('click', () => openSubmission(card));
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openSubmission(card);
+      }
+    });
   });
 });
 
