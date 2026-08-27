@@ -3163,7 +3163,10 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
 
     const videos = await Video.findAll({
       where: { id: allAccessibleVideoIds },
-      include: [{ model: Session, required: false, include: [Center] }],
+      include: [
+        { model: Session, required: false, include: [Center] },
+        { model: VideoSession, required: false, include: [Session] },
+      ],
       order: [['createdAt', 'DESC']],
     });
 
@@ -3172,10 +3175,13 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     grants.forEach(g => { grantBySessionId[g.SessionId] = g; });
 
     const lessons = videos.map(v => {
-      const grant = grantBySessionId[v.SessionId];
+      const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
+      if (!session) return null;
+
+      const grant = grantBySessionId[session.id];
       let status, viewsUsed = 0, maxViews = 0;
 
-      if (v.Session.is_free_for_all) {
+      if (session.is_free_for_all) {
         status = 'free';
       } else if (grant) {
         status = grant.views_used >= grant.max_views ? 'exhausted' : 'granted';
@@ -3188,14 +3194,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       return {
         videoId: v.id,
         title: v.title,
-        lessonNumber: v.Session.lesson_number,
-        date: v.Session.session_date,
+        lessonNumber: session.lesson_number,
+        date: session.session_date,
         status,
         viewsUsed,
         maxViews,
         price: student.price_per_session,
       };
-    });
+    }).filter(Boolean);
 
     res.json({ success: true, lessons });
   } catch (error) {
@@ -3209,10 +3215,17 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
   try {
     const { confirm_payment } = req.body;
     const student = await Student.findByPk(req.portalStudentId);
-    const video = await Video.findOne({ where: { id: req.params.videoId }, include: [Session] });
+    const video = await Video.findOne({
+      where: { id: req.params.videoId },
+      include: [
+        { model: Session, required: false },
+        { model: VideoSession, required: false, include: [Session] },
+      ],
+    });
     if (!video) return res.status(404).json({ success: false, message: 'الدرس غير موجود' });
 
-    const session = video.Session;
+    const session = video.Session || video.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
+    if (!session) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
 
     // 1) الحالة المجانية للجميع - فتح فوري بلا حدود + تسجيل حضور
     if (session.is_free_for_all) {
@@ -3248,7 +3261,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     if (individualAccess && !grant) {
       grant = await VideoAccessGrant.create({
         StudentId: student.id,
-        SessionId: video.SessionId,
+        SessionId: session.id,
         method: 'admin_free',
         max_views: 999,
         views_used: 1,
@@ -3359,12 +3372,21 @@ async function ensureAttendance(studentId, sessionId, comment) {
 app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
-    const video = await Video.findOne({ where: { id: req.params.videoId }, include: [Session] });
+    const video = await Video.findOne({
+      where: { id: req.params.videoId },
+      include: [
+        { model: Session, required: false },
+        { model: VideoSession, required: false, include: [Session] },
+      ],
+    });
     if (!video) return res.status(404).json({ success: false });
 
+    const session = video.Session || video.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
+    if (!session) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
+
     // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة)
-    if (!video.Session.is_free_for_all) {
-      const grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: video.SessionId } });
+    if (!session.is_free_for_all) {
+      const grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
       if (!grant) return res.status(403).json({ success: false, message: 'غير مسموح' });
     }
 
