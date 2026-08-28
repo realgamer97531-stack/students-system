@@ -2509,18 +2509,10 @@ app.post('/homework/scan/summary', async (req, res) => {
 app.post('/homework/scan/lookup', async (req, res) => {
   try {
     const { student_code } = req.body;
-    const sessionId = req.session.activeSessionId;
 
     const student = await Student.findOne({ where: { student_code } });
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
-    }
-
-    const attendance = await Attendance.findOne({
-      where: { StudentId: student.id, SessionId: sessionId },
-    });
-    if (!attendance) {
-      return res.json({ success: false, message: `الطالب ${student.name} لسه ما سجل حضوره في هذه الحصة` });
     }
 
     res.json({ success: true, student_id: student.id, student_name: student.name });
@@ -2542,13 +2534,6 @@ app.post('/homework/scan/save', async (req, res) => {
     const student = await Student.findOne({ where: { student_code } });
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
-    }
-
-    const attendance = await Attendance.findOne({
-      where: { StudentId: student.id, SessionId: sessionId },
-    });
-    if (!attendance) {
-      return res.json({ success: false, message: `الطالب ${student.name} لسه ما سجل حضوره في هذه الحصة` });
     }
 
     const [check, created] = await HomeworkCheck.findOrCreate({
