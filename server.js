@@ -2361,6 +2361,25 @@ app.post('/exams', async (req, res) => {
   }
 });
 
+app.post('/exams/:id/delete', requirePermission('exams'), async (req, res) => {
+  let transaction;
+  try {
+    const exam = await Exam.findByPk(req.params.id);
+    if (!exam) return res.status(404).send('❌ الامتحان غير موجود');
+
+    transaction = await sequelize.transaction();
+    await ExamResult.destroy({ where: { ExamId: exam.id }, transaction });
+    await exam.destroy({ transaction });
+    await transaction.commit();
+
+    res.redirect('/exams');
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
 // صفحة رصد الدرجات لامتحان معين
 app.get('/exams/:id', async (req, res) => {
   try {

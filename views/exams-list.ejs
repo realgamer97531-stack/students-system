@@ -100,6 +100,13 @@
                   <span class="ar-only">رصد الدرجات</span>
                   <span class="en-only" style="display:none;">Record Scores</span>
                 </a>
+                <form action="/exams/<%= exam.id %>/delete" method="POST" class="d-inline"
+                  onsubmit="return confirm('هل أنت متأكد من حذف هذا الامتحان وكل الدرجات المسجلة به؟');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2">
+                    <span class="ar-only">حذف</span>
+                    <span class="en-only" style="display:none;">Delete</span>
+                  </button>
+                </form>
               </td>
             </tr>
           <% }) %>
