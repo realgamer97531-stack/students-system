@@ -267,7 +267,7 @@
         <h5 class="modal-title">📤 رفع طلاب من Excel</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form action="/students/bulk-upload" method="POST" enctype="multipart/form-data">
+      <form action="/students/bulk-upload" method="POST" enctype="multipart/form-data" id="bulkUploadForm">
         <div class="modal-body">
           <div class="alert alert-info small">
             تأكد إن الملف على نفس شكل التيمبليت بالظبط.<br>
@@ -283,5 +283,13 @@
     </div>
   </div>
 </div>
+
+<script>
+  document.getElementById('bulkUploadForm').addEventListener('submit', function () {
+    const submitButton = this.querySelector('button[type="submit"]');
+    if (submitButton.disabled) return false;
+    submitButton.disabled = true;
+  });
+</script>
 
 <%- include('partials/footer') %>

@@ -61,7 +61,7 @@
 
     <div id="resultBox" class="mt-3"></div>
 
-    <% if (userRole === 'admin') { %>
+    <% if (userRole === 'admin' || userRole === 'assistant') { %>
       <hr style="border-color: var(--sf-input-border);">
       <button class="btn btn-sm btn-outline-danger w-100" onclick="openForceModal()">
         ⚠️ تسجيل حضور بالقوة (حتى مع نقص الرصيد)
@@ -536,30 +536,39 @@ if (data.followUpAssistant) {
 
   document.getElementById('quickAddForm').addEventListener('submit', async function (e) {
     e.preventDefault();
+    const submitButton = this.querySelector('button[type="submit"]');
+    if (submitButton.disabled) return;
+    submitButton.disabled = true;
     const formData = new FormData(this);
     const payload = Object.fromEntries(formData.entries());
 
-    const res = await fetch('/students/quick-add', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
+    try {
+      const res = await fetch('/students/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
 
-    if (!data.success) {
-      document.getElementById('quickAddError').innerHTML = `<div class="alert alert-danger small">${data.message}</div>`;
-      return;
+      if (!data.success) {
+        document.getElementById('quickAddError').innerHTML = `<div class="alert alert-danger small">${data.message}</div>`;
+        submitButton.disabled = false;
+        return;
+      }
+
+      this.style.display = 'none';
+      document.getElementById('quickAddResult').style.display = 'block';
+      document.getElementById('quickAddResult').innerHTML = `
+        <div class="text-center">
+          <h6 class="fw-bold text-success">✅ تم التسجيل: ${data.student.name}</h6>
+          <p class="mb-2">الكود: <strong>${data.student.student_code}</strong></p>
+          ${data.attendanceNote ? `<div class="alert alert-info small text-start">${data.attendanceNote}</div>` : ''}
+          <div class="p-2 d-inline-block bg-white rounded"><img src="${data.qrCodeImage}" style="max-width:150px;"></div>
+        </div>`;
+    } catch (error) {
+      document.getElementById('quickAddError').innerHTML = '<div class="alert alert-danger small">حصلت مشكلة في الاتصال</div>';
+      submitButton.disabled = false;
     }
-
-    this.style.display = 'none';
-    document.getElementById('quickAddResult').style.display = 'block';
-    document.getElementById('quickAddResult').innerHTML = `
-      <div class="text-center">
-        <h6 class="fw-bold text-success">✅ تم التسجيل: ${data.student.name}</h6>
-        <p class="mb-2">الكود: <strong>${data.student.student_code}</strong></p>
-        ${data.attendanceNote ? `<div class="alert alert-info small text-start">${data.attendanceNote}</div>` : ''}
-        <div class="p-2 d-inline-block bg-white rounded"><img src="${data.qrCodeImage}" style="max-width:150px;"></div>
-      </div>`;
   });
 
   function calcBookletRemaining(input, totalRemaining) {

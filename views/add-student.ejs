@@ -119,8 +119,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const subjectSelect = document.getElementById('subjectSelect');
   const priceInput = document.getElementById('priceInput');
   const form = document.getElementById('addStudentForm');
+  const submitButton = form.querySelector('button[type="submit"]');
   const phoneField = form.querySelector('input[name="phone"]');
   const parentField = form.querySelector('input[name="parent_phone"]');
+  let isSubmitting = false;
 
   function updatePriceFromSubject() {
     const opt = subjectSelect.options[subjectSelect.selectedIndex];
@@ -147,6 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   form.addEventListener('submit', (e) => {
+    if (isSubmitting) {
+      e.preventDefault();
+      return;
+    }
+
     const phone = phoneField.value.trim();
     const parent = parentField.value.trim();
 
@@ -162,12 +169,17 @@ document.addEventListener('DOMContentLoaded', () => {
           form.appendChild(hidden);
         }
         hidden.value = pwd.trim();
+        isSubmitting = true;
+        submitButton.disabled = true;
         form.submit();
       } else {
         alert('لم تُدخل كلمة المرور الإدارية. تم إلغاء الإضافة.');
       }
       return false;
     }
+
+    isSubmitting = true;
+    submitButton.disabled = true;
   });
 });
 </script>
