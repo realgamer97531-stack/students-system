@@ -2585,10 +2585,28 @@ app.post('/door/scan', async (req, res) => {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     }
 
-    const attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
     const currentSession = await Session.findByPk(sessionId, {
       attributes: ['lesson_number', 'CenterId', 'SubjectId'],
     });
+    let attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
+    if (!attendance && currentSession) {
+      const equivalentSessions = await Session.findAll({
+        attributes: ['id'],
+        where: {
+          lesson_number: currentSession.lesson_number,
+          SubjectId: currentSession.SubjectId,
+          CenterId: { [Op.ne]: currentSession.CenterId },
+        },
+      });
+      if (equivalentSessions.length > 0) {
+        attendance = await Attendance.findOne({
+          where: {
+            StudentId: student.id,
+            SessionId: equivalentSessions.map(session => session.id),
+          },
+        });
+      }
+    }
     const previousSession = currentSession && currentSession.lesson_number > 1
       ? await Session.findOne({
         where: {
