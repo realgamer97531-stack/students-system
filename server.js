@@ -2483,9 +2483,16 @@ app.post('/homework/scan/summary', async (req, res) => {
       order: [[Session, 'lesson_number', 'ASC']],
     });
 
-    const homeworkRecords = await HomeworkCheck.findAll({ where: { StudentId: student.id } });
+    const homeworkRecords = await HomeworkCheck.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Session, include: [Center] }],
+    });
     const homeworkMap = {};
-    homeworkRecords.forEach(h => { homeworkMap[h.SessionId] = h.status; });
+    homeworkRecords.forEach(h => {
+      if (h.Session && h.Session.SubjectId === student.SubjectId) {
+        homeworkMap[h.Session.lesson_number] = h.status;
+      }
+    });
 
     const homeworkLabels = {
       complete: 'كامل', incomplete: 'مش كامل', no_steps: 'من غير خطوات', not_done: 'مش معمول',
@@ -2496,7 +2503,7 @@ app.post('/homework/scan/summary', async (req, res) => {
       .map(a => ({
         lessonNumber: a.Session.lesson_number,
         centerName: a.Session.Center.name,
-        homeworkStatus: homeworkMap[a.SessionId] ? homeworkLabels[homeworkMap[a.SessionId]] : 'لم يصحح',
+        homeworkStatus: homeworkMap[a.Session.lesson_number] ? homeworkLabels[homeworkMap[a.Session.lesson_number]] : 'لم يصحح',
       }));
 
     res.json({ success: true, studentName: student.name, adminNote: student.admin_note, summary });
