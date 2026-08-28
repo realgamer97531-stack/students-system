@@ -2588,7 +2588,22 @@ app.post('/door/scan', async (req, res) => {
     }
 
     const attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
-    const homework = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
+    const currentSession = await Session.findByPk(sessionId, {
+      attributes: ['lesson_number', 'CenterId', 'SubjectId'],
+    });
+    const previousSession = currentSession && currentSession.lesson_number > 1
+      ? await Session.findOne({
+        where: {
+          lesson_number: currentSession.lesson_number - 1,
+          CenterId: currentSession.CenterId,
+          SubjectId: currentSession.SubjectId,
+        },
+        order: [['id', 'DESC']],
+      })
+      : null;
+    const homework = previousSession
+      ? await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: previousSession.id } })
+      : null;
 
     if (attendance && homework) {
       return res.json({ success: true, message: `✅ ${student.name} - تمام، الحضور والواجب مسجلين` });
