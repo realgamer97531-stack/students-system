@@ -1693,6 +1693,21 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
     const homeworkMap = {};
     homeworkRecords.forEach(h => { homeworkMap[h.StudentId] = h.status; });
 
+    // Get homework from previous session (lesson_number - 1 with same subject)
+    const previousSessionHomeworkRecords = await HomeworkCheck.findAll({
+      include: [{
+        model: Session,
+        where: {
+          lesson_number: session.lesson_number - 1,
+          SubjectId: session.SubjectId,
+        },
+      }],
+    });
+    const previousHomeworkMap = {};
+    previousSessionHomeworkRecords.forEach(h => {
+      previousHomeworkMap[h.StudentId] = h.status;
+    });
+
     const linkedExam = await Exam.findOne({ where: { SessionId: session.id } });
     const examMap = {};
     if (linkedExam) {
@@ -1720,6 +1735,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
       { header: 'تليفون الطالب', key: 'phone', width: 18 },
       { header: 'تليفون ولي الأمر', key: 'parent_phone', width: 18 },
       { header: 'الواجب', key: 'homework', width: 15 },
+      { header: 'الواجب من الحصة السابقة', key: 'previous_homework', width: 18 },
       { header: 'درجة الامتحان', key: 'exam_score', width: 15 },
       { header: 'كومنت', key: 'comment', width: 25 },
       { header: 'دفع وقت الحضور', key: 'payment', width: 15 },
@@ -1739,6 +1755,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
         phone: a.Student.phone,
         parent_phone: a.Student.parent_phone,
         homework: homeworkLabels[homeworkMap[a.StudentId]] || '-',
+        previous_homework: homeworkLabels[previousHomeworkMap[a.StudentId]] || '-',
         exam_score: examMap[a.StudentId] ?? '-',
         comment: a.comment || '-',
         payment: a.payment_collected || 0,
