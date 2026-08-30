@@ -1137,7 +1137,7 @@ app.get('/students/:id', async (req, res) => {
     const attendanceTimeByLesson = {};
     const attendanceIdByLesson = {};
     attendanceRecords.forEach(a => {
-      if (a.Session.SubjectId === student.SubjectId) {
+      if (a && a.Session && a.Session.SubjectId === student.SubjectId) {
         attendanceByLesson[a.Session.lesson_number] = a.Session;
         attendanceUserByLesson[a.Session.lesson_number] = a.User ? a.User.name : '-';
         attendanceTimeByLesson[a.Session.lesson_number] = a.attended_at;
@@ -1154,7 +1154,7 @@ app.get('/students/:id', async (req, res) => {
     const homeworkUserByLesson = {};
     const homeworkTimeByLesson = {};
     homeworkRecords.forEach(h => {
-      if (h.Session.SubjectId === student.SubjectId) {
+      if (h && h.Session && h.Session.SubjectId === student.SubjectId) {
         homeworkByLesson[h.Session.lesson_number] = h.status;
         homeworkUserByLesson[h.Session.lesson_number] = h.User ? h.User.name : '-';
         homeworkTimeByLesson[h.Session.lesson_number] = h.createdAt;
@@ -1170,7 +1170,7 @@ app.get('/students/:id', async (req, res) => {
     
     const examScoreByLesson = {};
     examResults.forEach(r => {
-      if (r.Exam.Session) {
+      if (r && r.Exam && r.Exam.Session) {
         examScoreByLesson[r.Exam.Session.lesson_number] = {
           score: r.score,
           max_score: r.Exam.max_score,
