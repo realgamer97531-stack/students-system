@@ -3111,6 +3111,10 @@ function verifyPortalToken(requiredType) {
 }
 
 // جلب بيانات الطالب الكاملة (بيستخدمها الطالب وولي الأمر مع بعض)
+function hasAllVideoAccess(student) {
+  return student.student_code === 'STU-00000';
+}
+
 async function buildStudentData(studentId) {
   const student = await Student.findOne({
     where: { id: studentId },
@@ -3326,13 +3330,15 @@ app.post('/api/portal/watch-progress', verifyPortalToken('student'), async (req,
 app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
+    if (!student) return res.status(404).json({ success: false, message: 'غير موجود' });
+    const allVideoAccess = hasAllVideoAccess(student);
 
     // نجيب الفيديوهات المتاحة للطالب:
     // 1) فيديوهات مرتبطة بحصة من مجموعته (عبر VideoSession)
     // 2) فيديوهات له وصول فردي فيها
 
     // حصص مجموعة الطالب
-    const studentSessions = await Session.findAll({
+    const studentSessions = allVideoAccess ? [] : await Session.findAll({
       where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
     });
     const studentSessionIds = studentSessions.map(s => s.id);
@@ -3359,12 +3365,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const individualVideoIds = individualAccesses.map(a => a.VideoId);
 
     // دمج الاتنين بدون تكرار
-    const allAccessibleVideoIds = [...new Set([...groupVideoIds, ...individualVideoIds])];
+    const allAccessibleVideoIds = allVideoAccess
+      ? null
+      : [...new Set([...groupVideoIds, ...individualVideoIds])];
 
-    if (allAccessibleVideoIds.length === 0) return res.json({ success: true, lessons: [] });
+    if (!allVideoAccess && allAccessibleVideoIds.length === 0) return res.json({ success: true, lessons: [] });
 
     const videos = await Video.findAll({
-      where: { id: allAccessibleVideoIds },
+      ...(allVideoAccess ? {} : { where: { id: allAccessibleVideoIds } }),
       include: [
         { model: Session, required: false, include: [Center] },
         { model: VideoSession, required: false, include: [Session] },
@@ -3380,10 +3388,12 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
       if (!session) return null;
 
-      const grant = grantBySessionId[session.id];
+      const grant = session ? grantBySessionId[session.id] : null;
       let status, viewsUsed = 0, maxViews = 0;
 
-      if (session.is_free_for_all) {
+      if (allVideoAccess) {
+        status = 'free';
+      } else if (session.is_free_for_all) {
         status = 'free';
       } else if (grant) {
         status = grant.views_used >= grant.max_views ? 'exhausted' : 'granted';
@@ -3396,8 +3406,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       return {
         videoId: v.id,
         title: v.title,
-        lessonNumber: session.lesson_number,
-        date: session.session_date,
+        lessonNumber: session ? session.lesson_number : null,
+        date: session ? session.session_date : null,
         status,
         viewsUsed,
         maxViews,
@@ -3417,6 +3427,8 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
   try {
     const { confirm_payment } = req.body;
     const student = await Student.findByPk(req.portalStudentId);
+    if (!student) return res.status(404).json({ success: false });
+    const allVideoAccess = hasAllVideoAccess(student);
     const video = await Video.findOne({
       where: { id: req.params.videoId },
       include: [
@@ -3427,7 +3439,11 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     if (!video) return res.status(404).json({ success: false, message: 'الدرس غير موجود' });
 
     const session = video.Session || video.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
-    if (!session) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
+    if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
+
+    if (allVideoAccess) {
+      return res.json({ success: true, unlimited: true });
+    }
 
     // 1) الحالة المجانية للجميع - فتح فوري بلا حدود + تسجيل حضور
     if (session.is_free_for_all) {
@@ -3574,6 +3590,8 @@ async function ensureAttendance(studentId, sessionId, comment) {
 app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
+    if (!student) return res.status(404).json({ success: false });
+    const allVideoAccess = hasAllVideoAccess(student);
     const video = await Video.findOne({
       where: { id: req.params.videoId },
       include: [
@@ -3584,10 +3602,10 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
     if (!video) return res.status(404).json({ success: false });
 
     const session = video.Session || video.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
-    if (!session) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
+    if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
 
     // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة)
-    if (!session.is_free_for_all) {
+    if (!allVideoAccess && !session.is_free_for_all) {
       const grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
       if (!grant) return res.status(403).json({ success: false, message: 'غير مسموح' });
     }
