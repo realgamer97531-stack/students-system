@@ -3130,7 +3130,7 @@ async function buildStudentData(studentId) {
   });
   const attendanceByLesson = {};
   attendanceRecords.forEach(a => {
-    if (a.Session.SubjectId === student.SubjectId) attendanceByLesson[a.Session.lesson_number] = a;
+    if (a.Session && a.Session.SubjectId === student.SubjectId) attendanceByLesson[a.Session.lesson_number] = a;
   });
 
   const homeworkRecords = await HomeworkCheck.findAll({
@@ -3139,7 +3139,7 @@ async function buildStudentData(studentId) {
   });
   const homeworkByLesson = {};
   homeworkRecords.forEach(h => {
-    if (h.Session.SubjectId === student.SubjectId) homeworkByLesson[h.Session.lesson_number] = h;
+    if (h.Session && h.Session.SubjectId === student.SubjectId) homeworkByLesson[h.Session.lesson_number] = h;
   });
 
   const examResults = await ExamResult.findAll({
@@ -3193,7 +3193,7 @@ async function buildStudentData(studentId) {
     let attendanceStatus, attendedCenterName = null;
     if (att) {
       attendanceStatus = 'attended';
-      attendedCenterName = att.Session.Center.name;
+      attendedCenterName = att.Session?.Center?.name || null;
     } else if (ownSession && ownSession.status === 'cancelled') {
       attendanceStatus = 'cancelled';
     } else {

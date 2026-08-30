@@ -13,10 +13,10 @@ const sequelize = new Sequelize(
     dialectModule: mysql2,
     logging: false,
     pool: {
-      max: 10,      // أقصى عدد اتصالات مفتوحة مع قاعدة البيانات في نفس الوقت
+      max: 3,       // Keep the connection footprint within hosted database limits
       min: 0,
       acquire: 30000,
-      idle: 10000,
+      idle: 60000,
     },
   }
 );
