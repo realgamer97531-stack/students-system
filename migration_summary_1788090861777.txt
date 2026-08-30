@@ -1,0 +1,35 @@
+
+═══════════════════════════════════════════════════════════════════════════════
+  ONLINE SESSION MIGRATION REPORT
+  Execution Time: 2026-08-30T11:54:21.777Z
+═══════════════════════════════════════════════════════════════════════════════
+
+MIGRATION CONFIGURATION:
+  Lesson 1: Merge Sessions 30 → Session 44
+  Lesson 2: Merge Sessions 38, 41, 43 → Session 45
+
+SUMMARY:
+  ✓ Sessions Merged: 4
+  ✓ Access Grants Migrated: 136
+  ✓ Online Students Audited: 513
+  ✓ Refunds Issued: 0
+  ✓ Total Refund Amount: 0
+
+STUDENTS AFFECTED:
+  Total affected: 136
+  Unique students: 108
+
+REFUNDS ISSUED:
+  None
+
+BALANCE AUDIT DETAILS:
+  Total online students: 513
+  Students needing refund: 0
+  Students with excess payments: 0
+
+ERRORS/WARNINGS:
+  None
+
+═══════════════════════════════════════════════════════════════════════════════
+  Full details saved to: migration_report_1788090861778.json
+═══════════════════════════════════════════════════════════════════════════════

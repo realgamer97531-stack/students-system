@@ -1,0 +1,158 @@
+{
+  "timestamp": "2026-08-30T11:36:55.218Z",
+  "centers": [
+    {
+      "id": 1,
+      "name": "جلوري"
+    },
+    {
+      "id": 3,
+      "name": "الرياض ميامي"
+    },
+    {
+      "id": 5,
+      "name": "صقر السيوف"
+    },
+    {
+      "id": 7,
+      "name": "اكاديمية سموحة"
+    },
+    {
+      "id": 8,
+      "name": "محرم بيك"
+    },
+    {
+      "id": 9,
+      "name": "فيوتشر الابراهيمية"
+    },
+    {
+      "id": 11,
+      "name": "صقر ميامي"
+    },
+    {
+      "id": 12,
+      "name": "Online"
+    }
+  ],
+  "subjects": [
+    {
+      "id": 1,
+      "name": "Math Senior 1"
+    },
+    {
+      "id": 2,
+      "name": "Physics Senior 2"
+    },
+    {
+      "id": 3,
+      "name": "Math Senior 2"
+    },
+    {
+      "id": 4,
+      "name": "Math Senior 3"
+    },
+    {
+      "id": 5,
+      "name": "Physics Senior 3"
+    },
+    {
+      "id": 6,
+      "name": "Statistics Senior 3"
+    }
+  ],
+  "sessionGroups": [
+    {
+      "name": "Lesson 1 - Relative 1001",
+      "sessions": [
+        {
+          "id": 30,
+          "centerName": "جلوري",
+          "status": "normal",
+          "videoCount": 1
+        },
+        {
+          "id": 33,
+          "centerName": "جلوري",
+          "status": "normal",
+          "videoCount": 1
+        }
+      ]
+    },
+    {
+      "name": "Lesson 1 - Relative 5001",
+      "sessions": [
+        {
+          "id": 36,
+          "centerName": "اكاديمية سموحة",
+          "status": "normal",
+          "videoCount": 0
+        }
+      ]
+    },
+    {
+      "name": "Lesson 1 - Relative 9001",
+      "sessions": [
+        {
+          "id": 44,
+          "centerName": "Online",
+          "status": "normal",
+          "videoCount": 1
+        }
+      ]
+    },
+    {
+      "name": "Lesson 2 - Relative 1002",
+      "sessions": [
+        {
+          "id": 38,
+          "centerName": "جلوري",
+          "status": "normal",
+          "videoCount": 0
+        },
+        {
+          "id": 43,
+          "centerName": "جلوري",
+          "status": "normal",
+          "videoCount": 1
+        }
+      ]
+    },
+    {
+      "name": "Lesson 2 - Relative 5002",
+      "sessions": [
+        {
+          "id": 41,
+          "centerName": "اكاديمية سموحة",
+          "status": "normal",
+          "videoCount": 1
+        }
+      ]
+    },
+    {
+      "name": "Lesson 2 - Relative 9002",
+      "sessions": [
+        {
+          "id": 45,
+          "centerName": "Online",
+          "status": "normal",
+          "videoCount": 1
+        }
+      ]
+    },
+    {
+      "name": "Lesson 3 - Relative 1003",
+      "sessions": [
+        {
+          "id": 46,
+          "centerName": "جلوري",
+          "status": "normal",
+          "videoCount": 0
+        }
+      ]
+    }
+  ],
+  "onlineStudentCount": 513,
+  "totalStudents": 1084,
+  "accessGrantsCount": 222,
+  "transactionsCount": 2494
+}
