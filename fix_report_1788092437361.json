@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-08-30T12:20:33.903Z",
+  "sessionsDeleted": [],
+  "viewsFixed": [
+    {
+      "grantId": 104,
+      "studentId": 1064,
+      "sessionId": 33,
+      "oldViews": 999,
+      "newViews": 3
+    },
+    {
+      "grantId": 180,
+      "studentId": 2092,
+      "sessionId": 43,
+      "oldViews": 999,
+      "newViews": 3
+    },
+    {
+      "grantId": 184,
+      "studentId": 2092,
+      "sessionId": 41,
+      "oldViews": 999,
+      "newViews": 3
+    },
+    {
+      "grantId": 190,
+      "studentId": 945,
+      "sessionId": 30,
+      "oldViews": 999,
+      "newViews": 3
+    },
+    {
+      "grantId": 363,
+      "studentId": 945,
+      "sessionId": 44,
+      "oldViews": 999,
+      "newViews": 3
+    },
+    {
+      "grantId": 388,
+      "studentId": 2092,
+      "sessionId": 45,
+      "oldViews": 999,
+      "newViews": 3
+    },
+    {
+      "grantId": 461,
+      "studentId": 1463,
+      "sessionId": 30,
+      "oldViews": 999,
+      "newViews": 3
+    }
+  ],
+  "balanceChanges": [],
+  "errors": [],
+  "summary": {
+    "sessionsDeleted": 0,
+    "accessGrantsDeleted": 0,
+    "viewsFixed": 7,
+    "balanceDetailExported": true
+  }
+}

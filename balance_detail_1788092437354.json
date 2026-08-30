@@ -1,0 +1,5010 @@
+{
+  "generatedAt": "2026-08-30T12:20:37.352Z",
+  "summary": {
+    "totalTransactions": 500,
+    "sessionsAffected": 4,
+    "grantsFixed": 7
+  },
+  "transactions": [
+    {
+      "id": 2978,
+      "studentId": 1057,
+      "studentName": "Ziad Medhat El Zayat",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T12:13:20.000Z"
+    },
+    {
+      "id": 2977,
+      "studentId": 1050,
+      "studentName": "Badr Eldeen Amr Badr",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T12:07:25.000Z"
+    },
+    {
+      "id": 2976,
+      "studentId": 1004,
+      "studentName": "Mohamed Ahmed Hassan Desoki",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:58:47.000Z"
+    },
+    {
+      "id": 2975,
+      "studentId": 1606,
+      "studentName": "moaz fafaat mourad",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:58:43.000Z"
+    },
+    {
+      "id": 2974,
+      "studentId": 1058,
+      "studentName": "Saeed Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:55:07.000Z"
+    },
+    {
+      "id": 2973,
+      "studentId": 1610,
+      "studentName": "Ehab Sameh El Sayed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:54:23.000Z"
+    },
+    {
+      "id": 2972,
+      "studentId": 1517,
+      "studentName": "Mazen Mohamed Ali Saad",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:50:19.000Z"
+    },
+    {
+      "id": 2971,
+      "studentId": 1486,
+      "studentName": "Adham Mohamed Abdallah",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:36:47.000Z"
+    },
+    {
+      "id": 2970,
+      "studentId": 1671,
+      "studentName": "Ziad Hossam El Deen",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:33:12.000Z"
+    },
+    {
+      "id": 2969,
+      "studentId": 1389,
+      "studentName": "Adel Abdelnasser",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:25:48.000Z"
+    },
+    {
+      "id": 2968,
+      "studentId": 1623,
+      "studentName": "Ahmed Mohamed Wahed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:23:56.000Z"
+    },
+    {
+      "id": 2967,
+      "studentId": 1000,
+      "studentName": "Mohamed Tarek Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9002)",
+      "date": "2026-08-30T11:23:23.000Z"
+    },
+    {
+      "id": 2966,
+      "studentId": 2127,
+      "studentName": "Abdallah",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T11:20:58.000Z"
+    },
+    {
+      "id": 2965,
+      "studentId": 2127,
+      "studentName": "Abdallah",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:19:19.000Z"
+    },
+    {
+      "id": 2964,
+      "studentId": 1000,
+      "studentName": "Mohamed Tarek Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:19:00.000Z"
+    },
+    {
+      "id": 2963,
+      "studentId": 1415,
+      "studentName": "Malak mahmoud mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:12:35.000Z"
+    },
+    {
+      "id": 2962,
+      "studentId": 1485,
+      "studentName": "Adham Mohamed Abdallah",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-30T11:11:35.000Z"
+    },
+    {
+      "id": 2961,
+      "studentId": 1486,
+      "studentName": "Adham Mohamed Abdallah",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-30T11:11:10.000Z"
+    },
+    {
+      "id": 2960,
+      "studentId": 1115,
+      "studentName": "Mariam hatem salah",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-30T11:10:30.000Z"
+    },
+    {
+      "id": 2959,
+      "studentId": 1005,
+      "studentName": "Abdelrahman Hamdy Gaber",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:10:07.000Z"
+    },
+    {
+      "id": 2958,
+      "studentId": 1618,
+      "studentName": "Ahmed Sameh Fareed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:05:48.000Z"
+    },
+    {
+      "id": 2957,
+      "studentId": 1576,
+      "studentName": "Ahmed Mahmoud Ali Abd El Badya",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T11:05:05.000Z"
+    },
+    {
+      "id": 2956,
+      "studentId": 1016,
+      "studentName": "Hala ayman farouk",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T10:51:47.000Z"
+    },
+    {
+      "id": 2955,
+      "studentId": 1471,
+      "studentName": "Ali Youssry Ali",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T10:47:17.000Z"
+    },
+    {
+      "id": 2954,
+      "studentId": 965,
+      "studentName": "retaj gomaa shaban",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T10:45:02.000Z"
+    },
+    {
+      "id": 2953,
+      "studentId": 1026,
+      "studentName": "Habiba Ahmed Hossam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T10:38:26.000Z"
+    },
+    {
+      "id": 2952,
+      "studentId": 1467,
+      "studentName": "Jana Mohamed Farouk",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T10:37:31.000Z"
+    },
+    {
+      "id": 2950,
+      "studentId": 1599,
+      "studentName": "rezk abdelatef ",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T10:31:36.000Z"
+    },
+    {
+      "id": 2951,
+      "studentId": 1599,
+      "studentName": "rezk abdelatef ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:31:36.000Z"
+    },
+    {
+      "id": 2949,
+      "studentId": 989,
+      "studentName": "Abdallah mohamed ramdan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9002)",
+      "date": "2026-08-30T10:30:34.000Z"
+    },
+    {
+      "id": 2948,
+      "studentId": 1439,
+      "studentName": "Peter Atef",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:27:52.000Z"
+    },
+    {
+      "id": 2947,
+      "studentId": 1591,
+      "studentName": "fares eslam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:24:30.000Z"
+    },
+    {
+      "id": 2946,
+      "studentId": 1215,
+      "studentName": "youssef mohamed saaed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:16:45.000Z"
+    },
+    {
+      "id": 2945,
+      "studentId": 1200,
+      "studentName": "youssef ahmed abdelhamid",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:15:54.000Z"
+    },
+    {
+      "id": 2944,
+      "studentId": 1234,
+      "studentName": "mohamed saaed eslam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:15:34.000Z"
+    },
+    {
+      "id": 2943,
+      "studentId": 1244,
+      "studentName": "adam moahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:15:05.000Z"
+    },
+    {
+      "id": 2942,
+      "studentId": 1340,
+      "studentName": "Kareem Mohamed Ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:14:22.000Z"
+    },
+    {
+      "id": 2941,
+      "studentId": 1395,
+      "studentName": "Adham hesham mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:13:00.000Z"
+    },
+    {
+      "id": 2940,
+      "studentId": 1483,
+      "studentName": "anas mamdouh elsaied",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:12:42.000Z"
+    },
+    {
+      "id": 2939,
+      "studentId": 1231,
+      "studentName": "Sief eldeen ayman yousry",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:11:24.000Z"
+    },
+    {
+      "id": 2938,
+      "studentId": 1246,
+      "studentName": "Youssef Amir el hag abd el Haleem hussien",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:09:45.000Z"
+    },
+    {
+      "id": 2937,
+      "studentId": 1236,
+      "studentName": "Saber radwan",
+      "amount": 125,
+      "sessionId": 46,
+      "lessonNumber": 3,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-30T10:07:31.000Z"
+    },
+    {
+      "id": 2936,
+      "studentId": 1236,
+      "studentName": "Saber radwan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:07:29.000Z"
+    },
+    {
+      "id": 2935,
+      "studentId": 1595,
+      "studentName": "adhm mostafa ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:05:08.000Z"
+    },
+    {
+      "id": 2934,
+      "studentId": 1595,
+      "studentName": "adhm mostafa ",
+      "amount": 540,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T10:05:07.000Z"
+    },
+    {
+      "id": 2933,
+      "studentId": 1221,
+      "studentName": "Yehia Samir",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:04:40.000Z"
+    },
+    {
+      "id": 2932,
+      "studentId": 1256,
+      "studentName": "Omar Amr Ahmed mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:04:09.000Z"
+    },
+    {
+      "id": 2931,
+      "studentId": 1257,
+      "studentName": "Youssef Tamer Fathy Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:03:02.000Z"
+    },
+    {
+      "id": 2930,
+      "studentId": 1217,
+      "studentName": "Hazem Wael Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:02:18.000Z"
+    },
+    {
+      "id": 2929,
+      "studentId": 1201,
+      "studentName": "habiba mohamed ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T10:01:51.000Z"
+    },
+    {
+      "id": 2928,
+      "studentId": 1201,
+      "studentName": "habiba mohamed ahmed",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T10:01:50.000Z"
+    },
+    {
+      "id": 2927,
+      "studentId": 1250,
+      "studentName": "ali shrief",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:59:37.000Z"
+    },
+    {
+      "id": 2926,
+      "studentId": 1213,
+      "studentName": "alaa mohamed arafat",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:59:16.000Z"
+    },
+    {
+      "id": 2925,
+      "studentId": 1216,
+      "studentName": "shahd fathy mahmoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:59:02.000Z"
+    },
+    {
+      "id": 2924,
+      "studentId": 1261,
+      "studentName": "Kariam mohamed elsaied",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:58:47.000Z"
+    },
+    {
+      "id": 2923,
+      "studentId": 1600,
+      "studentName": "hana ayman ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:58:41.000Z"
+    },
+    {
+      "id": 2922,
+      "studentId": 1600,
+      "studentName": "hana ayman ",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T09:58:40.000Z"
+    },
+    {
+      "id": 2921,
+      "studentId": 1240,
+      "studentName": "Seif Eldeen Tamer",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:58:33.000Z"
+    },
+    {
+      "id": 2920,
+      "studentId": 1277,
+      "studentName": "Omar abdelall",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:57:26.000Z"
+    },
+    {
+      "id": 2919,
+      "studentId": 1218,
+      "studentName": "Ziad Emad ElSayed Derbala",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:56:56.000Z"
+    },
+    {
+      "id": 2918,
+      "studentId": 2126,
+      "studentName": "mohamed elfaitory",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:56:36.000Z"
+    },
+    {
+      "id": 2917,
+      "studentId": 2126,
+      "studentName": "mohamed elfaitory",
+      "amount": 350,
+      "sessionId": 46,
+      "lessonNumber": 3,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-30T09:56:35.000Z"
+    },
+    {
+      "id": 2916,
+      "studentId": 1096,
+      "studentName": "Mariam Mohamed Ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-30T09:56:25.000Z"
+    },
+    {
+      "id": 2915,
+      "studentId": 1204,
+      "studentName": "mostafa ehab",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:55:43.000Z"
+    },
+    {
+      "id": 2914,
+      "studentId": 1278,
+      "studentName": "Mohamed Saber Ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:55:30.000Z"
+    },
+    {
+      "id": 2913,
+      "studentId": 1254,
+      "studentName": "Omar smay hessen",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:55:16.000Z"
+    },
+    {
+      "id": 2912,
+      "studentId": 2093,
+      "studentName": "lojain mohamed ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:54:54.000Z"
+    },
+    {
+      "id": 2911,
+      "studentId": 2093,
+      "studentName": "lojain mohamed ",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T09:54:53.000Z"
+    },
+    {
+      "id": 2909,
+      "studentId": 1545,
+      "studentName": "Seif Mohamed",
+      "amount": 30,
+      "sessionId": 46,
+      "lessonNumber": 3,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-30T09:54:23.000Z"
+    },
+    {
+      "id": 2910,
+      "studentId": 1545,
+      "studentName": "Seif Mohamed",
+      "amount": 30,
+      "sessionId": 46,
+      "lessonNumber": 3,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-30T09:54:23.000Z"
+    },
+    {
+      "id": 2907,
+      "studentId": 1545,
+      "studentName": "Seif Mohamed",
+      "amount": -25,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:54:22.000Z"
+    },
+    {
+      "id": 2908,
+      "studentId": 1545,
+      "studentName": "Seif Mohamed",
+      "amount": -25,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:54:22.000Z"
+    },
+    {
+      "id": 2905,
+      "studentId": 1545,
+      "studentName": "Seif Mohamed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T09:54:21.000Z"
+    },
+    {
+      "id": 2906,
+      "studentId": 1545,
+      "studentName": "Seif Mohamed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T09:54:21.000Z"
+    },
+    {
+      "id": 2904,
+      "studentId": 1672,
+      "studentName": "OMAR ABOBAKR ALI ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:54:11.000Z"
+    },
+    {
+      "id": 2903,
+      "studentId": 1272,
+      "studentName": "moataz alaa eldeen",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:53:54.000Z"
+    },
+    {
+      "id": 2902,
+      "studentId": 1196,
+      "studentName": "mohab emad abdelslam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:53:37.000Z"
+    },
+    {
+      "id": 2901,
+      "studentId": 1207,
+      "studentName": "abdelrhman mohamed ramdan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:53:17.000Z"
+    },
+    {
+      "id": 2900,
+      "studentId": 1276,
+      "studentName": "Mohand wael ragab",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:53:02.000Z"
+    },
+    {
+      "id": 2899,
+      "studentId": 1304,
+      "studentName": "Mahmoud Ibrahim Mahmoud Ibrahim",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:53:01.000Z"
+    },
+    {
+      "id": 2898,
+      "studentId": 1198,
+      "studentName": "Eyad Hatem Abdelaal",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:51:36.000Z"
+    },
+    {
+      "id": 2896,
+      "studentId": 1219,
+      "studentName": "mohamed salah mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:51:20.000Z"
+    },
+    {
+      "id": 2897,
+      "studentId": 1225,
+      "studentName": "hessen mohamed hassan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:51:20.000Z"
+    },
+    {
+      "id": 2895,
+      "studentId": 1205,
+      "studentName": "menntualla ali",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:51:01.000Z"
+    },
+    {
+      "id": 2894,
+      "studentId": 1208,
+      "studentName": "farah hany emad",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:50:50.000Z"
+    },
+    {
+      "id": 2893,
+      "studentId": 1251,
+      "studentName": "Youssef Mohamed Sayed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:50:29.000Z"
+    },
+    {
+      "id": 2892,
+      "studentId": 1598,
+      "studentName": "MOHAMED ASSER ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:50:28.000Z"
+    },
+    {
+      "id": 2891,
+      "studentId": 1259,
+      "studentName": "abdelhakiam ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:50:01.000Z"
+    },
+    {
+      "id": 2890,
+      "studentId": 1265,
+      "studentName": "Selim Karim",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:50:00.000Z"
+    },
+    {
+      "id": 2889,
+      "studentId": 1227,
+      "studentName": "Youssef Mohamed abd el salam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:49:34.000Z"
+    },
+    {
+      "id": 2887,
+      "studentId": 1543,
+      "studentName": "Malak Mohamed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T09:48:37.000Z"
+    },
+    {
+      "id": 2888,
+      "studentId": 1543,
+      "studentName": "Malak Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:48:37.000Z"
+    },
+    {
+      "id": 2886,
+      "studentId": 999,
+      "studentName": "Basmalla Abdelaziz",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T09:48:35.000Z"
+    },
+    {
+      "id": 2885,
+      "studentId": 1238,
+      "studentName": "Roqia Magdy Hamdy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:48:18.000Z"
+    },
+    {
+      "id": 2884,
+      "studentId": 1209,
+      "studentName": "Mohamed yasser",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:47:18.000Z"
+    },
+    {
+      "id": 2883,
+      "studentId": 1260,
+      "studentName": "Rahma Moustafa",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:46:53.000Z"
+    },
+    {
+      "id": 2882,
+      "studentId": 960,
+      "studentName": "Habiba atef",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:46:44.000Z"
+    },
+    {
+      "id": 2881,
+      "studentId": 1273,
+      "studentName": "Malak Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:46:41.000Z"
+    },
+    {
+      "id": 2880,
+      "studentId": 1189,
+      "studentName": "Baraa Nabil",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:46:28.000Z"
+    },
+    {
+      "id": 2879,
+      "studentId": 1300,
+      "studentName": "Ereen amir",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:46:21.000Z"
+    },
+    {
+      "id": 2878,
+      "studentId": 1263,
+      "studentName": "salma mahmoud abdelall",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:46:13.000Z"
+    },
+    {
+      "id": 2877,
+      "studentId": 1269,
+      "studentName": "saga salem fathy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:46:03.000Z"
+    },
+    {
+      "id": 2876,
+      "studentId": 1264,
+      "studentName": "retaj elsaied abdelfatah",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:45:54.000Z"
+    },
+    {
+      "id": 2874,
+      "studentId": 1279,
+      "studentName": "Hagar Sameh Helmy El Sayed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T09:45:33.000Z"
+    },
+    {
+      "id": 2875,
+      "studentId": 1279,
+      "studentName": "Hagar Sameh Helmy El Sayed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:45:33.000Z"
+    },
+    {
+      "id": 2873,
+      "studentId": 1270,
+      "studentName": "hana shawky",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:45:30.000Z"
+    },
+    {
+      "id": 2872,
+      "studentId": 953,
+      "studentName": "mohamed maher gomaa",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:45:06.000Z"
+    },
+    {
+      "id": 2871,
+      "studentId": 1590,
+      "studentName": "omar abelrazk ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:44:47.000Z"
+    },
+    {
+      "id": 2870,
+      "studentId": 1590,
+      "studentName": "omar abelrazk ",
+      "amount": 100,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-30T09:44:46.000Z"
+    },
+    {
+      "id": 2869,
+      "studentId": 1470,
+      "studentName": "Adam El Habashy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:44:12.000Z"
+    },
+    {
+      "id": 2868,
+      "studentId": 1589,
+      "studentName": "omar tamer ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:43:56.000Z"
+    },
+    {
+      "id": 2867,
+      "studentId": 1506,
+      "studentName": "Aliaa Salama Waleed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:43:33.000Z"
+    },
+    {
+      "id": 2866,
+      "studentId": 1579,
+      "studentName": "Haneen Ehab",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:43:19.000Z"
+    },
+    {
+      "id": 2865,
+      "studentId": 1268,
+      "studentName": "Karim Atia El Sayed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:43:11.000Z"
+    },
+    {
+      "id": 2864,
+      "studentId": 1271,
+      "studentName": "Toka Mohamed Ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:43:04.000Z"
+    },
+    {
+      "id": 2863,
+      "studentId": 1212,
+      "studentName": "Fahd mohamed shahin",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:42:52.000Z"
+    },
+    {
+      "id": 2862,
+      "studentId": 1199,
+      "studentName": "mohamed hossam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:42:51.000Z"
+    },
+    {
+      "id": 2861,
+      "studentId": 1247,
+      "studentName": "basma basaam elsaied ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:41:57.000Z"
+    },
+    {
+      "id": 2860,
+      "studentId": 1188,
+      "studentName": "Jacika maichil shnouda",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:41:46.000Z"
+    },
+    {
+      "id": 2859,
+      "studentId": 1222,
+      "studentName": "Omar Abdelhamid Amin Abdelhamid Saleh",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:41:39.000Z"
+    },
+    {
+      "id": 2858,
+      "studentId": 1228,
+      "studentName": "Mohamed Yasser Mohamed Abdallah",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:41:26.000Z"
+    },
+    {
+      "id": 2857,
+      "studentId": 1210,
+      "studentName": "menna mahmoud ismail",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:41:05.000Z"
+    },
+    {
+      "id": 2856,
+      "studentId": 1258,
+      "studentName": "rodina mohamed ibrahiam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:41:00.000Z"
+    },
+    {
+      "id": 2855,
+      "studentId": 1194,
+      "studentName": "Rodina Ahmed El Sayed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:40:51.000Z"
+    },
+    {
+      "id": 2854,
+      "studentId": 1241,
+      "studentName": "nada hany ragab",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:40:37.000Z"
+    },
+    {
+      "id": 2853,
+      "studentId": 1232,
+      "studentName": "sand hessien ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:40:36.000Z"
+    },
+    {
+      "id": 2852,
+      "studentId": 1239,
+      "studentName": "Jody Hamdy Ramadan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:40:10.000Z"
+    },
+    {
+      "id": 2851,
+      "studentId": 1033,
+      "studentName": "Kareem Ibrahim Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T09:39:38.000Z"
+    },
+    {
+      "id": 2850,
+      "studentId": 1593,
+      "studentName": "Mariam Ramy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:39:16.000Z"
+    },
+    {
+      "id": 2849,
+      "studentId": 964,
+      "studentName": "malak basiouny mostafa",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:38:56.000Z"
+    },
+    {
+      "id": 2848,
+      "studentId": 1245,
+      "studentName": "nadeen ahmed saaed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:38:49.000Z"
+    },
+    {
+      "id": 2847,
+      "studentId": 1214,
+      "studentName": "Sama moustfa hashem",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-30T09:38:33.000Z"
+    },
+    {
+      "id": 2846,
+      "studentId": 2125,
+      "studentName": "omar abobakr",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Physics Senior 3 Chapter 1,2",
+      "date": "2026-08-30T09:25:30.000Z"
+    },
+    {
+      "id": 2845,
+      "studentId": 994,
+      "studentName": "Abha ayman emara",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T09:21:12.000Z"
+    },
+    {
+      "id": 2844,
+      "studentId": 1052,
+      "studentName": "Reem Tamer Abdelmaksod",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 9001)",
+      "date": "2026-08-30T09:18:41.000Z"
+    },
+    {
+      "id": 2843,
+      "studentId": 1299,
+      "studentName": "Yassine Ehab Sobhy Abdelmged",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:53:09.000Z"
+    },
+    {
+      "id": 2839,
+      "studentId": 1032,
+      "studentName": "Antonyous Kerolos",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T08:50:06.000Z"
+    },
+    {
+      "id": 2840,
+      "studentId": 1032,
+      "studentName": "Antonyous Kerolos",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T08:50:06.000Z"
+    },
+    {
+      "id": 2841,
+      "studentId": 1032,
+      "studentName": "Antonyous Kerolos",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T08:50:06.000Z"
+    },
+    {
+      "id": 2842,
+      "studentId": 1032,
+      "studentName": "Antonyous Kerolos",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T08:50:06.000Z"
+    },
+    {
+      "id": 2838,
+      "studentId": 1032,
+      "studentName": "Antonyous Kerolos",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T08:50:05.000Z"
+    },
+    {
+      "id": 2837,
+      "studentId": 1032,
+      "studentName": "Antonyous Kerolos",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:44:20.000Z"
+    },
+    {
+      "id": 2836,
+      "studentId": 1320,
+      "studentName": "Adham Ossama Rashad",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:43:41.000Z"
+    },
+    {
+      "id": 2835,
+      "studentId": 1639,
+      "studentName": "Sherif Ashraf",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:40:18.000Z"
+    },
+    {
+      "id": 2834,
+      "studentId": 1472,
+      "studentName": "Mariam Abdelrahma Hussien",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:38:04.000Z"
+    },
+    {
+      "id": 2833,
+      "studentId": 1020,
+      "studentName": "Mohamed tarek mahmoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:34:18.000Z"
+    },
+    {
+      "id": 2832,
+      "studentId": 1457,
+      "studentName": "Ahmed Ashraf Hassan Abdallah",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:27:53.000Z"
+    },
+    {
+      "id": 2831,
+      "studentId": 1040,
+      "studentName": "Omar Tamer Zakriaa",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:19:35.000Z"
+    },
+    {
+      "id": 2830,
+      "studentId": 1402,
+      "studentName": "Tarek mohamed abdelmagid",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T08:15:37.000Z"
+    },
+    {
+      "id": 2829,
+      "studentId": 1029,
+      "studentName": "eiad shady",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T07:54:49.000Z"
+    },
+    {
+      "id": 2828,
+      "studentId": 1413,
+      "studentName": "Mahmoud ahmed hamdy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T07:49:56.000Z"
+    },
+    {
+      "id": 2827,
+      "studentId": 1480,
+      "studentName": "Seif Eldeen Eslam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T07:46:40.000Z"
+    },
+    {
+      "id": 2826,
+      "studentId": 1408,
+      "studentName": "Ahmed hany youssef",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T07:05:46.000Z"
+    },
+    {
+      "id": 2825,
+      "studentId": 1408,
+      "studentName": "Ahmed hany youssef",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T07:00:09.000Z"
+    },
+    {
+      "id": 2824,
+      "studentId": 1547,
+      "studentName": "Philopatir Maged",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T06:57:52.000Z"
+    },
+    {
+      "id": 2823,
+      "studentId": 989,
+      "studentName": "Abdallah mohamed ramdan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-30T06:56:53.000Z"
+    },
+    {
+      "id": 2822,
+      "studentId": 1216,
+      "studentName": "shahd fathy mahmoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-30T06:06:18.000Z"
+    },
+    {
+      "id": 2821,
+      "studentId": 1652,
+      "studentName": "hana saeed",
+      "amount": -80,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-30T05:36:11.000Z"
+    },
+    {
+      "id": 2820,
+      "studentId": 1317,
+      "studentName": "Mohamed Tamer Kedry Mohamed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T23:18:40.000Z"
+    },
+    {
+      "id": 2819,
+      "studentId": 2124,
+      "studentName": "Kareem Moustafa",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Physics Senior 3 Chapter 1,2 (bulk upload)",
+      "date": "2026-08-29T23:17:16.000Z"
+    },
+    {
+      "id": 2817,
+      "studentId": 2123,
+      "studentName": "Mazen Ahmed Ibrahim",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Physics Senior 3 Chapter 1,2 (bulk upload)",
+      "date": "2026-08-29T23:17:15.000Z"
+    },
+    {
+      "id": 2818,
+      "studentId": 2124,
+      "studentName": "Kareem Moustafa",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-29T23:17:15.000Z"
+    },
+    {
+      "id": 2816,
+      "studentId": 2123,
+      "studentName": "Mazen Ahmed Ibrahim",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-29T23:17:14.000Z"
+    },
+    {
+      "id": 2815,
+      "studentId": 2122,
+      "studentName": "Jana Nabil Awad",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-29T23:17:13.000Z"
+    },
+    {
+      "id": 2814,
+      "studentId": 2121,
+      "studentName": "Rahaf Ayman Abdelaziz",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-29T23:17:12.000Z"
+    },
+    {
+      "id": 2813,
+      "studentId": 2120,
+      "studentName": "Losenda Basem Tantawy El Sayed Kandel",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-29T23:17:11.000Z"
+    },
+    {
+      "id": 2812,
+      "studentId": 2119,
+      "studentName": "Malak Mohamed Zaki",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-29T23:17:10.000Z"
+    },
+    {
+      "id": 2811,
+      "studentId": 2118,
+      "studentName": "Nicole Michael Makram Galel",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-29T23:17:09.000Z"
+    },
+    {
+      "id": 2810,
+      "studentId": 2117,
+      "studentName": "Hana Mohamed Samir",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-29T23:17:08.000Z"
+    },
+    {
+      "id": 2809,
+      "studentId": 2116,
+      "studentName": "Salma Emad Nasr",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-29T23:17:06.000Z"
+    },
+    {
+      "id": 2808,
+      "studentId": 1415,
+      "studentName": "Malak mahmoud mohamed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T23:09:50.000Z"
+    },
+    {
+      "id": 2807,
+      "studentId": 989,
+      "studentName": "Abdallah mohamed ramdan",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T23:09:15.000Z"
+    },
+    {
+      "id": 2806,
+      "studentId": 1261,
+      "studentName": "Kariam mohamed elsaied",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T23:08:04.000Z"
+    },
+    {
+      "id": 2805,
+      "studentId": 1106,
+      "studentName": "jana hesham elsaied",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T22:49:04.000Z"
+    },
+    {
+      "id": 2804,
+      "studentId": 1409,
+      "studentName": "Ahmed hany youssef",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T22:27:20.000Z"
+    },
+    {
+      "id": 2803,
+      "studentId": 1408,
+      "studentName": "Ahmed hany youssef",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T22:26:49.000Z"
+    },
+    {
+      "id": 2802,
+      "studentId": 1651,
+      "studentName": "fahd saleh",
+      "amount": -680,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T22:23:23.000Z"
+    },
+    {
+      "id": 2801,
+      "studentId": 1651,
+      "studentName": "fahd saleh",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T21:28:20.000Z"
+    },
+    {
+      "id": 2800,
+      "studentId": 1304,
+      "studentName": "Mahmoud Ibrahim Mahmoud Ibrahim",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T21:10:43.000Z"
+    },
+    {
+      "id": 2799,
+      "studentId": 1601,
+      "studentName": "OMAR MOSTAFA ",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T21:10:29.000Z"
+    },
+    {
+      "id": 2798,
+      "studentId": 1075,
+      "studentName": "abdelrhman mohamed ramdan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T20:26:08.000Z"
+    },
+    {
+      "id": 2797,
+      "studentId": 1094,
+      "studentName": "Jaida Essam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T20:09:14.000Z"
+    },
+    {
+      "id": 2796,
+      "studentId": 1208,
+      "studentName": "farah hany emad",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-29T19:41:15.000Z"
+    },
+    {
+      "id": 2795,
+      "studentId": 1086,
+      "studentName": "Elhussien Abdelmaniem",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T18:53:48.000Z"
+    },
+    {
+      "id": 2794,
+      "studentId": 1642,
+      "studentName": "abdelrhman mohamed ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T18:41:44.000Z"
+    },
+    {
+      "id": 2793,
+      "studentId": 1304,
+      "studentName": "Mahmoud Ibrahim Mahmoud Ibrahim",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-29T18:23:13.000Z"
+    },
+    {
+      "id": 2792,
+      "studentId": 1227,
+      "studentName": "Youssef Mohamed abd el salam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T18:19:05.000Z"
+    },
+    {
+      "id": 2791,
+      "studentId": 1109,
+      "studentName": "Sondos usama haredy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T17:55:58.000Z"
+    },
+    {
+      "id": 2790,
+      "studentId": 952,
+      "studentName": "Mariam tarek youssef",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-29T17:53:04.000Z"
+    },
+    {
+      "id": 2789,
+      "studentId": 1117,
+      "studentName": "Nada elsaied ibrahiam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T17:43:46.000Z"
+    },
+    {
+      "id": 2788,
+      "studentId": 1222,
+      "studentName": "Omar Abdelhamid Amin Abdelhamid Saleh",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T17:27:25.000Z"
+    },
+    {
+      "id": 2787,
+      "studentId": 1649,
+      "studentName": "mariam ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T17:12:49.000Z"
+    },
+    {
+      "id": 2786,
+      "studentId": 1221,
+      "studentName": "Yehia Samir",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T17:09:57.000Z"
+    },
+    {
+      "id": 2785,
+      "studentId": 1418,
+      "studentName": "Marwan ahmed masaoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T17:02:19.000Z"
+    },
+    {
+      "id": 2784,
+      "studentId": 1270,
+      "studentName": "hana shawky",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T16:27:46.000Z"
+    },
+    {
+      "id": 2783,
+      "studentId": 1061,
+      "studentName": "mohamed waleed mahmoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T16:21:29.000Z"
+    },
+    {
+      "id": 2782,
+      "studentId": 1105,
+      "studentName": "khaled amr",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T16:16:29.000Z"
+    },
+    {
+      "id": 2781,
+      "studentId": 1655,
+      "studentName": "HAGER HAFEZ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T16:15:08.000Z"
+    },
+    {
+      "id": 2780,
+      "studentId": 1646,
+      "studentName": "saged wael ",
+      "amount": 0,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T16:12:49.000Z"
+    },
+    {
+      "id": 2779,
+      "studentId": 1198,
+      "studentName": "Eyad Hatem Abdelaal",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T16:09:24.000Z"
+    },
+    {
+      "id": 2778,
+      "studentId": 1655,
+      "studentName": "HAGER HAFEZ",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T16:06:29.000Z"
+    },
+    {
+      "id": 2777,
+      "studentId": 1304,
+      "studentName": "Mahmoud Ibrahim Mahmoud Ibrahim",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T16:06:00.000Z"
+    },
+    {
+      "id": 2776,
+      "studentId": 1127,
+      "studentName": "Kariam amr mohamed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T16:05:29.000Z"
+    },
+    {
+      "id": 2775,
+      "studentId": 952,
+      "studentName": "Mariam tarek youssef",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T16:05:00.000Z"
+    },
+    {
+      "id": 2774,
+      "studentId": 1413,
+      "studentName": "Mahmoud ahmed hamdy",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T16:04:35.000Z"
+    },
+    {
+      "id": 2773,
+      "studentId": 1115,
+      "studentName": "Mariam hatem salah",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T16:03:47.000Z"
+    },
+    {
+      "id": 2772,
+      "studentId": 1097,
+      "studentName": "Malak kariam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T15:47:01.000Z"
+    },
+    {
+      "id": 2771,
+      "studentId": 1341,
+      "studentName": "Eyad Fisal Ibrahim",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T15:44:42.000Z"
+    },
+    {
+      "id": 2770,
+      "studentId": 1114,
+      "studentName": "Youssef hossam eldeen",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T15:13:40.000Z"
+    },
+    {
+      "id": 2769,
+      "studentId": 1068,
+      "studentName": "mohab emad abdelslam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T14:55:46.000Z"
+    },
+    {
+      "id": 2768,
+      "studentId": 1090,
+      "studentName": "yassen mohamed mostafa",
+      "amount": 0,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T14:34:14.000Z"
+    },
+    {
+      "id": 2767,
+      "studentId": 1077,
+      "studentName": "mostafa magdy mahmoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T13:44:44.000Z"
+    },
+    {
+      "id": 2766,
+      "studentId": 1099,
+      "studentName": "yassen mohamed ali",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T13:10:08.000Z"
+    },
+    {
+      "id": 2765,
+      "studentId": 1647,
+      "studentName": "nadeen ahmed mohamed ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T13:07:20.000Z"
+    },
+    {
+      "id": 2764,
+      "studentId": 1064,
+      "studentName": "Kareem Ahmed Mohamed Nageb",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T13:04:39.000Z"
+    },
+    {
+      "id": 2763,
+      "studentId": 1085,
+      "studentName": "mohamed salah mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T13:03:58.000Z"
+    },
+    {
+      "id": 2762,
+      "studentId": 1129,
+      "studentName": "Omar Ahmed Shehata",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T12:59:41.000Z"
+    },
+    {
+      "id": 2761,
+      "studentId": 2114,
+      "studentName": "Test Phy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1002)",
+      "date": "2026-08-29T12:46:58.000Z"
+    },
+    {
+      "id": 2760,
+      "studentId": 954,
+      "studentName": "ahmed ibrhiam hassan",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T12:42:38.000Z"
+    },
+    {
+      "id": 2759,
+      "studentId": 975,
+      "studentName": "mohamed ahmed fathy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T12:39:35.000Z"
+    },
+    {
+      "id": 2758,
+      "studentId": 1320,
+      "studentName": "Adham Ossama Rashad",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T12:39:30.000Z"
+    },
+    {
+      "id": 2757,
+      "studentId": 1321,
+      "studentName": "Adham Ossama Rashad",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-29T12:39:08.000Z"
+    },
+    {
+      "id": 2756,
+      "studentId": 2115,
+      "studentName": "Seif Eldeen Ali Badr",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-29T12:35:10.000Z"
+    },
+    {
+      "id": 2755,
+      "studentId": 1590,
+      "studentName": "omar abelrazk ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T11:12:17.000Z"
+    },
+    {
+      "id": 2754,
+      "studentId": 1329,
+      "studentName": "Ziad Adham Hamada Ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 5002)",
+      "date": "2026-08-29T11:04:46.000Z"
+    },
+    {
+      "id": 2753,
+      "studentId": 1672,
+      "studentName": "OMAR ABOBAKR ALI ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-29T08:32:39.000Z"
+    },
+    {
+      "id": 2752,
+      "studentId": 2112,
+      "studentName": "Roaa Waleed Mahmoud",
+      "amount": -350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "تعديل مبلغ بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T23:10:20.000Z"
+    },
+    {
+      "id": 2751,
+      "studentId": 2112,
+      "studentName": "Roaa Waleed Mahmoud",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-28T23:09:49.000Z"
+    },
+    {
+      "id": 2750,
+      "studentId": 2109,
+      "studentName": "Jonathan Joseph Shahdy",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-28T23:08:08.000Z"
+    },
+    {
+      "id": 2749,
+      "studentId": 2109,
+      "studentName": "Jonathan Joseph Shahdy",
+      "amount": 125,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T23:07:59.000Z"
+    },
+    {
+      "id": 2748,
+      "studentId": 1335,
+      "studentName": "Aya Hussien Mohamed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-28T23:05:56.000Z"
+    },
+    {
+      "id": 2747,
+      "studentId": 2113,
+      "studentName": "Jana Essam Mohamed Abdelmahdy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:51:44.000Z"
+    },
+    {
+      "id": 2746,
+      "studentId": 2112,
+      "studentName": "Roaa Waleed Mahmoud",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:51:43.000Z"
+    },
+    {
+      "id": 2745,
+      "studentId": 2112,
+      "studentName": "Roaa Waleed Mahmoud",
+      "amount": 20,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-28T22:51:42.000Z"
+    },
+    {
+      "id": 2744,
+      "studentId": 2111,
+      "studentName": "Malak Mahmoud Morsy El Demerany",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T22:14:31.000Z"
+    },
+    {
+      "id": 2743,
+      "studentId": 2110,
+      "studentName": "Nour Ahmed Ali Abdelhamed",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:14:30.000Z"
+    },
+    {
+      "id": 2742,
+      "studentId": 2109,
+      "studentName": "Jonathan Joseph Shahdy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:14:29.000Z"
+    },
+    {
+      "id": 2741,
+      "studentId": 2108,
+      "studentName": "Joudy Hany Mohamed El Alfy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T22:14:27.000Z"
+    },
+    {
+      "id": 2739,
+      "studentId": 2107,
+      "studentName": "Abdelrahman Ahmed",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-28T22:14:26.000Z"
+    },
+    {
+      "id": 2740,
+      "studentId": 2107,
+      "studentName": "Abdelrahman Ahmed",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:14:26.000Z"
+    },
+    {
+      "id": 2738,
+      "studentId": 2106,
+      "studentName": "Haneen Ezz Eldeen",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:14:25.000Z"
+    },
+    {
+      "id": 2737,
+      "studentId": 2105,
+      "studentName": "Youssef Samy Zakry",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:14:24.000Z"
+    },
+    {
+      "id": 2735,
+      "studentId": 2104,
+      "studentName": "Youssef Samy Zakry",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Physics Senior 3 Chapter 1,2 (bulk upload)",
+      "date": "2026-08-28T22:14:23.000Z"
+    },
+    {
+      "id": 2736,
+      "studentId": 2105,
+      "studentName": "Youssef Samy Zakry",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-28T22:14:23.000Z"
+    },
+    {
+      "id": 2734,
+      "studentId": 2104,
+      "studentName": "Youssef Samy Zakry",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-28T22:14:22.000Z"
+    },
+    {
+      "id": 2733,
+      "studentId": 2103,
+      "studentName": "Seif Eldeen Kareem Saad",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T22:14:21.000Z"
+    },
+    {
+      "id": 2732,
+      "studentId": 2102,
+      "studentName": "Habiba Hossam Eldeen",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T22:14:20.000Z"
+    },
+    {
+      "id": 2731,
+      "studentId": 2101,
+      "studentName": "Abdelrahman Mohamed Zakaria El Sayed Mousa",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra (bulk upload)",
+      "date": "2026-08-28T22:14:19.000Z"
+    },
+    {
+      "id": 2729,
+      "studentId": 2100,
+      "studentName": "gasser mohamed naaem",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T22:14:18.000Z"
+    },
+    {
+      "id": 2730,
+      "studentId": 2101,
+      "studentName": "Abdelrahman Mohamed Zakaria El Sayed Mousa",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-28T22:14:18.000Z"
+    },
+    {
+      "id": 2728,
+      "studentId": 2099,
+      "studentName": "omar mohamed abdelaziz",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T22:14:17.000Z"
+    },
+    {
+      "id": 2727,
+      "studentId": 2098,
+      "studentName": "jana asalah hafaz",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T22:14:15.000Z"
+    },
+    {
+      "id": 2726,
+      "studentId": 2097,
+      "studentName": "layla kariam",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T22:14:14.000Z"
+    },
+    {
+      "id": 2725,
+      "studentId": 1302,
+      "studentName": "malak abdelrady hamda",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-28T20:27:25.000Z"
+    },
+    {
+      "id": 2724,
+      "studentId": 1248,
+      "studentName": "khaled amr",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T18:09:16.000Z"
+    },
+    {
+      "id": 2723,
+      "studentId": 1248,
+      "studentName": "khaled amr",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T18:08:33.000Z"
+    },
+    {
+      "id": 2722,
+      "studentId": 1248,
+      "studentName": "khaled amr",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-28T18:07:19.000Z"
+    },
+    {
+      "id": 2721,
+      "studentId": 1105,
+      "studentName": "khaled amr",
+      "amount": -630,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-28T18:06:21.000Z"
+    },
+    {
+      "id": 2720,
+      "studentId": 961,
+      "studentName": "diana hany fekry",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T17:40:13.000Z"
+    },
+    {
+      "id": 2719,
+      "studentId": 1482,
+      "studentName": "osama mohamed abdelaziz",
+      "amount": 400,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-28T17:29:11.000Z"
+    },
+    {
+      "id": 2718,
+      "studentId": 1482,
+      "studentName": "osama mohamed abdelaziz",
+      "amount": 30,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T17:28:59.000Z"
+    },
+    {
+      "id": 2717,
+      "studentId": 1657,
+      "studentName": "abdelrhman khaled ",
+      "amount": 350,
+      "sessionId": 41,
+      "lessonNumber": 2,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T17:26:11.000Z"
+    },
+    {
+      "id": 2716,
+      "studentId": 1657,
+      "studentName": "abdelrhman khaled ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:26:09.000Z"
+    },
+    {
+      "id": 2715,
+      "studentId": 1657,
+      "studentName": "abdelrhman khaled ",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T17:26:08.000Z"
+    },
+    {
+      "id": 2714,
+      "studentId": 1656,
+      "studentName": "AMR SAIED ",
+      "amount": 350,
+      "sessionId": 41,
+      "lessonNumber": 2,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T17:21:20.000Z"
+    },
+    {
+      "id": 2712,
+      "studentId": 1656,
+      "studentName": "AMR SAIED ",
+      "amount": 630,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T17:21:18.000Z"
+    },
+    {
+      "id": 2713,
+      "studentId": 1656,
+      "studentName": "AMR SAIED ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:21:18.000Z"
+    },
+    {
+      "id": 2711,
+      "studentId": 1262,
+      "studentName": "Malek ahmed nageh",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:08:48.000Z"
+    },
+    {
+      "id": 2710,
+      "studentId": 2093,
+      "studentName": "lojain mohamed ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:06:50.000Z"
+    },
+    {
+      "id": 2709,
+      "studentId": 951,
+      "studentName": "mostafa mohamed saaed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:06:09.000Z"
+    },
+    {
+      "id": 2708,
+      "studentId": 2096,
+      "studentName": "yassien ezat ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:05:27.000Z"
+    },
+    {
+      "id": 2707,
+      "studentId": 2096,
+      "studentName": "yassien ezat ",
+      "amount": 350,
+      "sessionId": 41,
+      "lessonNumber": 2,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T17:05:26.000Z"
+    },
+    {
+      "id": 2706,
+      "studentId": 955,
+      "studentName": "abdelrhman mohamed ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:04:09.000Z"
+    },
+    {
+      "id": 2705,
+      "studentId": 2095,
+      "studentName": "ziad ahmed ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:03:29.000Z"
+    },
+    {
+      "id": 2704,
+      "studentId": 2095,
+      "studentName": "ziad ahmed ",
+      "amount": 350,
+      "sessionId": 41,
+      "lessonNumber": 2,
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T17:03:28.000Z"
+    },
+    {
+      "id": 2701,
+      "studentId": 1025,
+      "studentName": "Abdelrahman Ahmed Nabil",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T17:01:28.000Z"
+    },
+    {
+      "id": 2700,
+      "studentId": 1324,
+      "studentName": "Sara Emad",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور (قوة)",
+      "date": "2026-08-28T16:59:10.000Z"
+    },
+    {
+      "id": 2698,
+      "studentId": 1599,
+      "studentName": "rezk abdelatef ",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T16:54:19.000Z"
+    },
+    {
+      "id": 2699,
+      "studentId": 1599,
+      "studentName": "rezk abdelatef ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:54:19.000Z"
+    },
+    {
+      "id": 2697,
+      "studentId": 971,
+      "studentName": "Youssef Mohamed Ibrahim",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:52:55.000Z"
+    },
+    {
+      "id": 2696,
+      "studentId": 1654,
+      "studentName": "abdelrhman gwdaa",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:52:49.000Z"
+    },
+    {
+      "id": 2695,
+      "studentId": 983,
+      "studentName": "Kareem Mohamed Ibrahim",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:52:42.000Z"
+    },
+    {
+      "id": 2694,
+      "studentId": 1215,
+      "studentName": "youssef mohamed saaed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:51:44.000Z"
+    },
+    {
+      "id": 2693,
+      "studentId": 1234,
+      "studentName": "mohamed saaed eslam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:51:29.000Z"
+    },
+    {
+      "id": 2692,
+      "studentId": 1244,
+      "studentName": "adam moahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:51:27.000Z"
+    },
+    {
+      "id": 2691,
+      "studentId": 1340,
+      "studentName": "Kareem Mohamed Ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:51:16.000Z"
+    },
+    {
+      "id": 2690,
+      "studentId": 1628,
+      "studentName": "omar ahmed negm",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:50:56.000Z"
+    },
+    {
+      "id": 2689,
+      "studentId": 1628,
+      "studentName": "omar ahmed negm",
+      "amount": 630,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T16:50:55.000Z"
+    },
+    {
+      "id": 2688,
+      "studentId": 1658,
+      "studentName": "ahmed sadiek ",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:50:41.000Z"
+    },
+    {
+      "id": 2687,
+      "studentId": 1629,
+      "studentName": "ahmed salama ibrhiam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:50:00.000Z"
+    },
+    {
+      "id": 2686,
+      "studentId": 1629,
+      "studentName": "ahmed salama ibrhiam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:49:59.000Z"
+    },
+    {
+      "id": 2685,
+      "studentId": 964,
+      "studentName": "malak basiouny mostafa",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:48:47.000Z"
+    },
+    {
+      "id": 2684,
+      "studentId": 950,
+      "studentName": "Nour mohamed mahmoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:47:26.000Z"
+    },
+    {
+      "id": 2683,
+      "studentId": 968,
+      "studentName": "Julia Nabil",
+      "amount": -50,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:46:35.000Z"
+    },
+    {
+      "id": 2681,
+      "studentId": 944,
+      "studentName": "yassen mohamed gamal",
+      "amount": 200,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T16:46:30.000Z"
+    },
+    {
+      "id": 2682,
+      "studentId": 944,
+      "studentName": "yassen mohamed gamal",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:46:30.000Z"
+    },
+    {
+      "id": 2680,
+      "studentId": 949,
+      "studentName": "Yehia Ayman El Otb",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:44:50.000Z"
+    },
+    {
+      "id": 2679,
+      "studentId": 960,
+      "studentName": "Habiba atef",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:43:43.000Z"
+    },
+    {
+      "id": 2678,
+      "studentId": 975,
+      "studentName": "mohamed ahmed fathy",
+      "amount": 130,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 3 Algebra",
+      "date": "2026-08-28T16:43:36.000Z"
+    },
+    {
+      "id": 2677,
+      "studentId": 975,
+      "studentName": "mohamed ahmed fathy",
+      "amount": 630,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "",
+      "date": "2026-08-28T16:43:12.000Z"
+    },
+    {
+      "id": 2676,
+      "studentId": 1223,
+      "studentName": "Merolla Emad Romany",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:42:51.000Z"
+    },
+    {
+      "id": 2675,
+      "studentId": 1518,
+      "studentName": "Retag Ashraf Reyad",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:41:29.000Z"
+    },
+    {
+      "id": 2674,
+      "studentId": 1250,
+      "studentName": "ali shrief",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:39:08.000Z"
+    },
+    {
+      "id": 2673,
+      "studentId": 1200,
+      "studentName": "youssef ahmed abdelhamid",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:38:53.000Z"
+    },
+    {
+      "id": 2671,
+      "studentId": 1627,
+      "studentName": "bishoy reda",
+      "amount": 630,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T16:38:38.000Z"
+    },
+    {
+      "id": 2672,
+      "studentId": 1627,
+      "studentName": "bishoy reda",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:38:38.000Z"
+    },
+    {
+      "id": 2670,
+      "studentId": 958,
+      "studentName": "malak mohamed shaban",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:36:36.000Z"
+    },
+    {
+      "id": 2669,
+      "studentId": 958,
+      "studentName": "malak mohamed shaban",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T16:36:35.000Z"
+    },
+    {
+      "id": 2668,
+      "studentId": 942,
+      "studentName": "nour eldeen ayman mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:36:11.000Z"
+    },
+    {
+      "id": 2667,
+      "studentId": 1231,
+      "studentName": "Sief eldeen ayman yousry",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:35:52.000Z"
+    },
+    {
+      "id": 2666,
+      "studentId": 984,
+      "studentName": "Ibrahim Adel Ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:32:31.000Z"
+    },
+    {
+      "id": 2665,
+      "studentId": 977,
+      "studentName": "Youssef Ahmed Mohamed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:30:50.000Z"
+    },
+    {
+      "id": 2664,
+      "studentId": 1474,
+      "studentName": "Alaa Abobakr Hassan Hany",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:30:06.000Z"
+    },
+    {
+      "id": 2663,
+      "studentId": 946,
+      "studentName": "lina ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:27:01.000Z"
+    },
+    {
+      "id": 2662,
+      "studentId": 974,
+      "studentName": "mahmoud arfa mahmoud",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:26:41.000Z"
+    },
+    {
+      "id": 2661,
+      "studentId": 1258,
+      "studentName": "rodina mohamed ibrahiam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:26:10.000Z"
+    },
+    {
+      "id": 2660,
+      "studentId": 982,
+      "studentName": "ahmed ibrhiam ahmed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:23:49.000Z"
+    },
+    {
+      "id": 2659,
+      "studentId": 1307,
+      "studentName": "Youssef Saber",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:23:24.000Z"
+    },
+    {
+      "id": 2658,
+      "studentId": 1307,
+      "studentName": "Youssef Saber",
+      "amount": 90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T16:23:23.000Z"
+    },
+    {
+      "id": 2657,
+      "studentId": 986,
+      "studentName": "malak ayser ibrhiam",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:19:03.000Z"
+    },
+    {
+      "id": 2656,
+      "studentId": 962,
+      "studentName": "sara mohamed medhat",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:18:40.000Z"
+    },
+    {
+      "id": 2654,
+      "studentId": 1303,
+      "studentName": "Mohamed Nasser Mohamed Sobhy",
+      "amount": 630,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع نقدي وقت الحضور",
+      "date": "2026-08-28T16:18:26.000Z"
+    },
+    {
+      "id": 2655,
+      "studentId": 1303,
+      "studentName": "Mohamed Nasser Mohamed Sobhy",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:18:26.000Z"
+    },
+    {
+      "id": 2653,
+      "studentId": 1197,
+      "studentName": "fares mahmoud diab",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:18:23.000Z"
+    },
+    {
+      "id": 2652,
+      "studentId": 1280,
+      "studentName": "Eyad Ammer",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:18:10.000Z"
+    },
+    {
+      "id": 2651,
+      "studentId": 953,
+      "studentName": "mohamed maher gomaa",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رسوم الحضور",
+      "date": "2026-08-28T16:07:34.000Z"
+    },
+    {
+      "id": 2650,
+      "studentId": 1025,
+      "studentName": "Abdelrahman Ahmed Nabil",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-28T15:07:57.000Z"
+    },
+    {
+      "id": 2649,
+      "studentId": 2090,
+      "studentName": "gasser mohamed naaem",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:53.000Z"
+    },
+    {
+      "id": 2648,
+      "studentId": 2089,
+      "studentName": "omar mohamed abdelaziz",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:52.000Z"
+    },
+    {
+      "id": 2647,
+      "studentId": 2088,
+      "studentName": "jana asalah hafaz",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:51.000Z"
+    },
+    {
+      "id": 2646,
+      "studentId": 2087,
+      "studentName": "layla kariam",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:49.000Z"
+    },
+    {
+      "id": 2645,
+      "studentId": 2086,
+      "studentName": "Amir Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:48.000Z"
+    },
+    {
+      "id": 2644,
+      "studentId": 2085,
+      "studentName": "Retag Ameen",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:47.000Z"
+    },
+    {
+      "id": 2643,
+      "studentId": 2084,
+      "studentName": "Mira Maher Youssef Saeed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:46.000Z"
+    },
+    {
+      "id": 2642,
+      "studentId": 2083,
+      "studentName": "Haneen Ahmed Sabry",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:45.000Z"
+    },
+    {
+      "id": 2641,
+      "studentId": 2082,
+      "studentName": "Tasneem Samir Youssef El Bahey",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:44.000Z"
+    },
+    {
+      "id": 2640,
+      "studentId": 2081,
+      "studentName": "tarek mahmoud",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:43.000Z"
+    },
+    {
+      "id": 2639,
+      "studentId": 2080,
+      "studentName": "ahmed mohamed abdelrhman",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:41.000Z"
+    },
+    {
+      "id": 2638,
+      "studentId": 2079,
+      "studentName": "Ammar Mohamed Saeed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:40.000Z"
+    },
+    {
+      "id": 2637,
+      "studentId": 2078,
+      "studentName": "Joury Abdelfatah Ibrahim",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:39.000Z"
+    },
+    {
+      "id": 2636,
+      "studentId": 2077,
+      "studentName": "rafial ramzy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:38.000Z"
+    },
+    {
+      "id": 2635,
+      "studentId": 2076,
+      "studentName": "hana khaled gaber",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:37.000Z"
+    },
+    {
+      "id": 2634,
+      "studentId": 2075,
+      "studentName": "Joudy Ahmed Zaki Ahmed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:36.000Z"
+    },
+    {
+      "id": 2633,
+      "studentId": 2074,
+      "studentName": "Sara Reda Abo Hussien",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:35.000Z"
+    },
+    {
+      "id": 2632,
+      "studentId": 2073,
+      "studentName": "Joudy Mohamed Akel",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:34.000Z"
+    },
+    {
+      "id": 2631,
+      "studentId": 2072,
+      "studentName": "Habiba Wahid Fawzy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:32.000Z"
+    },
+    {
+      "id": 2630,
+      "studentId": 2071,
+      "studentName": "Malak Essam",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:31.000Z"
+    },
+    {
+      "id": 2629,
+      "studentId": 2070,
+      "studentName": "Heba Tarek Sherif",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:30.000Z"
+    },
+    {
+      "id": 2628,
+      "studentId": 2069,
+      "studentName": "Mennatallah Ossama Ibrahim Mahmoud",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:29.000Z"
+    },
+    {
+      "id": 2627,
+      "studentId": 2068,
+      "studentName": "Salma Mohamed Waleed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:28.000Z"
+    },
+    {
+      "id": 2626,
+      "studentId": 2067,
+      "studentName": "Jana Ehab El Sayed Abdelkader",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:27.000Z"
+    },
+    {
+      "id": 2625,
+      "studentId": 2066,
+      "studentName": "Jana Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:26.000Z"
+    },
+    {
+      "id": 2624,
+      "studentId": 2065,
+      "studentName": "Arwa nabil abdelfatah",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:24.000Z"
+    },
+    {
+      "id": 2623,
+      "studentId": 2064,
+      "studentName": "Rodina Hesham",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:23.000Z"
+    },
+    {
+      "id": 2622,
+      "studentId": 2063,
+      "studentName": "Areej El Sayed Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:22.000Z"
+    },
+    {
+      "id": 2621,
+      "studentId": 2062,
+      "studentName": "Mariam Hesham Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:21.000Z"
+    },
+    {
+      "id": 2620,
+      "studentId": 2061,
+      "studentName": "Joudy Abdelrahman Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:20.000Z"
+    },
+    {
+      "id": 2619,
+      "studentId": 2060,
+      "studentName": "Jana Ahmed Hafez",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:19.000Z"
+    },
+    {
+      "id": 2618,
+      "studentId": 2059,
+      "studentName": "Sagda Atef Ahmed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:18.000Z"
+    },
+    {
+      "id": 2617,
+      "studentId": 2058,
+      "studentName": "retal mohamed elsaied",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:17.000Z"
+    },
+    {
+      "id": 2616,
+      "studentId": 2057,
+      "studentName": "halema mahmoud abdelrady",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:15.000Z"
+    },
+    {
+      "id": 2615,
+      "studentId": 2056,
+      "studentName": "Jana Hany Khalaf El Aref",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:14.000Z"
+    },
+    {
+      "id": 2614,
+      "studentId": 2055,
+      "studentName": "Jana Amir",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:13.000Z"
+    },
+    {
+      "id": 2613,
+      "studentId": 2054,
+      "studentName": "Mariam Ossama Yehia el Sarsy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:12.000Z"
+    },
+    {
+      "id": 2612,
+      "studentId": 2053,
+      "studentName": "Roqia Hany El Sayed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:11.000Z"
+    },
+    {
+      "id": 2611,
+      "studentId": 2052,
+      "studentName": "Retal Haytham Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:10.000Z"
+    },
+    {
+      "id": 2610,
+      "studentId": 2051,
+      "studentName": "Malak Mohamed Shahata",
+      "amount": 250,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:09.000Z"
+    },
+    {
+      "id": 2609,
+      "studentId": 2050,
+      "studentName": "Lamis Ahmed El Sayed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:07.000Z"
+    },
+    {
+      "id": 2608,
+      "studentId": 2049,
+      "studentName": "Moamena Abdel Latef",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:06.000Z"
+    },
+    {
+      "id": 2607,
+      "studentId": 2048,
+      "studentName": "Nour Hany Abo El Hussien",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:05.000Z"
+    },
+    {
+      "id": 2606,
+      "studentId": 2047,
+      "studentName": "Mariam Ahmed Ali",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:04.000Z"
+    },
+    {
+      "id": 2605,
+      "studentId": 2046,
+      "studentName": "Hana Ahmed Ibrahim",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:03.000Z"
+    },
+    {
+      "id": 2604,
+      "studentId": 2045,
+      "studentName": "Youmna Fanar Ahmed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:02.000Z"
+    },
+    {
+      "id": 2603,
+      "studentId": 2044,
+      "studentName": "jaida mohamed ahmed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:22:01.000Z"
+    },
+    {
+      "id": 2602,
+      "studentId": 2043,
+      "studentName": "ahmed mohamed abdelaziaz",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:59.000Z"
+    },
+    {
+      "id": 2601,
+      "studentId": 2042,
+      "studentName": "rokia ehab mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:58.000Z"
+    },
+    {
+      "id": 2600,
+      "studentId": 2041,
+      "studentName": "Hagar ahmed mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:57.000Z"
+    },
+    {
+      "id": 2599,
+      "studentId": 2040,
+      "studentName": "Mariam osama mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:56.000Z"
+    },
+    {
+      "id": 2598,
+      "studentId": 2039,
+      "studentName": "Malak mohamed hamdi",
+      "amount": 350,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:55.000Z"
+    },
+    {
+      "id": 2596,
+      "studentId": 2038,
+      "studentName": "ganah mahmoud elsaied",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:54.000Z"
+    },
+    {
+      "id": 2597,
+      "studentId": 2039,
+      "studentName": "Malak mohamed hamdi",
+      "amount": 720,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-28T13:21:54.000Z"
+    },
+    {
+      "id": 2595,
+      "studentId": 2037,
+      "studentName": "Mahmoud ibrhiam",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:52.000Z"
+    },
+    {
+      "id": 2594,
+      "studentId": 2036,
+      "studentName": "Marvan shrief",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:51.000Z"
+    },
+    {
+      "id": 2593,
+      "studentId": 2035,
+      "studentName": "Menna Amr Ahmed El Soghyar",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:50.000Z"
+    },
+    {
+      "id": 2592,
+      "studentId": 2034,
+      "studentName": "Mohamed Ekramy Hekal",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:49.000Z"
+    },
+    {
+      "id": 2591,
+      "studentId": 2033,
+      "studentName": "Eyad Haytham Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:48.000Z"
+    },
+    {
+      "id": 2590,
+      "studentId": 2032,
+      "studentName": "Malak mahmoud abed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:47.000Z"
+    },
+    {
+      "id": 2589,
+      "studentId": 2031,
+      "studentName": "Malak mahmoud",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:46.000Z"
+    },
+    {
+      "id": 2588,
+      "studentId": 2030,
+      "studentName": "Salsabil Mohamed El Sayed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:45.000Z"
+    },
+    {
+      "id": 2587,
+      "studentId": 2029,
+      "studentName": "Aliaa Hossam",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:43.000Z"
+    },
+    {
+      "id": 2586,
+      "studentId": 2028,
+      "studentName": "Arwa Salem",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:42.000Z"
+    },
+    {
+      "id": 2585,
+      "studentId": 2027,
+      "studentName": "Abdelrahman Mohamed Ismael",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:41.000Z"
+    },
+    {
+      "id": 2584,
+      "studentId": 2026,
+      "studentName": "Mona mohamed hamzawy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:40.000Z"
+    },
+    {
+      "id": 2583,
+      "studentId": 2025,
+      "studentName": "vieronia maged momtaz",
+      "amount": 200,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:39.000Z"
+    },
+    {
+      "id": 2582,
+      "studentId": 2024,
+      "studentName": "merola sobhy",
+      "amount": 200,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:38.000Z"
+    },
+    {
+      "id": 2581,
+      "studentId": 2023,
+      "studentName": "mennatualla osama ibrhiam",
+      "amount": 200,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:37.000Z"
+    },
+    {
+      "id": 2580,
+      "studentId": 2022,
+      "studentName": "malak mohamed ali hassan",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:36.000Z"
+    },
+    {
+      "id": 2579,
+      "studentId": 2021,
+      "studentName": "joudy mohamed ahmed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:34.000Z"
+    },
+    {
+      "id": 2578,
+      "studentId": 2020,
+      "studentName": "abdelghany mohamed abdelghany",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:33.000Z"
+    },
+    {
+      "id": 2577,
+      "studentId": 2019,
+      "studentName": "Ahmed Ayman Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:32.000Z"
+    },
+    {
+      "id": 2576,
+      "studentId": 2018,
+      "studentName": "Rehab Ismael Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:31.000Z"
+    },
+    {
+      "id": 2575,
+      "studentId": 2017,
+      "studentName": "Gehad mohamed soliman",
+      "amount": 250,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:30.000Z"
+    },
+    {
+      "id": 2574,
+      "studentId": 2016,
+      "studentName": "mennatualla youssef ibrhiam",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:29.000Z"
+    },
+    {
+      "id": 2573,
+      "studentId": 2015,
+      "studentName": "malak mohamed salah",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:28.000Z"
+    },
+    {
+      "id": 2572,
+      "studentId": 2014,
+      "studentName": "roaa eslam ali",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:26.000Z"
+    },
+    {
+      "id": 2571,
+      "studentId": 2013,
+      "studentName": "Rodina ahmed gomaa",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:25.000Z"
+    },
+    {
+      "id": 2570,
+      "studentId": 2012,
+      "studentName": "Aya elsaied mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:24.000Z"
+    },
+    {
+      "id": 2569,
+      "studentId": 2011,
+      "studentName": "Hala ayman farouk",
+      "amount": 150,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:23.000Z"
+    },
+    {
+      "id": 2568,
+      "studentId": 2010,
+      "studentName": "Malak kariam farouk",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:22.000Z"
+    },
+    {
+      "id": 2567,
+      "studentId": 2009,
+      "studentName": "Farida hossam eldeen ahmed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:21.000Z"
+    },
+    {
+      "id": 2566,
+      "studentId": 2008,
+      "studentName": "mevien nabile",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:20.000Z"
+    },
+    {
+      "id": 2565,
+      "studentId": 2007,
+      "studentName": "youseef ahmed ali",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:19.000Z"
+    },
+    {
+      "id": 2564,
+      "studentId": 2006,
+      "studentName": "antounios samy",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:17.000Z"
+    },
+    {
+      "id": 2563,
+      "studentId": 2005,
+      "studentName": "lyly mohamed mahmoud",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:16.000Z"
+    },
+    {
+      "id": 2562,
+      "studentId": 2004,
+      "studentName": "Joudy mahmoud gad",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:15.000Z"
+    },
+    {
+      "id": 2561,
+      "studentId": 2003,
+      "studentName": "Nadeen mohamed medany",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:14.000Z"
+    },
+    {
+      "id": 2560,
+      "studentId": 2002,
+      "studentName": "farida khaled",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:13.000Z"
+    },
+    {
+      "id": 2559,
+      "studentId": 2001,
+      "studentName": "malak mohamed mahmoud",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:12.000Z"
+    },
+    {
+      "id": 2558,
+      "studentId": 2000,
+      "studentName": "kariman mahmoud ahmed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:10.000Z"
+    },
+    {
+      "id": 2557,
+      "studentId": 1999,
+      "studentName": "habiba mohamed yakout",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:09.000Z"
+    },
+    {
+      "id": 2556,
+      "studentId": 1998,
+      "studentName": "Rodina Mohamed Abdelmaksod",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:08.000Z"
+    },
+    {
+      "id": 2555,
+      "studentId": 1997,
+      "studentName": "Nada Ahmed Sadek",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:07.000Z"
+    },
+    {
+      "id": 2554,
+      "studentId": 1996,
+      "studentName": "Malak Mohamed Gamal",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:06.000Z"
+    },
+    {
+      "id": 2553,
+      "studentId": 1995,
+      "studentName": "Toka mohamed mousa",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:05.000Z"
+    },
+    {
+      "id": 2552,
+      "studentId": 1994,
+      "studentName": "Rodina salah",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:04.000Z"
+    },
+    {
+      "id": 2551,
+      "studentId": 1993,
+      "studentName": "Tasbeh mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:03.000Z"
+    },
+    {
+      "id": 2550,
+      "studentId": 1992,
+      "studentName": "Lama Ahmed Ibrahim Abdelatif",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:01.000Z"
+    },
+    {
+      "id": 2549,
+      "studentId": 1991,
+      "studentName": "malak hany mounir",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:21:00.000Z"
+    },
+    {
+      "id": 2548,
+      "studentId": 1990,
+      "studentName": "wafaa ahmed sobhy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:59.000Z"
+    },
+    {
+      "id": 2547,
+      "studentId": 1989,
+      "studentName": "abdallah hady",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:58.000Z"
+    },
+    {
+      "id": 2546,
+      "studentId": 1988,
+      "studentName": "eiad mohamed abdelmagid",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:57.000Z"
+    },
+    {
+      "id": 2545,
+      "studentId": 1987,
+      "studentName": "menntuallah taha abdelhaliam",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:56.000Z"
+    },
+    {
+      "id": 2544,
+      "studentId": 1986,
+      "studentName": "shehab adel eldeeb",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:55.000Z"
+    },
+    {
+      "id": 2543,
+      "studentId": 1985,
+      "studentName": "Hana amer ahmed ali",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:53.000Z"
+    },
+    {
+      "id": 2542,
+      "studentId": 1984,
+      "studentName": "Farida Mohamed Mahmoud",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:52.000Z"
+    },
+    {
+      "id": 2541,
+      "studentId": 1983,
+      "studentName": "Rital Mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:51.000Z"
+    },
+    {
+      "id": 2540,
+      "studentId": 1982,
+      "studentName": "youssef  sherif elsaeed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:50.000Z"
+    },
+    {
+      "id": 2539,
+      "studentId": 1981,
+      "studentName": "malak ayman gaber",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:49.000Z"
+    },
+    {
+      "id": 2538,
+      "studentId": 1980,
+      "studentName": "Ritaj Alaa Elsayed Atia",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:48.000Z"
+    },
+    {
+      "id": 2537,
+      "studentId": 1979,
+      "studentName": "Hla Amr Mounir ElSayed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:47.000Z"
+    },
+    {
+      "id": 2536,
+      "studentId": 1978,
+      "studentName": "Rokia abdelhamid aboubakr",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:46.000Z"
+    },
+    {
+      "id": 2535,
+      "studentId": 1977,
+      "studentName": "Mariam Hesham Abdelgawad",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:44.000Z"
+    },
+    {
+      "id": 2534,
+      "studentId": 1976,
+      "studentName": "Menna Mohamed Saad",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:43.000Z"
+    },
+    {
+      "id": 2533,
+      "studentId": 1975,
+      "studentName": "Lamis khaled hassan",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:42.000Z"
+    },
+    {
+      "id": 2532,
+      "studentId": 1974,
+      "studentName": "Ramy medhat fawzy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:41.000Z"
+    },
+    {
+      "id": 2531,
+      "studentId": 1973,
+      "studentName": "Hamsa mohamed abou bakr",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:40.000Z"
+    },
+    {
+      "id": 2530,
+      "studentId": 1972,
+      "studentName": "Retal mohamed ahmed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:39.000Z"
+    },
+    {
+      "id": 2529,
+      "studentId": 1971,
+      "studentName": "Rokaia magdy mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:38.000Z"
+    },
+    {
+      "id": 2528,
+      "studentId": 1970,
+      "studentName": "Ganah nohamed gomaa",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:37.000Z"
+    },
+    {
+      "id": 2527,
+      "studentId": 1968,
+      "studentName": "Mariam gorg kamal",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:35.000Z"
+    },
+    {
+      "id": 2526,
+      "studentId": 1967,
+      "studentName": "Yassen ragab",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:34.000Z"
+    },
+    {
+      "id": 2525,
+      "studentId": 1966,
+      "studentName": "Mariam mamdouh harby",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:32.000Z"
+    },
+    {
+      "id": 2523,
+      "studentId": 1965,
+      "studentName": "Jana alaa mahfouz",
+      "amount": 625,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "رصيد أولي (bulk upload)",
+      "date": "2026-08-28T13:20:31.000Z"
+    },
+    {
+      "id": 2524,
+      "studentId": 1965,
+      "studentName": "Jana alaa mahfouz",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:31.000Z"
+    },
+    {
+      "id": 2522,
+      "studentId": 1964,
+      "studentName": "adel mohamed adel",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:30.000Z"
+    },
+    {
+      "id": 2521,
+      "studentId": 1963,
+      "studentName": "Hasnaa Ragab",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:29.000Z"
+    },
+    {
+      "id": 2520,
+      "studentId": 1962,
+      "studentName": "Malak Ossama Ibrahim",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:28.000Z"
+    },
+    {
+      "id": 2519,
+      "studentId": 1961,
+      "studentName": "Sama Adel Abdelaziz",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:27.000Z"
+    },
+    {
+      "id": 2518,
+      "studentId": 1960,
+      "studentName": "Ahmed Mohamed Aman El Shazly",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:26.000Z"
+    },
+    {
+      "id": 2517,
+      "studentId": 1959,
+      "studentName": "Malak Ezzat Mohamed Ali",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:24.000Z"
+    },
+    {
+      "id": 2516,
+      "studentId": 1958,
+      "studentName": "Salma Ibrahim Mohamed Ali",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 2 (bulk upload)",
+      "date": "2026-08-28T13:20:23.000Z"
+    },
+    {
+      "id": 2515,
+      "studentId": 951,
+      "studentName": "mostafa mohamed saaed",
+      "amount": -90,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع لمشاهدة حصة أونلاين (سيريال 1001)",
+      "date": "2026-08-28T12:03:02.000Z"
+    },
+    {
+      "id": 2514,
+      "studentId": 1957,
+      "studentName": "hamsa mohamed abdo",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:52.000Z"
+    },
+    {
+      "id": 2513,
+      "studentId": 1956,
+      "studentName": "farida mohamed ismail",
+      "amount": 200,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:50.000Z"
+    },
+    {
+      "id": 2512,
+      "studentId": 1955,
+      "studentName": "jana magdy mohamed",
+      "amount": 170,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:49.000Z"
+    },
+    {
+      "id": 2511,
+      "studentId": 1954,
+      "studentName": "jana ahmed mohamed",
+      "amount": 200,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:48.000Z"
+    },
+    {
+      "id": 2510,
+      "studentId": 1953,
+      "studentName": "sama ahmed metwaly",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:47.000Z"
+    },
+    {
+      "id": 2509,
+      "studentId": 1952,
+      "studentName": "jaida atef hassan",
+      "amount": 120,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:46.000Z"
+    },
+    {
+      "id": 2508,
+      "studentId": 1951,
+      "studentName": "Retaj Mohamed Mohy Eldeen Fahmy",
+      "amount": 200,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:45.000Z"
+    },
+    {
+      "id": 2507,
+      "studentId": 1950,
+      "studentName": "joudy kariam hassan",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:44.000Z"
+    },
+    {
+      "id": 2506,
+      "studentId": 1949,
+      "studentName": "yassen rabiaa",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:43.000Z"
+    },
+    {
+      "id": 2505,
+      "studentId": 1948,
+      "studentName": "mohamed wael",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:41.000Z"
+    },
+    {
+      "id": 2504,
+      "studentId": 1947,
+      "studentName": "youssef medhat",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:40.000Z"
+    },
+    {
+      "id": 2503,
+      "studentId": 1946,
+      "studentName": "basmallah ahmed mohamed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:39.000Z"
+    },
+    {
+      "id": 2502,
+      "studentId": 1945,
+      "studentName": "merola mina",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:38.000Z"
+    },
+    {
+      "id": 2501,
+      "studentId": 1944,
+      "studentName": "kalra romany",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:37.000Z"
+    },
+    {
+      "id": 2500,
+      "studentId": 1943,
+      "studentName": "mariam mohamed ahmed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:36.000Z"
+    },
+    {
+      "id": 2499,
+      "studentId": 1942,
+      "studentName": "rodina ahmed ali",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:35.000Z"
+    },
+    {
+      "id": 2498,
+      "studentId": 1941,
+      "studentName": "alaa elhady mohamed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:34.000Z"
+    },
+    {
+      "id": 2497,
+      "studentId": 1940,
+      "studentName": "nouver emad",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:32.000Z"
+    },
+    {
+      "id": 2496,
+      "studentId": 1939,
+      "studentName": "zina mohamed abdallah",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:31.000Z"
+    },
+    {
+      "id": 2495,
+      "studentId": 1938,
+      "studentName": "renad mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:30.000Z"
+    },
+    {
+      "id": 2494,
+      "studentId": 1937,
+      "studentName": "amira ahmed mohamed",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:29.000Z"
+    },
+    {
+      "id": 2493,
+      "studentId": 1936,
+      "studentName": "aisel mohamed mahmoud",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:28.000Z"
+    },
+    {
+      "id": 2492,
+      "studentId": 1935,
+      "studentName": "Yassien Samy",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:27.000Z"
+    },
+    {
+      "id": 2491,
+      "studentId": 1934,
+      "studentName": "Salma Yasser",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:26.000Z"
+    },
+    {
+      "id": 2489,
+      "studentId": 1932,
+      "studentName": "Salma Essam El Seman",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:23.000Z"
+    },
+    {
+      "id": 2488,
+      "studentId": 1931,
+      "studentName": "Mohamed Ossama Mohamed Abdelrahman",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:22.000Z"
+    },
+    {
+      "id": 2487,
+      "studentId": 1930,
+      "studentName": "Jana Mohamed Gaber",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:21.000Z"
+    },
+    {
+      "id": 2486,
+      "studentId": 1929,
+      "studentName": "Aliaa Mohamed Salah",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:20.000Z"
+    },
+    {
+      "id": 2485,
+      "studentId": 1928,
+      "studentName": "jana mohamoud elsaied",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:19.000Z"
+    },
+    {
+      "id": 2484,
+      "studentId": 1927,
+      "studentName": "marshlino melad makram",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:18.000Z"
+    },
+    {
+      "id": 2483,
+      "studentId": 1926,
+      "studentName": "johnosn gaber",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:17.000Z"
+    },
+    {
+      "id": 2482,
+      "studentId": 1925,
+      "studentName": "salma mohamed ahmed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:16.000Z"
+    },
+    {
+      "id": 2481,
+      "studentId": 1924,
+      "studentName": "sara mohamed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:14.000Z"
+    },
+    {
+      "id": 2480,
+      "studentId": 1923,
+      "studentName": "salah ahmed abdelfatah",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:13.000Z"
+    },
+    {
+      "id": 2478,
+      "studentId": 1921,
+      "studentName": "Jana Ahmed El Gamal",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:11.000Z"
+    },
+    {
+      "id": 2477,
+      "studentId": 1920,
+      "studentName": "Hana Mahmoud Saber",
+      "amount": 225,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:10.000Z"
+    },
+    {
+      "id": 2476,
+      "studentId": 1918,
+      "studentName": "korols osama kamal",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:08.000Z"
+    },
+    {
+      "id": 2475,
+      "studentId": 1917,
+      "studentName": "malak eslam mohamed",
+      "amount": 220,
+      "sessionId": null,
+      "lessonNumber": "N/A",
+      "reason": "دفع بوكليت: Math Senior 1 (bulk upload)",
+      "date": "2026-08-28T11:42:07.000Z"
+    }
+  ]
+}
