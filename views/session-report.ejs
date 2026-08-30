@@ -53,6 +53,13 @@
       الحاضرين (<%= attendedRows.length %>)
     </a>
   </li>
+  <% if (onlineAttendees && onlineAttendees.length > 0) { %>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#onlineTab">
+      حضور أونلاين (<%= onlineAttendees.length %>) 📹
+    </a>
+  </li>
+  <% } %>
   <li class="nav-item">
     <a class="nav-link" data-bs-toggle="tab" href="#absentTab">
       الغايبين (<%= absentStudents.length %>)
@@ -82,6 +89,7 @@
             <th>الاسم</th>
             <th>تليفون الطالب</th>
             <th>تليفون ولي الأمر</th>
+            <th>مكان الحضور</th>
             <th>الواجب</th>
             <th>الامتحان</th>
             <% if (userRole === 'admin') { %><th>دفع وقت الحضور</th><% } %>
@@ -99,6 +107,13 @@
               <td><a href="/students/<%= row.student.id %>"><%= row.student.name %></a></td>
               <td><%= row.student.phone %></td>
               <td><%= row.student.parent_phone %></td>
+              <td>
+                <% if (row.location === 'أونلاين') { %>
+                  <span class="badge bg-info">أونلاين</span>
+                <% } else { %>
+                  <span class="badge bg-primary"><%= row.location %></span>
+                <% } %>
+              </td>
               <td>
                 <% if (!row.homeworkStatus) { %>
                   <span class="text-muted small">-</span>
@@ -183,6 +198,41 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  <% if (onlineAttendees && onlineAttendees.length > 0) { %>
+  <div class="tab-pane fade" id="onlineTab">
+    <div class="alert alert-info">
+      🎓 هؤلاء الطلاب حضروا الحصة أونلاين فقط (لم يحضروا في المركز). تم تسجيل حضورهم كمعوض.
+    </div>
+    <div class="table-responsive bg-white rounded shadow-sm p-3">
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>الكود</th>
+            <th>الاسم</th>
+            <th>تليفون الطالب</th>
+            <th>تليفون ولي الأمر</th>
+            <th>الملاحظة</th>
+            <th>الرصيد الحالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% onlineAttendees.forEach(student => { %>
+            <tr>
+              <td><a href="/students/<%= student.id %>"><%= student.student_code %></a></td>
+              <td><a href="/students/<%= student.id %>"><%= student.name %></a></td>
+              <td><%= student.phone %></td>
+              <td><%= student.parent_phone %></td>
+              <td><span class="badge bg-info">حضر أونلاين (معوض)</span></td>
+              <td><%= student.balance %> ج</td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
   </div>
 
   <div class="tab-pane fade" id="assistantTab">

@@ -1583,6 +1583,24 @@ app.get('/sessions/:id/report', async (req, res) => {
       include: [{ model: Student }, User],
     });
 
+    // Also get center students who attended this lesson online
+    const onlineAttendances = await Attendance.findAll({
+      include: [{
+        model: Student,
+        where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
+      }, {
+        model: Session,
+        where: { lesson_number: session.lesson_number, SubjectId: session.SubjectId },
+        include: [Center],
+      }, User],
+    });
+
+    // Filter for only those who attended online (not at this center)
+    const onlineOnlyAttendances = onlineAttendances.filter(a => 
+      a.Session.Center.name === 'أونلاين' && 
+      !attendances.some(ca => ca.StudentId === a.StudentId)
+    );
+
     const homeworkRecords = await HomeworkCheck.findAll({
       where: { SessionId: session.id },
       include: [User],
@@ -1614,6 +1632,7 @@ app.get('/sessions/:id/report', async (req, res) => {
         attendanceTime: a.attended_at,
         comment: a.comment,
         payment: getActualSessionPayment(a),
+        location: session.Center.name,
         homeworkStatus: hw ? hw.status : null,
         homeworkUser: hw ? hw.user : null,
         homeworkTime: hw ? hw.time : null,
@@ -1624,21 +1643,65 @@ app.get('/sessions/:id/report', async (req, res) => {
       };
     });
 
+    // Add online attendees to the attended rows
+    const onlineAttendedRows = onlineOnlyAttendances.map(a => {
+      const hw = homeworkMap[a.StudentId];
+      const exam = examMap[a.StudentId];
+      return {
+        attendanceId: a.id,
+        student: a.Student,
+        attendanceUser: a.User ? a.User.name : '-',
+        attendanceTime: a.attended_at,
+        comment: a.comment,
+        payment: 0,
+        location: 'أونلاين',
+        homeworkStatus: hw ? hw.status : null,
+        homeworkUser: hw ? hw.user : null,
+        homeworkTime: hw ? hw.time : null,
+        examScore: exam ? exam.score : null,
+        examMax: exam ? exam.max : null,
+        examUser: exam ? exam.user : null,
+        examTime: exam ? exam.time : null,
+      };
+    });
+
+    // Combine both attended rows
+    const allAttendedRows = [...attendedRows, ...onlineAttendedRows];
+
     let absentStudents = [];
+    let onlineAttendees = [];
+
     if (session.status !== 'cancelled') {
       const groupStudents = await Student.findAll({
         where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
       });
 
+      // Get all attendance for this lesson from any center with center info
       const attendedAnywhere = await Attendance.findAll({
         include: [{
           model: Session,
           where: { lesson_number: session.lesson_number, SubjectId: session.SubjectId },
+          include: [Center],
         }],
       });
-      const attendedStudentIds = new Set(attendedAnywhere.map(a => a.StudentId));
 
-      absentStudents = groupStudents.filter(s => !attendedStudentIds.has(s.id));
+      // Separate online attendees from regular attendees
+      const attendedCenterStudentIds = new Set();
+      const onlineAttendeeIds = new Set();
+      
+      attendedAnywhere.forEach(a => {
+        if (a.Session.Center.name === 'أونلاين') {
+          onlineAttendeeIds.add(a.StudentId);
+        } else {
+          attendedCenterStudentIds.add(a.StudentId);
+        }
+      });
+
+      // Mark as absent only if they didn't attend at their center (online attendance counts as attended)
+      absentStudents = groupStudents.filter(s => !attendedCenterStudentIds.has(s.id) && !onlineAttendeeIds.has(s.id));
+      
+      // Get center students who attended online
+      onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }
 
     const subject = await Subject.findByPk(session.SubjectId);
@@ -1663,7 +1726,7 @@ app.get('/sessions/:id/report', async (req, res) => {
     const allUsers = await User.findAll({ order: [['name', 'ASC']] });
 
     res.render('session-report', {
-      session, attendedRows, absentStudents,
+      session, attendedRows: allAttendedRows, absentStudents, onlineAttendees,
       closing: { normalCount, reducedCount, freeCount, totalRevenue, totalCost },
       totalCashCollected,
       assistantAttendances,
@@ -1688,6 +1751,24 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
       where: { SessionId: session.id },
       include: [Student, User],
     });
+
+    // Also get center students who attended this lesson online
+    const onlineAttendances = await Attendance.findAll({
+      include: [{
+        model: Student,
+        where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
+      }, {
+        model: Session,
+        where: { lesson_number: session.lesson_number, SubjectId: session.SubjectId },
+        include: [Center],
+      }, User],
+    });
+
+    // Filter for only those who attended online (not at this center)
+    const onlineOnlyAttendances = onlineAttendances.filter(a => 
+      a.Session.Center.name === 'أونلاين' && 
+      !attendances.some(ca => ca.StudentId === a.StudentId)
+    );
 
     const homeworkRecords = await HomeworkCheck.findAll({ where: { SessionId: session.id } });
     const homeworkMap = {};
@@ -1734,6 +1815,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
       { header: 'الاسم', key: 'name', width: 25 },
       { header: 'تليفون الطالب', key: 'phone', width: 18 },
       { header: 'تليفون ولي الأمر', key: 'parent_phone', width: 18 },
+      { header: 'مكان الحضور', key: 'location', width: 15 },
       { header: 'الواجب', key: 'homework', width: 15 },
       { header: 'الواجب من الحصة السابقة', key: 'previous_homework', width: 18 },
       { header: 'درجة الامتحان', key: 'exam_score', width: 15 },
@@ -1748,12 +1830,14 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
       complete: 'كامل', incomplete: 'مش كامل', no_steps: 'من غير خطوات', not_done: 'مش معمول',
     };
 
+    // Add center attendees
     attendances.forEach(a => {
       sheet.addRow({
         code: a.Student.student_code,
         name: a.Student.name,
         phone: a.Student.phone,
         parent_phone: a.Student.parent_phone,
+        location: session.Center.name,
         homework: homeworkLabels[homeworkMap[a.StudentId]] || '-',
         previous_homework: homeworkLabels[previousHomeworkMap[a.StudentId]] || '-',
         exam_score: examMap[a.StudentId] ?? '-',
@@ -1761,6 +1845,25 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
         payment: a.payment_collected || 0,
         booklet_payment: bookletPaymentMap[a.StudentId] || 0,
         total_payment: Number(a.payment_collected || 0) + (bookletPaymentMap[a.StudentId] || 0),
+        user: a.User ? a.User.name : '-',
+      });
+    });
+
+    // Add online attendees (if any)
+    onlineOnlyAttendances.forEach(a => {
+      sheet.addRow({
+        code: a.Student.student_code,
+        name: a.Student.name,
+        phone: a.Student.phone,
+        parent_phone: a.Student.parent_phone,
+        location: 'أونلاين',
+        homework: homeworkLabels[homeworkMap[a.StudentId]] || '-',
+        previous_homework: homeworkLabels[previousHomeworkMap[a.StudentId]] || '-',
+        exam_score: examMap[a.StudentId] ?? '-',
+        comment: a.comment || '-',
+        payment: 0,
+        booklet_payment: bookletPaymentMap[a.StudentId] || 0,
+        total_payment: (bookletPaymentMap[a.StudentId] || 0),
         user: a.User ? a.User.name : '-',
       });
     });
@@ -1787,26 +1890,46 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
     if (!session) return res.status(404).send('❌ الحصة غير موجودة');
 
     let absentStudents = [];
+    let onlineAttendees = [];
+
     if (session.status !== 'cancelled') {
       const groupStudents = await Student.findAll({
         where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
       });
 
+      // Get all attendance for this lesson from any center with center info
       const attendedAnywhere = await Attendance.findAll({
         include: [{
           model: Session,
           where: { lesson_number: session.lesson_number, SubjectId: session.SubjectId },
+          include: [Center],
         }],
       });
-      const attendedStudentIds = new Set(attendedAnywhere.map(a => a.StudentId));
 
-      absentStudents = groupStudents.filter(s => !attendedStudentIds.has(s.id));
+      // Separate online attendees from regular attendees
+      const attendedCenterStudentIds = new Set();
+      const onlineAttendeeIds = new Set();
+      
+      attendedAnywhere.forEach(a => {
+        if (a.Session.Center.name === 'أونلاين') {
+          onlineAttendeeIds.add(a.StudentId);
+        } else {
+          attendedCenterStudentIds.add(a.StudentId);
+        }
+      });
+
+      // Mark as absent only if they didn't attend at their center (online attendance counts as attended)
+      absentStudents = groupStudents.filter(s => !attendedCenterStudentIds.has(s.id) && !onlineAttendeeIds.has(s.id));
+      
+      // Get center students who attended online
+      onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }
 
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('الغايبين');
-
-    sheet.columns = [
+    
+    // Sheet 1: Regular absent students
+    const absentSheet = workbook.addWorksheet('الغايبين');
+    absentSheet.columns = [
       { header: 'الكود', key: 'code', width: 15 },
       { header: 'الاسم', key: 'name', width: 25 },
       { header: 'تليفون الطالب', key: 'phone', width: 18 },
@@ -1815,7 +1938,7 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
     ];
 
     absentStudents.forEach(s => {
-      sheet.addRow({
+      absentSheet.addRow({
         code: s.student_code,
         name: s.name,
         phone: s.phone,
@@ -1824,7 +1947,31 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
       });
     });
 
-    sheet.getRow(1).font = { bold: true };
+    absentSheet.getRow(1).font = { bold: true };
+
+    // Sheet 2: Online attendees (center students who attended online)
+    if (onlineAttendees.length > 0) {
+      const onlineSheet = workbook.addWorksheet('حضور أونلاين');
+      onlineSheet.columns = [
+        { header: 'الكود', key: 'code', width: 15 },
+        { header: 'الاسم', key: 'name', width: 25 },
+        { header: 'تليفون الطالب', key: 'phone', width: 18 },
+        { header: 'تليفون ولي الأمر', key: 'parent_phone', width: 18 },
+        { header: 'ملاحظة', key: 'note', width: 30 },
+      ];
+
+      onlineAttendees.forEach(s => {
+        onlineSheet.addRow({
+          code: s.student_code,
+          name: s.name,
+          phone: s.phone,
+          parent_phone: s.parent_phone,
+          note: 'حضر الحصة أونلاين (معوض)',
+        });
+      });
+
+      onlineSheet.getRow(1).font = { bold: true };
+    }
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=absent_session_${session.serial_number}.xlsx`);
