@@ -61,8 +61,8 @@
       <% sessions.forEach(s => { %>
         <tr class="<%= String(s.id) === String(activeSessionId) ? 'table-success-adaptive' : '' %>">
           <td><strong><%= s.serial_number %></strong></td>
-          <td><%= s.Subject.name %></td>
-          <td><%= s.Center.name %></td>
+          <td><%= s.Subject ? s.Subject.name : 'N/A' %></td>
+          <td><%= s.Center ? s.Center.name : 'N/A' %></td>
           <td><%= s.lesson_number %></td>
           <td><%= s.session_date %></td>
           <td>
@@ -107,7 +107,7 @@
                 </form>
               <% } else { %>
                 <button type="button" class="btn btn-sm btn-outline-danger"
-                  onclick="openCancelModal(<%= s.id %>, '<%= s.lesson_number %>', '<%= s.Subject.name %>')">
+                  onclick="openCancelModal(<%= s.id %>, '<%= s.lesson_number %>', '<%= s.Subject ? s.Subject.name : "N/A" %>')">
                   <span class="ar-only">🚫 إلغاء</span>
                   <span class="en-only" style="display:none;">🚫 Cancel</span>
                 </button>
@@ -120,7 +120,7 @@
               </button>
 
               <form action="/sessions/<%= s.id %>/delete" method="POST" class="d-inline"
-                onsubmit="return confirmSessionDelete(this, '<%= s.Center.name %>')">
+                onsubmit="return confirmSessionDelete(this, '<%= s.Center ? s.Center.name : "N/A" %>')">
                 <button type="submit" class="btn btn-sm btn-outline-danger">
                   <span class="ar-only">🗑️ حذف</span>
                   <span class="en-only" style="display:none;">🗑️ Delete</span>
