@@ -3422,6 +3422,12 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const grantBySessionId = {};
     grants.forEach(g => { grantBySessionId[g.SessionId] = g; });
 
+    const attendanceRecords = await Attendance.findAll({
+      where: { StudentId: student.id },
+      attributes: ['SessionId'],
+    });
+    const attendedSessionIds = new Set(attendanceRecords.map(a => a.SessionId));
+
     const lessons = videos.map(v => {
       const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
       if (!session) return null;
@@ -3434,11 +3440,16 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       } else if (session.is_free_for_all) {
         status = 'free';
       } else if (grant) {
-        status = grant.views_used >= grant.max_views ? 'exhausted' : 'granted';
-        viewsUsed = grant.views_used;
-        maxViews = grant.max_views;
+        const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attendedSessionIds.has(session.id));
+        if (!isValidGrant) {
+          status = 'locked';
+        } else {
+          status = grant.views_used >= grant.max_views ? 'exhausted' : 'granted';
+          viewsUsed = grant.views_used;
+          maxViews = grant.max_views;
+        }
       } else {
-        status = 'locked'; // لسه محتاج نتحقق وقت الفتح الفعلي
+        status = 'locked';
       }
 
       return {
@@ -3494,23 +3505,32 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
 
     // 2) فيه صلاحية مسجلة بالفعل (حضور سابق / دفع سابق / فتح أدمن)
     let grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
+    const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: session.id } });
+
+    if (grant && grant.method === 'attended' && !attendanceExists) {
+      grant = null;
+    }
 
     if (grant) {
-      if (grant.views_used >= grant.max_views) {
+      const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attendanceExists);
+      if (!isValidGrant) {
+        grant = null;
+      } else if (grant.views_used >= grant.max_views) {
         return res.json({ success: false, message: 'لقد استهلكت كل مرات المشاهدة المتاحة لهذا الدرس' });
+      } else {
+        grant.views_used += 1;
+        await grant.save();
+
+        const methodComments = {
+          attended: '📹 حضر الحصة (سبق حضوره بالسنتر)',
+          paid: '📹 حضر عن طريق دفع ثمن مشاهدة الفيديو أونلاين',
+          admin_free: '📹 فُتحت له الحصة مجانًا من الأدمن',
+          admin_paid: '📹 فُتحت له الحصة من الأدمن (مدفوعة بدون خصم)',
+        };
+        await ensureAttendance(student.id, session.id, methodComments[grant.method] || '📹 حضر الحصة أونلاين (فيديو)');
+
+        return res.json({ success: true, viewsUsed: grant.views_used, maxViews: grant.max_views });
       }
-      grant.views_used += 1;
-      await grant.save();
-
-      const methodComments = {
-        attended: '📹 حضر الحصة (سبق حضوره بالسنتر)',
-        paid: '📹 حضر عن طريق دفع ثمن مشاهدة الفيديو أونلاين',
-        admin_free: '📹 فُتحت له الحصة مجانًا من الأدمن',
-        admin_paid: '📹 فُتحت له الحصة من الأدمن (مدفوعة بدون خصم)',
-      };
-      await ensureAttendance(student.id, session.id, methodComments[grant.method] || '📹 حضر الحصة أونلاين (فيديو)');
-
-      return res.json({ success: true, viewsUsed: grant.views_used, maxViews: grant.max_views });
     }
 
     // تحقق من الوصول الفردي (student-specific access)
@@ -3644,10 +3664,17 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
     const session = video.Session || video.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
     if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
 
-    // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة)
+    // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة، أو حضور فعلي حالي)
     if (!allVideoAccess && !session.is_free_for_all) {
       const grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
-      if (!grant) return res.status(403).json({ success: false, message: 'غير مسموح' });
+      const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: session.id } });
+      const isValidGrant = !!(grant && (
+        grant.method === 'paid' ||
+        grant.method === 'admin_free' ||
+        grant.method === 'admin_paid' ||
+        (grant.method === 'attended' && attendanceExists)
+      ));
+      if (!isValidGrant && !attendanceExists) return res.status(403).json({ success: false, message: 'غير مسموح' });
     }
 
     const parts = await VideoPart.findAll({ where: { VideoId: video.id }, order: [['order_index', 'ASC']] });
