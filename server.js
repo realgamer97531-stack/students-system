@@ -1985,7 +1985,6 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
         where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
       });
 
-      // Get all attendance for this lesson from any center with center info
       const attendedAnywhere = await Attendance.findAll({
         include: [{
           model: Session,
@@ -1994,34 +1993,43 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
         }],
       });
 
-      // Separate online attendees from regular attendees
       const attendedCenterStudentIds = new Set();
       const onlineAttendeeIds = new Set();
-      
+      const elsewhereAttendanceMap = new Map();
+
       attendedAnywhere.forEach(a => {
-        if (a.Session.Center.name === 'أونلاين') {
+        const placeName = a.Session && a.Session.Center ? a.Session.Center.name : 'غير معروف';
+
+        if (placeName === 'أونلاين') {
           onlineAttendeeIds.add(a.StudentId);
         } else {
           attendedCenterStudentIds.add(a.StudentId);
         }
+
+        if (!elsewhereAttendanceMap.has(a.StudentId)) {
+          elsewhereAttendanceMap.set(a.StudentId, placeName);
+        }
       });
 
-      // Mark as absent only if they didn't attend at their center (online attendance counts as attended)
-      absentStudents = groupStudents.filter(s => !attendedCenterStudentIds.has(s.id) && !onlineAttendeeIds.has(s.id));
-      
-      // Get center students who attended online
+      absentStudents = groupStudents
+        .filter(s => !attendedCenterStudentIds.has(s.id))
+        .map(student => ({
+          ...(student.toJSON ? student.toJSON() : student),
+          elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
+        }));
+
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }
 
     const workbook = new ExcelJS.Workbook();
-    
-    // Sheet 1: Regular absent students
+
     const absentSheet = workbook.addWorksheet('الغايبين');
     absentSheet.columns = [
       { header: 'الكود', key: 'code', width: 15 },
       { header: 'الاسم', key: 'name', width: 25 },
       { header: 'تليفون الطالب', key: 'phone', width: 18 },
       { header: 'تليفون ولي الأمر', key: 'parent_phone', width: 18 },
+      { header: 'حضر في', key: 'attendance_place', width: 22 },
       { header: 'الرصيد الحالي', key: 'balance', width: 15 },
     ];
 
@@ -2031,6 +2039,7 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
         name: s.name,
         phone: s.phone,
         parent_phone: s.parent_phone,
+        attendance_place: s.elsewhereAttendanceLocation || '-',
         balance: s.balance,
       });
     });
