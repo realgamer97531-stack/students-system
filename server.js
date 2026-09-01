@@ -1779,11 +1779,14 @@ app.get('/sessions/:id/report', async (req, res) => {
         }
       });
 
-      // This report only: keep the main absent list stable for the center and add a note for elsewhere attendance.
-      absentStudents = groupStudents.map(student => ({
-        ...(student.toJSON ? student.toJSON() : student),
-        elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
-      }));
+      // This report only: exclude students who actually attended at their own center,
+      // but keep students absent from their center even if they attended elsewhere/online and show a note.
+      absentStudents = groupStudents
+        .filter(s => !attendedCenterStudentIds.has(s.id))
+        .map(student => ({
+          ...(student.toJSON ? student.toJSON() : student),
+          elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
+        }));
 
       // Get center students who attended online
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
