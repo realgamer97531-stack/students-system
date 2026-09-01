@@ -3549,6 +3549,36 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const grantBySessionId = {};
     cleanedGrants.forEach(g => { if (g.SessionId) grantBySessionId[g.SessionId] = g; });
 
+    const homeworkAssignments = await HomeworkAssignment.findAll({
+      where: { SubjectId: student.SubjectId },
+      include: [
+        { model: Session, required: false, attributes: ['id', 'lesson_number', 'week_number', 'CenterId'] },
+        { model: Session, as: 'LinkedSessions', required: false, attributes: ['id', 'lesson_number', 'week_number', 'CenterId'] },
+      ],
+      order: [['order_number', 'ASC']],
+    });
+
+    const homeworkBySessionId = new Map();
+    for (const assignment of homeworkAssignments) {
+      const sessionIds = [
+        ...(assignment.SessionId ? [assignment.SessionId] : []),
+        ...((assignment.LinkedSessions || []).map(s => s.id)),
+      ].filter(Boolean);
+
+      for (const sessionId of sessionIds) {
+        const key = String(sessionId);
+        if (!homeworkBySessionId.has(key)) homeworkBySessionId.set(key, []);
+        homeworkBySessionId.get(key).push({
+          id: assignment.id,
+          title: assignment.title,
+          description: assignment.description,
+          orderNumber: assignment.order_number,
+          startDate: assignment.start_date,
+          endDate: assignment.end_date,
+        });
+      }
+    }
+
     const lessons = videos.map(v => {
       const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
       if (!session) return null;
@@ -3573,6 +3603,9 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         status = 'locked';
       }
 
+      const homeworkItems = homeworkBySessionId.get(String(session.id)) || [];
+      const homeworkVideoUrl = session && session.homework_video_url ? session.homework_video_url : null;
+
       return {
         videoId: v.id,
         title: v.title,
@@ -3583,7 +3616,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         viewsUsed,
         maxViews,
         price: student.price_per_session,
-        homeworkVideoUrl: session && session.homework_video_url ? session.homework_video_url : null,
+        homeworkVideoUrl,
+        homeworkItems,
         examUrl: session && session.exam_url ? session.exam_url : null,
       };
     }).filter(Boolean);

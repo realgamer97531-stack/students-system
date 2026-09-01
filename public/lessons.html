@@ -580,6 +580,7 @@ html[dir="ltr"] .whatsapp-float {
 
         selectedWeek.lessons.forEach((lesson, index) => {
           const extra = getLessonExtras(lesson.lessonNumber);
+          const rawHomeworkItems = Array.isArray(lesson.homeworkItems) ? lesson.homeworkItems : [];
           const homeworkVideoUrl = lesson.homeworkVideoUrl || lesson.homework_video_url || extra.homeworkVideoUrl || '';
           const examUrl = lesson.examUrl || lesson.exam_url || extra.examUrl || '';
           const viewsText = lesson.status === 'granted' || lesson.status === 'exhausted'
@@ -606,9 +607,27 @@ html[dir="ltr"] .whatsapp-float {
               </div>
             </div>`;
 
-          const homeworkCardHtml = homeworkVideoUrl
-            ? `
-              <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.2) * 0.08}s">
+          const homeworkCards = [
+            ...rawHomeworkItems.map((hw, hwIndex) => `
+              <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.2 + hwIndex * 0.05) * 0.08}s">
+                <div class="card lesson-card h-100" data-status="free" onclick="event.stopPropagation();" style="border-top: 4px solid #10B3A3;">
+                  <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <span class="badge bg-success px-2 py-1">${translations[currentLang].homeworkBtn}</span>
+                      <span class="badge" style="background: rgba(16, 179, 163, 0.1); color: #0f766e;">${translations[currentLang].lessonOrder} ${lesson.lessonNumber}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                      <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #10B3A3, #4F46E5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;box-shadow: 0 4px 12px rgba(16,179,163,0.2);">▶</div>
+                      <h6 class="mb-0 fw-bold" style="font-size:1.05rem;">${hw.title || translations[currentLang].homeworkBtn}</h6>
+                    </div>
+                    <p class="small mb-2" style="color: var(--sf-muted);">${hw.description || ''}</p>
+                    <p class="small mb-0" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
+                  </div>
+                </div>
+              </div>
+            `),
+            ...(homeworkVideoUrl ? [`
+              <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.2 + rawHomeworkItems.length * 0.05) * 0.08}s">
                 <div class="card lesson-card h-100" data-status="free" onclick="event.stopPropagation(); window.open('${homeworkVideoUrl.replace(/'/g, "\\'")}', '_blank', 'noopener,noreferrer');" style="border-top: 4px solid #10B3A3;">
                   <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -622,10 +641,11 @@ html[dir="ltr"] .whatsapp-float {
                     <p class="small mb-0" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
                   </div>
                 </div>
-              </div>`
-            : '';
+              </div>
+            `] : [])
+          ].join('');
 
-          container.innerHTML += lessonCardHtml + homeworkCardHtml;
+          container.innerHTML += lessonCardHtml + homeworkCards;
         });
         return;
       }
