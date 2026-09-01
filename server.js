@@ -1779,14 +1779,16 @@ app.get('/sessions/:id/report', async (req, res) => {
         }
       });
 
-      // Keep all students in the absent list for this center/session.
-      // If they attended elsewhere or online, just annotate the alternate place.
-      absentStudents = groupStudents.map(student => ({
-        ...(student.toJSON ? student.toJSON() : student),
-        elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
-      }));
+      // Keep students absent only if they did not attend in their own center.
+      // If they attended elsewhere or online, keep them visible with a note instead of removing them.
+      absentStudents = groupStudents
+        .filter(s => !attendedCenterStudentIds.has(s.id))
+        .map(student => ({
+          ...(student.toJSON ? student.toJSON() : student),
+          elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
+        }));
 
-      // Online visitors remain in a separate tab for display, but are still kept in the absent list.
+      // Online visitors remain in a separate tab for display, but are not removed from the main absent list.
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }
 
