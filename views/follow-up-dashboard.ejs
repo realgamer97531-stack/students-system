@@ -10,16 +10,20 @@
   </div>
 
   <!-- اختيار الحصة -->
-  <form method="GET" class="d-flex gap-2 flex-wrap">
-    <select name="session_id" class="form-select session-select" style="max-width: 350px;">
-      <option value="">-- اختر الحصة --</option>
-      <% sessions.forEach(s => { %>
-        <option value="<%= s.id %>" <%= String(s.id) === String(filters.session_id) ? 'selected':'' %>>
-          <%= s.Subject?.name %> - <%= s.Center?.name %> (حصة <%= s.lesson_number %>)
-        </option>
-      <% }) %>
-    </select>
-  </form>
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    <form method="GET" class="d-flex gap-2 flex-wrap">
+      <select name="session_id" class="form-select session-select" style="max-width: 350px;">
+        <option value="">-- اختر الحصة --</option>
+        <% sessions.forEach(s => { %>
+          <option value="<%= s.id %>" <%= String(s.id) === String(filters.session_id) ? 'selected':'' %>>
+            <%= s.Subject?.name %> - <%= s.Center?.name %> (حصة <%= s.lesson_number %>)
+          </option>
+        <% }) %>
+      </select>
+    </form>
+    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '' }).toString(); %>
+    <a href="/follow-up-dashboard/export?<%= exportQuery %>" class="btn btn-success btn-sm">📥 تصدير Excel</a>
+  </div>
 </div>
 
 <!-- الفلاتر -->

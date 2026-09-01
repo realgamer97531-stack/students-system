@@ -5796,6 +5796,151 @@ function requireFollowUp(req, res, next) {
 }
 
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
+app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
+  try {
+    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, center_id, subject_id } = req.query;
+
+    const centersList = await Center.findAll({ order: [['name', 'ASC']] });
+    const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
+
+    let students = [];
+    if (show_all) {
+      const where = {};
+      if (center_id) where.CenterId = center_id;
+      if (subject_id) where.SubjectId = subject_id;
+      students = await Student.findAll({ where, include: [Center, Subject], order: [['name', 'ASC']] });
+    } else {
+      const assignments = await FollowUpAssignment.findAll({
+        where: req.session.userRole !== 'admin' ? { AssistantId: req.session.userId } : {},
+        include: [{ model: Student, include: [Center, Subject] }],
+      });
+      students = assignments.map(a => a.Student).filter(Boolean);
+      if (center_id) students = students.filter(s => String(s.CenterId) === String(center_id));
+      if (subject_id) students = students.filter(s => String(s.SubjectId) === String(subject_id));
+    }
+
+    const sessions = await Session.findAll({ order: [['lesson_number', 'DESC']], include: [Center, Subject] });
+    const selectedSession = session_id
+      ? sessions.find(s => String(s.id) === String(session_id))
+      : sessions[0];
+
+    if (!selectedSession || students.length === 0) {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('متابعة الطلاب');
+      sheet.columns = [
+        { header: 'الكود', key: 'student_code', width: 18 },
+        { header: 'الاسم', key: 'name', width: 25 },
+        { header: 'المركز', key: 'center', width: 20 },
+        { header: 'المادة', key: 'subject', width: 20 },
+      ];
+      sheet.getRow(1).font = { bold: true };
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=followup_students.xlsx');
+      await workbook.xlsx.write(res);
+      res.end();
+      return;
+    }
+
+    const watchRecords = await WatchProgress.findAll({ where: { StudentId: students.map(s => s.id) }, include: [VideoPart] });
+    const watchMap = {};
+    watchRecords.forEach(w => { watchMap[`${w.StudentId}_${w.VideoPartId}`] = w.watched_seconds; });
+
+    const video = await Video.findOne({ where: { SessionId: selectedSession.id }, include: [{ model: VideoPart, order: [['order_index', 'ASC']] }] });
+
+    const sessionRows = [];
+    for (const student of students) {
+      const attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: selectedSession.id }, include: [User] });
+      const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: selectedSession.id } });
+      const examResult = await ExamResult.findOne({
+        where: { StudentId: student.id },
+        include: [{ model: Exam, where: { SessionId: selectedSession.id }, required: true }],
+      }).catch(() => null);
+      const sessionComment = await SessionComment.findOne({ where: { StudentId: student.id, SessionId: selectedSession.id } });
+
+      let videoWatch = { explanation: 0, questions: 0, homework_solution: 0, explanationTotal: 0, questionsTotal: 0, hwTotal: 0 };
+      if (video && video.VideoParts) {
+        video.VideoParts.forEach(part => {
+          const watched = watchMap[`${student.id}_${part.id}`] || 0;
+          videoWatch[part.category] = (videoWatch[part.category] || 0) + watched;
+          videoWatch[`${part.category}Total`] = (videoWatch[`${part.category}Total`] || 0) + part.duration_seconds;
+        });
+      }
+
+      const row = {
+        student,
+        attended: !!attendance,
+        attendedWhere: attendance ? (await Session.findByPk(attendance.SessionId, { include: [Center] }))?.Center?.name : null,
+        attendanceTime: attendance ? attendance.attended_at : null,
+        hwStatus: hw ? hw.status : null,
+        examScore: examResult ? examResult.score : null,
+        examMax: examResult ? examResult.Exam?.max_score : null,
+        videoWatch,
+        sessionComment: sessionComment ? sessionComment.comment : null,
+      };
+
+      if (filter_video_type && filter_video_max) {
+        const maxMin = parseFloat(filter_video_max);
+        const watchedMin = row.videoWatch[filter_video_type] / 60;
+        if (watchedMin > maxMin) continue;
+      }
+
+      if (filter_hw_status) {
+        if (row.hwStatus !== filter_hw_status && !(row.hwStatus === null && filter_hw_status === 'not_checked')) continue;
+      }
+
+      if (filter_exam_max) {
+        if (row.examScore === null || row.examScore > parseFloat(filter_exam_max)) continue;
+      }
+
+      sessionRows.push(row);
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('متابعة الطلاب');
+    sheet.columns = [
+      { header: 'الكود', key: 'student_code', width: 18 },
+      { header: 'الاسم', key: 'name', width: 25 },
+      { header: 'المركز', key: 'center', width: 20 },
+      { header: 'المادة', key: 'subject', width: 20 },
+      { header: 'الحضور', key: 'attendance', width: 18 },
+      { header: 'مكان الحضور', key: 'attended_where', width: 22 },
+      { header: 'الواجب', key: 'hw_status', width: 18 },
+      { header: 'الامتحان', key: 'exam_score', width: 14 },
+      { header: 'شرح (دقيقة)', key: 'explanation_minutes', width: 16 },
+      { header: 'أسئلة (دقيقة)', key: 'questions_minutes', width: 16 },
+      { header: 'حل واجب (دقيقة)', key: 'homework_minutes', width: 18 },
+      { header: 'كومنت', key: 'comment', width: 30 },
+    ];
+
+    sessionRows.forEach(r => {
+      sheet.addRow({
+        student_code: r.student.student_code,
+        name: r.student.name,
+        center: r.student.Center ? r.student.Center.name : '-',
+        subject: r.student.Subject ? r.student.Subject.name : '-',
+        attendance: r.attended ? 'حاضر' : 'غائب',
+        attended_where: r.attendedWhere || '-',
+        hw_status: r.hwStatus || '-',
+        exam_score: r.examScore !== null ? `${r.examScore}/${r.examMax || '-'}` : '-',
+        explanation_minutes: Math.floor((r.videoWatch.explanation || 0) / 60),
+        questions_minutes: Math.floor((r.videoWatch.questions || 0) / 60),
+        homework_minutes: Math.floor((r.videoWatch.homework_solution || 0) / 60),
+        comment: r.sessionComment || '-',
+      });
+    });
+
+    sheet.getRow(1).font = { bold: true };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=followup_students_${selectedSession.lesson_number || Date.now()}.xlsx`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
     const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, center_id, subject_id } = req.query;
