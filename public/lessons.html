@@ -393,8 +393,6 @@ html[dir="ltr"] .whatsapp-float {
       }
     };
 
-    // Edit this section only to organize the lessons into weeks for display.
-    // Each number is a lesson number, and each week can contain any number of sessions.
     const lessonWeekMap = {
       1: [1, 2],
       2: [3, 5],
@@ -402,8 +400,6 @@ html[dir="ltr"] .whatsapp-float {
       4: [7, 8],
     };
 
-    // Add the homework video URL and exam form URL per lesson number.
-    // Leave the value empty if that lesson does not have a homework or exam.
     const lessonExtrasByNumber = {
       1: { homeworkVideoUrl: '', examUrl: '' },
       2: { homeworkVideoUrl: '', examUrl: '' },
@@ -420,35 +416,42 @@ html[dir="ltr"] .whatsapp-float {
       return item || { homeworkVideoUrl: '', examUrl: '' };
     }
 
+    function getWeekFromLesson(lesson) {
+      if (lesson && (lesson.weekNumber !== undefined && lesson.weekNumber !== null && lesson.weekNumber !== '')) {
+        return Number(lesson.weekNumber);
+      }
+      if (lesson && (lesson.week_number !== undefined && lesson.week_number !== null && lesson.week_number !== '')) {
+        return Number(lesson.week_number);
+      }
+      const lessonNumber = Number(lesson && lesson.lessonNumber);
+      const sessionToWeek = new Map();
+      Object.entries(lessonWeekMap).forEach(([weekNumber, numbers]) => {
+        (numbers || []).forEach((num) => sessionToWeek.set(Number(num), Number(weekNumber)));
+      });
+      return sessionToWeek.get(lessonNumber) || Math.max(1, Math.ceil(lessonNumber / 2));
+    }
+
     function buildLessonWeeks(lessons, lang) {
       const weekToLessons = new Map();
-      const sessionToWeek = new Map();
-      const sortedWeekEntries = Object.entries(lessonWeekMap).sort((a, b) => Number(a[0]) - Number(b[0]));
-
-      sortedWeekEntries.forEach(([weekNumber, sessionNumbers]) => {
-        const normalized = (sessionNumbers || []).map(Number).filter(Boolean);
-        normalized.forEach(sessionNumber => {
-          sessionToWeek.set(sessionNumber, Number(weekNumber));
-        });
-      });
 
       lessons.forEach((lesson) => {
-        const lessonNumber = Number(lesson.lessonNumber);
-        const mappedWeek = sessionToWeek.get(lessonNumber);
-        const displayWeek = mappedWeek ? `Week ${mappedWeek}` : `Week ${Math.max(1, Math.ceil(lessonNumber / 2))}`;
+        const weekNumber = getWeekFromLesson(lesson);
+        const key = `week-${weekNumber}`;
 
-        if (!weekToLessons.has(displayWeek)) {
-          weekToLessons.set(displayWeek, []);
+        if (!weekToLessons.has(key)) {
+          weekToLessons.set(key, { number: weekNumber, lessons: [] });
         }
-        weekToLessons.get(displayWeek).push(lesson);
+
+        weekToLessons.get(key).lessons.push(lesson);
       });
 
-      return Array.from(weekToLessons.entries())
-        .map(([displayWeek, weekLessons]) => ({
-          label: `${translations[lang].weekLabel} ${displayWeek.replace(/^Week\s+/i, '')}`,
-          lessons: weekLessons.sort((a, b) => Number(a.lessonNumber) - Number(b.lessonNumber)),
+      return Array.from(weekToLessons.values())
+        .map((week) => ({
+          number: week.number,
+          label: `${translations[lang].weekLabel} ${week.number}`,
+          lessons: week.lessons.sort((a, b) => Number(a.lessonNumber) - Number(b.lessonNumber)),
         }))
-        .sort((a, b) => parseInt(a.label.match(/\d+/)?.[0] || '0', 10) - parseInt(b.label.match(/\d+/)?.[0] || '0', 10));
+        .sort((a, b) => a.number - b.number);
     }
 
     function applyLanguage(lang) {
@@ -546,9 +549,26 @@ html[dir="ltr"] .whatsapp-float {
       }
 
       const weeks = buildLessonWeeks(result.lessons, currentLang);
+      const currentWeek = new URLSearchParams(window.location.search).get('week');
 
-      weeks.forEach((week, weekIndex) => {
-        const cardsHtml = week.lessons.map((lesson, index) => {
+      if (currentWeek) {
+        const selectedWeek = weeks.find(week => String(week.number) === String(currentWeek));
+        if (!selectedWeek) {
+          window.history.replaceState({}, '', 'lessons.html');
+          loadLessons();
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="col-12 mb-3">
+            <button class="btn btn-outline-secondary" onclick="window.history.replaceState({}, '', 'lessons.html'); loadLessons();">← ${translations[currentLang].weekLabel}</button>
+          </div>
+          <div class="col-12 mb-4">
+            <h4 class="fw-bold mb-0">${selectedWeek.label}</h4>
+          </div>
+        `;
+
+        selectedWeek.lessons.forEach((lesson, index) => {
           const extra = getLessonExtras(lesson.lessonNumber);
           const viewsText = lesson.status === 'granted' || lesson.status === 'exhausted'
             ? `<span class="small" style="color: var(--sf-muted);">${lesson.viewsUsed} / ${lesson.maxViews} ${translations[currentLang].viewsCount}</span>` : '';
@@ -561,8 +581,8 @@ html[dir="ltr"] .whatsapp-float {
             ? `<button class="btn btn-sm btn-primary mt-2" onclick="event.stopPropagation(); openExamLink('${extra.examUrl.replace(/'/g, "\\'")}');">${translations[currentLang].examBtn}</button>`
             : '';
 
-          return `
-            <div class="col-md-4 fade-in-up" style="animation-delay: ${weekIndex * 0.15 + index * 0.08}s">
+          container.innerHTML += `
+            <div class="col-md-4 fade-in-up" style="animation-delay: ${index * 0.08}s">
               <div class="card lesson-card h-100" onclick="openLesson(${lesson.videoId})" style="border-top: 4px solid var(--sf-primary);">
                 <div class="card-body p-4">
                   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -582,14 +602,25 @@ html[dir="ltr"] .whatsapp-float {
                 </div>
               </div>
             </div>`;
-        }).join('');
+        });
+        return;
+      }
 
+      weeks.forEach((week, weekIndex) => {
         container.innerHTML += `
           <div class="col-12 fade-in-up" style="animation-delay: ${weekIndex * 0.1}s">
-            <div class="mb-3 d-flex align-items-center justify-content-between">
-              <h5 class="fw-bold mb-0" style="color: var(--sf-text);">${week.label}</h5>
+            <div class="card lesson-card h-100" onclick="window.location.href='lessons.html?week=${week.number}'" style="border: 1px solid var(--sf-border); background: linear-gradient(135deg, rgba(79,70,229,0.06), rgba(16,179,163,0.05));">
+              <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <span class="badge mb-2" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].weekLabel}</span>
+                    <h4 class="fw-bold mb-1">${week.label}</h4>
+                    <p class="mb-0 small" style="color: var(--sf-muted);">${week.lessons.length} ${translations[currentLang].lessonOrder}</p>
+                  </div>
+                  <div class="btn btn-primary btn-sm">Open</div>
+                </div>
+              </div>
             </div>
-            <div class="row g-3">${cardsHtml}</div>
           </div>`;
       });
     }

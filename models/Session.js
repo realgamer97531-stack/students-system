@@ -12,6 +12,11 @@ const Session = sequelize.define('Session', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  week_number: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+  },
   serial_number: {
     type: DataTypes.INTEGER,
     allowNull: false,

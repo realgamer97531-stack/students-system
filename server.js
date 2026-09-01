@@ -1498,7 +1498,7 @@ app.get('/sessions/new', requirePermission('sessions_create'), async (req, res) 
 
 app.post('/sessions', async (req, res) => {
   try {
-    const { subject_id, center_id, mode, lesson_number } = req.body;
+    const { subject_id, center_id, mode, lesson_number, week_number } = req.body;
 
     const series = await CenterSubjectSeries.findOne({
       where: { CenterId: center_id, SubjectId: subject_id },
@@ -1525,8 +1525,11 @@ app.post('/sessions', async (req, res) => {
 
     const serialNumber = series.base_number + finalLessonNumber;
 
+    const normalizedWeekNumber = week_number !== undefined && week_number !== null && week_number !== '' ? Number(week_number) : null;
+
     const newSession = await Session.create({
       lesson_number: finalLessonNumber,
+      week_number: normalizedWeekNumber,
       serial_number: serialNumber,
       CenterId: center_id,
       SubjectId: subject_id,
@@ -3407,6 +3410,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         videoId: v.id,
         title: v.title,
         lessonNumber: session ? session.lesson_number : null,
+        weekNumber: session ? (session.week_number ?? null) : null,
         date: session ? session.session_date : null,
         status,
         viewsUsed,
