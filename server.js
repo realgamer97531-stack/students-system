@@ -1761,17 +1761,21 @@ app.get('/sessions/:id/report', async (req, res) => {
         }],
       });
 
-      const attendedCenterStudentIds = new Set();
+      const ownCenterStudentIds = new Set();
       const onlineAttendeeIds = new Set();
       const elsewhereAttendanceMap = new Map();
 
       attendedAnywhere.forEach(a => {
         const placeName = a.Session && a.Session.Center ? a.Session.Center.name : 'غير معروف';
+        const isOwnCenter = a.Session && a.Session.CenterId === session.CenterId;
+
+        if (isOwnCenter) {
+          ownCenterStudentIds.add(a.StudentId);
+          return;
+        }
 
         if (placeName === 'أونلاين') {
           onlineAttendeeIds.add(a.StudentId);
-        } else {
-          attendedCenterStudentIds.add(a.StudentId);
         }
 
         if (!elsewhereAttendanceMap.has(a.StudentId)) {
@@ -1779,17 +1783,17 @@ app.get('/sessions/:id/report', async (req, res) => {
         }
       });
 
-      // Keep students absent only if they did not attend in their own center.
-      // If they attended elsewhere or online, keep them visible with a note instead of removing them.
+      // Hide only students who attended in this same center.
+      // If they attended elsewhere or online, keep them in the absent list and show the place.
       absentStudents = groupStudents
-        .filter(s => !attendedCenterStudentIds.has(s.id))
+        .filter(s => !ownCenterStudentIds.has(s.id))
         .map(student => ({
           ...(student.toJSON ? student.toJSON() : student),
           elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
         }));
 
-      // Online visitors remain in a separate tab for display, but are not removed from the main absent list.
-      onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
+      // Keep online/other-center attendees in a display list, but they remain absent for this center.
+      onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !ownCenterStudentIds.has(s.id));
     }
 
     const subject = await Subject.findByPk(session.SubjectId);
@@ -1993,17 +1997,21 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
         }],
       });
 
-      const attendedCenterStudentIds = new Set();
+      const ownCenterStudentIds = new Set();
       const onlineAttendeeIds = new Set();
       const elsewhereAttendanceMap = new Map();
 
       attendedAnywhere.forEach(a => {
         const placeName = a.Session && a.Session.Center ? a.Session.Center.name : 'غير معروف';
+        const isOwnCenter = a.Session && a.Session.CenterId === session.CenterId;
+
+        if (isOwnCenter) {
+          ownCenterStudentIds.add(a.StudentId);
+          return;
+        }
 
         if (placeName === 'أونلاين') {
           onlineAttendeeIds.add(a.StudentId);
-        } else {
-          attendedCenterStudentIds.add(a.StudentId);
         }
 
         if (!elsewhereAttendanceMap.has(a.StudentId)) {
@@ -2011,12 +2019,14 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
         }
       });
 
-      absentStudents = groupStudents.map(student => ({
-        ...(student.toJSON ? student.toJSON() : student),
-        elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
-      }));
+      absentStudents = groupStudents
+        .filter(s => !ownCenterStudentIds.has(s.id))
+        .map(student => ({
+          ...(student.toJSON ? student.toJSON() : student),
+          elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
+        }));
 
-      onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
+      onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !ownCenterStudentIds.has(s.id));
     }
 
     const workbook = new ExcelJS.Workbook();
