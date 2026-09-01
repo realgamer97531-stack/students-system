@@ -5847,15 +5847,42 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
 
     const video = await Video.findOne({ where: { SessionId: selectedSession.id }, include: [{ model: VideoPart, order: [['order_index', 'ASC']] }] });
 
+    const studentIds = students.map(s => s.id);
+    const [attendanceRecords, hwRecords, examResults, sessionComments] = await Promise.all([
+      Attendance.findAll({
+        where: { StudentId: studentIds, SessionId: selectedSession.id },
+        include: [User],
+      }),
+      HomeworkCheck.findAll({
+        where: { StudentId: studentIds, SessionId: selectedSession.id },
+      }),
+      ExamResult.findAll({
+        where: { StudentId: studentIds },
+        include: [{ model: Exam, where: { SessionId: selectedSession.id }, required: true }],
+      }),
+      SessionComment.findAll({
+        where: { StudentId: studentIds, SessionId: selectedSession.id },
+      }),
+    ]);
+
+    const attendanceMap = {};
+    attendanceRecords.forEach(att => { attendanceMap[att.StudentId] = att; });
+
+    const hwMap = {};
+    hwRecords.forEach(hw => { hwMap[hw.StudentId] = hw; });
+
+    const examMap = {};
+    examResults.forEach(er => { examMap[er.StudentId] = er; });
+
+    const commentMap = {};
+    sessionComments.forEach(sc => { commentMap[sc.StudentId] = sc; });
+
     const sessionRows = [];
     for (const student of students) {
-      const attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: selectedSession.id }, include: [User] });
-      const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: selectedSession.id } });
-      const examResult = await ExamResult.findOne({
-        where: { StudentId: student.id },
-        include: [{ model: Exam, where: { SessionId: selectedSession.id }, required: true }],
-      }).catch(() => null);
-      const sessionComment = await SessionComment.findOne({ where: { StudentId: student.id, SessionId: selectedSession.id } });
+      const attendance = attendanceMap[student.id] || null;
+      const hw = hwMap[student.id] || null;
+      const examResult = examMap[student.id] || null;
+      const sessionComment = commentMap[student.id] || null;
 
       let videoWatch = { explanation: 0, questions: 0, homework_solution: 0, explanationTotal: 0, questionsTotal: 0, hwTotal: 0 };
       if (video && video.VideoParts) {
@@ -5869,7 +5896,7 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       const row = {
         student,
         attended: !!attendance,
-        attendedWhere: attendance ? (await Session.findByPk(attendance.SessionId, { include: [Center] }))?.Center?.name : null,
+        attendedWhere: attendance ? (selectedSession.Center?.name || null) : null,
         attendanceTime: attendance ? attendance.attended_at : null,
         hwStatus: hw ? hw.status : null,
         examScore: examResult ? examResult.score : null,
@@ -6019,25 +6046,44 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
     });
 
+    const studentIds = students.map(s => s.id);
+    const [attendanceRecords, hwRecords, examResults, sessionComments] = await Promise.all([
+      Attendance.findAll({
+        where: { StudentId: studentIds, SessionId: selectedSession.id },
+        include: [User],
+      }),
+      HomeworkCheck.findAll({
+        where: { StudentId: studentIds, SessionId: selectedSession.id },
+      }),
+      ExamResult.findAll({
+        where: { StudentId: studentIds },
+        include: [{ model: Exam, where: { SessionId: selectedSession.id }, required: true }],
+      }),
+      SessionComment.findAll({
+        where: { StudentId: studentIds, SessionId: selectedSession.id },
+      }),
+    ]);
+
+    const attendanceMap = {};
+    attendanceRecords.forEach(att => { attendanceMap[att.StudentId] = att; });
+
+    const hwMap = {};
+    hwRecords.forEach(hw => { hwMap[hw.StudentId] = hw; });
+
+    const examMap = {};
+    examResults.forEach(er => { examMap[er.StudentId] = er; });
+
+    const commentMap = {};
+    sessionComments.forEach(sc => { commentMap[sc.StudentId] = sc; });
+
     const sessionRows = [];
     const absentStudents = [];
 
     for (const student of students) {
-      const attendance = await Attendance.findOne({
-        where: { StudentId: student.id, SessionId: selectedSession.id },
-        include: [User],
-      });
-      const hw = await HomeworkCheck.findOne({
-        where: { StudentId: student.id, SessionId: selectedSession.id },
-      });
-      const examResult = await ExamResult.findOne({
-        where: { StudentId: student.id },
-        include: [{ model: Exam, where: { SessionId: selectedSession.id }, required: true }],
-      }).catch(() => null);
-
-      const sessionComment = await SessionComment.findOne({
-        where: { StudentId: student.id, SessionId: selectedSession.id },
-      });
+      const attendance = attendanceMap[student.id] || null;
+      const hw = hwMap[student.id] || null;
+      const examResult = examMap[student.id] || null;
+      const sessionComment = commentMap[student.id] || null;
 
       // مدد المشاهدة حسب نوع الفيديو
       let videoWatch = { explanation: 0, questions: 0, homework_solution: 0, explanationTotal: 0, questionsTotal: 0, hwTotal: 0 };
@@ -6052,7 +6098,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       const row = {
         student,
         attended: !!attendance,
-        attendedWhere: attendance ? (await Session.findByPk(attendance.SessionId, { include: [Center] }))?.Center?.name : null,
+        attendedWhere: attendance ? (selectedSession.Center?.name || null) : null,
         attendanceTime: attendance ? attendance.attended_at : null,
         attendedBy: attendance ? attendance.User?.name : null,
         hwStatus: hw ? hw.status : null,
