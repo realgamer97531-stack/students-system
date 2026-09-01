@@ -26,6 +26,30 @@
   </div>
 </div>
 
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="mb-3 fw-bold">🔗 رابط الامتحان للحصة</h5>
+    <form action="/admin/videos/session/exam" method="POST" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small">اختر الحصة</label>
+        <select name="session_id" class="form-select" required>
+          <option value="">-- اختر حصة --</option>
+          <% allSessions.forEach(s => { %>
+            <option value="<%= s.id %>"><%= s.Subject.name %> - <%= s.Center.name %> (حصة <%= s.lesson_number %> | سيريال <%= s.serial_number %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label small">رابط الامتحان</label>
+        <input type="url" name="exam_url" class="form-control" placeholder="https://example.com/exam" required>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-warning w-100">حفظ رابط الامتحان</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <h5 class="mb-3 fw-bold">الدروس الموجودة</h5>
 <div class="row g-3">
   <% videos.forEach(v => { %>
@@ -51,6 +75,15 @@
             <a href="/admin/videos/<%= v.id %>" class="btn btn-sm btn-outline-primary flex-grow-1">إدارة الفيديوهات</a>
             <a href="/admin/videos/<%= v.id %>/access" class="btn btn-sm btn-outline-secondary flex-grow-1">التحكم</a>
           </div>
+
+          <% const examUrl = v.Session && v.Session.exam_url ? v.Session.exam_url : ''; %>
+          <% if (examUrl) { %>
+            <div class="mt-2">
+              <a href="<%= examUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning w-100">🔗 فتح رابط الامتحان</a>
+            </div>
+          <% } else { %>
+            <div class="mt-2 small text-muted">لا يوجد رابط امتحان لهذه الحصة</div>
+          <% } %>
         </div>
       </div>
     </div>

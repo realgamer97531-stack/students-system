@@ -3970,6 +3970,26 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
   res.render('manage-videos', { allSessions, videos });
 });
 
+app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const { session_id, exam_url } = req.body;
+    const sessionId = Number(session_id);
+    if (!sessionId) return res.status(400).send('❌ اختر حصة أولاً');
+
+    const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
+    if (!cleanExamUrl) return res.status(400).send('❌ رابط الامتحان مطلوب');
+
+    const session = await Session.findByPk(sessionId);
+    if (!session) return res.status(404).send('❌ الحصة غير موجودة');
+
+    await session.update({ exam_url: cleanExamUrl });
+    res.redirect('/admin/videos');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
 app.post('/admin/videos/:id/update-title', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
     const { title } = req.body;
@@ -4243,12 +4263,14 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
 });
 
 app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const { is_free_for_all, views_if_attended, views_if_paid } = req.body;
+  const { is_free_for_all, views_if_attended, views_if_paid, exam_url } = req.body;
   const video = await Video.findByPk(req.params.id);
+  const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
   await Session.update({
     is_free_for_all: is_free_for_all === 'on',
     views_if_attended,
     views_if_paid,
+    exam_url: cleanExamUrl,
   }, { where: { id: video.SessionId } });
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
