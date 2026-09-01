@@ -610,7 +610,7 @@ html[dir="ltr"] .whatsapp-float {
           const homeworkCards = [
             ...rawHomeworkItems.map((hw, hwIndex) => {
               const hwTitle = String(hw.title || translations[currentLang].homeworkBtn || 'Homework');
-              const hwOpenUrl = (hw.link || hw.url || homeworkVideoUrl || '').toString();
+              const hwOpenUrl = (hw.link || hw.url || hw.video_url || hw.homework_video_url || homeworkVideoUrl || '').toString();
               const safeHwTitle = hwTitle.replace(/'/g, "\\'");
               const safeHwOpenUrl = hwOpenUrl.replace(/'/g, "\\'");
               return `
@@ -683,8 +683,12 @@ html[dir="ltr"] .whatsapp-float {
 
     function openHomeworkCard(url, title) {
       const cleanedUrl = (url || '').trim();
-      if (cleanedUrl && /^https?:\/\//i.test(cleanedUrl)) {
-        window.open(cleanedUrl, '_blank', 'noopener,noreferrer');
+      if (cleanedUrl) {
+        const normalizedUrl = cleanedUrl.startsWith('http://') || cleanedUrl.startsWith('https://')
+          ? cleanedUrl
+          : `https://${cleanedUrl}`;
+
+        window.open(normalizedUrl, '_blank', 'noopener,noreferrer');
         return;
       }
 

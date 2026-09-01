@@ -191,6 +191,36 @@ async function ensureSessionWeekNumberColumn() {
   }
 }
 
+async function ensureSessionHomeworkFields() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('sessions');
+
+    if (!tableInfo.homework_video_url) {
+      await queryInterface.addColumn('sessions', 'homework_video_url', {
+        type: sequelize.Sequelize.TEXT,
+        allowNull: true,
+        defaultValue: null,
+      });
+      console.log('✅ Added homework_video_url column to sessions table');
+    }
+
+    if (!tableInfo.exam_url) {
+      await queryInterface.addColumn('sessions', 'exam_url', {
+        type: sequelize.Sequelize.TEXT,
+        allowNull: true,
+        defaultValue: null,
+      });
+      console.log('✅ Added exam_url column to sessions table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure sessions homework/exam URL columns:', error.message);
+  }
+}
+
 async function ensureStudentBookletCustomPriceColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -6528,6 +6558,7 @@ async function startServer() {
     await RechargeCode.sync();
     await ensureUserPhoneColumn();
     await ensureSessionWeekNumberColumn();
+    await ensureSessionHomeworkFields();
     await ensureStudentBookletCustomPriceColumn();
     await ensureBalanceTransactionSessionColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
@@ -6574,6 +6605,7 @@ async function startServer() {
           await RechargeCode.sync();
           await ensureUserPhoneColumn();
           await ensureSessionWeekNumberColumn();
+          await ensureSessionHomeworkFields();
           await ensureStudentBookletCustomPriceColumn();
           await ensureUserProfilePhotoColumn();
           await ensureBookletReservationSchema(sequelize);
