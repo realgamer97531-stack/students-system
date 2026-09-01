@@ -570,15 +570,17 @@ html[dir="ltr"] .whatsapp-float {
 
         selectedWeek.lessons.forEach((lesson, index) => {
           const extra = getLessonExtras(lesson.lessonNumber);
+          const homeworkVideoUrl = lesson.homeworkVideoUrl || lesson.homework_video_url || extra.homeworkVideoUrl || '';
+          const examUrl = lesson.examUrl || lesson.exam_url || extra.examUrl || '';
           const viewsText = lesson.status === 'granted' || lesson.status === 'exhausted'
             ? `<span class="small" style="color: var(--sf-muted);">${lesson.viewsUsed} / ${lesson.maxViews} ${translations[currentLang].viewsCount}</span>` : '';
 
-          const homeworkButton = extra.homeworkVideoUrl
-            ? `<button class="btn btn-sm btn-outline-success mt-2 ms-1" onclick="event.stopPropagation(); openHomeworkVideo(${lesson.videoId}, '${extra.homeworkVideoUrl.replace(/'/g, "\\'")}');">${translations[currentLang].homeworkBtn}</button>`
+          const homeworkButton = homeworkVideoUrl
+            ? `<button class="btn btn-sm btn-outline-success mt-2 ms-1" onclick="event.stopPropagation(); openHomeworkVideo(${lesson.videoId}, '${homeworkVideoUrl.replace(/'/g, "\\'")}');">${translations[currentLang].homeworkBtn}</button>`
             : '';
 
-          const examButton = extra.examUrl
-            ? `<button class="btn btn-sm btn-primary mt-2" onclick="event.stopPropagation(); openExamLink('${extra.examUrl.replace(/'/g, "\\'")}');">${translations[currentLang].examBtn}</button>`
+          const examButton = examUrl
+            ? `<button class="btn btn-sm btn-primary mt-2" onclick="event.stopPropagation(); openExamLink('${examUrl.replace(/'/g, "\\'")}');">${translations[currentLang].examBtn}</button>`
             : '';
 
           container.innerHTML += `

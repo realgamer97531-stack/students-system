@@ -3451,6 +3451,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         viewsUsed,
         maxViews,
         price: student.price_per_session,
+        homeworkVideoUrl: session && session.homework_video_url ? session.homework_video_url : null,
+        examUrl: session && session.exam_url ? session.exam_url : null,
       };
     }).filter(Boolean);
 
@@ -3529,15 +3531,14 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
 
     // 3) مفيش صلاحية - نتحقق هل حضر هذه الحصة في أي سنتر فعلي (غير أونلاين)
     const attendedInCenter = await Attendance.findOne({
-      where: { StudentId: student.id },
+      where: { StudentId: student.id, SessionId: session.id },
       include: [{
         model: Session,
-        where: { lesson_number: session.lesson_number, SubjectId: student.SubjectId },
-        include: [{ model: Center, where: { name: { [Op.ne]: 'أونلاين' } } }],
+        include: [{ model: Center }],
       }],
     });
 
-    if (attendedInCenter) {
+    if (attendedInCenter && attendedInCenter.Session && attendedInCenter.Session.Center && attendedInCenter.Session.Center.name !== 'أونلاين') {
       grant = await VideoAccessGrant.create({
         StudentId: student.id,
         SessionId: session.id,
