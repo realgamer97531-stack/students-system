@@ -3153,6 +3153,52 @@ function hasAllVideoAccess(student) {
   return student.student_code === 'STU-00000';
 }
 
+async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
+  const where = { StudentId: studentId };
+  if (sessionId !== null) {
+    where.SessionId = sessionId;
+  }
+
+  const grants = await VideoAccessGrant.findAll({ where });
+  const staleGrantIds = [];
+
+  for (const grant of grants) {
+    if (grant.method !== 'attended') continue;
+
+    if (!grant.SessionId) {
+      staleGrantIds.push(grant.id);
+      continue;
+    }
+
+    const hasValidAttendance = await Attendance.findOne({
+      where: { StudentId: studentId, SessionId: grant.SessionId },
+    });
+
+    if (!hasValidAttendance) {
+      staleGrantIds.push(grant.id);
+    }
+  }
+
+  if (staleGrantIds.length > 0) {
+    await VideoAccessGrant.destroy({ where: { id: staleGrantIds } });
+  }
+
+  if (sessionId !== null) {
+    const sessionGrants = await VideoAccessGrant.findAll({ where: { StudentId: studentId, SessionId: sessionId } });
+    if (sessionGrants.length > 1) {
+      const sorted = [...sessionGrants].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const keepId = sorted[0].id;
+      const extras = sorted.slice(1).map(g => g.id);
+      if (extras.length > 0) {
+        await VideoAccessGrant.destroy({ where: { id: extras, StudentId: studentId, SessionId: sessionId } });
+      }
+      if (keepId !== sorted[0].id) {
+        // kept by sort above; no-op
+      }
+    }
+  }
+}
+
 async function buildStudentData(studentId) {
   const student = await Student.findOne({
     where: { id: studentId },
@@ -3422,7 +3468,9 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       where: { StudentId: student.id },
       attributes: ['SessionId'],
     });
-    const attendedSessionIds = new Set(attendanceRecords.map(a => a.SessionId));
+    const attendedSessionIds = new Set(attendanceRecords.map(a => a.SessionId).filter(Boolean));
+
+    await cleanupStaleVideoAccessGrants(student.id);
 
     const grants = await VideoAccessGrant.findAll({ where: { StudentId: student.id } });
     const cleanedGrants = [];
@@ -3436,7 +3484,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     }
 
     const grantBySessionId = {};
-    cleanedGrants.forEach(g => { grantBySessionId[g.SessionId] = g; });
+    cleanedGrants.forEach(g => { if (g.SessionId) grantBySessionId[g.SessionId] = g; });
 
     const lessons = videos.map(v => {
       const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
@@ -3514,11 +3562,12 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     }
 
     // 2) فيه صلاحية مسجلة بالفعل (حضور سابق / دفع سابق / فتح أدمن)
-    let grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
     const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: session.id } });
+    await cleanupStaleVideoAccessGrants(student.id, session.id);
+    let grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
 
     if (grant && grant.method === 'attended' && !attendanceExists) {
-      await grant.destroy();
+      await VideoAccessGrant.destroy({ where: { StudentId: student.id, SessionId: session.id, method: 'attended' } });
       grant = null;
     }
 
