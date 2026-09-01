@@ -1152,16 +1152,24 @@ app.get('/students/:id', async (req, res) => {
       include: [{ model: Session, include: [Center] }, User],
     });
 
+    const ownSessionIds = new Set(ownSessions.map(s => s.id));
     const attendanceByLesson = {};
     const attendanceUserByLesson = {};
     const attendanceTimeByLesson = {};
     const attendanceIdByLesson = {};
     attendanceRecords.forEach(a => {
       if (a && a.Session && a.Session.SubjectId === student.SubjectId) {
-        attendanceByLesson[a.Session.lesson_number] = a.Session;
-        attendanceUserByLesson[a.Session.lesson_number] = a.User ? a.User.name : '-';
-        attendanceTimeByLesson[a.Session.lesson_number] = a.attended_at;
-        attendanceIdByLesson[a.Session.lesson_number] = a.id;
+        const key = Number(a.Session.lesson_number);
+        const current = attendanceByLesson[key];
+        const isPreferred = ownSessionIds.has(a.SessionId);
+        const currentPreferred = current && current.id && ownSessionIds.has(current.id);
+
+        if (!current || (isPreferred && !currentPreferred) || (!current.id && a.SessionId)) {
+          attendanceByLesson[key] = a.Session;
+          attendanceUserByLesson[key] = a.User ? a.User.name : '-';
+          attendanceTimeByLesson[key] = a.attended_at;
+          attendanceIdByLesson[key] = a.id;
+        }
       }
     });
 
@@ -1175,9 +1183,16 @@ app.get('/students/:id', async (req, res) => {
     const homeworkTimeByLesson = {};
     homeworkRecords.forEach(h => {
       if (h && h.Session && h.Session.SubjectId === student.SubjectId) {
-        homeworkByLesson[h.Session.lesson_number] = h.status;
-        homeworkUserByLesson[h.Session.lesson_number] = h.User ? h.User.name : '-';
-        homeworkTimeByLesson[h.Session.lesson_number] = h.createdAt;
+        const key = Number(h.Session.lesson_number);
+        const current = homeworkByLesson[key];
+        const isPreferred = ownSessionIds.has(h.SessionId);
+        const currentPreferred = current && current.sessionId && ownSessionIds.has(current.sessionId);
+
+        if (!current || (isPreferred && !currentPreferred) || (!current.sessionId && h.SessionId)) {
+          homeworkByLesson[key] = h.status;
+          homeworkUserByLesson[key] = h.User ? h.User.name : '-';
+          homeworkTimeByLesson[key] = h.createdAt;
+        }
       }
     });
 
@@ -1191,13 +1206,21 @@ app.get('/students/:id', async (req, res) => {
     const examScoreByLesson = {};
     examResults.forEach(r => {
       if (r && r.Exam && r.Exam.Session) {
-        examScoreByLesson[r.Exam.Session.lesson_number] = {
-          score: r.score,
-          max_score: r.Exam.max_score,
-          examName: r.Exam.name,
-          recordedBy: r.User ? r.User.name : '-',
-          recordedAt: r.createdAt,
-        };
+        const key = Number(r.Exam.Session.lesson_number);
+        const current = examScoreByLesson[key];
+        const isPreferred = ownSessionIds.has(r.Exam.SessionId);
+        const currentPreferred = current && current.sessionId && ownSessionIds.has(current.sessionId);
+
+        if (!current || (isPreferred && !currentPreferred) || (!current.sessionId && r.Exam.SessionId)) {
+          examScoreByLesson[key] = {
+            score: r.score,
+            max_score: r.Exam.max_score,
+            examName: r.Exam.name,
+            recordedBy: r.User ? r.User.name : '-',
+            recordedAt: r.createdAt,
+            sessionId: r.Exam.SessionId,
+          };
+        }
       }
     });
 
@@ -3212,13 +3235,23 @@ async function buildStudentData(studentId) {
     order: [['lesson_number', 'ASC']],
   });
 
+  const ownSessionIds = new Set(ownSessions.map(s => s.id));
+
   const attendanceRecords = await Attendance.findAll({
     where: { StudentId: student.id },
     include: [{ model: Session, include: [Center] }, User],
   });
   const attendanceByLesson = {};
   attendanceRecords.forEach(a => {
-    if (a.Session && a.Session.SubjectId === student.SubjectId) attendanceByLesson[a.Session.lesson_number] = a;
+    if (a.Session && a.Session.SubjectId === student.SubjectId) {
+      const key = Number(a.Session.lesson_number);
+      const current = attendanceByLesson[key];
+      const isPreferredSession = ownSessionIds.has(a.SessionId);
+      const currentPreferred = current && current.SessionId && ownSessionIds.has(current.SessionId);
+      if (!current || (isPreferred && !currentPreferred) || (!current.SessionId && a.SessionId)) {
+        attendanceByLesson[key] = a;
+      }
+    }
   });
 
   const homeworkRecords = await HomeworkCheck.findAll({
@@ -3227,7 +3260,15 @@ async function buildStudentData(studentId) {
   });
   const homeworkByLesson = {};
   homeworkRecords.forEach(h => {
-    if (h.Session && h.Session.SubjectId === student.SubjectId) homeworkByLesson[h.Session.lesson_number] = h;
+    if (h.Session && h.Session.SubjectId === student.SubjectId) {
+      const key = Number(h.Session.lesson_number);
+      const current = homeworkByLesson[key];
+      const isPreferredSession = ownSessionIds.has(h.SessionId);
+      const currentPreferred = current && current.SessionId && ownSessionIds.has(current.SessionId);
+      if (!current || (isPreferred && !currentPreferred) || (!current.SessionId && h.SessionId)) {
+        homeworkByLesson[key] = h;
+      }
+    }
   });
 
   const examResults = await ExamResult.findAll({
@@ -3236,7 +3277,15 @@ async function buildStudentData(studentId) {
   });
   const examByLesson = {};
   examResults.forEach(r => {
-    if (r.Exam.Session) examByLesson[r.Exam.Session.lesson_number] = r;
+    if (r.Exam.Session) {
+      const key = Number(r.Exam.Session.lesson_number);
+      const current = examByLesson[key];
+      const isPreferredSession = ownSessionIds.has(r.Exam.SessionId);
+      const currentPreferred = current && current.Exam && current.Exam.SessionId && ownSessionIds.has(current.Exam.SessionId);
+      if (!current || (isPreferred && !currentPreferred) || (!current.Exam?.SessionId && r.Exam.SessionId)) {
+        examByLesson[key] = r;
+      }
+    }
   });
 
   // نجمع كل أرقام الحصص النسبية اللي للطالب علاقة بيها: سواء من مجموعته، أو حضرها في مكان تاني
