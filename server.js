@@ -171,6 +171,26 @@ async function ensureUserPhoneColumn() {
   }
 }
 
+async function ensureSessionWeekNumberColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('sessions');
+    if (!tableInfo.week_number) {
+      await queryInterface.addColumn('sessions', 'week_number', {
+        type: sequelize.Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+      });
+      console.log('✅ Added week_number column to sessions table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure sessions.week_number column:', error.message);
+  }
+}
+
 async function ensureStudentBookletCustomPriceColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -6287,6 +6307,7 @@ async function startServer() {
     // await sequelize.sync();
     await RechargeCode.sync();
     await ensureUserPhoneColumn();
+    await ensureSessionWeekNumberColumn();
     await ensureStudentBookletCustomPriceColumn();
     await ensureBalanceTransactionSessionColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
@@ -6332,6 +6353,7 @@ async function startServer() {
           dbReady = true;
           await RechargeCode.sync();
           await ensureUserPhoneColumn();
+          await ensureSessionWeekNumberColumn();
           await ensureStudentBookletCustomPriceColumn();
           await ensureUserProfilePhotoColumn();
           await ensureBookletReservationSchema(sequelize);
