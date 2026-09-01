@@ -3176,6 +3176,30 @@ function hasAllVideoAccess(student) {
   return student.student_code === 'STU-00000';
 }
 
+function choosePreferredLessonRecord(current, candidate, ownSessionIds) {
+  if (!candidate) return current;
+  if (!current) return candidate;
+
+  const getSessionId = (record) => {
+    if (!record) return null;
+    if (record.SessionId) return record.SessionId;
+    if (record.sessionId) return record.sessionId;
+    if (record.Exam && record.Exam.SessionId) return record.Exam.SessionId;
+    if (record.Session && record.Session.id) return record.Session.id;
+    if (record.id && record.constructor && record.constructor.name === 'Session') return record.id;
+    return null;
+  };
+
+  const candidateSessionId = getSessionId(candidate);
+  const currentSessionId = getSessionId(current);
+  const candidatePreferred = !!candidateSessionId && ownSessionIds.has(candidateSessionId);
+  const currentPreferred = !!currentSessionId && ownSessionIds.has(currentSessionId);
+
+  if (candidatePreferred && !currentPreferred) return candidate;
+  if (!currentSessionId && candidateSessionId) return candidate;
+  return current;
+}
+
 async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
   const where = { StudentId: studentId };
   if (sessionId !== null) {
@@ -3245,12 +3269,7 @@ async function buildStudentData(studentId) {
   attendanceRecords.forEach(a => {
     if (a.Session && a.Session.SubjectId === student.SubjectId) {
       const key = Number(a.Session.lesson_number);
-      const current = attendanceByLesson[key];
-      const isPreferredSession = ownSessionIds.has(a.SessionId);
-      const currentPreferred = current && current.SessionId && ownSessionIds.has(current.SessionId);
-      if (!current || (isPreferred && !currentPreferred) || (!current.SessionId && a.SessionId)) {
-        attendanceByLesson[key] = a;
-      }
+      attendanceByLesson[key] = choosePreferredLessonRecord(attendanceByLesson[key], a, ownSessionIds);
     }
   });
 
@@ -3262,12 +3281,7 @@ async function buildStudentData(studentId) {
   homeworkRecords.forEach(h => {
     if (h.Session && h.Session.SubjectId === student.SubjectId) {
       const key = Number(h.Session.lesson_number);
-      const current = homeworkByLesson[key];
-      const isPreferredSession = ownSessionIds.has(h.SessionId);
-      const currentPreferred = current && current.SessionId && ownSessionIds.has(current.SessionId);
-      if (!current || (isPreferred && !currentPreferred) || (!current.SessionId && h.SessionId)) {
-        homeworkByLesson[key] = h;
-      }
+      homeworkByLesson[key] = choosePreferredLessonRecord(homeworkByLesson[key], h, ownSessionIds);
     }
   });
 
@@ -3279,12 +3293,7 @@ async function buildStudentData(studentId) {
   examResults.forEach(r => {
     if (r.Exam.Session) {
       const key = Number(r.Exam.Session.lesson_number);
-      const current = examByLesson[key];
-      const isPreferredSession = ownSessionIds.has(r.Exam.SessionId);
-      const currentPreferred = current && current.Exam && current.Exam.SessionId && ownSessionIds.has(current.Exam.SessionId);
-      if (!current || (isPreferred && !currentPreferred) || (!current.Exam?.SessionId && r.Exam.SessionId)) {
-        examByLesson[key] = r;
-      }
+      examByLesson[key] = choosePreferredLessonRecord(examByLesson[key], r, ownSessionIds);
     }
   });
 
@@ -5839,13 +5848,19 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       include: [Center],
       order: [['lesson_number', 'ASC']],
     });
+    const ownSessionIds = new Set(ownSessions.map(s => s.id));
 
     const attendances = await Attendance.findAll({
       where: { StudentId: student.id },
       include: [{ model: Session, include: [Center] }, User],
     });
     const attMap = {};
-    attendances.forEach(a => { if (a.Session.SubjectId === student.SubjectId) attMap[a.Session.lesson_number] = a; });
+    attendances.forEach(a => {
+      if (a.Session && a.Session.SubjectId === student.SubjectId) {
+        const key = Number(a.Session.lesson_number);
+        attMap[key] = choosePreferredLessonRecord(attMap[key], a, ownSessionIds);
+      }
+    });
 
     const hwChecks = await HomeworkCheck.findAll({
       where: { StudentId: student.id },
