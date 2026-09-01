@@ -1779,16 +1779,14 @@ app.get('/sessions/:id/report', async (req, res) => {
         }
       });
 
-      // This report only: keep them in the absent table for this center/session,
-      // even if they attended elsewhere/online, and only show the other-place note.
-      absentStudents = groupStudents
-        .filter(s => !attendedCenterStudentIds.has(s.id))
-        .map(student => ({
-          ...(student.toJSON ? student.toJSON() : student),
-          elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
-        }));
+      // Keep all students in the absent list for this center/session.
+      // If they attended elsewhere or online, just annotate the alternate place.
+      absentStudents = groupStudents.map(student => ({
+        ...(student.toJSON ? student.toJSON() : student),
+        elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
+      }));
 
-      // Online visitors remain in a separate tab only for display; they are not removed from the main absent list.
+      // Online visitors remain in a separate tab for display, but are still kept in the absent list.
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }
 
@@ -2011,12 +2009,10 @@ app.get('/sessions/:id/report/export-absent', async (req, res) => {
         }
       });
 
-      absentStudents = groupStudents
-        .filter(s => !attendedCenterStudentIds.has(s.id))
-        .map(student => ({
-          ...(student.toJSON ? student.toJSON() : student),
-          elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
-        }));
+      absentStudents = groupStudents.map(student => ({
+        ...(student.toJSON ? student.toJSON() : student),
+        elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
+      }));
 
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }
