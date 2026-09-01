@@ -3941,6 +3941,26 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
   res.render('manage-videos', { allSessions, videos });
 });
 
+app.post('/admin/videos/:id/update-title', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const { title } = req.body;
+    const trimmedTitle = typeof title === 'string' ? title.trim() : '';
+
+    if (!trimmedTitle) {
+      return res.status(400).send('❌ عنوان الفيديو مطلوب');
+    }
+
+    const video = await Video.findByPk(req.params.id);
+    if (!video) return res.status(404).send('❌ الفيديو غير موجود');
+
+    await video.update({ title: trimmedTitle });
+    res.redirect('/admin/videos');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
 app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), imageUpload.single('session_image'), async (req, res) => {
   let transaction;
   try {
