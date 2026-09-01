@@ -1779,8 +1779,8 @@ app.get('/sessions/:id/report', async (req, res) => {
         }
       });
 
-      // This report only: exclude students who actually attended at their own center,
-      // but keep students absent from their center even if they attended elsewhere/online and show a note.
+      // This report only: keep them in the absent table for this center/session,
+      // even if they attended elsewhere/online, and only show the other-place note.
       absentStudents = groupStudents
         .filter(s => !attendedCenterStudentIds.has(s.id))
         .map(student => ({
@@ -1788,7 +1788,7 @@ app.get('/sessions/:id/report', async (req, res) => {
           elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
         }));
 
-      // Get center students who attended online
+      // Online visitors remain in a separate tab only for display; they are not removed from the main absent list.
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }
 
