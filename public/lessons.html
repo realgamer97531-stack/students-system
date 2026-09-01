@@ -3,124 +3,487 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title id="page-title">مشاهدة الدرس</title>
+  <title id="page-title">الفيديوهات</title>
+  <link href="style.css" rel="stylesheet">
   <link id="bootstrap-link" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  
   <style>
+    /* 🎨 المتغيرات ولوحة الألوان الثنائية (Premium Slate Theme) */
     :root {
-      --dark-bg: #0b0f19;
-      --dark-card: #141b2d;
-      --dark-text: #f1f5f9;
-      --dark-muted: #94a3b8;
-      --dark-border: #1f293d;
-      --dark-accent: #6366f1;
+      --sf-bg: #F7F8FD;
+      --sf-card: #ffffff;
+      --sf-text: #1E293B;
+      --sf-muted: #64748B;
+      --sf-border: #E2E8F0;
+      --sf-primary: #4F46E5;
+      --sf-accent: #10B3A3;
+      --sf-warm: #F59E0B;
+      --loader-bg: rgba(245, 246, 251, 0.85);
+      --card-gradient: linear-gradient(135deg, #10B3A3, #4F46E5);
     }
-    body.dark-theme { background-color: var(--dark-bg) !important; color: var(--dark-text); }
-    body.dark-theme .card { background-color: var(--dark-card); border-color: var(--dark-border); color: var(--dark-text); }
-    body.dark-theme .text-muted { color: var(--dark-muted) !important; }
-    .theme-controls { position: fixed; bottom: 20px; left: 20px; z-index: 1050; display: flex; gap: 10px; }
+
+    /* 🌙 توافقات وثيم الدارك مود الفخم */
+    body.dark-theme {
+      --sf-bg: #0b0f19;          
+      --sf-card: #141b2d;        
+      --sf-text: #f1f5f9;        
+      --sf-muted: #94a3b8;       
+      --sf-border: #1f293d;      
+      --sf-primary: #6366f1;      
+      --loader-bg: rgba(11, 15, 25, 0.9);
+      --card-gradient: linear-gradient(135deg, #0f766e, #4f46e5);
+    }
+
+    body {
+      background-color: var(--sf-bg) !important;
+      color: var(--sf-text);
+      font-family: system-ui, -apple-system, sans-serif;
+      position: relative;
+      min-height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* إعدادات الـ Loading Spinner */
+    #global-loader {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--loader-bg);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+      transition: background 0.3s ease;
+    }
+    .spinner {
+      border: 4px solid var(--sf-border);
+      border-top: 4px solid var(--sf-primary);
+      border-radius: 50%;
+      width: 50px; height: 50px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* أنيميشن دخول العناصر تتابعياً */
+    .fade-in-up {
+      animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(25px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* أشكال الخلفية الهلامية */
+    .bg-shape {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      z-index: -1;
+      opacity: 0.25;
+      animation: float 7s ease-in-out infinite;
+    }
+    body.dark-theme .bg-shape {
+      opacity: 0.12;
+    }
+    .bg-shape-1 {
+      width: 350px; height: 350px;
+      background: var(--sf-primary);
+      top: -60px; right: -60px;
+    }
+    .bg-shape-2 {
+      width: 450px; height: 450px;
+      background: var(--sf-accent);
+      bottom: -120px; left: -120px;
+      animation-delay: 2.5s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(25px); }
+    }
+
+    /* الهيدر والقائمة العلوية */
+    .navbar {
+      background: #0F172A !important;
+      padding: 14px 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+    body.dark-theme .navbar {
+      background-color: #0b0f19 !important;
+      border-bottom: 1px solid var(--sf-border);
+    }
+    .navbar-brand {
+      font-weight: 800;
+      color: #ffffff !important;
+    }
+    
+    /* ستايل المنيو الجانبية للموبايل في الدارك مود */
+    body.dark-theme .offcanvas {
+      background-color: var(--sf-card) !important;
+      color: var(--sf-text) !important;
+      border-color: var(--sf-border) !important;
+    }
+    body.dark-theme .offcanvas-header {
+      border-bottom: 1px solid var(--sf-border) !important;
+    }
+    
+    /* 📱 تظبيط ألوان الأزرار في القائمة الجانبية للموبايل فقط */
+    @media (max-width: 767px) {
+      .nav-tabs-custom .btn-light {
+        background-color: var(--sf-primary) !important;
+        color: #ffffff !important;
+        border: none !important;
+      }
+      .nav-tabs-custom .btn-outline-light {
+        color: var(--sf-text) !important;
+        border-color: var(--sf-border) !important;
+        background-color: transparent !important;
+      }
+      .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(0,0,0,0.05) !important;
+      }
+      body.dark-theme .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(255,255,255,0.05) !important;
+      }
+    }
+
+    .nav-tabs-custom .btn {
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.25s ease;
+    }
+
+    /* كروت الدروس */
+    .card.lesson-card {
+      background-color: var(--sf-card) !important;
+      border: 1px solid var(--sf-border) !important;
+      color: var(--sf-text) !important;
+      border-radius: 20px !important;
+      cursor: pointer; 
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card.lesson-card:hover { 
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08); 
+    }
+    body.dark-theme .card.lesson-card:hover {
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important; 
+    }
+
+    /* المودالات والشارات */
+    .modal-content {
+      background-color: var(--sf-card) !important;
+      color: var(--sf-text) !important;
+      border: 1px solid var(--sf-border) !important;
+      border-radius: 18px;
+    }
+    .modal-header, .modal-footer { border-color: var(--sf-border) !important; }
+    body.dark-theme .btn-close { filter: invert(1) grayscale(1) brightness(2); }
+
+    .badge {
+      font-weight: 600 !important;
+      border-radius: 8px !important;
+    }
+
+    /* 🛠️ أزرار التحكم العائمة */
+    .theme-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: auto;
+      z-index: 1050;
+      display: flex;
+      gap: 10px;
+    }
     html[dir="ltr"] .theme-controls { left: auto; right: 20px; }
-    .control-btn { background: rgba(255,255,255,0.9); border: 1px solid #E2E4F3; padding: 8px 14px; border-radius: 30px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
-    body.dark-theme .control-btn { background: var(--dark-card); border-color: var(--dark-border); color: var(--dark-text); }
+    
+    .control-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #E2E4F3;
+      padding: 8px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #1E293B;
+    }
+    body.dark-theme .control-btn {
+      background: var(--sf-card);
+      border-color: var(--sf-border);
+      color: var(--sf-text);
+    }
+    
+    /* 💬 ستايل زر دعم واتساب العائم */
+.whatsapp-float {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #25D366;
+  color: #FFF;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 26px;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+  z-index: 1040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* عكس مكان الزر إذا كانت الصفحة تدعم الإنجليزية (LTR) */
+html[dir="ltr"] .whatsapp-float {
+  right: auto;
+  left: 20px;
+}
+
+.whatsapp-float:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.6);
+  color: #FFF;
+}
   </style>
 </head>
-<body class="bg-light">
+<body>
+
+  <!-- منع الـ Flicker -->
+  <script>
+    (function injectThemeImmediately() {
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+      }
+    })();
+  </script>
+
+  <div id="global-loader">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="bg-shape bg-shape-1"></div>
+  <div class="bg-shape bg-shape-2"></div>
+
   <div class="theme-controls">
     <button class="control-btn" id="lang-toggle-btn" onclick="toggleLanguage()">English</button>
     <button class="control-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙</button>
   </div>
 
-  <nav class="navbar navbar-dark bg-dark px-3">
-    <a href="lessons.html" class="btn btn-sm btn-outline-light" id="btn-back">⬅ رجوع للدروس</a>
-    <span class="navbar-brand" id="lessonTitle">جاري التحميل...</span>
-    <button class="btn btn-sm btn-outline-light" onclick="logout()" id="btn-logout">خروج</button>
+  <!-- الناف بار المتجاوب مع القائمة الجانبية للموبايل -->
+  <nav class="navbar navbar-expand-md px-3 sticky-top">
+    <div class="container-fluid">
+      <span class="navbar-brand d-flex align-items-center gap-2"><span class="sf-logo-mark">S</span> <span class="platform-name" data-platform-brand></span> <span id="nav-brand-title">دروس الفيديو</span></span>
+      
+      <button class="navbar-toggler p-1 border-0 shadow-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#ffffff" class="bi bi-list" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+        </svg>
+      </button>
+
+      <div class="offcanvas offcanvas-end" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+        <div class="offcanvas-header">
+          <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">القائمة</h5>
+          <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <div class="d-flex flex-column flex-md-row align-items-md-center gap-2 nav-tabs-custom ms-auto mt-2 mt-md-0 w-100">
+            <a href="student.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-profile">بياناتي</a>
+            <a href="sessions.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-sessions">حصصي</a>
+            <a href="lessons.html" class="btn btn-light w-100 w-md-auto text-start text-md-center" id="nav-lessons">الفيديوهات</a>
+            <a href="homework.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-homework">الواجب</a>
+            <a href="booklets.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center me-md-1" id="nav-booklets">البوكليتس</a>
+            <button class="btn btn-outline-danger mt-3 mt-md-0 ms-md-2 w-100 w-md-auto text-start text-md-center" onclick="logout()" id="nav-logout">خروج</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </nav>
 
-  <div class="container py-4">
-    <div class="btn-group mb-3 w-100" role="group">
-      <button class="btn btn-outline-primary" id="catExplanation" onclick="switchCategory('explanation')">📖 الشرح</button>
-      <button class="btn btn-outline-primary" id="catQuestions" onclick="switchCategory('questions')">❓ الأسئلة</button>
-      <button class="btn btn-outline-primary" id="catHomework" onclick="switchCategory('homework_solution')">✅ حل الواجب</button>
-    </div>
+  <div class="container py-4" style="position: relative; z-index: 1;">
+    <div id="errorBox"></div>
+    <div class="row g-3" id="lessonsContainer"></div>
+  </div>
 
-    <div id="noPartsMsg" class="alert alert-secondary" style="display:none;">لا يوجد فيديو من هذا النوع لهذا الدرس</div>
-
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div id="playerContainer"></div>
-        <div class="d-flex justify-content-between align-items-center mt-3">
-          <button class="btn btn-outline-secondary" id="prevPartBtn" onclick="changePart(-1)">⬅ السابق</button>
-          <span class="text-muted" id="partIndicator"></span>
-          <button class="btn btn-outline-secondary" id="nextPartBtn" onclick="changePart(1)">التالي ➡</button>
+  <div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modal-payment-title">تأكيد الدفع</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="paymentModalBody"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btn-modal-reject">رفض</button>
+          <button type="button" class="btn btn-primary" id="confirmPaymentBtn">موافق، ادفع وشاهد</button>
         </div>
       </div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="config.js"></script>
   <script src="shared.js"></script>
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const videoId = urlParams.get('videoId');
-    if (!videoId) window.location.href = 'lessons.html';
-
-    let currentParts = {};
-    let currentCategory = 'explanation';
-    let currentIndex = 0;
-    let ytPlayer = null;
-    let ytInterval = null;
-    let iframeWatchInterval = null;
-    let iframeWatchLastSent = 0;
-    let iframeWatchPartId = null;
-    let iframeWatchStart = 0;
-    let iframeWatchBase = 0;
-
     const translations = {
-      ar: { pageTitle: 'مشاهدة الدرس', btnBack: '⬅ رجوع للدروس', btnLogout: 'خروج', catExplanation: '📖 الشرح', catQuestions: '❓ الأسئلة', catHomework: '✅ حل الواجب', noPartsMsg: 'لا يوجد فيديو من هذا النوع لهذا الدرس', prevPart: '⬅ السابق', nextPart: 'التالي ➡', driveWarning: '⚠️ لا يمكن تتبع وقت المشاهدة لفيديوهات Google Drive بدقة', formatError: "<div class='alert alert-warning'>صيغة الرابط غير مدعومة</div>", loading: 'جاري التحميل...', alertError: 'لا يمكن فتح هذا الدرس', iframePlaybackNote: 'إذا لم يبدأ الفيديو تلقائياً، اضغط تشغيل داخل الإطار وفك كتم الصوت إذا كان مطلوباً.' },
-      en: { pageTitle: 'Watch Lesson', btnBack: '⬅ Back to Lessons', btnLogout: 'Logout', catExplanation: '📖 Explanation', catQuestions: '❓ Questions', catHomework: '✅ HW Solution', noPartsMsg: 'There is no video of this type for this lesson', prevPart: '⬅ Previous', nextPart: 'Next ➡', driveWarning: '⚠️ Watch time cannot be tracked accurately for Google Drive videos', formatError: "<div class='alert alert-warning'>Unsupported video link format</div>", loading: 'Loading...', alertError: 'Cannot open this lesson', iframePlaybackNote: 'If the video does not start automatically, click play inside the frame and unmute it if needed.' }
+      ar: {
+        pageTitle: "الفيديوهات",
+        navBrandTitle: "دروس الفيديو",
+        menuLabel: "القائمة",
+        navProfile: "بياناتي",
+        navSessions: "حصصي",
+        navLessons: "الفيديوهات",
+        navHomework: "الواجب",
+        navBooklets: "البوكليتس",
+        navLogout: "خروج",
+        noLessons: "لا يوجد دروس فيديو متاحة حاليًا",
+        lessonOrder: "حصة",
+        weekLabel: "الأسبوع",
+        viewsCount: "مشاهدة",
+        modalPaymentTitle: "تأكيد الدفع",
+        btnModalReject: "رفض",
+        btnModalConfirm: "موافق، ادفع وشاهد",
+        homeworkBtn: "فيديو الواجب",
+        examBtn: "اختبار",
+        statusLabels: {
+          free: '<span class="badge bg-success px-2 py-1">مجانية</span>',
+          granted: '<span class="badge bg-primary px-2 py-1">متاحة</span>',
+          exhausted: '<span class="badge bg-secondary px-2 py-1">انتهت المشاهدات</span>',
+          locked: '<span class="badge bg-warning text-dark px-2 py-1">تحتاج فتح</span>',
+        }
+      },
+      en: {
+        pageTitle: "Videos",
+        navBrandTitle: "Video Lessons",
+        menuLabel: "Menu",
+        navProfile: "My Profile",
+        navSessions: "My Sessions",
+        navLessons: "Videos",
+        navHomework: "Homework",
+        navBooklets: "Booklets",
+        navLogout: "Logout",
+        noLessons: "No video lessons currently available",
+        lessonOrder: "Lesson",
+        weekLabel: "Week",
+        viewsCount: "views",
+        modalPaymentTitle: "Confirm Payment",
+        btnModalReject: "Reject",
+        btnModalConfirm: "Accept & Watch",
+        homeworkBtn: "Homework Video",
+        examBtn: "Exam",
+        statusLabels: {
+          free: '<span class="badge bg-success px-2 py-1">Free</span>',
+          granted: '<span class="badge bg-primary px-2 py-1">Available</span>',
+          exhausted: '<span class="badge bg-secondary px-2 py-1">Views Expired</span>',
+          locked: '<span class="badge bg-warning text-dark px-2 py-1">Locked</span>',
+        }
+      }
     };
 
-    function normalizeCategory(category) {
-      if (category === 'questions') return 'questions';
-      if (category === 'homework' || category === 'homework_solution') return 'homework_solution';
-      return 'explanation';
+    // Edit this section only to organize the lessons into weeks for display.
+    // Each number is a lesson number, and each week can contain any number of sessions.
+    const lessonWeekMap = {
+      1: [1, 2],
+      2: [3, 5],
+      3: [4, 6],
+      4: [7, 8],
+    };
+
+    // Add the homework video URL and exam form URL per lesson number.
+    // Leave the value empty if that lesson does not have a homework or exam.
+    const lessonExtrasByNumber = {
+      1: { homeworkVideoUrl: '', examUrl: '' },
+      2: { homeworkVideoUrl: '', examUrl: '' },
+      3: { homeworkVideoUrl: '', examUrl: '' },
+      4: { homeworkVideoUrl: '', examUrl: '' },
+      5: { homeworkVideoUrl: '', examUrl: '' },
+      6: { homeworkVideoUrl: '', examUrl: '' },
+      7: { homeworkVideoUrl: '', examUrl: '' },
+      8: { homeworkVideoUrl: '', examUrl: '' },
+    };
+
+    function getLessonExtras(lessonNumber) {
+      const item = lessonExtrasByNumber[Number(lessonNumber)];
+      return item || { homeworkVideoUrl: '', examUrl: '' };
     }
 
-    function getCategoryParts(category) {
-      const normalized = normalizeCategory(category);
-      return Array.isArray(currentParts[normalized]) ? currentParts[normalized] : [];
-    }
+    function buildLessonWeeks(lessons, lang) {
+      const weekToLessons = new Map();
+      const sessionToWeek = new Map();
+      const sortedWeekEntries = Object.entries(lessonWeekMap).sort((a, b) => Number(a[0]) - Number(b[0]));
 
-    function resolveCategory(category) {
-      const categories = ['explanation', 'questions', 'homework_solution'];
-      if (category && getCategoryParts(category).length > 0) return normalizeCategory(category);
-      return categories.find(cat => getCategoryParts(cat).length > 0) || 'explanation';
+      sortedWeekEntries.forEach(([weekNumber, sessionNumbers]) => {
+        const normalized = (sessionNumbers || []).map(Number).filter(Boolean);
+        normalized.forEach(sessionNumber => {
+          sessionToWeek.set(sessionNumber, Number(weekNumber));
+        });
+      });
+
+      lessons.forEach((lesson) => {
+        const lessonNumber = Number(lesson.lessonNumber);
+        const mappedWeek = sessionToWeek.get(lessonNumber);
+        const displayWeek = mappedWeek ? `Week ${mappedWeek}` : `Week ${Math.max(1, Math.ceil(lessonNumber / 2))}`;
+
+        if (!weekToLessons.has(displayWeek)) {
+          weekToLessons.set(displayWeek, []);
+        }
+        weekToLessons.get(displayWeek).push(lesson);
+      });
+
+      return Array.from(weekToLessons.entries())
+        .map(([displayWeek, weekLessons]) => ({
+          label: `${translations[lang].weekLabel} ${displayWeek.replace(/^Week\s+/i, '')}`,
+          lessons: weekLessons.sort((a, b) => Number(a.lessonNumber) - Number(b.lessonNumber)),
+        }))
+        .sort((a, b) => parseInt(a.label.match(/\d+/)?.[0] || '0', 10) - parseInt(b.label.match(/\d+/)?.[0] || '0', 10));
     }
 
     function applyLanguage(lang) {
       const isEn = lang === 'en';
       document.documentElement.lang = lang;
       document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+      
       const bootstrapLink = document.getElementById('bootstrap-link');
-      bootstrapLink.href = isEn ? 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' : 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css';
-      document.title = translations[lang].pageTitle;
-      document.getElementById('btn-back').innerText = translations[lang].btnBack;
-      document.getElementById('btn-logout').innerText = translations[lang].btnLogout;
-      document.getElementById('catExplanation').innerText = translations[lang].catExplanation;
-      document.getElementById('catQuestions').innerText = translations[lang].catQuestions;
-      document.getElementById('catHomework').innerText = translations[lang].catHomework;
-      document.getElementById('noPartsMsg').innerText = translations[lang].noPartsMsg;
-      document.getElementById('prevPartBtn').innerText = translations[lang].prevPart;
-      document.getElementById('nextPartBtn').innerText = translations[lang].nextPart;
-      if (document.getElementById('lessonTitle').textContent === 'جاري التحميل...' || document.getElementById('lessonTitle').textContent === 'Loading...') {
-        document.getElementById('lessonTitle').textContent = translations[lang].loading;
-      }
+      bootstrapLink.href = isEn 
+        ? "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        : "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css";
+
+      document.getElementById('page-title').innerText = translations[lang].pageTitle;
+      document.getElementById('nav-brand-title').innerText = translations[lang].navBrandTitle;
+      if(document.getElementById('mobileSidebarLabel')) document.getElementById('mobileSidebarLabel').innerText = translations[lang].menuLabel;
+      document.getElementById('nav-profile').innerText = translations[lang].navProfile;
+      document.getElementById('nav-sessions').innerText = translations[lang].navSessions;
+      document.getElementById('nav-lessons').innerText = translations[lang].navLessons;
+      
+      if(document.getElementById('nav-homework')) document.getElementById('nav-homework').innerText = translations[lang].navHomework;
+      if(document.getElementById('nav-booklets')) document.getElementById('nav-booklets').innerText = translations[lang].navBooklets;
+
+      document.getElementById('nav-logout').innerText = translations[lang].navLogout;
+      document.getElementById('modal-payment-title').innerText = translations[lang].modalPaymentTitle;
+      document.getElementById('btn-modal-reject').innerText = translations[lang].btnModalReject;
+      document.getElementById('confirmPaymentBtn').innerText = translations[lang].btnModalConfirm;
+
       document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
-      if (Object.keys(currentParts).length > 0) renderCurrentPart();
+      
+      loadLessons();
     }
 
     function toggleLanguage() {
-      const currentLang = localStorage.getItem('portal_lang') || 'ar';
-      const newLang = currentLang === 'ar' ? 'en' : 'ar';
+      let currentLang = localStorage.getItem('portal_lang') || 'ar';
+      let newLang = currentLang === 'ar' ? 'en' : 'ar';
       localStorage.setItem('portal_lang', newLang);
       applyLanguage(newLang);
     }
@@ -136,231 +499,117 @@
     }
 
     function toggleTheme() {
-      const currentTheme = localStorage.getItem('portal_theme') || 'light';
-      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      let currentTheme = localStorage.getItem('portal_theme') || 'light';
+      let newTheme = currentTheme === 'light' ? 'dark' : 'light';
       localStorage.setItem('portal_theme', newTheme);
       applyTheme(newTheme);
     }
 
-    function clearPlayer() {
-      if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
-      if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
-      if (iframeWatchInterval) {
-        clearInterval(iframeWatchInterval);
-        iframeWatchInterval = null;
-        if (iframeWatchPartId && iframeWatchLastSent > 0) {
-          sendProgress(iframeWatchPartId, iframeWatchLastSent);
-        }
-        iframeWatchPartId = null;
-      }
-      document.getElementById('playerContainer').innerHTML = '';
-    }
+    async function openProtectedAction(videoId, onSuccess) {
+      const result = await apiPost(`/api/portal/student/lessons/${videoId}/access`, { confirm_payment: false });
 
-    function normalizeMediaDeliveryUrl(url) {
-      try {
-        const parsed = new URL(url);
-        if (parsed.hostname.toLowerCase().includes('mediadelivery.net')) {
-          parsed.searchParams.set('autoplay', 'true');
-          parsed.searchParams.set('muted', 'true');
-          parsed.searchParams.set('responsive', 'true');
-          return parsed.toString();
-        }
-      } catch (_) {
-        return url;
-      }
-      return url;
-    }
-
-    function detectVideoSource(url) {
-      if (!url) return { type: 'unknown' };
-      const trimmedUrl = String(url).trim();
-      const ytMatch = trimmedUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
-      if (ytMatch) return { type: 'youtube', id: ytMatch[1] };
-      const driveMatch = trimmedUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
-      if (driveMatch) return { type: 'drive', id: driveMatch[1] };
-      const mediaMatch = trimmedUrl.match(/mediadelivery\.net/i);
-      if (mediaMatch) return { type: 'mediadelivery', url: normalizeMediaDeliveryUrl(trimmedUrl) };
-      if (/^https?:\/\//i.test(trimmedUrl)) return { type: 'iframe', url: trimmedUrl };
-      return { type: 'direct', url: trimmedUrl };
-    }
-
-    function sendProgress(partId, seconds) {
-      apiPost('/api/portal/watch-progress', { video_part_id: partId, watched_seconds: seconds });
-    }
-
-    function flushIframeProgress() {
-      if (iframeWatchPartId && iframeWatchLastSent > 0) {
-        sendProgress(iframeWatchPartId, iframeWatchLastSent);
-      }
-    }
-
-    window.addEventListener('beforeunload', () => {
-      flushIframeProgress();
-    });
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) flushIframeProgress();
-    });
-
-    function loadYouTubeAPI(callback) {
-      if (window.YT && window.YT.Player) { callback(); return; }
-      window.onYouTubeIframeAPIReady = callback;
-      if (!document.getElementById('youtubeAPIScript')) {
-        const tag = document.createElement('script');
-        tag.id = 'youtubeAPIScript';
-        tag.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(tag);
-      }
-    }
-
-    async function loadLesson() {
-      const currentLang = localStorage.getItem('portal_lang') || 'ar';
-      const result = await apiGet(`/api/portal/student/lessons/${videoId}/parts`);
-      if (!result.success) {
-        alert(result.message || translations[currentLang].alertError);
-        window.location.href = 'lessons.html';
-        return;
-      }
-      const normalizedParts = { explanation: [], questions: [], homework_solution: [] };
-      const incomingParts = result.parts || {};
-      ['explanation', 'questions', 'homework_solution'].forEach(category => {
-        normalizedParts[category] = Array.isArray(incomingParts[category]) ? incomingParts[category] : [];
-      });
-      currentParts = normalizedParts;
-      document.getElementById('lessonTitle').textContent = result.title || 'Lesson';
-      switchCategory('explanation');
-    }
-
-    function switchCategory(category) {
-      currentCategory = resolveCategory(category);
-      currentIndex = 0;
-      ['catExplanation', 'catQuestions', 'catHomework'].forEach(id => document.getElementById(id).classList.remove('active'));
-      const btnId = currentCategory === 'explanation' ? 'catExplanation' : currentCategory === 'questions' ? 'catQuestions' : 'catHomework';
-      document.getElementById(btnId).classList.add('active');
-      renderCurrentPart();
-    }
-
-    function changePart(direction) {
-      const parts = getCategoryParts(currentCategory);
-      const newIndex = currentIndex + direction;
-      if (newIndex >= 0 && newIndex < parts.length) {
-        currentIndex = newIndex;
-        renderCurrentPart();
-      }
-    }
-
-    function renderCurrentPart() {
-      const currentLang = localStorage.getItem('portal_lang') || 'ar';
-      const parts = getCategoryParts(currentCategory);
-      const noPartsMsg = document.getElementById('noPartsMsg');
-      const container = document.getElementById('playerContainer');
-      clearPlayer();
-
-      if (parts.length === 0) {
-        container.style.display = 'none';
-        noPartsMsg.style.display = 'block';
-        document.getElementById('partIndicator').textContent = '';
-        document.getElementById('prevPartBtn').style.display = 'none';
-        document.getElementById('nextPartBtn').style.display = 'none';
-        return;
-      }
-
-      container.style.display = 'block';
-      noPartsMsg.style.display = 'none';
-      const part = parts[currentIndex] || parts[0];
-      currentIndex = parts.indexOf(part);
-      iframeWatchLastSent = 0;
-      iframeWatchPartId = null;
-      iframeWatchStart = 0;
-      iframeWatchBase = 0;
-      document.getElementById('partIndicator').textContent = parts.length > 1 ? `${currentIndex + 1} / ${parts.length}` : '';
-      document.getElementById('prevPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
-      document.getElementById('nextPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
-
-      const rawUrl = part.sourceType === 'upload' ? `${API_BASE_URL}${part.filePath}` : (part.videoUrl || part.filePath || '');
-      const source = part.sourceType === 'upload' ? { type: 'direct', url: rawUrl } : detectVideoSource(rawUrl);
-
-      if (source.type === 'direct') {
-        const video = document.createElement('video');
-        video.className = 'w-100';
-        video.controls = true;
-        video.style.maxHeight = '600px';
-        video.src = source.url;
-        container.appendChild(video);
-        video.currentTime = part.watchedSeconds || 0;
-        let lastSent = 0;
-        video.ontimeupdate = () => {
-          const current = Math.floor(video.currentTime);
-          if (current - lastSent >= 5) { lastSent = current; sendProgress(part.id, current); }
-        };
-        video.onpause = () => sendProgress(part.id, Math.floor(video.currentTime));
-      } else if (source.type === 'youtube') {
-        const div = document.createElement('div');
-        div.id = 'ytPlayerDiv';
-        container.appendChild(div);
-        loadYouTubeAPI(() => {
-          ytPlayer = new YT.Player('ytPlayerDiv', {
-            height: '600', width: '100%', videoId: source.id,
-            events: {
-              onReady: (e) => { if (part.watchedSeconds) e.target.seekTo(part.watchedSeconds, true); },
-              onStateChange: (e) => {
-                if (e.data === YT.PlayerState.PLAYING) {
-                  ytInterval = setInterval(() => sendProgress(part.id, Math.floor(ytPlayer.getCurrentTime())), 5000);
-                } else {
-                  if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
-                  if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
-                    sendProgress(part.id, Math.floor(ytPlayer.getCurrentTime()));
-                  }
-                }
-              }
-            }
-          });
-        });
-      } else if (source.type === 'drive') {
-        const iframe = document.createElement('iframe');
-        iframe.src = `https://drive.google.com/file/d/${source.id}/preview`;
-        iframe.width = '100%'; iframe.height = '600'; iframe.allow = 'autoplay'; iframe.style.border = 'none';
-        container.appendChild(iframe);
-        const note = document.createElement('p');
-        note.className = 'text-muted small mt-1'; note.textContent = translations[currentLang].driveWarning; container.appendChild(note);
-      } else if (source.type === 'mediadelivery' || source.type === 'iframe') {
-        const iframe = document.createElement('iframe');
-        iframe.src = source.url;
-        iframe.width = '100%'; iframe.height = '600';
-        iframe.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write';
-        iframe.style.border = 'none';
-        iframe.setAttribute('allowfullscreen', 'true');
-        container.appendChild(iframe);
-
-        iframeWatchPartId = part.id;
-        iframeWatchBase = part.watchedSeconds || 0;
-        iframeWatchLastSent = iframeWatchBase;
-        iframeWatchStart = Date.now();
-
-        const updateIframeProgress = () => {
-          const elapsed = Math.floor((Date.now() - iframeWatchStart) / 1000);
-          const total = part.durationSeconds
-            ? Math.min(part.durationSeconds, iframeWatchBase + elapsed)
-            : iframeWatchBase + elapsed;
-          if (total > iframeWatchLastSent) {
-            iframeWatchLastSent = total;
-            sendProgress(part.id, total);
+      if (result.requiresPayment) {
+        document.getElementById('paymentModalBody').textContent = result.message;
+        const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+        modal.show();
+        document.getElementById('confirmPaymentBtn').onclick = async () => {
+          const confirmResult = await apiPost(`/api/portal/student/lessons/${videoId}/access`, { confirm_payment: true });
+          modal.hide();
+          if (confirmResult.success) {
+            onSuccess();
+          } else {
+            document.getElementById('errorBox').innerHTML = `<div class="alert alert-danger">${confirmResult.message}</div>`;
           }
         };
-
-        if (iframeWatchBase > 0) {
-          sendProgress(part.id, iframeWatchBase);
-        }
-        updateIframeProgress();
-        iframeWatchInterval = setInterval(updateIframeProgress, 5000);
-
-        const note = document.createElement('p');
-        note.className = 'text-muted small mt-2';
-        note.textContent = translations[currentLang].iframePlaybackNote || 'If the player does not start automatically, click the play button inside the video frame.';
-        container.appendChild(note);
-      } else {
-        container.innerHTML = translations[currentLang].formatError;
+        return;
       }
+
+      if (!result.success) {
+        document.getElementById('errorBox').innerHTML = `<div class="alert alert-danger">${result.message}</div>`;
+        return;
+      }
+
+      onSuccess();
+    }
+
+    async function loadLessons() {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const result = await apiGet('/api/portal/student/lessons');
+      const container = document.getElementById('lessonsContainer');
+      container.innerHTML = '';
+
+      document.getElementById('global-loader').style.display = 'none';
+
+      if (!result.success || !result.lessons || result.lessons.length === 0) {
+        container.innerHTML = `<div class="col-12"><p class="text-muted text-center py-5">${translations[currentLang].noLessons}</p></div>`;
+        return;
+      }
+
+      const weeks = buildLessonWeeks(result.lessons, currentLang);
+
+      weeks.forEach((week, weekIndex) => {
+        const cardsHtml = week.lessons.map((lesson, index) => {
+          const extra = getLessonExtras(lesson.lessonNumber);
+          const viewsText = lesson.status === 'granted' || lesson.status === 'exhausted'
+            ? `<span class="small" style="color: var(--sf-muted);">${lesson.viewsUsed} / ${lesson.maxViews} ${translations[currentLang].viewsCount}</span>` : '';
+
+          const homeworkButton = extra.homeworkVideoUrl
+            ? `<button class="btn btn-sm btn-outline-success mt-2 ms-1" onclick="event.stopPropagation(); openHomeworkVideo(${lesson.videoId}, '${extra.homeworkVideoUrl.replace(/'/g, "\\'")}');">${translations[currentLang].homeworkBtn}</button>`
+            : '';
+
+          const examButton = extra.examUrl
+            ? `<button class="btn btn-sm btn-primary mt-2" onclick="event.stopPropagation(); openExamLink('${extra.examUrl.replace(/'/g, "\\'")}');">${translations[currentLang].examBtn}</button>`
+            : '';
+
+          return `
+            <div class="col-md-4 fade-in-up" style="animation-delay: ${weekIndex * 0.15 + index * 0.08}s">
+              <div class="card lesson-card h-100" onclick="openLesson(${lesson.videoId})" style="border-top: 4px solid var(--sf-primary);">
+                <div class="card-body p-4">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    ${translations[currentLang].statusLabels[lesson.status] || ''}
+                    <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].lessonOrder} ${lesson.lessonNumber}</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="width:42px;height:42px;border-radius:12px;background:var(--card-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;box-shadow: 0 4px 12px rgba(79,70,229,0.2);">▶</div>
+                    <h6 class="mb-0 fw-bold" style="font-size:1.05rem;">${lesson.title}</h6>
+                  </div>
+                  <p class="small mb-2" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
+                  ${viewsText}
+                  <div class="d-flex flex-wrap mt-3">
+                    ${homeworkButton}
+                    ${examButton}
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+
+        container.innerHTML += `
+          <div class="col-12 fade-in-up" style="animation-delay: ${weekIndex * 0.1}s">
+            <div class="mb-3 d-flex align-items-center justify-content-between">
+              <h5 class="fw-bold mb-0" style="color: var(--sf-text);">${week.label}</h5>
+            </div>
+            <div class="row g-3">${cardsHtml}</div>
+          </div>`;
+      });
+    }
+
+    async function openLesson(videoId) {
+      await openProtectedAction(videoId, () => {
+        window.location.href = `lesson-view.html?videoId=${videoId}`;
+      });
+    }
+
+    async function openHomeworkVideo(videoId, homeworkUrl) {
+      if (!homeworkUrl) return;
+      await openProtectedAction(videoId, () => {
+        window.open(homeworkUrl, '_blank', 'noopener,noreferrer');
+      });
+    }
+
+    function openExamLink(examUrl) {
+      if (!examUrl) return;
+      window.open(examUrl, '_blank', 'noopener,noreferrer');
     }
 
     (function init() {
@@ -368,8 +617,29 @@
       applyLanguage(savedLang);
       const savedTheme = localStorage.getItem('portal_theme') || 'light';
       applyTheme(savedTheme);
-      loadLesson();
     })();
   </script>
+  <!-- Floating WhatsApp Support Button -->
+<a id="whatsapp-support" href="#" class="whatsapp-float" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Support">
+  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="bi bi-whatsapp" viewBox="0 0 16 16">
+    <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.955-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.558 6.558 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.348.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.342-.116-.007-.249-.008-.382-.008-.133 0-.348.05-.53.248-.183.198-.7.683-.7 1.664 0 .98.718 1.925.818 2.059.1.133 1.41 2.154 3.415 3.018.477.206.85.33 1.141.424.481.153.921.132 1.268.08.388-.058 1.17-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.379-.232z"/>
+  </svg>
+</a>
+<script>
+  (() => {
+    const whatsappLink = document.getElementById('whatsapp-support');
+    const supportPhone = String(
+      window.CONFIG?.SUPPORT_PHONE ||
+      (typeof CONFIG !== 'undefined' ? CONFIG.SUPPORT_PHONE : '') ||
+      ''
+    ).replace(/\D/g, '');
+
+    if (!whatsappLink || !supportPhone) return;
+
+    whatsappLink.href = `https://wa.me/${supportPhone}?text=${encodeURIComponent(
+      'مرحباً، لدي استفسار بخصوص منصة الدروس'
+    )}`;
+  })();
+</script>
 </body>
 </html>
