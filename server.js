@@ -3609,6 +3609,30 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       }
     }
 
+    // Fetch homework solution videos (VideoParts with category='homework_solution')
+    const VideoPartModel = require('./models/VideoPart');
+    
+    const homeworkParts = await VideoPartModel.findAll({
+      where: { category: 'homework_solution' },
+      order: [['order_index', 'ASC']],
+    });
+
+    // Build map of VideoId -> homework URL
+    const homeworkByVideoId = new Map();
+    let globalHomeworkUrl = null; // fallback: first homework URL found
+    
+    homeworkParts.forEach((part, index) => {
+      // Use the first homework URL as global fallback
+      if (index === 0 && part.video_url) {
+        globalHomeworkUrl = part.video_url;
+      }
+      
+      // If this part has a VideoId, map it
+      if (part.VideoId && !homeworkByVideoId.has(part.VideoId)) {
+        homeworkByVideoId.set(part.VideoId, part.video_url || null);
+      }
+    });
+
     const lessons = videos.map(v => {
       const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
       if (!session) return null;
@@ -3634,7 +3658,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       }
 
       const homeworkItems = homeworkBySessionId.get(String(session.id)) || [];
-      const homeworkVideoUrl = session && session.homework_video_url ? session.homework_video_url : null;
+      // Priority: specific video homework URL > session field > global homework URL > nothing
+      const homeworkVideoUrl = homeworkByVideoId.get(v.id) || (session && session.homework_video_url ? session.homework_video_url : globalHomeworkUrl);
 
       return {
         videoId: v.id,
