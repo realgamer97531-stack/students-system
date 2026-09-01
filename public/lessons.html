@@ -169,6 +169,16 @@
       cursor: pointer; 
       transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
+    .card.lesson-card[data-status="granted"],
+    .card.lesson-card[data-status="free"],
+    .card.lesson-card[data-status="exhausted"] {
+      border: 1px solid rgba(16, 179, 163, 0.35) !important;
+      background: linear-gradient(135deg, rgba(16, 179, 163, 0.08), rgba(79, 70, 229, 0.06)) !important;
+    }
+    .card.lesson-card[data-status="locked"] {
+      border: 1px solid rgba(245, 158, 11, 0.35) !important;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(148, 163, 184, 0.04)) !important;
+    }
     .card.lesson-card:hover { 
       transform: translateY(-4px);
       box-shadow: 0 10px 25px rgba(0,0,0,0.08); 
@@ -585,7 +595,7 @@ html[dir="ltr"] .whatsapp-float {
 
           container.innerHTML += `
             <div class="col-md-4 fade-in-up" style="animation-delay: ${index * 0.08}s">
-              <div class="card lesson-card h-100" onclick="openLesson(${lesson.videoId})" style="border-top: 4px solid var(--sf-primary);">
+              <div class="card lesson-card h-100" data-status="${lesson.status || 'locked'}" onclick="openLesson(${lesson.videoId})" style="border-top: 4px solid var(--sf-primary);">
                 <div class="card-body p-4">
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     ${translations[currentLang].statusLabels[lesson.status] || ''}

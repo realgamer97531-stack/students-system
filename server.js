@@ -3539,14 +3539,6 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         continue;
       }
 
-      const session = await Session.findByPk(grant.SessionId);
-      const sessionMatchesStudent = !!session && session.SubjectId === student.SubjectId && session.CenterId === student.CenterId;
-
-      if (!sessionMatchesStudent) {
-        await grant.destroy();
-        continue;
-      }
-
       if (grant.method === 'attended' && !attendedSessionIds.has(grant.SessionId)) {
         await grant.destroy();
         continue;
@@ -3643,13 +3635,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     }
 
     if (grant) {
-      const sessionMatchesStudent = !!session && session.SubjectId === student.SubjectId && session.CenterId === student.CenterId;
-      const isValidGrant = sessionMatchesStudent && (
-        grant.method === 'paid' ||
-        grant.method === 'admin_free' ||
-        grant.method === 'admin_paid' ||
-        (grant.method === 'attended' && attendanceExists)
-      );
+      const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attendanceExists);
       if (!isValidGrant) {
         await VideoAccessGrant.destroy({ where: { id: grant.id } });
         grant = null;
