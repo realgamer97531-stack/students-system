@@ -1761,21 +1761,32 @@ app.get('/sessions/:id/report', async (req, res) => {
         }],
       });
 
-      // Separate online attendees from regular attendees
+      // Keep the student in the main absent list for this report, and show where else they attended.
       const attendedCenterStudentIds = new Set();
       const onlineAttendeeIds = new Set();
-      
+      const elsewhereAttendanceMap = new Map();
+
       attendedAnywhere.forEach(a => {
-        if (a.Session.Center.name === 'أونلاين') {
+        const placeName = a.Session && a.Session.Center ? a.Session.Center.name : 'غير معروف';
+
+        if (placeName === 'أونلاين') {
           onlineAttendeeIds.add(a.StudentId);
         } else {
           attendedCenterStudentIds.add(a.StudentId);
         }
+
+        if (!elsewhereAttendanceMap.has(a.StudentId)) {
+          elsewhereAttendanceMap.set(a.StudentId, placeName);
+        }
       });
 
-      // Mark as absent only if they didn't attend at their center (online attendance counts as attended)
-      absentStudents = groupStudents.filter(s => !attendedCenterStudentIds.has(s.id) && !onlineAttendeeIds.has(s.id));
-      
+      absentStudents = groupStudents
+        .filter(s => !attendedCenterStudentIds.has(s.id))
+        .map(student => ({
+          ...(student.toJSON ? student.toJSON() : student),
+          elsewhereAttendanceLocation: elsewhereAttendanceMap.get(student.id) || null,
+        }));
+
       // Get center students who attended online
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !attendedCenterStudentIds.has(s.id));
     }

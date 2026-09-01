@@ -182,6 +182,7 @@
             <th>الاسم</th>
             <th>تليفون الطالب</th>
             <th>تليفون ولي الأمر</th>
+            <th>حضر في مكان آخر</th>
             <th>الرصيد الحالي</th>
           </tr>
         </thead>
@@ -192,6 +193,13 @@
               <td><a href="/students/<%= student.id %>"><%= student.name %></a></td>
               <td><%= student.phone %></td>
               <td><%= student.parent_phone %></td>
+              <td>
+                <% if (student.elsewhereAttendanceLocation) { %>
+                  <span class="badge bg-info text-dark">حضر في <%= student.elsewhereAttendanceLocation %></span>
+                <% } else { %>
+                  <span class="text-muted small">-</span>
+                <% } %>
+              </td>
               <td><%= student.balance %> ج</td>
             </tr>
           <% }) %>
