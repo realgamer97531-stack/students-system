@@ -3418,15 +3418,25 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       order: [['createdAt', 'DESC']],
     });
 
-    const grants = await VideoAccessGrant.findAll({ where: { StudentId: student.id } });
-    const grantBySessionId = {};
-    grants.forEach(g => { grantBySessionId[g.SessionId] = g; });
-
     const attendanceRecords = await Attendance.findAll({
       where: { StudentId: student.id },
       attributes: ['SessionId'],
     });
     const attendedSessionIds = new Set(attendanceRecords.map(a => a.SessionId));
+
+    const grants = await VideoAccessGrant.findAll({ where: { StudentId: student.id } });
+    const cleanedGrants = [];
+
+    for (const grant of grants) {
+      if (grant.method === 'attended' && !attendedSessionIds.has(grant.SessionId)) {
+        await grant.destroy();
+        continue;
+      }
+      cleanedGrants.push(grant);
+    }
+
+    const grantBySessionId = {};
+    cleanedGrants.forEach(g => { grantBySessionId[g.SessionId] = g; });
 
     const lessons = videos.map(v => {
       const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
@@ -3508,6 +3518,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: session.id } });
 
     if (grant && grant.method === 'attended' && !attendanceExists) {
+      await grant.destroy();
       grant = null;
     }
 
@@ -4066,6 +4077,14 @@ app.post('/attendance/:id/delete', requireAdmin, async (req, res) => {
       amount: student.price_per_session,
       reason: 'استرجاع رصيد بعد حذف سجل حضور',
       UserId: req.session.userId,
+    });
+
+    await VideoAccessGrant.destroy({
+      where: {
+        StudentId: studentId,
+        SessionId: sessionId,
+        method: 'attended',
+      },
     });
 
     await Attendance.destroy({ where: { id: req.params.id } });
