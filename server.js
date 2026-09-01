@@ -2057,6 +2057,21 @@ app.post('/sessions/:id/edit', requireAdmin, async (req, res) => {
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
   }
 });
+
+// تعديل أسبوع الحصة أو إزالتها من أي أسبوع
+app.post('/sessions/:id/update-week', requireAdmin, async (req, res) => {
+  try {
+    const rawWeek = req.body.week_number;
+    const normalizedWeek = rawWeek === undefined || rawWeek === null || rawWeek === '' ? null : Number(rawWeek);
+
+    await Session.update({ week_number: normalizedWeek }, { where: { id: req.params.id } });
+    res.redirect('/sessions');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
 app.post('/students/:id/edit', async (req, res) => {
   try {
     const { name, phone, parent_phone, price_per_session, booklet_status, center_id, subject_id, admin_note } = req.body;

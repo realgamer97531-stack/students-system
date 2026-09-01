@@ -52,6 +52,7 @@
         <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
         <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
         <th><span class="ar-only">الرقم النسبي</span><span class="en-only" style="display:none;">Lesson #</span></th>
+        <th><span class="ar-only">الأسبوع</span><span class="en-only" style="display:none;">Week</span></th>
         <th><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
         <th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th>
         <th></th>
@@ -64,6 +65,7 @@
           <td><%= s.Subject ? s.Subject.name : 'N/A' %></td>
           <td><%= s.Center ? s.Center.name : 'N/A' %></td>
           <td><%= s.lesson_number %></td>
+          <td><%= s.week_number ?? '—' %></td>
           <td><%= s.session_date %></td>
           <td>
             <% if (s.status === 'cancelled') { %>
@@ -117,6 +119,12 @@
                 onclick="openEditModal(<%= s.id %>, '<%= s.session_date %>')">
                 <span class="ar-only">✏️ تعديل</span>
                 <span class="en-only" style="display:none;">✏️ Edit</span>
+              </button>
+
+              <button type="button" class="btn btn-sm btn-outline-info"
+                onclick="openWeekEditModal(<%= s.id %>, <%= s.week_number == null ? 'null' : s.week_number %>)">
+                <span class="ar-only">📅 تعديل الأسبوع</span>
+                <span class="en-only" style="display:none;">📅 Edit Week</span>
               </button>
 
               <form action="/sessions/<%= s.id %>/delete" method="POST" class="d-inline"
@@ -187,6 +195,39 @@
   </div>
 </div>
 
+<div class="modal fade" id="weekEditModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content card">
+      <div class="modal-header border-bottom-0">
+        <h5 class="modal-title">تعديل الأسبوع</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="weekEditForm" method="POST">
+        <div class="modal-body">
+          <label class="form-label">اختر الأسبوع</label>
+          <select name="week_number" id="weekEditInput" class="form-select">
+            <option value="">لا يوجد أسبوع</option>
+            <option value="1">الأسبوع 1</option>
+            <option value="2">الأسبوع 2</option>
+            <option value="3">الأسبوع 3</option>
+            <option value="4">الأسبوع 4</option>
+            <option value="5">الأسبوع 5</option>
+            <option value="6">الأسبوع 6</option>
+            <option value="7">الأسبوع 7</option>
+            <option value="8">الأسبوع 8</option>
+            <option value="9">الأسبوع 9</option>
+            <option value="10">الأسبوع 10</option>
+          </select>
+        </div>
+        <div class="modal-footer border-top-0">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">رجوع</button>
+          <button type="submit" class="btn btn-primary">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
   function openCancelModal(sessionId, lessonNumber, subjectName) {
     document.getElementById('cancelLessonNumber').textContent = lessonNumber;
@@ -200,6 +241,14 @@
     document.getElementById('editDateInput').value = currentDate;
     document.getElementById('editForm').action = `/sessions/${sessionId}/edit`;
     const modal = new bootstrap.Modal(document.getElementById('editModal'));
+    modal.show();
+  }
+
+  function openWeekEditModal(sessionId, currentWeek) {
+    const select = document.getElementById('weekEditInput');
+    select.value = currentWeek == null ? '' : String(currentWeek);
+    document.getElementById('weekEditForm').action = `/sessions/${sessionId}/update-week`;
+    const modal = new bootstrap.Modal(document.getElementById('weekEditModal'));
     modal.show();
   }
 
