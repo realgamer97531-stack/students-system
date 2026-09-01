@@ -3658,8 +3658,12 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       }
 
       const homeworkItems = homeworkBySessionId.get(String(session.id)) || [];
-      // Priority: specific video homework URL > session field > global homework URL > nothing
-      const homeworkVideoUrl = homeworkByVideoId.get(v.id) || (session && session.homework_video_url ? session.homework_video_url : globalHomeworkUrl);
+      
+      // Only use REAL homework URLs for THIS lesson (not global fallback for card display)
+      const realHomeworkUrl = homeworkByVideoId.get(v.id) || (session && session.homework_video_url ? session.homework_video_url : null);
+      
+      // For clicking, use the real URL or global fallback
+      const homeworkVideoUrl = realHomeworkUrl || globalHomeworkUrl;
 
       return {
         videoId: v.id,
@@ -3672,6 +3676,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         maxViews,
         price: student.price_per_session,
         homeworkVideoUrl,
+        realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
         homeworkItems,
         examUrl: session && session.exam_url ? session.exam_url : null,
       };

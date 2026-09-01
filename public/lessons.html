@@ -632,9 +632,10 @@ html[dir="ltr"] .whatsapp-float {
                 </div>
               `;
             }),
-            ...(homeworkVideoUrl ? [`
+            // ONLY show homework video card if this lesson REALLY has homework (realHomeworkUrl is NOT from global fallback)
+            ...(lesson.realHomeworkUrl ? [`
               <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.2 + rawHomeworkItems.length * 0.05) * 0.08}s">
-                <div class="card lesson-card h-100" data-status="free" onclick="event.stopPropagation(); openHomeworkCard('${homeworkVideoUrl.replace(/'/g, "\\'")}', '${translations[currentLang].homeworkBtn.replace(/'/g, "\\'")}');" style="border-top: 4px solid #10B3A3;">
+                <div class="card lesson-card h-100" data-status="free" onclick="event.stopPropagation(); openHomeworkCard('${lesson.homeworkVideoUrl.replace(/'/g, "\\'")}', '${translations[currentLang].homeworkBtn.replace(/'/g, "\\'")}');" style="border-top: 4px solid #10B3A3;">
                   <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                       <span class="badge bg-success px-2 py-1">${translations[currentLang].homeworkBtn}</span>
