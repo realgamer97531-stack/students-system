@@ -3621,8 +3621,12 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const attendedLessonNumbers = new Set(
       sameLessonSessions.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number)
     );
+    const subjectSessionsWithExamLinks = await Session.findAll({
+      where: { SubjectId: student.SubjectId },
+      attributes: ['lesson_number', 'exam_url', 'exam_video_url'],
+    });
     const examLinksByLesson = new Map();
-    sameLessonSessions.forEach(s => {
+    subjectSessionsWithExamLinks.forEach(s => {
       const existing = examLinksByLesson.get(s.lesson_number) || {};
       examLinksByLesson.set(s.lesson_number, {
         examUrl: existing.examUrl || s.exam_url || null,
