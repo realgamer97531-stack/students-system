@@ -314,7 +314,9 @@ async function connectWithRetry(maxAttempts = 5, delayMs = 5000) {
       console.log(`✅ تم الاتصال بقاعدة البيانات بنجاح (attempt ${attempt})`);
       return;
     } catch (error) {
-      console.error(`⚠️ محاولة الاتصال بقاعدة البيانات فشلت (${attempt}/${maxAttempts}):`, error.message);
+      if (attempt === 1 || attempt === maxAttempts) {
+        console.error(`⚠️ اتصال قاعدة البيانات فشل (${attempt}/${maxAttempts}):`, error.message);
+      }
       if (attempt === maxAttempts) {
         throw error;
       }
@@ -6978,7 +6980,6 @@ async function startServer() {
     (async function backgroundReconnect() {
       while (!dbReady) {
         try {
-          console.log('🔁 محاولة إعادة الاتصال بقاعدة البيانات في الخلفية...');
           await connectWithRetry(5, 10000);
           dbReady = true;
           await RechargeCode.sync();
