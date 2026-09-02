@@ -4009,13 +4009,15 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
   res.render('manage-videos', { allSessions, videos });
 });
 
-app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'), videoUpload.single('exam_video_file'), async (req, res) => {
   try {
     const { session_id, exam_url } = req.body;
     const sessionId = Number(session_id);
     if (!sessionId) return res.status(400).send('❌ اختر حصة أولاً');
 
-    const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
+    const cleanExamUrl = req.file
+      ? `/uploads/videos/${req.file.filename}`
+      : (typeof exam_url === 'string' ? exam_url.trim() : '');
     if (!cleanExamUrl) return res.status(400).send('❌ رابط الامتحان مطلوب');
 
     const session = await Session.findByPk(sessionId);

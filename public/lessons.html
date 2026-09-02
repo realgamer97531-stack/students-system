@@ -367,7 +367,7 @@ html[dir="ltr"] .whatsapp-float {
         btnModalReject: "رفض",
         btnModalConfirm: "موافق، ادفع وشاهد",
         homeworkBtn: "فيديو الواجب",
-        examBtn: "اختبار",
+        examBtn: "فيديو الامتحان",
         statusLabels: {
           free: '<span class="badge bg-success px-2 py-1">مجانية</span>',
           granted: '<span class="badge bg-primary px-2 py-1">متاحة</span>',
@@ -393,7 +393,7 @@ html[dir="ltr"] .whatsapp-float {
         btnModalReject: "Reject",
         btnModalConfirm: "Accept & Watch",
         homeworkBtn: "Homework Video",
-        examBtn: "Exam",
+        examBtn: "Exam Video",
         statusLabels: {
           free: '<span class="badge bg-success px-2 py-1">Free</span>',
           granted: '<span class="badge bg-primary px-2 py-1">Available</span>',
@@ -606,16 +606,17 @@ html[dir="ltr"] .whatsapp-float {
 
           const examCardHtml = examUrl ? `
             <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.15) * 0.08}s">
-              <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(16, 179, 163, 0.08)); border: 1px solid rgba(79, 70, 229, 0.15) !important; cursor: pointer;" onclick="event.stopPropagation(); openExamLink('${examUrl.replace(/'/g, "\\'")}');">
+              <div class="card lesson-card h-100" data-status="free" onclick="event.stopPropagation(); openExamLink('${examUrl.replace(/'/g, "\\'")}');" style="border-top: 4px solid #4F46E5;">
                 <div class="card-body p-4">
-                  <div class="d-flex align-items-center gap-3">
-                    <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #4F46E5, #10B3A3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;">✍️</div>
-                    <div class="flex-grow-1">
-                      <div class="fw-bold">${translations[currentLang].examBtn}</div>
-                      <div class="small" style="color: var(--sf-muted);">${lesson.date}</div>
-                    </div>
-                    <span class="badge bg-primary-subtle text-primary">Open</span>
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="badge bg-primary px-2 py-1">${translations[currentLang].examBtn}</span>
+                    <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].lessonOrder} ${lesson.lessonNumber}</span>
                   </div>
+                  <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #4F46E5, #10B3A3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;">▶</div>
+                    <h6 class="mb-0 fw-bold" style="font-size:1.05rem;">${translations[currentLang].examBtn}</h6>
+                  </div>
+                  <p class="small mb-0" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
                 </div>
               </div>
             </div>
