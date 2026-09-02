@@ -213,6 +213,15 @@ async function ensureSessionHomeworkFields() {
       });
       console.log('✅ Added exam_url column to sessions table');
     }
+
+    if (!tableInfo.exam_video_url) {
+      await queryInterface.addColumn('sessions', 'exam_video_url', {
+        type: sequelize.Sequelize.TEXT,
+        allowNull: true,
+        defaultValue: null,
+      });
+      console.log('✅ Added exam_video_url column to sessions table');
+    }
   } catch (error) {
     if (error.message && error.message.includes('does not exist')) {
       return;
@@ -3736,6 +3745,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
         homeworkItems,
         examUrl: session && session.exam_url ? session.exam_url : null,
+        examVideoUrl: session && session.exam_video_url ? session.exam_video_url : null,
       };
     }).filter(Boolean);
 
@@ -4009,21 +4019,23 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
   res.render('manage-videos', { allSessions, videos });
 });
 
-app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'), videoUpload.single('exam_video_file'), async (req, res) => {
+app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
-    const { session_id, exam_url } = req.body;
+    const { session_id, exam_url, exam_video_url } = req.body;
     const sessionId = Number(session_id);
     if (!sessionId) return res.status(400).send('❌ اختر حصة أولاً');
 
-    const cleanExamUrl = req.file
-      ? `/uploads/videos/${req.file.filename}`
-      : (typeof exam_url === 'string' ? exam_url.trim() : '');
-    if (!cleanExamUrl) return res.status(400).send('❌ رابط الامتحان مطلوب');
+    const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
+    const cleanExamVideoUrl = typeof exam_video_url === 'string' ? exam_video_url.trim() : '';
+    if (!cleanExamUrl && !cleanExamVideoUrl) return res.status(400).send('❌ أضف رابط الاختبار أو رابط فيديو الإجابة');
 
     const session = await Session.findByPk(sessionId);
     if (!session) return res.status(404).send('❌ الحصة غير موجودة');
 
-    await session.update({ exam_url: cleanExamUrl });
+    await session.update({
+      ...(cleanExamUrl ? { exam_url: cleanExamUrl } : {}),
+      ...(cleanExamVideoUrl ? { exam_video_url: cleanExamVideoUrl } : {}),
+    });
     res.redirect('/admin/videos');
   } catch (error) {
     console.error(error);
@@ -4304,14 +4316,16 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
 });
 
 app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const { is_free_for_all, views_if_attended, views_if_paid, exam_url } = req.body;
+  const { is_free_for_all, views_if_attended, views_if_paid, exam_url, exam_video_url } = req.body;
   const video = await Video.findByPk(req.params.id);
   const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
+  const cleanExamVideoUrl = typeof exam_video_url === 'string' ? exam_video_url.trim() : '';
   await Session.update({
     is_free_for_all: is_free_for_all === 'on',
     views_if_attended,
     views_if_paid,
     exam_url: cleanExamUrl,
+    exam_video_url: cleanExamVideoUrl,
   }, { where: { id: video.SessionId } });
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });

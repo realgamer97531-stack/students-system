@@ -56,6 +56,11 @@ const Session = sequelize.define('Session', {
     allowNull: true,
     defaultValue: null,
   },
+  exam_video_url: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    defaultValue: null,
+  },
   cost_per_normal: { type: DataTypes.FLOAT, allowNull: true },
   cost_per_reduced: { type: DataTypes.FLOAT, allowNull: true },
 }, {

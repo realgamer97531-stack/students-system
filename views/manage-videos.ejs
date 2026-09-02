@@ -28,8 +28,8 @@
 
 <div class="card mb-4">
   <div class="card-body">
-    <h5 class="mb-3 fw-bold">🔗 رابط الامتحان للحصة</h5>
-    <form action="/admin/videos/session/exam" method="POST" enctype="multipart/form-data" class="row g-2 align-items-end">
+    <h5 class="mb-3 fw-bold">🔗 روابط الامتحان للحصة</h5>
+    <form action="/admin/videos/session/exam" method="POST" class="row g-2 align-items-end">
       <div class="col-md-4">
         <label class="form-label small">اختر الحصة</label>
         <select name="session_id" class="form-select" required>
@@ -40,18 +40,18 @@
         </select>
       </div>
       <div class="col-md-5">
-        <label class="form-label small">رابط الامتحان</label>
-        <input type="url" name="exam_url" class="form-control" placeholder="https://vimeo.com/...">
+        <label class="form-label small">رابط الاختبار</label>
+        <input type="url" name="exam_url" class="form-control" placeholder="https://example.com/quiz">
       </div>
       <div class="col-md-5">
-        <label class="form-label small">أو ارفع فيديو الامتحان</label>
-        <input type="file" name="exam_video_file" class="form-control" accept="video/*">
+        <label class="form-label small">رابط فيديو إجابة الاختبار</label>
+        <input type="url" name="exam_video_url" class="form-control" placeholder="https://vimeo.com/...">
       </div>
       <div class="col-md-2">
-        <button type="submit" class="btn btn-warning w-100">حفظ فيديو الامتحان</button>
+        <button type="submit" class="btn btn-warning w-100">حفظ روابط الاختبار</button>
       </div>
     </form>
-    <p class="text-muted small mt-2 mb-0">اختر رابط Vimeo أو ارفع ملف فيديو. عند اختيار الملف سيتم استخدامه بدل الرابط.</p>
+    <p class="text-muted small mt-2 mb-0">يمكنك إضافة رابط الاختبار ورابط فيديو الإجابة معًا. سيظهر كل واحد في بطاقة مستقلة.</p>
   </div>
 </div>
 
