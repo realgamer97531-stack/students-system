@@ -600,12 +600,26 @@ html[dir="ltr"] .whatsapp-float {
                   </div>
                   <p class="small mb-2" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
                   ${viewsText}
-                  <div class="d-flex flex-wrap mt-3">
-                    ${examUrl ? `<button class="btn btn-sm btn-primary mt-2" onclick="event.stopPropagation(); openExamLink('${examUrl.replace(/'/g, "\\'")}');">${translations[currentLang].examBtn}</button>` : ''}
-                  </div>
                 </div>
               </div>
             </div>`;
+
+          const examCardHtml = examUrl ? `
+            <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.15) * 0.08}s">
+              <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(16, 179, 163, 0.08)); border: 1px solid rgba(79, 70, 229, 0.15) !important; cursor: pointer;" onclick="event.stopPropagation(); openExamLink('${examUrl.replace(/'/g, "\\'")}');">
+                <div class="card-body p-4">
+                  <div class="d-flex align-items-center gap-3">
+                    <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #4F46E5, #10B3A3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;">✍️</div>
+                    <div class="flex-grow-1">
+                      <div class="fw-bold">${translations[currentLang].examBtn}</div>
+                      <div class="small" style="color: var(--sf-muted);">${lesson.date}</div>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary">Open</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ` : '';
 
           const homeworkCards = [
             // ONLY show homework video card if this lesson REALLY has homework (realHomeworkUrl is NOT from global fallback)
@@ -628,23 +642,20 @@ html[dir="ltr"] .whatsapp-float {
             `] : [])
           ].join('');
 
-          container.innerHTML += lessonCardHtml + homeworkCards;
+          container.innerHTML += lessonCardHtml + examCardHtml + homeworkCards;
         });
         return;
       }
 
       weeks.forEach((week, weekIndex) => {
         container.innerHTML += `
-          <div class="col-12 fade-in-up" style="animation-delay: ${weekIndex * 0.1}s">
-            <div class="card lesson-card h-100" onclick="window.location.href='lessons.html?week=${week.number}'" style="border: 1px solid var(--sf-border); background: linear-gradient(135deg, rgba(79,70,229,0.06), rgba(16,179,163,0.05));">
-              <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                    <span class="badge mb-2" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].weekLabel}</span>
-                    <h4 class="fw-bold mb-1">${week.label}</h4>
-                    <p class="mb-0 small" style="color: var(--sf-muted);">${week.lessons.length} ${translations[currentLang].lessonOrder}</p>
-                  </div>
-                  <div class="btn btn-primary btn-sm">Open</div>
+          <div class="col-md-3 col-sm-6 col-12 fade-in-up" style="animation-delay: ${weekIndex * 0.1}s">
+            <div class="card lesson-card h-100" onclick="window.location.href='lessons.html?week=${week.number}'" style="border: 1px solid var(--sf-border); background: linear-gradient(135deg, rgba(79,70,229,0.06), rgba(16,179,163,0.05)); min-height: 190px; display: flex; align-items: center; justify-content: center; text-align: center;">
+              <div class="card-body p-4 w-100">
+                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                  <span class="badge mb-3" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].weekLabel}</span>
+                  <h4 class="fw-bold mb-2">${week.label}</h4>
+                  <p class="mb-0 small" style="color: var(--sf-muted);">${week.lessons.length} ${translations[currentLang].lessonOrder}</p>
                 </div>
               </div>
             </div>

@@ -3276,8 +3276,17 @@ async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
       continue;
     }
 
+    const grantSession = await Session.findByPk(grant.SessionId, {
+      attributes: ['id', 'SubjectId', 'lesson_number'],
+    });
+    const equivalentSessionIds = grantSession
+      ? (await Session.findAll({
+          where: { SubjectId: grantSession.SubjectId, lesson_number: grantSession.lesson_number },
+          attributes: ['id'],
+        })).map(session => session.id)
+      : [grant.SessionId];
     const hasValidAttendance = await Attendance.findOne({
-      where: { StudentId: studentId, SessionId: grant.SessionId },
+      where: { StudentId: studentId, SessionId: equivalentSessionIds },
     });
 
     if (!hasValidAttendance) {
@@ -3542,15 +3551,22 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const studentSessions = allVideoAccess ? [] : await Session.findAll({
       where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
     });
-    const studentSessionIds = studentSessions.map(s => s.id);
+    const studentLessonNumbers = [...new Set(studentSessions.map(s => s.lesson_number))];
+    const sameLessonSessions = studentLessonNumbers.length > 0
+      ? await Session.findAll({
+          where: { SubjectId: student.SubjectId, lesson_number: studentLessonNumbers },
+          attributes: ['id', 'lesson_number', 'SubjectId'],
+        })
+      : [];
+    const lessonSessionIds = sameLessonSessions.map(s => s.id);
 
     // الفيديوهات المرتبطة بحصص مجموعته
     const groupVideoSessions = await VideoSession.findAll({
-      where: { SessionId: studentSessionIds },
+      where: { SessionId: lessonSessionIds },
       attributes: ['VideoId'],
     });
-    const directlyLinkedVideos = studentSessionIds.length > 0 ? await Video.findAll({
-      where: { SessionId: studentSessionIds },
+    const directlyLinkedVideos = lessonSessionIds.length > 0 ? await Video.findAll({
+      where: { SessionId: lessonSessionIds },
       attributes: ['id'],
     }) : [];
     const groupVideoIds = [...new Set([
@@ -3586,6 +3602,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       attributes: ['SessionId'],
     });
     const attendedSessionIds = new Set(attendanceRecords.map(a => a.SessionId).filter(Boolean));
+    const sessionIdsByLesson = new Map();
+    sameLessonSessions.forEach(s => {
+      if (!sessionIdsByLesson.has(s.lesson_number)) sessionIdsByLesson.set(s.lesson_number, []);
+      sessionIdsByLesson.get(s.lesson_number).push(s.id);
+    });
+    const attendedLessonNumbers = new Set(
+      sameLessonSessions.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number)
+    );
 
     await cleanupStaleVideoAccessGrants(student.id);
 
@@ -3598,7 +3622,9 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         continue;
       }
 
-      if (grant.method === 'attended' && !attendedSessionIds.has(grant.SessionId)) {
+      const grantSession = sameLessonSessions.find(session => session.id === grant.SessionId);
+      const grantHasEquivalentAttendance = grantSession && attendedLessonNumbers.has(grantSession.lesson_number);
+      if (grant.method === 'attended' && !grantHasEquivalentAttendance) {
         await grant.destroy();
         continue;
       }
@@ -3666,7 +3692,9 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
       if (!session) return null;
 
-      const grant = session ? grantBySessionId[session.id] : null;
+      const equivalentSessionIds = session ? (sessionIdsByLesson.get(session.lesson_number) || [session.id]) : [];
+      const grant = equivalentSessionIds.map(sessionId => grantBySessionId[sessionId]).find(Boolean);
+      const attended = session && attendedLessonNumbers.has(session.lesson_number);
       let status, viewsUsed = 0, maxViews = 0;
 
       if (allVideoAccess) {
@@ -3674,7 +3702,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       } else if (session.is_free_for_all) {
         status = 'free';
       } else if (grant) {
-        const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attendedSessionIds.has(session.id));
+        const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attended);
         if (!isValidGrant) {
           status = 'locked';
         } else {
@@ -3748,12 +3776,20 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     }
 
     // 2) فيه صلاحية مسجلة بالفعل (حضور سابق / دفع سابق / فتح أدمن)
-    const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: session.id } });
+    const equivalentSessions = await Session.findAll({
+      where: { SubjectId: session.SubjectId, lesson_number: session.lesson_number },
+      include: [{ model: Center }],
+    });
+    const equivalentSessionIds = equivalentSessions.map(equivalentSession => equivalentSession.id);
+    const attendanceRecords = await Attendance.findAll({
+      where: { StudentId: student.id, SessionId: equivalentSessionIds },
+    });
+    const attendanceExists = attendanceRecords.length > 0;
     await cleanupStaleVideoAccessGrants(student.id, session.id);
-    let grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
+    let grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
 
     if (grant && grant.method === 'attended' && !attendanceExists) {
-      await VideoAccessGrant.destroy({ where: { StudentId: student.id, SessionId: session.id, method: 'attended' } });
+      await VideoAccessGrant.destroy({ where: { id: grant.id } });
       grant = null;
     }
 
@@ -3774,7 +3810,9 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
           admin_free: '📹 فُتحت له الحصة مجانًا من الأدمن',
           admin_paid: '📹 فُتحت له الحصة من الأدمن (مدفوعة بدون خصم)',
         };
-        await ensureAttendance(student.id, session.id, methodComments[grant.method] || '📹 حضر الحصة أونلاين (فيديو)');
+        if (grant.method !== 'attended') {
+          await ensureAttendance(student.id, session.id, methodComments[grant.method] || '📹 حضر الحصة أونلاين (فيديو)');
+        }
 
         return res.json({ success: true, viewsUsed: grant.views_used, maxViews: grant.max_views });
       }
@@ -3797,15 +3835,12 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     }
 
     // 3) مفيش صلاحية - نتحقق هل حضر هذه الحصة في أي سنتر فعلي (غير أونلاين)
-    const attendedInCenter = await Attendance.findOne({
-      where: { StudentId: student.id, SessionId: session.id },
-      include: [{
-        model: Session,
-        include: [{ model: Center }],
-      }],
-    });
+    const attendedSessionIds = new Set(attendanceRecords.map(attendance => attendance.SessionId));
+    const attendedInCenter = equivalentSessions.find(equivalentSession =>
+      attendedSessionIds.has(equivalentSession.id) && equivalentSession.Center && equivalentSession.Center.name !== 'أونلاين'
+    );
 
-    if (attendedInCenter && attendedInCenter.Session && attendedInCenter.Session.Center && attendedInCenter.Session.Center.name !== 'أونلاين') {
+    if (attendedInCenter) {
       grant = await VideoAccessGrant.create({
         StudentId: student.id,
         SessionId: session.id,
@@ -3814,7 +3849,6 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
         views_used: 1,
       });
       // الحضور هنا مسجل بالفعل أصلاً (هو سبب الأهلية)، بس نتأكد بنفس الدالة لضمان التناسق
-      await ensureAttendance(student.id, session.id, '📹 حضر الحصة (سبق حضوره بالسنتر)');
       return res.json({ success: true, viewsUsed: 1, maxViews: grant.max_views });
     }
 
@@ -3913,8 +3947,13 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
 
     // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة، أو حضور فعلي حالي)
     if (!allVideoAccess && !session.is_free_for_all) {
-      const grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: session.id } });
-      const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: session.id } });
+      const equivalentSessions = await Session.findAll({
+        where: { SubjectId: session.SubjectId, lesson_number: session.lesson_number },
+        attributes: ['id'],
+      });
+      const equivalentSessionIds = equivalentSessions.map(equivalentSession => equivalentSession.id);
+      const grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
+      const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
       const isValidGrant = !!(grant && (
         grant.method === 'paid' ||
         grant.method === 'admin_free' ||
