@@ -4343,8 +4343,8 @@ app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_v
     is_free_for_all: is_free_for_all === 'on',
     views_if_attended,
     views_if_paid,
-    exam_url: cleanExamUrl,
-    exam_video_url: cleanExamVideoUrl,
+    ...(cleanExamUrl ? { exam_url: cleanExamUrl } : {}),
+    ...(cleanExamVideoUrl ? { exam_video_url: cleanExamVideoUrl } : {}),
   }, { where: { id: video.SessionId } });
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
