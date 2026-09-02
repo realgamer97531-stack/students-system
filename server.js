@@ -4043,6 +4043,25 @@ app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'),
   }
 });
 
+app.post('/admin/videos/session/exam/delete', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const sessionId = Number(req.body.session_id);
+    const field = req.body.field;
+    if (!sessionId || !['exam_url', 'exam_video_url'].includes(field)) {
+      return res.status(400).send('❌ بيانات الحذف غير صحيحة');
+    }
+
+    const session = await Session.findByPk(sessionId);
+    if (!session) return res.status(404).send('❌ الحصة غير موجودة');
+
+    await session.update({ [field]: null });
+    res.redirect('/admin/videos');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة في حذف الرابط: ' + error.message);
+  }
+});
+
 app.post('/admin/videos/:id/update-title', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
     const { title } = req.body;
@@ -4327,6 +4346,19 @@ app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_v
     exam_url: cleanExamUrl,
     exam_video_url: cleanExamVideoUrl,
   }, { where: { id: video.SessionId } });
+  res.redirect('/admin/videos/' + req.params.id + '/access');
+});
+
+app.post('/admin/videos/:id/session-link/delete', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  const field = req.body.field;
+  if (!['exam_url', 'exam_video_url'].includes(field)) {
+    return res.status(400).send('❌ نوع الرابط غير صحيح');
+  }
+
+  const video = await Video.findByPk(req.params.id);
+  if (!video || !video.SessionId) return res.status(404).send('❌ الفيديو أو الحصة غير موجودة');
+
+  await Session.update({ [field]: null }, { where: { id: video.SessionId } });
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
 

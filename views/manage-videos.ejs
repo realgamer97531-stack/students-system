@@ -82,12 +82,29 @@
           </div>
 
           <% const examUrl = v.Session && v.Session.exam_url ? v.Session.exam_url : ''; %>
+          <% const examVideoUrl = v.Session && v.Session.exam_video_url ? v.Session.exam_video_url : ''; %>
           <% if (examUrl) { %>
             <div class="mt-2">
               <a href="<%= examUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning w-100">🔗 فتح رابط الامتحان</a>
+              <form action="/admin/videos/session/exam/delete" method="POST" class="mt-1" onsubmit="return confirm('حذف رابط الاختبار؟')">
+                <input type="hidden" name="session_id" value="<%= v.Session.id %>">
+                <input type="hidden" name="field" value="exam_url">
+                <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف رابط الاختبار</button>
+              </form>
             </div>
-          <% } else { %>
-            <div class="mt-2 small text-muted">لا يوجد رابط امتحان لهذه الحصة</div>
+          <% } %>
+          <% if (examVideoUrl) { %>
+            <div class="mt-2">
+              <a href="<%= examVideoUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-info w-100">▶ فتح فيديو إجابة الاختبار</a>
+              <form action="/admin/videos/session/exam/delete" method="POST" class="mt-1" onsubmit="return confirm('حذف فيديو إجابة الاختبار؟')">
+                <input type="hidden" name="session_id" value="<%= v.Session.id %>">
+                <input type="hidden" name="field" value="exam_video_url">
+                <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف فيديو الإجابة</button>
+              </form>
+            </div>
+          <% } %>
+          <% if (!examUrl && !examVideoUrl) { %>
+            <div class="mt-2 small text-muted">لا توجد روابط اختبار لهذه الحصة</div>
           <% } %>
         </div>
       </div>

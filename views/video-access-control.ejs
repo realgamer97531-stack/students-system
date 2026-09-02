@@ -31,6 +31,24 @@
         <button type="submit" class="btn btn-primary w-100">حفظ</button>
       </div>
     </form>
+    <div class="row g-2 mt-2">
+      <% if (video.Session.exam_url) { %>
+        <div class="col-md-6">
+          <form action="/admin/videos/<%= video.id %>/session-link/delete" method="POST" onsubmit="return confirm('حذف رابط الاختبار؟')">
+            <input type="hidden" name="field" value="exam_url">
+            <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف رابط الاختبار</button>
+          </form>
+        </div>
+      <% } %>
+      <% if (video.Session.exam_video_url) { %>
+        <div class="col-md-6">
+          <form action="/admin/videos/<%= video.id %>/session-link/delete" method="POST" onsubmit="return confirm('حذف فيديو إجابة الاختبار؟')">
+            <input type="hidden" name="field" value="exam_video_url">
+            <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف فيديو الإجابة</button>
+          </form>
+        </div>
+      <% } %>
+    </div>
   </div>
 </div>
 
