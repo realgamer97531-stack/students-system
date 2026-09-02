@@ -3566,7 +3566,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const sameLessonSessions = studentLessonNumbers.length > 0
       ? await Session.findAll({
           where: { SubjectId: student.SubjectId, lesson_number: studentLessonNumbers },
-          attributes: ['id', 'lesson_number', 'SubjectId'],
+          attributes: ['id', 'lesson_number', 'SubjectId', 'exam_url', 'exam_video_url'],
         })
       : [];
     const lessonSessionIds = sameLessonSessions.map(s => s.id);
@@ -3621,6 +3621,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const attendedLessonNumbers = new Set(
       sameLessonSessions.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number)
     );
+    const examLinksByLesson = new Map();
+    sameLessonSessions.forEach(s => {
+      const existing = examLinksByLesson.get(s.lesson_number) || {};
+      examLinksByLesson.set(s.lesson_number, {
+        examUrl: existing.examUrl || s.exam_url || null,
+        examVideoUrl: existing.examVideoUrl || s.exam_video_url || null,
+      });
+    });
 
     await cleanupStaleVideoAccessGrants(student.id);
 
@@ -3746,8 +3754,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         homeworkVideoUrl,
         realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
         homeworkItems,
-        examUrl: session && session.exam_url ? session.exam_url : null,
-        examVideoUrl: session && session.exam_video_url ? session.exam_video_url : null,
+        examUrl: (examLinksByLesson.get(session.lesson_number)?.examUrl) || (session && session.exam_url ? session.exam_url : null),
+        examVideoUrl: (examLinksByLesson.get(session.lesson_number)?.examVideoUrl) || (session && session.exam_video_url ? session.exam_video_url : null),
       };
     }).filter(Boolean);
 
