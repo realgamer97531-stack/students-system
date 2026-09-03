@@ -1432,11 +1432,12 @@ app.post('/students/:id/points', requireAdmin, async (req, res) => {
     const student = await Student.findByPk(req.params.id);
     const signedAmount = type === 'deduct' ? -Math.abs(parseInt(amount)) : Math.abs(parseInt(amount));
 
-    await Student.increment('points', { by: signedAmount, where: { id: req.params.id } });
+    const appliedAmount = await addPoints(student.id, signedAmount);
+    if (appliedAmount === 0) return res.redirect('/students/' + req.params.id);
 
     await BalanceTransaction.create({
       StudentId: student.id,
-      amount: signedAmount,
+      amount: appliedAmount,
       reason: `نقاط: ${reason || (type === 'deduct' ? 'خصم يدوي' : 'إضافة يدوية')}`,
       UserId: req.session.userId,
     });
@@ -2753,7 +2754,9 @@ app.post('/exams/:id/scores', async (req, res) => {
           result.UserId = req.session.userId;
           await result.save();
         }
-        await addPoints(studentId, Math.round(parseFloat(score)));
+        const previousScore = created ? 0 : Math.round(parseFloat(result.previous('score')) || 0);
+        const currentScore = Math.round(parseFloat(score) || 0);
+        await addPoints(studentId, currentScore - previousScore);
       }
     }
 
@@ -2872,7 +2875,8 @@ app.post('/homework/scan/save', async (req, res) => {
     }
 
     const pointsMap = { complete: 3, incomplete: 1, no_steps: 0, not_done: -2 };
-    await addPoints(student.id, pointsMap[status] || 0);
+    const previousPoints = created ? 0 : (pointsMap[check.previous('status')] || 0);
+    await addPoints(student.id, (pointsMap[status] || 0) - previousPoints);
 
     res.json({ success: true, message: 'تم حفظ حالة الواجب بنجاح', student_name: student.name });
   } catch (error) {
@@ -3958,8 +3962,19 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
 });
 
 async function addPoints(studentId, amount) {
-  if (amount === 0) return;
-  await Student.increment('points', { by: amount, where: { id: studentId } });
+  const requestedAmount = Number(amount) || 0;
+  if (requestedAmount === 0) return 0;
+
+  const student = await Student.findByPk(studentId, { attributes: ['id', 'points'] });
+  if (!student) return 0;
+
+  const currentPoints = Math.min(100, Math.max(0, Number(student.points) || 0));
+  const nextPoints = Math.min(100, Math.max(0, currentPoints + requestedAmount));
+  const appliedAmount = nextPoints - currentPoints;
+  if (appliedAmount !== 0 || Number(student.points) !== currentPoints) {
+    await Student.update({ points: nextPoints }, { where: { id: studentId } });
+  }
+  return appliedAmount;
 }
 
 app.get('/api/portal/leaderboard', verifyPortalToken('student'), async (req, res) => {
