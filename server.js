@@ -1469,7 +1469,7 @@ app.get('/admin/points/:id', requireAdmin, async (req, res) => {
     },
     order: [['createdAt', 'DESC']],
   });
-  const currentPoints = Math.min(100, Math.max(0, Number(student.points) || 0));
+  const currentPoints = Number(student.points) || 0;
   const loggedPoints = pointHistory.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   const unreconciledPoints = currentPoints - loggedPoints;
   if (unreconciledPoints !== 0) {
@@ -4014,8 +4014,8 @@ async function addPoints(studentId, amount, reason = 'تعديل نقاط', user
   const student = await Student.findByPk(studentId, { attributes: ['id', 'points'] });
   if (!student) return 0;
 
-  const currentPoints = Math.min(100, Math.max(0, Number(student.points) || 0));
-  const nextPoints = Math.min(100, Math.max(0, currentPoints + requestedAmount));
+  const currentPoints = Number(student.points) || 0;
+  const nextPoints = currentPoints + requestedAmount;
   const appliedAmount = nextPoints - currentPoints;
   if (appliedAmount !== 0 || Number(student.points) !== currentPoints) {
     await Student.update({ points: nextPoints }, { where: { id: studentId } });
