@@ -6157,6 +6157,19 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       ? sessions.find(s => String(s.id) === String(session_id))
       : sessions[0];
 
+    // A selected session defines the student scope. Do not classify students from
+    // other centers or subjects as absent, even when show_all is enabled.
+    if (selectedSession) {
+      students = await Student.findAll({
+        where: {
+          CenterId: selectedSession.CenterId,
+          SubjectId: selectedSession.SubjectId,
+        },
+        include: [Center, Subject],
+        order: [['name', 'ASC']],
+      });
+    }
+
     // If there are no assigned students at all, render empty state immediately
     if (students.length === 0) {
       return res.render('follow-up-dashboard', {
