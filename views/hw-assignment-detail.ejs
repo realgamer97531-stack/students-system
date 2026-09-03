@@ -1,6 +1,11 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-1">📝 <%= assignment.title %></h3>
+<div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+  <h3 class="mb-0">📝 <%= assignment.title %></h3>
+  <a class="btn btn-outline-success btn-sm" href="/hw/assignments/<%= assignment.id %>/export?<%= new URLSearchParams({ student_search: student_search || '', show_all_students: show_all_students ? '1' : '', marked_filter: marked_filter || 'all' }).toString() %>">
+    📥 تصدير Excel
+  </a>
+</div>
 <p class="text-muted mb-2">واجب رقم <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
 <p class="text-muted mb-3">
   <% if (assignment.Subject) { %>📚 <%= assignment.Subject.name %><br><% } %>

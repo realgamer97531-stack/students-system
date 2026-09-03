@@ -4895,6 +4895,107 @@ app.get('/hw/assignments/:id', requirePermission('homework_online'), async (req,
   });
 });
 
+app.get('/hw/assignments/:id/export', requirePermission('homework_online'), async (req, res) => {
+  try {
+    const { student_search, show_all_students, marked_filter } = req.query;
+    const showAllStudents = show_all_students === '1' || show_all_students === 'on';
+    const assignment = await HomeworkAssignment.findByPk(req.params.id, {
+      include: [
+        { model: Session, required: false },
+        { model: Session, as: 'LinkedSessions', required: false },
+      ],
+    });
+    if (!assignment) return res.status(404).send('غير موجود');
+
+    let assignedStudentIds = null;
+    if (req.session.userRole !== 'admin' && ['assistant', 'follow_up'].includes(req.session.userRole)) {
+      const assistantAssignments = await FollowUpAssignment.findAll({
+        where: { AssistantId: req.session.userId },
+        attributes: ['StudentId'],
+      });
+      assignedStudentIds = assistantAssignments.map(a => a.StudentId);
+    }
+
+    const assignmentSessionIds = [
+      ...(assignment.SessionId ? [assignment.SessionId] : []),
+      ...(assignment.LinkedSessions || []).map(s => s.id),
+    ].filter(Boolean);
+    const centerIds = [...new Set([
+      ...(assignment.Session ? [assignment.Session.CenterId] : []),
+      ...(assignment.LinkedSessions || []).map(s => s.CenterId),
+    ].filter(Boolean))];
+
+    const studentWhere = {};
+    if (assignment.SubjectId) studentWhere.SubjectId = assignment.SubjectId;
+    if (centerIds.length) studentWhere.CenterId = centerIds;
+    if (assignedStudentIds !== null && !showAllStudents) {
+      studentWhere.id = assignedStudentIds.length ? assignedStudentIds : -1;
+    }
+
+    let students = await Student.findAll({ where: studentWhere, include: [Center] });
+    let submissions = await HomeworkSubmission.findAll({
+      where: { HomeworkAssignmentId: assignment.id },
+      include: [{ model: Student, include: [Center] }],
+    });
+    const submissionsByStudentId = new Map(submissions.map(submission => [submission.StudentId, submission]));
+
+    if (student_search) {
+      const searchTerm = String(student_search).toLowerCase();
+      const matches = student => String(student.name || '').toLowerCase().includes(searchTerm) ||
+        String(student.student_code || '').toLowerCase().includes(searchTerm);
+      students = students.filter(matches);
+      submissions = submissions.filter(submission => matches(submission.Student));
+    }
+
+    const rows = [];
+    for (const student of students) {
+      const submission = submissionsByStudentId.get(student.id);
+      const status = submission ? submission.status : 'not_submitted';
+      if (marked_filter === 'marked' && (!submission || submission.status === 'submitted')) continue;
+      if (marked_filter === 'not_marked' && (!submission || submission.status !== 'submitted')) continue;
+
+      if (!submission && assignmentSessionIds.length) {
+        const homeworkCheck = await HomeworkCheck.findOne({
+          where: { StudentId: student.id, SessionId: assignmentSessionIds },
+        });
+        if (homeworkCheck) continue;
+      }
+
+      rows.push({
+        code: student.student_code || '',
+        name: student.name || '',
+        phone: student.phone || '',
+        parent_phone: student.parent_phone || '',
+        center: student.Center ? student.Center.name : '',
+        status,
+        submitted_at: submission ? submission.createdAt : '',
+      });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Homework');
+    worksheet.columns = [
+      { header: 'Student Code', key: 'code', width: 18 },
+      { header: 'Student Name', key: 'name', width: 30 },
+      { header: 'Student Phone', key: 'phone', width: 18 },
+      { header: 'Parent Phone', key: 'parent_phone', width: 18 },
+      { header: 'Center', key: 'center', width: 18 },
+      { header: 'Status', key: 'status', width: 18 },
+      { header: 'Submitted At', key: 'submitted_at', width: 22 },
+    ];
+    worksheet.addRows(rows);
+    worksheet.getRow(1).font = { bold: true };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=homework_${assignment.id}.xlsx`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('حصلت مشكلة أثناء تصدير الملف');
+  }
+});
+
 app.get('/hw/submissions/:id', requirePermission('homework_online'), async (req, res) => {
   const submission = await HomeworkSubmission.findByPk(req.params.id, {
     include: [{ model: Student, include: [Center, Subject] }],
