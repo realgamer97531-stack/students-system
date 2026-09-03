@@ -44,6 +44,49 @@
   </a>
 </div>
 
+<form method="GET" action="/sessions" class="card p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label for="centerFilter" class="form-label mb-1">
+        <span class="ar-only">السنتر</span>
+        <span class="en-only" style="display:none;">Center</span>
+      </label>
+      <select id="centerFilter" name="center_id" class="form-select">
+        <option value="">كل السناتر</option>
+        <% centers.forEach(center => { %>
+          <option value="<%= center.id %>" <%= String(selectedCenterId) === String(center.id) ? 'selected' : '' %>>
+            <%= center.name %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label for="subjectFilter" class="form-label mb-1">
+        <span class="ar-only">المادة</span>
+        <span class="en-only" style="display:none;">Subject</span>
+      </label>
+      <select id="subjectFilter" name="subject_id" class="form-select">
+        <option value="">كل المواد</option>
+        <% subjects.forEach(subject => { %>
+          <option value="<%= subject.id %>" <%= String(selectedSubjectId) === String(subject.id) ? 'selected' : '' %>>
+            <%= subject.name %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-4 d-flex gap-2">
+      <button type="submit" class="btn btn-primary flex-grow-1">
+        <span class="ar-only">تصفية</span>
+        <span class="en-only" style="display:none;">Filter</span>
+      </button>
+      <a href="/sessions" class="btn btn-outline-secondary">
+        <span class="ar-only">مسح</span>
+        <span class="en-only" style="display:none;">Clear</span>
+      </a>
+    </div>
+  </div>
+</form>
+
 <div class="table-responsive card p-3">
   <table class="table table-hover align-middle">
     <thead>

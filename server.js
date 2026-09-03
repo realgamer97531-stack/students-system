@@ -1639,12 +1639,31 @@ app.post('/sessions', async (req, res) => {
 
 // عرض كل الحصص + اختيار الشغالة
 app.get('/sessions', requirePermission('sessions_view'), async (req, res) => {
-  const sessions = await Session.findAll({
-    include: [Center, Subject],
-    order: [['createdAt', 'DESC']],
-    limit: 100,
+  const centerId = Number.parseInt(req.query.center_id, 10);
+  const subjectId = Number.parseInt(req.query.subject_id, 10);
+  const sessionWhere = {};
+
+  if (Number.isInteger(centerId) && centerId > 0) sessionWhere.CenterId = centerId;
+  if (Number.isInteger(subjectId) && subjectId > 0) sessionWhere.SubjectId = subjectId;
+
+  const [sessions, centers, subjects] = await Promise.all([
+    Session.findAll({
+      where: sessionWhere,
+      include: [Center, Subject],
+      order: [['lesson_number', 'ASC'], ['session_date', 'ASC'], ['serial_number', 'ASC']],
+      limit: 100,
+    }),
+    Center.findAll({ order: [['name', 'ASC']] }),
+    Subject.findAll({ order: [['name', 'ASC']] }),
+  ]);
+  res.render('sessions-list', {
+    sessions,
+    centers,
+    subjects,
+    selectedCenterId: Number.isInteger(centerId) && centerId > 0 ? centerId : '',
+    selectedSubjectId: Number.isInteger(subjectId) && subjectId > 0 ? subjectId : '',
+    activeSessionId: req.session.activeSessionId,
   });
-  res.render('sessions-list', { sessions, activeSessionId: req.session.activeSessionId });
 });
 
 // تفعيل حصة موجودة كـ "الشغالة دلوقتي"
