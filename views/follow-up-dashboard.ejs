@@ -138,6 +138,8 @@
         <thead class="table-light">
           <tr>
             <th style="width:180px;">الطالب</th>
+            <th>تليفون الطالب</th>
+            <th>تليفون ولي الأمر</th>
             <th>الحضور</th>
             <th>الواجب</th>
             <th>الامتحان</th>
@@ -155,6 +157,8 @@
                 <span class="text-muted" style="font-size:0.7rem;"><%= row.student.student_code %></span><br>
                 <span class="text-muted" style="font-size:0.65rem;"><%= row.student.Center?.name %> | <%= row.student.Subject?.name %></span>
               </td>
+              <td><%= row.student.phone || '-' %></td>
+              <td><%= row.student.parent_phone || '-' %></td>
               <td>
                 <% if (row.attended) { %>
                   <span class="badge" style="background:#D1FAE5;color:#047857;">✓ <%= row.attendedWhere %></span>
