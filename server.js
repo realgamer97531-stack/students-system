@@ -6209,10 +6209,19 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     });
 
     const studentIds = students.map(s => s.id);
+    const equivalentAttendanceSessions = await Session.findAll({
+      where: {
+        SubjectId: selectedSession.SubjectId,
+        lesson_number: selectedSession.lesson_number,
+      },
+      include: [Center],
+      attributes: ['id'],
+    });
+    const equivalentAttendanceSessionIds = equivalentAttendanceSessions.map(session => session.id);
     const [attendanceRecords, hwRecords, examResults, sessionComments] = await Promise.all([
       Attendance.findAll({
-        where: { StudentId: studentIds, SessionId: selectedSession.id },
-        include: [User],
+        where: { StudentId: studentIds, SessionId: equivalentAttendanceSessionIds },
+        include: [User, { model: Session, include: [Center] }],
       }),
       HomeworkCheck.findAll({
         where: { StudentId: studentIds, SessionId: selectedSession.id },
@@ -6260,7 +6269,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       const row = {
         student,
         attended: !!attendance,
-        attendedWhere: attendance ? (selectedSession.Center?.name || null) : null,
+        attendedWhere: attendance ? (attendance.Session?.Center?.name || selectedSession.Center?.name || null) : null,
         attendanceTime: attendance ? attendance.attended_at : null,
         attendedBy: attendance ? attendance.User?.name : null,
         hwStatus: hw ? hw.status : null,
