@@ -4962,8 +4962,8 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
     let assignments = await HomeworkAssignment.findAll({
       where: { SubjectId: student.SubjectId },
       include: [
-        { model: Session, required: false, attributes: ['id', 'CenterId'] },
-        { model: Session, as: 'LinkedSessions', required: false, attributes: ['id', 'CenterId'] },
+        { model: Session, required: false, attributes: ['id', 'CenterId'], include: [{ model: Center, attributes: ['id', 'name'] }] },
+        { model: Session, as: 'LinkedSessions', required: false, attributes: ['id', 'CenterId'], include: [{ model: Center, attributes: ['id', 'name'] }] },
       ],
       order: [['order_number', 'ASC']],
     });
@@ -4987,7 +4987,10 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
       ].filter(Boolean);
       if (assignmentSessionIds.length && !a.show_for_all) {
         const attended = assignmentSessionIds.some(id => attendedSessionIds.has(id));
-        if (!attended) continue;
+        const isOnlineAssignment = [a.Session, ...(a.LinkedSessions || [])].some(session =>
+          String(session.Center?.name || '').trim().toLowerCase() === 'online'
+        );
+        if (!attended && !isOnlineAssignment) continue;
       }
 
       visibleAssignments.push(a);

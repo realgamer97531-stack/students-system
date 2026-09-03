@@ -34,6 +34,10 @@ const VideoPart = sequelize.define('VideoPart', {
     allowNull: false,
     defaultValue: 0,
   },
+  VideoId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 }, {
   tableName: 'videoparts',
 });
