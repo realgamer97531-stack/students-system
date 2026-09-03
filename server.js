@@ -5964,6 +5964,17 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       ? sessions.find(s => String(s.id) === String(session_id))
       : sessions[0];
 
+    if (selectedSession) {
+      students = await Student.findAll({
+        where: {
+          CenterId: selectedSession.CenterId,
+          SubjectId: selectedSession.SubjectId,
+        },
+        include: [Center, Subject],
+        order: [['name', 'ASC']],
+      });
+    }
+
     if (!selectedSession || students.length === 0) {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('متابعة الطلاب');
@@ -6053,6 +6064,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
         videoWatch,
         sessionComment: sessionComment ? sessionComment.comment : null,
       };
+
+      if (!show_attended && row.attended) continue;
 
       if (filter_video_type && filter_video_max) {
         const maxMin = parseFloat(filter_video_max);
