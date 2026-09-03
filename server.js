@@ -1469,7 +1469,18 @@ app.get('/admin/points/:id', requireAdmin, async (req, res) => {
     },
     order: [['createdAt', 'DESC']],
   });
-  res.render('admin-points-student', { student, pointHistory });
+  const currentPoints = Math.min(100, Math.max(0, Number(student.points) || 0));
+  const loggedPoints = pointHistory.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const unreconciledPoints = currentPoints - loggedPoints;
+  if (unreconciledPoints !== 0) {
+    pointHistory.push({
+      reason: 'نقاط: رصيد نقاط سابق غير مفصل',
+      amount: unreconciledPoints,
+      createdAt: null,
+      isReconciliation: true,
+    });
+  }
+  res.render('admin-points-student', { student, pointHistory, currentPoints });
 });
 
 app.post('/students', async (req, res) => {

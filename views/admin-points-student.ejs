@@ -12,7 +12,7 @@
   <div class="col-md-4">
     <div class="card p-3 h-100">
       <div class="text-muted small">إجمالي النقاط</div>
-      <div class="display-6 fw-bold text-warning"><%= student.points || 0 %> <span class="fs-6">/ 100</span></div>
+      <div class="display-6 fw-bold text-warning"><%= currentPoints %> <span class="fs-6">/ 100</span></div>
     </div>
   </div>
   <div class="col-md-4">
@@ -46,11 +46,16 @@
         <tbody>
           <% pointHistory.forEach(entry => { %>
             <tr>
-              <td><%= entry.reason.replace(/^نقاط:\s*/, '') %></td>
+              <td>
+                <%= entry.reason.replace(/^نقاط:\s*/, '') %>
+                <% if (entry.isReconciliation) { %>
+                  <span class="badge bg-secondary ms-1">تسوية عرض فقط</span>
+                <% } %>
+              </td>
               <td class="text-center fw-bold <%= Number(entry.amount) >= 0 ? 'text-success' : 'text-danger' %>">
                 <%= Number(entry.amount) >= 0 ? '+' : '' %><%= entry.amount %>
               </td>
-              <td class="text-muted small"><%= entry.createdAt ? new Date(entry.createdAt).toLocaleString('ar-EG') : '-' %></td>
+              <td class="text-muted small"><%= entry.createdAt ? new Date(entry.createdAt).toLocaleString('ar-EG') : 'قديم' %></td>
             </tr>
           <% }) %>
         </tbody>
