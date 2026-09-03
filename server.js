@@ -5985,8 +5985,6 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
     const watchMap = {};
     watchRecords.forEach(w => { watchMap[`${w.StudentId}_${w.VideoPartId}`] = w.watched_seconds; });
 
-    const video = await Video.findOne({ where: { SessionId: selectedSession.id }, include: [{ model: VideoPart, order: [['order_index', 'ASC']] }] });
-
     const studentIds = students.map(s => s.id);
     const equivalentAttendanceSessions = await Session.findAll({
       where: {
@@ -5997,6 +5995,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       attributes: ['id'],
     });
     const equivalentAttendanceSessionIds = equivalentAttendanceSessions.map(session => session.id);
+    const video = await Video.findOne({ where: { SessionId: equivalentAttendanceSessionIds }, include: [{ model: VideoPart, order: [['order_index', 'ASC']] }] });
+
     const [attendanceRecords, hwRecords, examResults, sessionComments] = await Promise.all([
       Attendance.findAll({
         where: { StudentId: studentIds, SessionId: equivalentAttendanceSessionIds },
@@ -6203,11 +6203,6 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     const watchMap = {};
     watchRecords.forEach(w => { watchMap[`${w.StudentId}_${w.VideoPartId}`] = w.watched_seconds; });
 
-    const video = await Video.findOne({
-      where: { SessionId: selectedSession.id },
-      include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
-    });
-
     const studentIds = students.map(s => s.id);
     const equivalentAttendanceSessions = await Session.findAll({
       where: {
@@ -6218,6 +6213,11 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       attributes: ['id'],
     });
     const equivalentAttendanceSessionIds = equivalentAttendanceSessions.map(session => session.id);
+    const video = await Video.findOne({
+      where: { SessionId: equivalentAttendanceSessionIds },
+      include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
+    });
+
     const [attendanceRecords, hwRecords, examResults, sessionComments] = await Promise.all([
       Attendance.findAll({
         where: { StudentId: studentIds, SessionId: equivalentAttendanceSessionIds },
