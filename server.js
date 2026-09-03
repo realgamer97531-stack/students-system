@@ -1432,21 +1432,44 @@ app.post('/students/:id/points', requireAdmin, async (req, res) => {
     const student = await Student.findByPk(req.params.id);
     const signedAmount = type === 'deduct' ? -Math.abs(parseInt(amount)) : Math.abs(parseInt(amount));
 
-    const appliedAmount = await addPoints(student.id, signedAmount);
+    const appliedAmount = await addPoints(
+      student.id,
+      signedAmount,
+      reason || (type === 'deduct' ? 'خصم يدوي' : 'إضافة يدوية'),
+      req.session.userId,
+    );
     if (appliedAmount === 0) return res.redirect('/students/' + req.params.id);
-
-    await BalanceTransaction.create({
-      StudentId: student.id,
-      amount: appliedAmount,
-      reason: `نقاط: ${reason || (type === 'deduct' ? 'خصم يدوي' : 'إضافة يدوية')}`,
-      UserId: req.session.userId,
-    });
 
     res.redirect('/students/' + req.params.id);
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
   }
+});
+
+app.get('/admin/points', requireAdmin, async (req, res) => {
+  const students = await Student.findAll({
+    include: [Center, Subject],
+    order: [['points', 'DESC'], ['name', 'ASC']],
+  });
+  res.render('admin-points', { students });
+});
+
+app.get('/admin/points/:id', requireAdmin, async (req, res) => {
+  const student = await Student.findOne({
+    where: { id: req.params.id },
+    include: [Center, Subject],
+  });
+  if (!student) return res.status(404).send('❌ الطالب غير موجود');
+
+  const pointHistory = await BalanceTransaction.findAll({
+    where: {
+      StudentId: student.id,
+      reason: { [Op.like]: 'نقاط:%' },
+    },
+    order: [['createdAt', 'DESC']],
+  });
+  res.render('admin-points-student', { student, pointHistory });
 });
 
 app.post('/students', async (req, res) => {
@@ -1561,7 +1584,7 @@ app.post('/students', async (req, res) => {
               comment: comment || null,
               payment_collected: initialBalance,
             });
-            await addPoints(student.id, 2);
+            await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
             attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
           }
         }
@@ -2349,7 +2372,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
               comment: comment || null,
               payment_collected: initialBalance,
             });
-            await addPoints(student.id, 2);
+            await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
             attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
           }
         }
@@ -2585,7 +2608,7 @@ app.post('/attendance/scan', async (req, res) => {
       await processBookletPayments(student.id, req.body.booklet_payments, req.session.userId, sessionId);
     }
 
-    await addPoints(student.id, 2);
+    await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
 
     res.json({
       success: true,
@@ -2736,6 +2759,7 @@ app.get('/exams/:id', async (req, res) => {
 app.post('/exams/:id/scores', async (req, res) => {
   try {
     const examId = req.params.id;
+    const exam = await Exam.findByPk(examId);
 
     for (const key in req.body) {
       if (key.startsWith('score_')) {
@@ -2756,7 +2780,7 @@ app.post('/exams/:id/scores', async (req, res) => {
         }
         const previousScore = created ? 0 : Math.round(parseFloat(result.previous('score')) || 0);
         const currentScore = Math.round(parseFloat(score) || 0);
-        await addPoints(studentId, currentScore - previousScore);
+        await addPoints(studentId, currentScore - previousScore, `درجة امتحان: ${exam?.name || examId}`, req.session.userId);
       }
     }
 
@@ -2876,7 +2900,14 @@ app.post('/homework/scan/save', async (req, res) => {
 
     const pointsMap = { complete: 3, incomplete: 1, no_steps: 0, not_done: -2 };
     const previousPoints = created ? 0 : (pointsMap[check.previous('status')] || 0);
-    await addPoints(student.id, (pointsMap[status] || 0) - previousPoints);
+    const pointDelta = (pointsMap[status] || 0) - previousPoints;
+    const statusLabels = {
+      complete: 'واجب كامل',
+      incomplete: 'واجب غير كامل',
+      no_steps: 'واجب بدون خطوات',
+      not_done: 'الواجب غير محلول',
+    };
+    await addPoints(student.id, pointDelta, statusLabels[status] || 'تعديل حالة الواجب', req.session.userId);
 
     res.json({ success: true, message: 'تم حفظ حالة الواجب بنجاح', student_name: student.name });
   } catch (error) {
@@ -3579,6 +3610,10 @@ app.post('/api/portal/watch-progress', verifyPortalToken('student'), async (req,
       defaults: { watched_seconds },
     });
 
+    if (created) {
+      await addPoints(studentId, 1, 'مشاهدة فيديو', null);
+    }
+
     if (!created && watched_seconds > progress.watched_seconds) {
       progress.watched_seconds = watched_seconds;
       await progress.save();
@@ -3961,7 +3996,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
   }
 });
 
-async function addPoints(studentId, amount) {
+async function addPoints(studentId, amount, reason = 'تعديل نقاط', userId = null) {
   const requestedAmount = Number(amount) || 0;
   if (requestedAmount === 0) return 0;
 
@@ -3973,6 +4008,14 @@ async function addPoints(studentId, amount) {
   const appliedAmount = nextPoints - currentPoints;
   if (appliedAmount !== 0 || Number(student.points) !== currentPoints) {
     await Student.update({ points: nextPoints }, { where: { id: studentId } });
+  }
+  if (appliedAmount !== 0) {
+    await BalanceTransaction.create({
+      StudentId: studentId,
+      amount: appliedAmount,
+      reason: `نقاط: ${reason}`,
+      UserId: userId,
+    });
   }
   return appliedAmount;
 }

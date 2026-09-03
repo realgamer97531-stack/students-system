@@ -1,0 +1,66 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="mb-1">⭐ تفاصيل نقاط الطالب</h3>
+    <p class="text-muted small mb-0"><%= student.name %> | <%= student.student_code || '-' %></p>
+  </div>
+  <a href="/admin/points" class="btn btn-outline-secondary">العودة للقائمة</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <div class="text-muted small">إجمالي النقاط</div>
+      <div class="display-6 fw-bold text-warning"><%= student.points || 0 %> <span class="fs-6">/ 100</span></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <div class="text-muted small">المادة</div>
+      <div class="fw-bold"><%= student.Subject ? student.Subject.name : '-' %></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <div class="text-muted small">السنتر</div>
+      <div class="fw-bold"><%= student.Center ? student.Center.name : '-' %></div>
+    </div>
+  </div>
+</div>
+
+<div class="card p-3">
+  <h5 class="mb-3">سجل أسباب النقاط</h5>
+  <% if (pointHistory.length === 0) { %>
+    <p class="text-muted mb-0">لا يوجد سجل أسباب محفوظ لهذا الطالب حتى الآن.</p>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>السبب</th>
+            <th class="text-center">النقاط</th>
+            <th>التاريخ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pointHistory.forEach(entry => { %>
+            <tr>
+              <td><%= entry.reason.replace(/^نقاط:\s*/, '') %></td>
+              <td class="text-center fw-bold <%= Number(entry.amount) >= 0 ? 'text-success' : 'text-danger' %>">
+                <%= Number(entry.amount) >= 0 ? '+' : '' %><%= entry.amount %>
+              </td>
+              <td class="text-muted small"><%= entry.createdAt ? new Date(entry.createdAt).toLocaleString('ar-EG') : '-' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<div class="alert alert-info mt-3 mb-0">
+  الحضور +2، الواجب الكامل +3، الواجب غير الكامل +1، الواجب غير المحلول -2، ودرجة الامتحان تضاف كنقاط.
+</div>
+
+<%- include('partials/footer') %>
