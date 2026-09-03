@@ -5938,7 +5938,7 @@ function requireFollowUp(req, res, next) {
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
 app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, center_id, subject_id } = req.query;
+    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, center_id, subject_id } = req.query;
 
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
     const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
@@ -6277,6 +6277,10 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     // تطبيق الفلاتر
     let filteredRows = [...sessionRows];
 
+    if (!show_attended) {
+      filteredRows = filteredRows.filter(row => !row.attended);
+    }
+
     if (filter_video_type && filter_video_max) {
       const maxMin = parseFloat(filter_video_max);
       filteredRows = filteredRows.filter(r => {
@@ -6295,7 +6299,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
 
     res.render('follow-up-dashboard', {
       students, sessionRows: filteredRows, sessions, selectedSession,
-      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', center_id: center_id || '', subject_id: subject_id || '' },
+      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
       absentStudents: absentStudents,
       hasFilters: !!(filter_video_type || filter_hw_status || filter_exam_max),
       centers: centersList,

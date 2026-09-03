@@ -21,7 +21,7 @@
         <% }) %>
       </select>
     </form>
-    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '' }).toString(); %>
+    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '' }).toString(); %>
     <a href="/follow-up-dashboard/export?<%= exportQuery %>" class="btn btn-success btn-sm">📥 تصدير Excel</a>
   </div>
 </div>
@@ -32,6 +32,7 @@
     <form method="GET" class="row g-2 align-items-end">
       <input type="hidden" name="session_id" value="<%= filters.session_id %>">
       <input type="hidden" name="show_all" value="<%= filters.show_all || '' %>">
+      <input type="hidden" name="show_attended" value="<%= filters.show_attended || '' %>">
       <div class="col-md-2">
         <label class="form-label small fw-bold">نوع الفيديو</label>
         <select name="filter_video_type" class="form-select form-select-sm">
@@ -83,6 +84,13 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="showAllCheckbox" <%= filters.show_all ? 'checked':'' %> >
           <label class="form-check-label small" for="showAllCheckbox">اظهار جميع الطلاب</label>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">عرض الحاضرين</label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="showAttendedCheckbox" <%= filters.show_attended ? 'checked':'' %> >
+          <label class="form-check-label small" for="showAttendedCheckbox">إظهار الحاضرين</label>
         </div>
       </div>
       <div class="col-md-2">
@@ -245,6 +253,13 @@
     if (showAllCheckbox && showAllHidden) {
       showAllCheckbox.addEventListener('change', () => {
         showAllHidden.value = showAllCheckbox.checked ? '1' : '';
+      });
+    }
+    const showAttendedCheckbox = document.getElementById('showAttendedCheckbox');
+    const showAttendedHidden = document.querySelector('form.row input[name="show_attended"]');
+    if (showAttendedCheckbox && showAttendedHidden) {
+      showAttendedCheckbox.addEventListener('change', () => {
+        showAttendedHidden.value = showAttendedCheckbox.checked ? '1' : '';
       });
     }
   });
