@@ -6596,7 +6596,11 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       include: [{ model: Session }],
     });
     const hwMap = {};
-    hwChecks.forEach(h => { if (h.Session.SubjectId === student.SubjectId) hwMap[h.Session.lesson_number] = h; });
+    hwChecks.forEach(h => {
+      if (h.Session && h.Session.SubjectId === student.SubjectId) {
+        hwMap[h.Session.lesson_number] = h;
+      }
+    });
 
     const examResults = await ExamResult.findAll({
       where: { StudentId: student.id },
@@ -6610,7 +6614,9 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       include: [Session, User],
     });
     const commentMap = {};
-    sessionComments.forEach(c => { commentMap[c.Session.lesson_number] = c; });
+    sessionComments.forEach(c => {
+      if (c.Session) commentMap[c.Session.lesson_number] = c;
+    });
 
     const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
     const watchMap = {};
