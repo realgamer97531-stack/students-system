@@ -1202,10 +1202,13 @@ app.get('/students/:id', async (req, res) => {
       if (a && a.Session && a.Session.SubjectId === student.SubjectId) {
         const key = Number(a.Session.lesson_number);
         const current = attendanceByLesson[key];
-        const isPreferred = ownSessionIds.has(a.SessionId);
-        const currentPreferred = current && current.id && ownSessionIds.has(current.id);
 
-        if (!current || (isPreferred && !currentPreferred) || (!current.id && a.SessionId)) {
+        const currentAttendance = current ? {
+          Session: current,
+          SessionId: current.id,
+        } : null;
+        const selectedAttendance = choosePreferredAttendanceRecord(currentAttendance, a, ownSessionIds);
+        if (!current || selectedAttendance === a) {
           attendanceByLesson[key] = a.Session;
           attendanceUserByLesson[key] = a.User ? a.User.name : '-';
           attendanceTimeByLesson[key] = a.attended_at;
@@ -3270,6 +3273,24 @@ function choosePreferredLessonRecord(current, candidate, ownSessionIds) {
   return current;
 }
 
+function choosePreferredAttendanceRecord(current, candidate, ownSessionIds) {
+  if (!candidate) return current;
+  if (!current) return candidate;
+
+  const getCenterName = (record) => record?.Session?.Center?.name || record?.Center?.name;
+  const isOnline = (record) => {
+    const centerName = getCenterName(record);
+    return centerName === 'أونلاين' || String(centerName || '').trim().toLowerCase() === 'online';
+  };
+
+  if (isOnline(candidate) && !isOnline(current)) return candidate;
+  if (!isOnline(current) && !isOnline(candidate)) {
+    return choosePreferredLessonRecord(current, candidate, ownSessionIds);
+  }
+
+  return current;
+}
+
 async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
   const where = { StudentId: studentId };
   if (sessionId !== null) {
@@ -3348,7 +3369,7 @@ async function buildStudentData(studentId) {
   attendanceRecords.forEach(a => {
     if (a.Session && a.Session.SubjectId === student.SubjectId) {
       const key = Number(a.Session.lesson_number);
-      attendanceByLesson[key] = choosePreferredLessonRecord(attendanceByLesson[key], a, ownSessionIds);
+      attendanceByLesson[key] = choosePreferredAttendanceRecord(attendanceByLesson[key], a, ownSessionIds);
     }
   });
 
