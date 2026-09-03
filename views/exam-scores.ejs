@@ -22,7 +22,7 @@
           <tr data-search="<%= (student.name + ' ' + student.student_code).toLowerCase() %>">
             <td><%= student.student_code %></td>
             <td><%= student.name %></td>
-            <td><%= student.Center.name %></td>
+            <td><%= student.Center ? student.Center.name : 'غير محدد' %></td>
             <td>
               <input
                 type="number"
