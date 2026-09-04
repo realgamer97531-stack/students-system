@@ -521,7 +521,16 @@ app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const user = await User.findOne({ where: { username } });
+    let user;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        user = await User.findOne({ where: { username } });
+        break;
+      } catch (error) {
+        if (attempt === 3) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
     if (!user) {
       return res.render('login', { error: 'اليوزرنيم أو الباسورد غلط' });
     }
@@ -539,7 +548,7 @@ app.post('/login', async (req, res) => {
     res.redirect('/sessions');
   } catch (error) {
     console.error(error);
-    res.render('login', { error: 'حصلت مشكلة، جرب تاني' });
+    res.render('login', { error: 'قاعدة البيانات غير متاحة مؤقتًا، حاول مرة أخرى بعد قليل' });
   }
 });
 
