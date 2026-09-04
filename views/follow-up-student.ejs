@@ -91,9 +91,16 @@
                   <% const watched = Math.floor((row.videoWatch[cat]||0)/60); %>
                   <% const total = Math.floor((row.videoWatch[`${cat}Total`]||0)/60); %>
                   <% if (total > 0) { %>
-                    <span style="font-size:0.8rem;font-weight:600;color:<%= watched/total>=0.7?'#059669':watched/total>=0.4?'#D97706':'#DC2626' %>;">
+                    <div style="font-size:0.8rem;font-weight:600;color:<%= watched/total>=0.7?'#059669':watched/total>=0.4?'#D97706':'#DC2626' %>;">
                       <%= watched %>/<%= total %>د
-                    </span>
+                    </div>
+                    <% row.videoParts.filter(part => part.category === cat).forEach(part => { %>
+                      <form action="/follow-up-dashboard/student/<%= student.id %>/video-time" method="POST" class="d-flex align-items-center gap-1 mt-1">
+                        <input type="hidden" name="video_part_id" value="<%= part.id %>">
+                        <input type="number" name="watched_seconds" class="form-control form-control-sm" style="width:78px;font-size:0.7rem;" value="<%= part.watchedSeconds %>" min="0" max="<%= part.durationSeconds %>" title="الثواني" required>
+                        <button type="submit" class="btn btn-sm" style="padding:2px 5px;background:#EEF0FB;color:#4338CA;font-size:0.7rem;" title="حفظ وقت المشاهدة">💾</button>
+                      </form>
+                    <% }) %>
                   <% } else { %><span class="text-muted small">-</span><% } %>
                 </td>
               <% }) %>

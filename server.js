@@ -6637,10 +6637,19 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       const video = videoByLesson[s.lesson_number];
 
       let videoWatch = {};
+      const videoParts = [];
       if (video && video.VideoParts) {
         video.VideoParts.forEach(p => {
           const cat = p.category;
-          videoWatch[cat] = (videoWatch[cat] || 0) + (watchMap[p.id] || 0);
+          const watchedSeconds = watchMap[p.id] || 0;
+          videoParts.push({
+            id: p.id,
+            category: cat,
+            orderIndex: p.order_index,
+            watchedSeconds,
+            durationSeconds: p.duration_seconds,
+          });
+          videoWatch[cat] = (videoWatch[cat] || 0) + watchedSeconds;
           videoWatch[`${cat}Total`] = (videoWatch[`${cat}Total`] || 0) + p.duration_seconds;
         });
       }
@@ -6655,12 +6664,49 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
         examScore: exam ? exam.score : null,
         examMax: exam ? exam.Exam?.max_score : null,
         videoWatch,
+        videoParts,
         comment: comment ? comment.comment : null,
         commentUser: comment ? comment.User?.name : null,
       };
     });
 
     res.render('follow-up-student', { student, assignment, followUpAssistant, lessonData });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/follow-up-dashboard/student/:studentId/video-time', requireFollowUp, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { video_part_id, watched_seconds } = req.body;
+    const student = await Student.findByPk(studentId);
+    const videoPartId = Number.parseInt(video_part_id, 10);
+    const watchedSeconds = Number.parseInt(watched_seconds, 10);
+
+    if (!student) return res.status(404).send('❌ الطالب غير موجود');
+    if (!Number.isInteger(videoPartId) || !Number.isInteger(watchedSeconds) || watchedSeconds < 0) {
+      return res.status(400).send('❌ وقت المشاهدة غير صحيح');
+    }
+
+    const videoPart = await VideoPart.findByPk(videoPartId);
+    const video = videoPart ? await Video.findOne({ where: { id: videoPart.VideoId, SubjectId: student.SubjectId } }) : null;
+    if (!video) return res.status(404).send('❌ جزء الفيديو غير موجود لهذا الطالب');
+    if (watchedSeconds > Number(videoPart.duration_seconds || 0)) {
+      return res.status(400).send('❌ وقت المشاهدة أكبر من مدة الفيديو');
+    }
+
+    const [progress] = await WatchProgress.findOrCreate({
+      where: { StudentId: student.id, VideoPartId: videoPart.id },
+      defaults: { watched_seconds: watchedSeconds },
+    });
+    if (progress.watched_seconds !== watchedSeconds) {
+      progress.watched_seconds = watchedSeconds;
+      await progress.save();
+    }
+
+    res.redirect(`/follow-up-dashboard/student/${student.id}`);
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
