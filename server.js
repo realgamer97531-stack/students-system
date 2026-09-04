@@ -54,7 +54,7 @@ const XLSX = require('xlsx');
 const bulkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const databaseBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const profilePhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
-const centerLedgerPath = path.join(__dirname, 'data', 'center-recharge-ledger.json');
+const centerLedgerPath = process.env.CENTER_LEDGER_PATH || path.join(__dirname, 'data', 'center-recharge-ledger.json');
 
 const VideoSession = require('./models/VideoSession');
 const VideoStudentAccess = require('./models/VideoStudentAccess');
@@ -7434,6 +7434,9 @@ app.post('/user/profile-photo', requireLogin, profilePhotoUpload.single('photo')
 });
 
 async function startServer() {
+  if (process.env.NODE_ENV === 'production' && !process.env.CENTER_LEDGER_PATH) {
+    console.warn('⚠️ CENTER_LEDGER_PATH is not configured; center accounts will be stored on the ephemeral deployment filesystem.');
+  }
   // Attempt initial DB connection; if it fails, still start the HTTP server
   try {
     await connectWithRetry(5, 5000);
