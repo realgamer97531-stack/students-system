@@ -6573,7 +6573,7 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
     });
 
     const ownSessions = await Session.findAll({
-      where: { SubjectId: student.SubjectId },
+      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
       include: [Center],
       order: [['lesson_number', 'ASC']],
     });
