@@ -15,10 +15,38 @@
         <input type="number" name="count" class="form-control" placeholder="مثال: 50" required min="1" max="500">
       </div>
       <div class="col-md-3">
+        <label class="form-label small">السنتر المستلم</label>
+        <select name="center_id" class="form-select" required>
+          <option value="">اختر السنتر</option>
+          <% centers.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
         <button type="submit" class="btn btn-primary w-100">⚡ Generate + تحميل Excel</button>
       </div>
     </form>
     <p class="text-muted small mt-2">⚠️ بمجرد الضغط على Generate، هيتم إنشاء الأكواد وتحميل ملف Excel فوراً.</p>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">إنشاء حساب سنتر</h6>
+    <form action="/admin/recharge-codes/accounts" method="POST" class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label small">السنتر</label><select name="center_id" class="form-select" required><option value="">اختر السنتر</option><% centers.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %></select></div>
+      <div class="col-md-3"><label class="form-label small">اسم المستخدم</label><input name="username" class="form-control" required></div>
+      <div class="col-md-3"><label class="form-label small">كلمة المرور</label><input name="password" type="password" class="form-control" required minlength="6"></div>
+      <div class="col-md-3"><button class="btn btn-outline-primary w-100">حفظ الحساب</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">ملخص مبيعات الأكواد حسب السنتر</h6>
+    <div class="table-responsive"><table class="table table-sm"><thead class="table-light"><tr><th>السنتر</th><th>المستلم</th><th>المستخدم</th><th>المتاح</th><th>قيمة المستخدم</th><th>الحساب</th></tr></thead><tbody>
+      <% centerStats.forEach(item => { %><tr><td><%= item.center.name %></td><td><%= item.stats.receivedCount %></td><td><%= item.stats.usedCount %></td><td><%= item.stats.availableCount %></td><td><%= item.stats.usedAmount %> ج</td><td><%= item.account ? item.account.username : 'غير منشأ' %></td></tr><% }) %>
+    </tbody></table></div>
   </div>
 </div>
 

@@ -54,9 +54,44 @@ const XLSX = require('xlsx');
 const bulkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const databaseBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const profilePhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const centerLedgerPath = path.join(__dirname, 'data', 'center-recharge-ledger.json');
 
 const VideoSession = require('./models/VideoSession');
 const VideoStudentAccess = require('./models/VideoStudentAccess');
+
+function readCenterLedger() {
+  try {
+    if (!fs.existsSync(centerLedgerPath)) {
+      fs.mkdirSync(path.dirname(centerLedgerPath), { recursive: true });
+      fs.writeFileSync(centerLedgerPath, JSON.stringify({ codes: {}, accounts: {} }, null, 2));
+    }
+    const ledger = JSON.parse(fs.readFileSync(centerLedgerPath, 'utf8'));
+    return { codes: ledger.codes || {}, accounts: ledger.accounts || {} };
+  } catch (error) {
+    console.error('Failed to read center recharge ledger:', error.message);
+    return { codes: {}, accounts: {} };
+  }
+}
+
+function writeCenterLedger(ledger) {
+  fs.mkdirSync(path.dirname(centerLedgerPath), { recursive: true });
+  const temporaryPath = `${centerLedgerPath}.tmp`;
+  fs.writeFileSync(temporaryPath, JSON.stringify(ledger, null, 2));
+  fs.renameSync(temporaryPath, centerLedgerPath);
+}
+
+function getCenterStats(ledger, centerId) {
+  const codes = Object.values(ledger.codes).filter(code => String(code.centerId) === String(centerId));
+  const usedCodes = codes.filter(code => code.used);
+  return {
+    receivedCount: codes.length,
+    usedCount: usedCodes.length,
+    availableCount: codes.length - usedCodes.length,
+    receivedAmount: codes.reduce((total, code) => total + Number(code.amount || 0), 0),
+    usedAmount: usedCodes.reduce((total, code) => total + Number(code.amount || 0), 0),
+    availableAmount: codes.filter(code => !code.used).reduce((total, code) => total + Number(code.amount || 0), 0),
+  };
+}
 
 VideoSession.belongsTo(Video, { foreignKey: 'VideoId' });
 VideoSession.belongsTo(Session, { foreignKey: 'SessionId' });
@@ -509,6 +544,98 @@ app.set('views', path.join(__dirname, 'views'));
 // صفحة تجريبية للتأكد إن السيرفر شغال
 app.get('/', (req, res) => {
   res.send('<h1>السيستم شغال تمام! 🎉</h1>');
+});
+
+app.get('/api/public/student-registration-options', async (req, res) => {
+  try {
+    const subjects = await Subject.findAll({ order: [['name', 'ASC']], attributes: ['id', 'name'] });
+    res.json({ success: true, subjects });
+  } catch (error) {
+    console.error('Failed to load public registration options:', error);
+    res.status(500).json({ success: false, message: 'تعذر تحميل المواد حاليًا.' });
+  }
+});
+
+app.post('/api/public/student-register', async (req, res) => {
+  const { name, phone, parent_phone, price_per_session, subject_id, recharge_code } = req.body;
+  try {
+    const cleanCode = String(recharge_code || '').trim().toUpperCase();
+    const phoneDigits = String(phone || '').replace(/[^0-9]/g, '');
+    const parentDigits = String(parent_phone || '').replace(/[^0-9]/g, '');
+    if (!name || phoneDigits.length !== 11 || parentDigits.length !== 11 || !subject_id || !price_per_session || !cleanCode) {
+      return res.status(400).json({ success: false, message: 'من فضلك أدخل كل البيانات بصورة صحيحة.' });
+    }
+    const ledger = readCenterLedger();
+    const ledgerCode = ledger.codes[cleanCode];
+    const rechargeCode = await RechargeCode.findOne({ where: { code: cleanCode, is_used: false } });
+    if (!rechargeCode || !ledgerCode || ledgerCode.used || !ledgerCode.centerId) {
+      return res.status(400).json({ success: false, message: 'كود الشحن غير صالح أو تم استخدامه من قبل.' });
+    }
+    const transaction = await sequelize.transaction();
+    let student;
+    try {
+      student = await Student.create({
+        name: String(name).trim(), phone: phoneDigits, parent_phone: parentDigits,
+        price_per_session: parseFloat(price_per_session), balance: Number(rechargeCode.amount),
+        CenterId: ledgerCode.centerId, SubjectId: subject_id, booklet_status: false,
+      }, { transaction });
+      const [updatedCodes] = await RechargeCode.update({ is_used: true }, { where: { id: rechargeCode.id, is_used: false }, transaction });
+      if (updatedCodes !== 1) throw new Error('Recharge code was already used');
+      await BalanceTransaction.create({ StudentId: student.id, amount: rechargeCode.amount, reason: `رصيد التسجيل بكود (${rechargeCode.code})` }, { transaction });
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+    ledgerCode.used = true;
+    ledgerCode.studentId = student.id;
+    ledgerCode.usedAt = new Date().toISOString();
+    writeCenterLedger(ledger);
+    const qrCodeImage = await QRCode.toDataURL(student.student_code);
+    res.json({ success: true, student: { name: student.name, student_code: student.student_code, balance: student.balance }, qrCodeImage, centerName: ledgerCode.centerName });
+  } catch (error) {
+    console.error('Public student registration failed:', error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة أثناء التسجيل. حاول مرة أخرى.' });
+  }
+});
+
+function verifyCenterPortalToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ success: false, message: 'غير مسجل دخول' });
+  try {
+    const decoded = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET);
+    if (decoded.type !== 'center') throw new Error('Invalid token type');
+    req.centerPortalId = decoded.centerId;
+    next();
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'انتهت صلاحية الدخول، سجل دخول مرة أخرى.' });
+  }
+}
+
+app.post('/api/public/center-login', async (req, res) => {
+  try {
+    const ledger = readCenterLedger();
+    const account = Object.values(ledger.accounts).find(item => item.username === String(req.body.username || '').trim());
+    if (!account || !(await bcrypt.compare(String(req.body.password || ''), account.passwordHash))) return res.status(401).json({ success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة.' });
+    const center = await Center.findByPk(account.centerId);
+    if (!center) return res.status(401).json({ success: false, message: 'حساب السنتر غير مرتبط بسنتر صالح.' });
+    const token = jwt.sign({ centerId: center.id, type: 'center' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, centerName: center.name });
+  } catch (error) {
+    console.error('Public center login failed:', error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر.' });
+  }
+});
+
+app.get('/api/public/center-dashboard', verifyCenterPortalToken, async (req, res) => {
+  try {
+    const ledger = readCenterLedger();
+    const center = await Center.findByPk(req.centerPortalId, { attributes: ['id', 'name'] });
+    if (!center) return res.status(404).json({ success: false, message: 'السنتر غير موجود.' });
+    res.json({ success: true, centerName: center.name, stats: getCenterStats(ledger, center.id) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'تعذر تحميل الإحصائيات.' });
+  }
 });
 
 // ===== Routes بتاعة تسجيل الدخول =====
@@ -1149,7 +1276,6 @@ app.get('/students/export', async (req, res) => {
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('طلاب جدد');
-
       sheet.columns = [
         { header: 'name', key: 'name', width: 25 },
         { header: 'phone', key: 'phone', width: 15 },
@@ -1161,10 +1287,8 @@ app.get('/students/export', async (req, res) => {
         { header: 'booklet_name', key: 'booklet_name', width: 25 },
         { header: 'booklet_paid', key: 'booklet_paid', width: 12 },
       ];
-
       sheet.addRow(['محمد أحمد', '01012345678', '01198765432', 'Math Senior 1', 'جلوري', '80', '0', 'بوكليت أول ثانوي', '0']);
       sheet.addRow(['فاطمة علي', '01023456789', '01187654321', 'Math Senior 1', 'الرياض ميامي', '80', '160', '', '']);
-
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=students_template.xlsx');
       await workbook.xlsx.write(res);
@@ -1176,32 +1300,24 @@ app.get('/students/export', async (req, res) => {
   });
 
   // عرض بروفايل طالب واحد بالتفصيل
-
 app.get('/students/:id', async (req, res) => {
   try {
     const student = await Student.findOne({
       where: { id: req.params.id },
       include: [Center, Subject],
     });
-
     if (!student) return res.status(404).send('❌ الطالب غير موجود');
-
     const centers = await Center.findAll();
     const subjects = await Subject.findAll();
-
-    // فقط حصص مجموعة الطالب بتاعته (سنتره + مادته)
     const ownSessions = await Session.findAll({
       where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
       include: [Center, Subject],
       order: [['lesson_number', 'ASC']],
     });
-
-    // كل سجلات حضور الطالب
     const attendanceRecords = await Attendance.findAll({
       where: { StudentId: student.id },
       include: [{ model: Session, include: [Center] }, User],
     });
-
     const ownSessionIds = new Set(ownSessions.map(s => s.id));
     const attendanceByLesson = {};
     const attendanceUserByLesson = {};
@@ -1211,11 +1327,7 @@ app.get('/students/:id', async (req, res) => {
       if (a && a.Session && a.Session.SubjectId === student.SubjectId) {
         const key = Number(a.Session.lesson_number);
         const current = attendanceByLesson[key];
-
-        const currentAttendance = current ? {
-          Session: current,
-          SessionId: current.id,
-        } : null;
+        const currentAttendance = current ? { Session: current, SessionId: current.id } : null;
         const selectedAttendance = choosePreferredAttendanceRecord(currentAttendance, a, ownSessionIds);
         if (!current || selectedAttendance === a) {
           attendanceByLesson[key] = a.Session;
@@ -4681,7 +4793,10 @@ if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
 app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
   try {
     const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
-    res.render('recharge-codes', { codes });
+    const centers = await Center.findAll({ order: [['name', 'ASC']] });
+    const ledger = readCenterLedger();
+    const centerStats = centers.map(center => ({ center, stats: getCenterStats(ledger, center.id), account: ledger.accounts[String(center.id)] || null }));
+    res.render('recharge-codes', { codes, centers, centerStats, ledger });
   } catch (error) {
     console.error('Failed to load recharge codes page:', error);
     res.status(500).send('حصلت مشكلة أثناء تحميل صفحة أكواد الشحن: ' + error.message);
@@ -4691,15 +4806,20 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
 // توليد أكواد جديدة
 app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   try {
-    const { amount, count } = req.body;
+    const { amount, count, center_id } = req.body;
     if (!amount || !count || count > 500) return res.status(400).send('❌ بيانات غير صحيحة');
+    const center = await Center.findByPk(center_id);
+    if (!center) return res.status(400).send('❌ اختر السنتر قبل توليد الأكواد');
+    const ledger = readCenterLedger();
 
     const generated = [];
     for (let i = 0; i < parseInt(count); i++) {
       const code = crypto.randomBytes(6).toString('hex').toUpperCase(); // كود 12 حرف
       await RechargeCode.create({ code, amount: parseFloat(amount) });
+      ledger.codes[code] = { centerId: center.id, centerName: center.name, amount: parseFloat(amount), used: false, createdAt: new Date().toISOString() };
       generated.push({ code, amount });
     }
+    writeCenterLedger(ledger);
 
     // تصدير Excel
     const workbook = new ExcelJS.Workbook();
@@ -4721,6 +4841,25 @@ app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/admin/recharge-codes/accounts', requireAdmin, async (req, res) => {
+  const { center_id, username, password } = req.body;
+  const center = await Center.findByPk(center_id);
+  if (!center || !username || !password) return res.status(400).send('❌ بيانات الحساب غير مكتملة');
+  const ledger = readCenterLedger();
+  const normalizedUsername = String(username).trim();
+  const existing = Object.values(ledger.accounts).find(account => account.username === normalizedUsername);
+  if (existing) return res.status(409).send('❌ اسم المستخدم مستخدم بالفعل');
+  ledger.accounts[String(center.id)] = {
+    centerId: center.id,
+    centerName: center.name,
+    username: normalizedUsername,
+    passwordHash: await bcrypt.hash(String(password), 10),
+    createdAt: new Date().toISOString(),
+  };
+  writeCenterLedger(ledger);
+  res.redirect('/admin/recharge-codes');
+});
+
 // API استخدام كود الشحن (من البوابة)
 app.post('/api/portal/recharge', verifyPortalToken('student'), async (req, res) => {
   try {
@@ -4740,8 +4879,14 @@ app.post('/api/portal/recharge', verifyPortalToken('student'), async (req, res) 
       reason: `شحن رصيد بكود (${rechargeCode.code})`,
     });
 
-    // مسح الكود بعد الاستخدام
-    await RechargeCode.destroy({ where: { id: rechargeCode.id } });
+    await RechargeCode.update({ is_used: true }, { where: { id: rechargeCode.id } });
+    const ledger = readCenterLedger();
+    if (ledger.codes[rechargeCode.code]) {
+      ledger.codes[rechargeCode.code].used = true;
+      ledger.codes[rechargeCode.code].studentId = student.id;
+      ledger.codes[rechargeCode.code].usedAt = new Date().toISOString();
+      writeCenterLedger(ledger);
+    }
 
     res.json({ success: true, message: `✅ تم شحن ${rechargeCode.amount} ج بنجاح!`, newBalance: student.balance });
   } catch (error) {
