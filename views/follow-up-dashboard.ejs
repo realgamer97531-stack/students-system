@@ -26,6 +26,10 @@
   </div>
 </div>
 
+<div class="mb-3">
+  <input type="search" id="studentSearch" class="form-control" placeholder="🔍 بحث باسم الطالب أو الكود...">
+</div>
+
 <!-- الفلاتر -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">
@@ -115,7 +119,7 @@
       <h6 class="mb-3">الطلاب المسندين إليك (<%= students.length %>)</h6>
       <div class="row g-2">
         <% students.forEach(s => { %>
-          <div class="col-md-3">
+          <div class="col-md-3 follow-up-search-item" data-search="<%= `${s.name} ${s.student_code}`.toLowerCase() %>">
             <div class="p-2 rounded" style="background:#EEF2FF;">
               <div class="small fw-bold"><%= s.name %></div>
               <div style="font-size:0.7rem;color:#6B7280;"><%= s.student_code %></div>
@@ -148,7 +152,7 @@
         </thead>
         <tbody>
           <% sessionRows.forEach(row => { %>
-            <tr>
+            <tr class="follow-up-search-item" data-search="<%= `${row.student.name} ${row.student.student_code}`.toLowerCase() %>">
               <td>
                 <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="fw-bold d-block"><%= row.student.name %></a>
                 <span class="text-muted" style="font-size:0.7rem;"><%= row.student.student_code %></span><br>
@@ -226,7 +230,7 @@
     <h6 class="mb-3">🔴 الغائبون (<%= absentStudents.length %>)</h6>
     <div class="row g-2">
       <% absentStudents.forEach(row => { %>
-        <div class="col-md-3">
+          <div class="col-md-3 follow-up-search-item" data-search="<%= `${row.student.name} ${row.student.student_code}`.toLowerCase() %>">
           <div class="p-2 rounded" style="background:#FEE2E2;">
             <div class="small fw-bold"><%= row.student.name %></div>
             <div style="font-size:0.7rem;color:#6B7280;"><%= row.student.student_code %></div>
@@ -261,6 +265,16 @@
     if (showAttendedCheckbox && showAttendedHidden) {
       showAttendedCheckbox.addEventListener('change', () => {
         showAttendedHidden.value = showAttendedCheckbox.checked ? '1' : '';
+      });
+    }
+
+    const studentSearch = document.getElementById('studentSearch');
+    if (studentSearch) {
+      studentSearch.addEventListener('input', () => {
+        const term = studentSearch.value.trim().toLowerCase();
+        document.querySelectorAll('.follow-up-search-item').forEach(item => {
+          item.style.display = !term || item.dataset.search.includes(term) ? '' : 'none';
+        });
       });
     }
   });
