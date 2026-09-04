@@ -549,7 +549,8 @@ app.get('/', (req, res) => {
 app.get('/api/public/student-registration-options', async (req, res) => {
   try {
     const subjects = await Subject.findAll({ order: [['name', 'ASC']], attributes: ['id', 'name'] });
-    res.json({ success: true, subjects });
+    const centers = await Center.findAll({ order: [['name', 'ASC']], attributes: ['id', 'name'] });
+    res.json({ success: true, subjects, centers });
   } catch (error) {
     console.error('Failed to load public registration options:', error);
     res.status(500).json({ success: false, message: 'تعذر تحميل المواد حاليًا.' });
@@ -557,18 +558,18 @@ app.get('/api/public/student-registration-options', async (req, res) => {
 });
 
 app.post('/api/public/student-register', async (req, res) => {
-  const { name, phone, parent_phone, price_per_session, subject_id, recharge_code } = req.body;
+  const { name, phone, parent_phone, price_per_session, subject_id, center_id, recharge_code } = req.body;
   try {
     const cleanCode = String(recharge_code || '').trim().toUpperCase();
     const phoneDigits = String(phone || '').replace(/[^0-9]/g, '');
     const parentDigits = String(parent_phone || '').replace(/[^0-9]/g, '');
-    if (!name || phoneDigits.length !== 11 || parentDigits.length !== 11 || !subject_id || !price_per_session || !cleanCode) {
+    if (!name || phoneDigits.length !== 11 || parentDigits.length !== 11 || !subject_id || !center_id || !price_per_session || !cleanCode) {
       return res.status(400).json({ success: false, message: 'من فضلك أدخل كل البيانات بصورة صحيحة.' });
     }
     const ledger = readCenterLedger();
     const ledgerCode = ledger.codes[cleanCode];
     const rechargeCode = await RechargeCode.findOne({ where: { code: cleanCode, is_used: false } });
-    if (!rechargeCode || !ledgerCode || ledgerCode.used || !ledgerCode.centerId) {
+    if (!rechargeCode || !ledgerCode || ledgerCode.used || !ledgerCode.centerId || String(ledgerCode.centerId) !== String(center_id)) {
       return res.status(400).json({ success: false, message: 'كود الشحن غير صالح أو تم استخدامه من قبل.' });
     }
     const transaction = await sequelize.transaction();
