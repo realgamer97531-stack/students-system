@@ -550,7 +550,15 @@ app.get('/api/public/student-registration-options', async (req, res) => {
   try {
     const subjects = await Subject.findAll({ order: [['name', 'ASC']], attributes: ['id', 'name'] });
     const centers = await Center.findAll({ order: [['name', 'ASC']], attributes: ['id', 'name'] });
-    res.json({ success: true, subjects, centers });
+    res.json({
+      success: true,
+      subjects: subjects.map(subject => ({
+        id: subject.id,
+        name: subject.name,
+        sessionPrice: /senior\s*1/i.test(subject.name) ? 80 : 90,
+      })),
+      centers,
+    });
   } catch (error) {
     console.error('Failed to load public registration options:', error);
     res.status(500).json({ success: false, message: 'تعذر تحميل المواد حاليًا.' });
@@ -558,27 +566,32 @@ app.get('/api/public/student-registration-options', async (req, res) => {
 });
 
 app.post('/api/public/student-register', async (req, res) => {
-  const { name, phone, parent_phone, price_per_session, subject_id, center_id, recharge_code } = req.body;
+  const { name, phone, parent_phone, subject_id, center_id, recharge_code } = req.body;
   try {
     const cleanCode = String(recharge_code || '').trim().toUpperCase();
     const phoneDigits = String(phone || '').replace(/[^0-9]/g, '');
     const parentDigits = String(parent_phone || '').replace(/[^0-9]/g, '');
-    if (!name || phoneDigits.length !== 11 || parentDigits.length !== 11 || !subject_id || !center_id || !price_per_session || !cleanCode) {
+    if (!name || phoneDigits.length !== 11 || parentDigits.length !== 11 || !subject_id || !center_id || !cleanCode) {
       return res.status(400).json({ success: false, message: 'من فضلك أدخل كل البيانات بصورة صحيحة.' });
     }
+    const subject = await Subject.findByPk(subject_id, { attributes: ['id', 'name'] });
+    const center = await Center.findByPk(center_id, { attributes: ['id', 'name'] });
+    if (!subject || !center) return res.status(400).json({ success: false, message: 'المادة أو السنتر غير صحيح.' });
+    const sessionPrice = /senior\s*1/i.test(subject.name) ? 80 : 90;
     const ledger = readCenterLedger();
     const ledgerCode = ledger.codes[cleanCode];
     const rechargeCode = await RechargeCode.findOne({ where: { code: cleanCode, is_used: false } });
-    if (!rechargeCode || !ledgerCode || ledgerCode.used || !ledgerCode.centerId || String(ledgerCode.centerId) !== String(center_id)) {
+    if (!rechargeCode || ledgerCode?.used || (ledgerCode?.centerId && String(ledgerCode.centerId) !== String(center_id))) {
       return res.status(400).json({ success: false, message: 'كود الشحن غير صالح أو تم استخدامه من قبل.' });
     }
+    const codeRecord = ledgerCode || { centerId: center.id, centerName: center.name, amount: Number(rechargeCode.amount), used: false, createdAt: new Date().toISOString() };
     const transaction = await sequelize.transaction();
     let student;
     try {
       student = await Student.create({
         name: String(name).trim(), phone: phoneDigits, parent_phone: parentDigits,
-        price_per_session: parseFloat(price_per_session), balance: Number(rechargeCode.amount),
-        CenterId: ledgerCode.centerId, SubjectId: subject_id, booklet_status: false,
+        price_per_session: sessionPrice, balance: Number(rechargeCode.amount),
+        CenterId: center.id, SubjectId: subject_id, booklet_status: false,
       }, { transaction });
       const [updatedCodes] = await RechargeCode.update({ is_used: true }, { where: { id: rechargeCode.id, is_used: false }, transaction });
       if (updatedCodes !== 1) throw new Error('Recharge code was already used');
@@ -588,12 +601,13 @@ app.post('/api/public/student-register', async (req, res) => {
       await transaction.rollback();
       throw error;
     }
-    ledgerCode.used = true;
-    ledgerCode.studentId = student.id;
-    ledgerCode.usedAt = new Date().toISOString();
+    codeRecord.used = true;
+    codeRecord.studentId = student.id;
+    codeRecord.usedAt = new Date().toISOString();
+    ledger.codes[cleanCode] = codeRecord;
     writeCenterLedger(ledger);
     const qrCodeImage = await QRCode.toDataURL(student.student_code);
-    res.json({ success: true, student: { name: student.name, student_code: student.student_code, balance: student.balance }, qrCodeImage, centerName: ledgerCode.centerName });
+    res.json({ success: true, student: { name: student.name, student_code: student.student_code, balance: student.balance }, qrCodeImage, centerName: codeRecord.centerName });
   } catch (error) {
     console.error('Public student registration failed:', error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة أثناء التسجيل. حاول مرة أخرى.' });
