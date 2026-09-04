@@ -581,7 +581,7 @@ app.post('/api/public/student-register', async (req, res) => {
     const ledger = readCenterLedger();
     const ledgerCode = ledger.codes[cleanCode];
     const rechargeCode = await RechargeCode.findOne({ where: { code: cleanCode, is_used: false } });
-    if (!rechargeCode || ledgerCode?.used || (ledgerCode?.centerId && String(ledgerCode.centerId) !== String(center_id))) {
+    if (!rechargeCode || ledgerCode?.used) {
       return res.status(400).json({ success: false, message: 'كود الشحن غير صالح أو تم استخدامه من قبل.' });
     }
     const codeRecord = ledgerCode || { centerId: center.id, centerName: center.name, amount: Number(rechargeCode.amount), used: false, createdAt: new Date().toISOString() };
@@ -611,7 +611,13 @@ app.post('/api/public/student-register', async (req, res) => {
     ledger.codes[cleanCode] = codeRecord;
     writeCenterLedger(ledger);
     const qrCodeImage = await QRCode.toDataURL(student.student_code);
-    res.json({ success: true, student: { name: student.name, student_code: student.student_code, balance: student.balance }, qrCodeImage, centerName: codeRecord.centerName });
+    res.json({
+      success: true,
+      student: { name: student.name, student_code: student.student_code, balance: student.balance },
+      qrCodeImage,
+      attendanceCenterName: center.name,
+      distributionCenterName: codeRecord.centerName,
+    });
   } catch (error) {
     console.error('Public student registration failed:', error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة أثناء التسجيل. حاول مرة أخرى.' });
