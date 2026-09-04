@@ -202,7 +202,7 @@
                 <% } else { %><span class="text-muted small">-</span><% } %>
               </td>
               <td style="min-width:160px;">
-                <form action="/follow-up-dashboard/comment" method="POST" class="d-flex gap-1">
+                <form action="/follow-up-dashboard/comment" method="POST" class="d-flex gap-1 follow-up-comment-form">
                   <input type="hidden" name="student_id" value="<%= row.student.id %>">
                   <input type="hidden" name="session_id" value="<%= selectedSession.id %>">
                   <input type="hidden" name="redirect_to" value="/follow-up-dashboard?session_id=<%= selectedSession.id %>">
@@ -267,6 +267,36 @@
         showAttendedHidden.value = showAttendedCheckbox.checked ? '1' : '';
       });
     }
+
+    document.querySelectorAll('.follow-up-comment-form').forEach(form => {
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = form.querySelector('button[type="submit"]');
+        const originalText = button ? button.textContent : '';
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'جارٍ الحفظ...';
+        }
+        try {
+          const response = await fetch(form.action, {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+            body: new FormData(form),
+          });
+          const result = await response.json();
+          if (!response.ok || !result.success) throw new Error(result.message || 'تعذر حفظ الكومنت');
+          if (button) {
+            button.textContent = 'تم الحفظ';
+            setTimeout(() => { button.textContent = originalText; }, 1200);
+          }
+        } catch (error) {
+          if (button) button.textContent = 'فشل الحفظ';
+          setTimeout(() => { if (button) button.textContent = originalText; }, 1600);
+        } finally {
+          if (button) button.disabled = false;
+        }
+      });
+    });
 
     const studentSearch = document.getElementById('studentSearch');
     if (studentSearch) {

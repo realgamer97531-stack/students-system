@@ -6905,6 +6905,9 @@ app.post('/follow-up-dashboard/comment', requireFollowUp, async (req, res) => {
       sc.UserId = req.session.userId;
       await sc.save();
     }
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json({ success: true, comment: sc.comment });
+    }
     res.redirect(redirect_to || '/follow-up-dashboard');
   } catch (e) {
     console.error(e);
