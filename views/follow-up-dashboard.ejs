@@ -36,10 +36,7 @@
       <div class="col-md-2">
         <label class="form-label small fw-bold">نوع الفيديو</label>
         <select name="filter_video_type" class="form-select form-select-sm">
-          <option value="">-- اختر --</option>
           <option value="explanation" <%= filters.filter_video_type==='explanation'?'selected':'' %>>شرح</option>
-          <option value="questions" <%= filters.filter_video_type==='questions'?'selected':'' %>>أسئلة</option>
-          <option value="homework_solution" <%= filters.filter_video_type==='homework_solution'?'selected':'' %>>حل واجب</option>
         </select>
       </div>
       <div class="col-md-2">

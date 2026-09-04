@@ -6151,7 +6151,7 @@ function requireFollowUp(req, res, next) {
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
 app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, center_id, subject_id } = req.query;
 
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
     const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
@@ -6345,7 +6345,7 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
 
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, center_id, subject_id } = req.query;
 
     // load centers & subjects for filters
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
