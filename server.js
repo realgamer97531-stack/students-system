@@ -598,7 +598,11 @@ app.post('/api/public/student-register', async (req, res) => {
       await BalanceTransaction.create({ StudentId: student.id, amount: rechargeCode.amount, reason: `رصيد التسجيل بكود (${rechargeCode.code})` }, { transaction });
       await transaction.commit();
     } catch (error) {
-      await transaction.rollback();
+      try {
+        if (!transaction.finished) await transaction.rollback();
+      } catch (rollbackError) {
+        console.error('Registration transaction rollback failed:', rollbackError.message);
+      }
       throw error;
     }
     codeRecord.used = true;

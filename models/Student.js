@@ -60,10 +60,10 @@ const Student = sequelize.define('Student', {
   tableName: 'students',
   hooks: {
     // بعد إنشاء الطالب مباشرة، نولّد له كود تلقائي بناءً على الـ id بتاعه
-    afterCreate: async (student) => {
+    afterCreate: async (student, options) => {
       const code = `STU-${String(student.id).padStart(5, '0')}`; // مثال: STU-00001
       student.student_code = code;
-      await student.save();
+      await student.save({ transaction: options.transaction });
     },
   },
 });
