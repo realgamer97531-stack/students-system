@@ -280,8 +280,11 @@
         try {
           const response = await fetch(form.action, {
             method: 'POST',
-            headers: { Accept: 'application/json' },
-            body: new FormData(form),
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(Object.fromEntries(new FormData(form))),
           });
           const result = await response.json();
           if (!response.ok || !result.success) throw new Error(result.message || 'تعذر حفظ الكومنت');

@@ -6895,7 +6895,10 @@ app.post('/follow-up-dashboard/student/:studentId/video-time', requireFollowUp, 
 // ===== إضافة/تعديل كومنت الحصة =====
 app.post('/follow-up-dashboard/comment', requireFollowUp, async (req, res) => {
   try {
-    const { student_id, session_id, comment, redirect_to } = req.body;
+    const { student_id, session_id, comment, redirect_to } = req.body || {};
+    if (!student_id || !session_id) {
+      return res.status(400).json({ success: false, message: 'بيانات الكومنت غير مكتملة.' });
+    }
     const [sc] = await SessionComment.findOrCreate({
       where: { StudentId: student_id, SessionId: session_id },
       defaults: { UserId: req.session.userId, comment },
