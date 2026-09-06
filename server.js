@@ -627,14 +627,28 @@ app.post('/api/public/student-register', async (req, res) => {
   const { name, phone, parent_phone, subject_id, center_id, recharge_code } = req.body;
   try {
     const cleanCode = String(recharge_code || '').trim().toUpperCase();
+    const studentName = String(name || '').trim();
     const phoneDigits = String(phone || '').replace(/[^0-9]/g, '');
     const parentDigits = String(parent_phone || '').replace(/[^0-9]/g, '');
-    if (!name || phoneDigits.length !== 11 || parentDigits.length !== 11 || !subject_id || !center_id || !cleanCode) {
+    if (!studentName || phoneDigits.length !== 11 || parentDigits.length !== 11 || !subject_id || !center_id || !cleanCode) {
       return res.status(400).json({ success: false, message: 'من فضلك أدخل كل البيانات بصورة صحيحة.' });
     }
     const subject = await Subject.findByPk(subject_id, { attributes: ['id', 'name'] });
     const center = await Center.findByPk(center_id, { attributes: ['id', 'name'] });
     if (!subject || !center) return res.status(400).json({ success: false, message: 'المادة أو السنتر غير صحيح.' });
+    const existingStudent = await Student.findOne({
+      where: {
+        name: studentName,
+        phone: phoneDigits,
+        parent_phone: parentDigits,
+        SubjectId: subject.id,
+        CenterId: center.id,
+      },
+      attributes: ['id'],
+    });
+    if (existingStudent) {
+      return res.status(409).json({ success: false, message: 'يوجد طالب مسجل بالفعل بنفس البيانات.' });
+    }
     const sessionPrice = /senior\s*1/i.test(subject.name) ? 80 : 90;
     const rechargeCode = await RechargeCode.findOne({ where: { code: cleanCode, is_used: false } });
     if (!rechargeCode) {
@@ -647,7 +661,7 @@ app.post('/api/public/student-register', async (req, res) => {
     let student;
     try {
       student = await Student.create({
-        name: String(name).trim(), phone: phoneDigits, parent_phone: parentDigits,
+        name: studentName, phone: phoneDigits, parent_phone: parentDigits,
         price_per_session: sessionPrice, balance: Number(rechargeCode.amount),
         CenterId: center.id, SubjectId: subject_id, booklet_status: false,
       }, { transaction });
