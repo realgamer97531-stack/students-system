@@ -4890,7 +4890,11 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
       stats: await getRechargeCenterStats(center.id),
       account: await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id } }),
     })));
-    res.render('recharge-codes', { codes, centers, accountCenters, centerStats });
+    const codesByCenter = centers
+      .map(center => ({ center, codes: codes.filter(code => String(code.recharge_center_id) === String(center.id)) }))
+      .filter(group => group.codes.length > 0);
+    const unassignedCodes = codes.filter(code => !code.recharge_center_id);
+    res.render('recharge-codes', { codes, centers, accountCenters, centerStats, codesByCenter, unassignedCodes });
   } catch (error) {
     console.error('Failed to load recharge codes page:', error);
     res.status(500).send('حصلت مشكلة أثناء تحميل صفحة أكواد الشحن: ' + error.message);
