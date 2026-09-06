@@ -2020,9 +2020,10 @@ app.get('/sessions/:id/report', async (req, res) => {
     });
 
     // Filter for only those who attended online (not at this center)
+    const attendedStudentIds = new Set(attendances.map(attendance => attendance.StudentId));
     const onlineOnlyAttendances = onlineAttendances.filter(a => 
       a.Session.Center.name === 'أونلاين' && 
-      !attendances.some(ca => ca.StudentId === a.StudentId)
+      !attendedStudentIds.has(a.StudentId)
     );
 
     const homeworkRecords = await HomeworkCheck.findAll({
@@ -2144,11 +2145,12 @@ app.get('/sessions/:id/report', async (req, res) => {
       onlineAttendees = groupStudents.filter(s => onlineAttendeeIds.has(s.id) && !ownCenterStudentIds.has(s.id));
     }
 
-    const subject = await Subject.findByPk(session.SubjectId);
+    const subject = session.Subject;
     let normalCount = 0, reducedCount = 0, freeCount = 0, totalRevenue = 0;
 
     for (const a of attendances) {
-      const st = await Student.findByPk(a.StudentId);
+      const st = a.Student;
+      if (!st) continue;
       totalRevenue += st.price_per_session;
       if (st.price_per_session === 0) freeCount++;
       else if (st.price_per_session >= subject.default_price) normalCount++;
