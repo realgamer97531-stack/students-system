@@ -12,6 +12,11 @@
   <a href="/sessions/<%= session.id %>/report/export-absent" class="btn btn-outline-danger">
     📥 تصدير الغايبين
   </a>
+  <% if (callCenterIntegrationEnabled) { %>
+    <button type="button" class="btn btn-outline-success js-callcenter-report" data-url="/sessions/<%= session.id %>/report/send-present">☎️ إرسال الحاضرين للاتصال</button>
+    <button type="button" class="btn btn-outline-danger js-callcenter-report" data-url="/sessions/<%= session.id %>/report/send-absent">☎️ إرسال الغايبين للاتصال</button>
+    <span id="callcenterReportStatus" class="small text-muted"></span>
+  <% } %>
 </div>
 
 <% if (userRole === 'admin') { %>
@@ -397,6 +402,26 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.js-callcenter-report').forEach(button => {
+      button.addEventListener('click', async () => {
+        const status = document.getElementById('callcenterReportStatus');
+        const originalText = button.textContent;
+        button.disabled = true;
+        if (status) status.textContent = ' جاري الإرسال...';
+        try {
+          const response = await fetch(button.dataset.url, { method: 'POST', headers: { Accept: 'application/json' } });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'تعذر الإرسال');
+          if (status) status.textContent = ` تم إنشاء جلسة اتصال رقم ${result.sessionId} (${result.imported} طالب)`;
+        } catch (error) {
+          if (status) status.textContent = ` فشل الإرسال: ${error.message}`;
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      });
+    });
+
     const searchInput = document.getElementById('attendedStudentSearch');
     const table = document.getElementById('attendedStudentsTable');
     if (!searchInput || !table) return;

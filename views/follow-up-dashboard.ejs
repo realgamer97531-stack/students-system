@@ -23,8 +23,30 @@
     </form>
     <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', show_only_attended: filters.show_only_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '' }).toString(); %>
     <a href="/follow-up-dashboard/export?<%= exportQuery %>" class="btn btn-success btn-sm">📥 تصدير Excel</a>
+    <% if (callCenterIntegrationEnabled && selectedSession && sessionRows.length > 0) { %>
+      <button type="button" id="sendFollowUpToCallcenter" class="btn btn-outline-primary btn-sm">☎️ إرسال الظاهرين للاتصال</button>
+      <span id="followUpCallcenterStatus" class="small text-muted"></span>
+    <% } %>
   </div>
 </div>
+
+<% if (callCenterIntegrationEnabled && selectedSession) { %>
+  <script type="application/json" id="followUpCallcenterConfig"><%- JSON.stringify({
+    token: followUpSelectionToken,
+    filters: {
+      filter_video_type: filters.filter_video_type || '',
+      filter_video_max: filters.filter_video_max || '',
+      filter_hw_status: filters.filter_hw_status || '',
+      filter_exam_max: filters.filter_exam_max || '',
+      session_id: filters.session_id || selectedSession.id,
+      show_all: filters.show_all || '',
+      show_attended: filters.show_attended || '',
+      show_only_attended: filters.show_only_attended || '',
+      center_id: filters.center_id || '',
+      subject_id: filters.subject_id || ''
+    }
+  }).replace(/</g, '\\u003c') %></script>
+<% } %>
 
 <div class="mb-3">
   <input type="search" id="studentSearch" class="form-control" placeholder="🔍 بحث باسم الطالب أو الكود...">
@@ -161,7 +183,7 @@
         </thead>
         <tbody>
           <% sessionRows.forEach((row, index) => { %>
-            <tr class="follow-up-search-item" data-search="<%= `${row.student.name} ${row.student.student_code}`.toLowerCase() %>">
+            <tr class="follow-up-search-item" data-student-id="<%= row.student.id %>" data-search="<%= `${row.student.name} ${row.student.student_code}`.toLowerCase() %>">
               <td><%= index + 1 %></td>
               <td>
                 <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="fw-bold d-block"><%= row.student.name %></a>
@@ -325,6 +347,46 @@
         document.querySelectorAll('.follow-up-search-item').forEach(item => {
           item.style.display = !term || item.dataset.search.includes(term) ? '' : 'none';
         });
+      });
+    }
+
+    const callcenterButton = document.getElementById('sendFollowUpToCallcenter');
+    const callcenterStatus = document.getElementById('followUpCallcenterStatus');
+    const callcenterConfigElement = document.getElementById('followUpCallcenterConfig');
+    if (callcenterButton && callcenterConfigElement) {
+      const callcenterConfig = JSON.parse(callcenterConfigElement.textContent);
+      callcenterButton.addEventListener('click', async () => {
+        const items = Array.from(document.querySelectorAll('.follow-up-search-item[data-student-id]'));
+        const availableStudentIds = items.map(item => item.dataset.studentId);
+        const studentIds = items
+          .filter(item => item.style.display !== 'none')
+          .map(item => item.dataset.studentId);
+        if (!studentIds.length) {
+          if (callcenterStatus) callcenterStatus.textContent = ' لا يوجد طلاب ظاهرون للإرسال';
+          return;
+        }
+
+        callcenterButton.disabled = true;
+        if (callcenterStatus) callcenterStatus.textContent = ' جاري الإرسال...';
+        try {
+          const response = await fetch('/follow-up-dashboard/send-to-callcenter', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              student_ids: studentIds,
+              available_student_ids: availableStudentIds,
+              selection_token: callcenterConfig.token,
+              filters: { ...callcenterConfig.filters, search: studentSearch?.value.trim() || '' },
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'تعذر الإرسال');
+          if (callcenterStatus) callcenterStatus.textContent = ` تم إنشاء جلسة اتصال رقم ${result.sessionId} (${result.imported} طالب)`;
+        } catch (error) {
+          if (callcenterStatus) callcenterStatus.textContent = ` فشل الإرسال: ${error.message}`;
+        } finally {
+          callcenterButton.disabled = false;
+        }
       });
     }
   });

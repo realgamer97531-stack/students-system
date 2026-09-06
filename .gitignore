@@ -5,3 +5,4 @@ backups/
 public/*
 !public/register.html
 !public/center.html
+callcenter-system/

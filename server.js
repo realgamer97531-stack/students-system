@@ -95,6 +95,74 @@ function getCenterStats(ledger, centerId) {
   };
 }
 
+function isCallCenterIntegrationEnabled() {
+  return process.env.CALLCENTER_INTEGRATION_ENABLED === 'true'
+    && process.env.CALLCENTER_INTERNAL_URL
+    && process.env.CALLCENTER_SERVICE_TOKEN;
+}
+
+function buildCallCenterSessionName({ session, scope, filters = {} }) {
+  const details = [
+    `Session ${session.id}`,
+    `Relative ${session.lesson_number || '-'}`,
+    session.Subject?.name || 'Subject -',
+    session.Center?.name === 'أونلاين' ? 'Online' : `Center: ${session.Center?.name || '-'}`,
+  ];
+  if (scope) details.push(`Type: ${scope}`);
+
+  const activeFilters = Object.entries(filters)
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+    .map(([key, value]) => `${key}=${String(value).trim()}`);
+  if (activeFilters.length) details.push(`Filters: ${activeFilters.join('; ')}`);
+  return details.join(' | ').slice(0, 255);
+}
+
+function createFollowUpSelectionToken(studentIds, filters) {
+  const secret = process.env.CALLCENTER_SERVICE_TOKEN;
+  if (!secret) return '';
+  const payload = JSON.stringify({ studentIds: [...new Set(studentIds.map(String))].sort(), filters });
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
+}
+
+function isValidFollowUpSelectionToken(studentIds, filters, token) {
+  const expected = createFollowUpSelectionToken(studentIds, filters);
+  return Boolean(token && expected && token.length === expected.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected)));
+}
+
+async function sendStudentsToCallCenter(name, students) {
+  if (!isCallCenterIntegrationEnabled()) {
+    const error = new Error('Call-center integration is not enabled');
+    error.code = 'CALLCENTER_DISABLED';
+    throw error;
+  }
+  const response = await fetch(process.env.CALLCENTER_INTERNAL_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Callcenter-Service-Token': process.env.CALLCENTER_SERVICE_TOKEN,
+    },
+    body: JSON.stringify({ name, students }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(result.error || `Call-center returned ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return result;
+}
+
+function callCenterStudent(student) {
+  return {
+    student_id: student.student_code || student.id,
+    name: student.name,
+    phone: student.phone,
+    parent_phone: student.parent_phone,
+    center: student.Center?.name,
+    subject: student.Subject?.name,
+  };
+}
+
 async function getOrCreateRechargeCenter(name) {
   const cleanName = String(name || '').trim();
   if (!cleanName) return null;
@@ -2103,12 +2171,82 @@ app.get('/sessions/:id/report', async (req, res) => {
       totalCashCollected,
       assistantAttendances,
       allUsers,
+      callCenterIntegrationEnabled: isCallCenterIntegrationEnabled(),
     });
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
   }
 });
+
+async function getSessionReportCallStudents(session, scope) {
+  if (scope === 'present') {
+    const attendances = await Attendance.findAll({
+      where: { SessionId: session.id },
+      include: [Student],
+    });
+    const onlineAttendances = await Attendance.findAll({
+      include: [{
+        model: Student,
+        where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
+      }, {
+        model: Session,
+        where: { lesson_number: session.lesson_number, SubjectId: session.SubjectId },
+        include: [Center],
+      }],
+    });
+    const students = attendances.map(attendance => attendance.Student);
+    onlineAttendances.forEach(attendance => {
+      if (attendance.Session?.Center?.name === 'أونلاين'
+        && !students.some(student => student.id === attendance.StudentId)) {
+        students.push(attendance.Student);
+      }
+    });
+    return students.filter(Boolean);
+  }
+
+  const groupStudents = await Student.findAll({
+    where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
+  });
+  const attendedAnywhere = await Attendance.findAll({
+    include: [{
+      model: Session,
+      where: { lesson_number: session.lesson_number, SubjectId: session.SubjectId },
+    }],
+  });
+  const ownCenterStudentIds = new Set(
+    attendedAnywhere
+      .filter(attendance => attendance.Session?.CenterId === session.CenterId)
+      .map(attendance => attendance.StudentId)
+  );
+  return groupStudents.filter(student => !ownCenterStudentIds.has(student.id));
+}
+
+async function handleSessionReportCallExport(req, res, scope) {
+  try {
+    const session = await Session.findOne({
+      where: { id: req.params.id },
+      include: [Center, Subject],
+    });
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (session.status === 'cancelled') return res.status(400).json({ error: 'Cancelled sessions cannot be sent' });
+
+    const students = await getSessionReportCallStudents(session, scope);
+    if (!students.length) return res.status(400).json({ error: `No ${scope} students found` });
+
+    const result = await sendStudentsToCallCenter(
+      buildCallCenterSessionName({ session, scope: scope === 'present' ? 'Present' : 'Absent' }),
+      students.map(callCenterStudent)
+    );
+    res.json({ success: true, sessionId: result.id, imported: result.imported });
+  } catch (error) {
+    console.error('Session report call-center handoff failed:', error);
+    res.status(error.code === 'CALLCENTER_DISABLED' ? 503 : (error.status || 500)).json({ error: error.message });
+  }
+}
+
+app.post('/sessions/:id/report/send-present', (req, res) => handleSessionReportCallExport(req, res, 'present'));
+app.post('/sessions/:id/report/send-absent', (req, res) => handleSessionReportCallExport(req, res, 'absent'));
 
 // تصدير الحاضرين في حصة معينة إلى إكسيل
 app.get('/sessions/:id/report/export-attendance', async (req, res) => {
@@ -6606,6 +6744,54 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
   }
 });
 
+app.post('/follow-up-dashboard/send-to-callcenter', requireFollowUp, async (req, res) => {
+  try {
+    const studentIds = Array.isArray(req.body?.student_ids)
+      ? [...new Set(req.body.student_ids.map(String).filter(Boolean))]
+      : [];
+    const availableStudentIds = Array.isArray(req.body?.available_student_ids)
+      ? [...new Set(req.body.available_student_ids.map(String).filter(Boolean))]
+      : [];
+    const filters = req.body?.filters && typeof req.body.filters === 'object' ? req.body.filters : {};
+    const signedFilters = { ...filters };
+    delete signedFilters.search;
+    if (!studentIds.length) return res.status(400).json({ error: 'No visible students selected' });
+    if (!availableStudentIds.length || !isValidFollowUpSelectionToken(availableStudentIds, signedFilters, req.body.selection_token)) {
+      return res.status(400).json({ error: 'The displayed student list is outdated. Refresh the page and try again.' });
+    }
+    if (studentIds.some(studentId => !availableStudentIds.includes(studentId))) {
+      return res.status(400).json({ error: 'Selected students are not part of the displayed list' });
+    }
+
+    const selectedSession = await Session.findOne({
+      where: { id: filters.session_id },
+      include: [Center, Subject],
+    });
+    if (!selectedSession) return res.status(400).json({ error: 'A session is required' });
+
+    const students = await Student.findAll({
+      where: {
+        id: studentIds,
+        CenterId: selectedSession.CenterId,
+        SubjectId: selectedSession.SubjectId,
+      },
+      include: [Center, Subject],
+    });
+    if (students.length !== studentIds.length) {
+      return res.status(403).json({ error: 'One or more students are not available in this dashboard scope' });
+    }
+
+    const result = await sendStudentsToCallCenter(
+      buildCallCenterSessionName({ session: selectedSession, scope: 'Follow-up', filters }),
+      students.map(callCenterStudent)
+    );
+    res.json({ success: true, sessionId: result.id, imported: result.imported });
+  } catch (error) {
+    console.error('Follow-up call-center handoff failed:', error);
+    res.status(error.code === 'CALLCENTER_DISABLED' ? 503 : (error.status || 500)).json({ error: error.message });
+  }
+});
+
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
     const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
@@ -6668,6 +6854,8 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
         centers: centersList,
         subjects: subjectsList,
         hasFilters: false,
+        callCenterIntegrationEnabled: isCallCenterIntegrationEnabled(),
+        followUpSelectionToken: createFollowUpSelectionToken([], { session_id }),
       });
     }
 
@@ -6681,6 +6869,8 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
         centers: centersList,
         subjects: subjectsList,
         hasFilters: false,
+        callCenterIntegrationEnabled: isCallCenterIntegrationEnabled(),
+        followUpSelectionToken: createFollowUpSelectionToken([], { session_id }),
       });
     }
 
@@ -6806,6 +6996,11 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       hasFilters: !!(show_attended || show_only_attended || filter_video_type || filter_hw_status || filter_exam_max),
       centers: centersList,
       subjects: subjectsList,
+      callCenterIntegrationEnabled: isCallCenterIntegrationEnabled(),
+      followUpSelectionToken: createFollowUpSelectionToken(
+        filteredRows.map(row => row.student.id),
+        { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id: session_id || selectedSession.id, show_all, show_attended, show_only_attended, center_id, subject_id }
+      ),
     });
   } catch (e) {
     console.error(e);
