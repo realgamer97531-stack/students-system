@@ -6330,7 +6330,7 @@ function requireFollowUp(req, res, next) {
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
 app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
 
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
     const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
@@ -6459,7 +6459,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
         sessionComment: sessionComment ? sessionComment.comment : null,
       };
 
-      if (!show_attended && row.attended) continue;
+      if (!show_attended && !show_only_attended && row.attended) continue;
+      if (show_only_attended && !row.attended) continue;
 
       if (filter_video_type && filter_video_max) {
         const maxMin = parseFloat(filter_video_max);
@@ -6530,7 +6531,7 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
 
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
 
     // load centers & subjects for filters
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
@@ -6585,7 +6586,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     if (students.length === 0) {
       return res.render('follow-up-dashboard', {
         students: [], sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
         absentStudents: [],
         centers: centersList,
         subjects: subjectsList,
@@ -6598,7 +6599,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     if (!selectedSession) {
       return res.render('follow-up-dashboard', {
         students, sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
         absentStudents: [],
         centers: centersList,
         subjects: subjectsList,
@@ -6697,8 +6698,12 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     // تطبيق الفلاتر
     let filteredRows = [...sessionRows];
 
-    if (!show_attended) {
+    if (!show_attended && !show_only_attended) {
       filteredRows = filteredRows.filter(row => !row.attended);
+    }
+
+    if (show_only_attended) {
+      filteredRows = filteredRows.filter(row => row.attended);
     }
 
     if (filter_video_type && filter_video_max) {
@@ -6719,9 +6724,9 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
 
     res.render('follow-up-dashboard', {
       students, sessionRows: filteredRows, sessions, selectedSession,
-      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
       absentStudents: absentStudents,
-      hasFilters: !!(show_attended || filter_video_type || filter_hw_status || filter_exam_max),
+      hasFilters: !!(show_attended || show_only_attended || filter_video_type || filter_hw_status || filter_exam_max),
       centers: centersList,
       subjects: subjectsList,
     });
