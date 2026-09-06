@@ -16,10 +16,7 @@
       </div>
       <div class="col-md-3">
         <label class="form-label small">سنتر توزيع الأكواد</label>
-        <select name="center_id" class="form-select" required>
-          <option value="">اختر السنتر</option>
-          <% centers.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %>
-        </select>
+        <input name="center_name" class="form-control" placeholder="اكتب اسم سنتر التوزيع" required maxlength="150">
       </div>
       <div class="col-md-3">
         <button type="submit" class="btn btn-primary w-100">⚡ Generate + تحميل Excel</button>
@@ -33,7 +30,7 @@
   <div class="card-body">
     <h6 class="mb-3">إنشاء حساب سنتر</h6>
     <form action="/admin/recharge-codes/accounts" method="POST" class="row g-2 align-items-end">
-      <div class="col-md-3"><label class="form-label small">السنتر</label><select name="center_id" class="form-select" required><option value="">اختر السنتر</option><% centers.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %></select></div>
+      <div class="col-md-3"><label class="form-label small">اسم السنتر الخارجي</label><input name="center_name" class="form-control" placeholder="اكتب اسم السنتر" required maxlength="150"></div>
       <div class="col-md-3"><label class="form-label small">اسم المستخدم</label><input name="username" class="form-control" required></div>
       <div class="col-md-3"><label class="form-label small">كلمة المرور</label><input name="password" type="password" class="form-control" required minlength="6"></div>
       <div class="col-md-3"><button class="btn btn-outline-primary w-100">حفظ الحساب</button></div>
@@ -56,14 +53,15 @@
     <div class="table-responsive">
       <table class="table table-sm">
         <thead class="table-light">
-          <tr><th>الكود</th><th>القيمة</th><th>الحالة</th><th>تاريخ الإنشاء</th></tr>
+          <tr><th>الكود</th><th>القيمة</th><th>الحالة</th><th>سنتر التوزيع الخارجي</th><th>تاريخ الإنشاء</th></tr>
         </thead>
         <tbody>
           <% codes.forEach(c => { %>
             <tr>
-              <td><code><%= c.code %></code></td>
+                      <td><code><%= c.code %></code></td>
               <td><%= c.amount %> ج</td>
               <td><span class="badge <%= c.is_used ? 'bg-secondary' : 'bg-success' %>"><%= c.is_used ? 'مستخدم' : 'متاح' %></span></td>
+                      <td><%= centers.find(center => center.id === c.recharge_center_id)?.name || '-' %></td>
               <td class="small text-muted"><%= new Date(c.createdAt).toLocaleString('ar-EG') %></td>
             </tr>
           <% }) %>

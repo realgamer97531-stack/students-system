@@ -16,6 +16,8 @@ const { exec, execFile } = require('child_process');
 const { promisify } = require('util');
 const compression = require('compression');
 const RechargeCode = require('./models/RechargeCode');
+const RechargeCenter = require('./models/RechargeCenter');
+const RechargeCenterAccount = require('./models/RechargeCenterAccount');
 const crypto = require('crypto');
 const execFileAsync = promisify(execFile);
 
@@ -91,6 +93,45 @@ function getCenterStats(ledger, centerId) {
     usedAmount: usedCodes.reduce((total, code) => total + Number(code.amount || 0), 0),
     availableAmount: codes.filter(code => !code.used).reduce((total, code) => total + Number(code.amount || 0), 0),
   };
+}
+
+async function getOrCreateRechargeCenter(name) {
+  const cleanName = String(name || '').trim();
+  if (!cleanName) return null;
+  const [center] = await RechargeCenter.findOrCreate({
+    where: { name: cleanName },
+    defaults: { name: cleanName },
+  });
+  return center;
+}
+
+async function getRechargeCenterStats(centerId) {
+  const codes = await RechargeCode.findAll({ where: { recharge_center_id: centerId } });
+  const usedCodes = codes.filter(code => code.is_used);
+  return {
+    receivedCount: codes.length,
+    usedCount: usedCodes.length,
+    availableCount: codes.length - usedCodes.length,
+    receivedAmount: codes.reduce((total, code) => total + Number(code.amount || 0), 0),
+    usedAmount: usedCodes.reduce((total, code) => total + Number(code.amount || 0), 0),
+    availableAmount: codes.filter(code => !code.is_used).reduce((total, code) => total + Number(code.amount || 0), 0),
+  };
+}
+
+async function migrateRechargeLedgerToDatabase() {
+  const ledger = readCenterLedger();
+  for (const [codeValue, record] of Object.entries(ledger.codes)) {
+    if (!record.centerName) continue;
+    const center = await getOrCreateRechargeCenter(record.centerName);
+    const code = await RechargeCode.findOne({ where: { code: codeValue } });
+    if (code && !code.recharge_center_id) await code.update({ recharge_center_id: center.id, is_used: Boolean(record.used) });
+  }
+  for (const account of Object.values(ledger.accounts)) {
+    if (!account.centerName || !account.username || !account.passwordHash) continue;
+    const center = await getOrCreateRechargeCenter(account.centerName);
+    const existing = await RechargeCenterAccount.findOne({ where: { username: account.username } });
+    if (!existing) await RechargeCenterAccount.create({ username: account.username, password_hash: account.passwordHash, recharge_center_id: center.id });
+  }
 }
 
 VideoSession.belongsTo(Video, { foreignKey: 'VideoId' });
@@ -342,6 +383,23 @@ async function ensureUserProfilePhotoColumn() {
   }
 }
 
+async function ensureRechargeCodeCenterColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('RechargeCodes');
+    if (!tableInfo.recharge_center_id) {
+      await queryInterface.addColumn('RechargeCodes', 'recharge_center_id', {
+        type: sequelize.Sequelize.INTEGER,
+        allowNull: true,
+      });
+      console.log('Added recharge_center_id column to RechargeCodes table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) return;
+    console.error('Failed to ensure RechargeCodes.recharge_center_id column:', error.message);
+  }
+}
+
 async function connectWithRetry(maxAttempts = 5, delayMs = 5000) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -578,13 +636,13 @@ app.post('/api/public/student-register', async (req, res) => {
     const center = await Center.findByPk(center_id, { attributes: ['id', 'name'] });
     if (!subject || !center) return res.status(400).json({ success: false, message: 'المادة أو السنتر غير صحيح.' });
     const sessionPrice = /senior\s*1/i.test(subject.name) ? 80 : 90;
-    const ledger = readCenterLedger();
-    const ledgerCode = ledger.codes[cleanCode];
     const rechargeCode = await RechargeCode.findOne({ where: { code: cleanCode, is_used: false } });
-    if (!rechargeCode || ledgerCode?.used) {
+    if (!rechargeCode) {
       return res.status(400).json({ success: false, message: 'كود الشحن غير صالح أو تم استخدامه من قبل.' });
     }
-    const codeRecord = ledgerCode || { centerId: center.id, centerName: center.name, amount: Number(rechargeCode.amount), used: false, createdAt: new Date().toISOString() };
+    const rechargeCenter = rechargeCode.recharge_center_id
+      ? await RechargeCenter.findByPk(rechargeCode.recharge_center_id, { attributes: ['name'] })
+      : null;
     const transaction = await sequelize.transaction();
     let student;
     try {
@@ -605,18 +663,13 @@ app.post('/api/public/student-register', async (req, res) => {
       }
       throw error;
     }
-    codeRecord.used = true;
-    codeRecord.studentId = student.id;
-    codeRecord.usedAt = new Date().toISOString();
-    ledger.codes[cleanCode] = codeRecord;
-    writeCenterLedger(ledger);
     const qrCodeImage = await QRCode.toDataURL(student.student_code);
     res.json({
       success: true,
       student: { name: student.name, student_code: student.student_code, balance: student.balance },
       qrCodeImage,
       attendanceCenterName: center.name,
-      distributionCenterName: codeRecord.centerName,
+      distributionCenterName: rechargeCenter?.name || 'تم التسجيل',
     });
   } catch (error) {
     console.error('Public student registration failed:', error);
@@ -631,6 +684,7 @@ function verifyCenterPortalToken(req, res, next) {
     const decoded = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET);
     if (decoded.type !== 'center') throw new Error('Invalid token type');
     req.centerPortalId = decoded.centerId;
+    req.rechargeCenterId = decoded.rechargeCenterId;
     next();
   } catch (error) {
     res.status(401).json({ success: false, message: 'انتهت صلاحية الدخول، سجل دخول مرة أخرى.' });
@@ -639,12 +693,11 @@ function verifyCenterPortalToken(req, res, next) {
 
 app.post('/api/public/center-login', async (req, res) => {
   try {
-    const ledger = readCenterLedger();
-    const account = Object.values(ledger.accounts).find(item => item.username === String(req.body.username || '').trim());
-    if (!account || !(await bcrypt.compare(String(req.body.password || ''), account.passwordHash))) return res.status(401).json({ success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة.' });
-    const center = await Center.findByPk(account.centerId);
-    if (!center) return res.status(401).json({ success: false, message: 'حساب السنتر غير مرتبط بسنتر صالح.' });
-    const token = jwt.sign({ centerId: center.id, type: 'center' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const account = await RechargeCenterAccount.findOne({ where: { username: String(req.body.username || '').trim() } });
+    if (!account || !(await bcrypt.compare(String(req.body.password || ''), account.password_hash))) return res.status(401).json({ success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة.' });
+    const center = await RechargeCenter.findByPk(account.recharge_center_id);
+    if (!center) return res.status(401).json({ success: false, message: 'حساب السنتر غير مرتبط بسنتر توزيع صالح.' });
+    const token = jwt.sign({ rechargeCenterId: center.id, type: 'center' }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ success: true, token, centerName: center.name });
   } catch (error) {
     console.error('Public center login failed:', error);
@@ -654,10 +707,9 @@ app.post('/api/public/center-login', async (req, res) => {
 
 app.get('/api/public/center-dashboard', verifyCenterPortalToken, async (req, res) => {
   try {
-    const ledger = readCenterLedger();
-    const center = await Center.findByPk(req.centerPortalId, { attributes: ['id', 'name'] });
+    const center = await RechargeCenter.findByPk(req.rechargeCenterId, { attributes: ['id', 'name'] });
     if (!center) return res.status(404).json({ success: false, message: 'السنتر غير موجود.' });
-    res.json({ success: true, centerName: center.name, stats: getCenterStats(ledger, center.id) });
+    res.json({ success: true, centerName: center.name, stats: await getRechargeCenterStats(center.id) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'تعذر تحميل الإحصائيات.' });
   }
@@ -4829,10 +4881,13 @@ if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
 app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
   try {
     const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
-    const centers = await Center.findAll({ order: [['name', 'ASC']] });
-    const ledger = readCenterLedger();
-    const centerStats = centers.map(center => ({ center, stats: getCenterStats(ledger, center.id), account: ledger.accounts[String(center.id)] || null }));
-    res.render('recharge-codes', { codes, centers, centerStats, ledger });
+    const centers = await RechargeCenter.findAll({ order: [['name', 'ASC']] });
+    const centerStats = await Promise.all(centers.map(async center => ({
+      center,
+      stats: await getRechargeCenterStats(center.id),
+      account: await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id } }),
+    })));
+    res.render('recharge-codes', { codes, centers, centerStats });
   } catch (error) {
     console.error('Failed to load recharge codes page:', error);
     res.status(500).send('حصلت مشكلة أثناء تحميل صفحة أكواد الشحن: ' + error.message);
@@ -4842,20 +4897,17 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
 // توليد أكواد جديدة
 app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   try {
-    const { amount, count, center_id } = req.body;
+    const { amount, count, center_name } = req.body;
     if (!amount || !count || count > 500) return res.status(400).send('❌ بيانات غير صحيحة');
-    const center = await Center.findByPk(center_id);
-    if (!center) return res.status(400).send('❌ اختر السنتر قبل توليد الأكواد');
-    const ledger = readCenterLedger();
+    const center = await getOrCreateRechargeCenter(center_name);
+    if (!center) return res.status(400).send('❌ اكتب اسم سنتر التوزيع قبل توليد الأكواد');
 
     const generated = [];
     for (let i = 0; i < parseInt(count); i++) {
       const code = crypto.randomBytes(6).toString('hex').toUpperCase(); // كود 12 حرف
-      await RechargeCode.create({ code, amount: parseFloat(amount) });
-      ledger.codes[code] = { centerId: center.id, centerName: center.name, amount: parseFloat(amount), used: false, createdAt: new Date().toISOString() };
+      await RechargeCode.create({ code, amount: parseFloat(amount), recharge_center_id: center.id });
       generated.push({ code, amount });
     }
-    writeCenterLedger(ledger);
 
     // تصدير Excel
     const workbook = new ExcelJS.Workbook();
@@ -4878,21 +4930,13 @@ app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
 });
 
 app.post('/admin/recharge-codes/accounts', requireAdmin, async (req, res) => {
-  const { center_id, username, password } = req.body;
-  const center = await Center.findByPk(center_id);
+  const { center_name, username, password } = req.body;
+  const center = await getOrCreateRechargeCenter(center_name);
   if (!center || !username || !password) return res.status(400).send('❌ بيانات الحساب غير مكتملة');
-  const ledger = readCenterLedger();
   const normalizedUsername = String(username).trim();
-  const existing = Object.values(ledger.accounts).find(account => account.username === normalizedUsername);
+  const existing = await RechargeCenterAccount.findOne({ where: { username: normalizedUsername } });
   if (existing) return res.status(409).send('❌ اسم المستخدم مستخدم بالفعل');
-  ledger.accounts[String(center.id)] = {
-    centerId: center.id,
-    centerName: center.name,
-    username: normalizedUsername,
-    passwordHash: await bcrypt.hash(String(password), 10),
-    createdAt: new Date().toISOString(),
-  };
-  writeCenterLedger(ledger);
+  await RechargeCenterAccount.create({ username: normalizedUsername, password_hash: await bcrypt.hash(String(password), 10), recharge_center_id: center.id });
   res.redirect('/admin/recharge-codes');
 });
 
@@ -7462,16 +7506,17 @@ app.post('/user/profile-photo', requireLogin, profilePhotoUpload.single('photo')
 });
 
 async function startServer() {
-  if (process.env.NODE_ENV === 'production' && !process.env.CENTER_LEDGER_PATH) {
-    console.warn('⚠️ CENTER_LEDGER_PATH is not configured; center accounts will be stored on the ephemeral deployment filesystem.');
-  }
   // Attempt initial DB connection; if it fails, still start the HTTP server
   try {
     await connectWithRetry(5, 5000);
     dbReady = true;
     // IMPORTANT: منع sync المؤقتًا لتجنب Duplicate keys أثناء تشغيل السيرفر
     // await sequelize.sync();
+    await RechargeCenter.sync();
+    await RechargeCenterAccount.sync();
     await RechargeCode.sync();
+    await ensureRechargeCodeCenterColumn();
+    await migrateRechargeLedgerToDatabase();
     await ensureUserPhoneColumn();
     await ensureSessionWeekNumberColumn();
     await ensureSessionHomeworkFields();
@@ -7517,7 +7562,11 @@ async function startServer() {
         try {
           await connectWithRetry(5, 10000);
           dbReady = true;
+          await RechargeCenter.sync();
+          await RechargeCenterAccount.sync();
           await RechargeCode.sync();
+          await ensureRechargeCodeCenterColumn();
+          await migrateRechargeLedgerToDatabase();
           await ensureUserPhoneColumn();
           await ensureSessionWeekNumberColumn();
           await ensureSessionHomeworkFields();
