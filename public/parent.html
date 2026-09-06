@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">بوابة ولي الأمر | المتابعة</title>
+  <link href="style.css" rel="stylesheet">
+  <!-- سيتم التحكم بملف البوتستراب ديناميكياً لتغيير الاتجاه -->
+  <link id="bootstrap-link" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  
+  <style>
+    /* 🎨 لوحة الألوان الليلية الفخمة الثابتة (Premium Slate Theme) */
+    :root {
+      --dark-bg: #0b0f19;          /* خلفية ليلية عميقة */
+      --dark-card: #141b2d;        /* لون كروت الإحصائيات والجداول */
+      --dark-text: #f1f5f9;        /* كتابة فاتحة مريحة للعين */
+      --dark-muted: #94a3b8;       /* النصوص الجانبية والتفاصيل */
+      --dark-border: #1f293d;      /* حدود ناعمة غير حادة */
+      --dark-accent: #6366f1;      /* بنفسجي ليلي ناعم وراقي */
+    }
+
+    /* حجم كتابة أكبر بشكل عام حتى تكون الصفحة مريحة لكل الأعمار */
+    html {
+      font-size: 16px;
+    }
+
+    body.dark-theme {
+      background-color: var(--dark-bg) !important;
+      color: var(--dark-text);
+    }
+
+    body.dark-theme .navbar {
+      background-color: var(--dark-bg) !important;
+      border-bottom: 1px solid var(--dark-border);
+    }
+
+    /* إعدادات الـ Loading Spinner متوافق مع الدارك مود */
+    #global-loader {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(245, 246, 251, 0.85);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+    }
+    body.dark-theme #global-loader {
+      background: rgba(11, 15, 25, 0.9) !important;
+    }
+    .spinner {
+      border: 4px solid #E2E4F3;
+      border-top: 4px solid var(--dark-accent);
+      border-radius: 50%;
+      width: 50px; height: 50px;
+      animation: spin 0.8s linear infinite;
+    }
+    body.dark-theme .spinner {
+      border-color: var(--dark-border);
+      border-top-color: var(--dark-accent);
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* أنيميشن الدخول */
+    .fade-in-up {
+      animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+
+    /* صناديق الإحصائيات الشيك */
+    .stat-box {
+      background: #fff;
+      border: 1px solid #E2E4F3;
+      border-radius: 14px;
+      padding: 18px;
+      text-align: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    body.dark-theme .stat-box {
+      background: var(--dark-card);
+      border-color: var(--dark-border);
+      color: var(--dark-text);
+    }
+    .stat-box:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    body.dark-theme .stat-box:hover {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    .stat-title {
+      font-size: 0.88rem;
+      color: #64748b;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    body.dark-theme .stat-title {
+      color: var(--dark-muted);
+    }
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #1e293b;
+      margin: 0;
+    }
+    body.dark-theme .stat-value {
+      color: var(--dark-text);
+    }
+    
+    /* تحسين شكل الجدول والقوائم والكروت في الدارك مود واختفاء البياض تماماً */
+    body.dark-theme .card {
+      background-color: var(--dark-card) !important;
+      border-color: var(--dark-border) !important;
+      color: var(--dark-text);
+    }
+    body.dark-theme .card h5, body.dark-theme .card h6 {
+      color: var(--dark-text) !important;
+    }
+    body.dark-theme .card .text-muted {
+      color: var(--dark-muted) !important;
+    }
+    .table-responsive {
+      border: 1px solid #E2E4F3;
+      background: #fff;
+      border-radius: 8px;
+    }
+    body.dark-theme .table-responsive {
+      border-color: var(--dark-border) !important;
+      background: var(--dark-card) !important;
+    }
+    
+    /* 🎨 حل مشكلة بياض خلايا الجدول في الدارك مود */
+    body.dark-theme .table {
+      color: var(--dark-text) !important;
+      background-color: transparent !important;
+      --bs-table-bg: transparent !important;
+    }
+    body.dark-theme .table th {
+      background-color: #1e293b !important;
+      color: var(--dark-text) !important;
+      border-color: var(--dark-border) !important;
+    }
+    body.dark-theme .table td {
+      background-color: var(--dark-card) !important;
+      color: var(--dark-text) !important;
+      border-color: var(--dark-border) !important;
+    }
+    body.dark-theme .table tbody tr:hover td {
+      background-color: #1e293b !important; /* لون لطيف عند تمرير الماوس */
+    }
+
+    /* تظبيط البادجات للدارك مود عشان تظهر فخمة زي جدول الطالب */
+    .badge {
+      font-weight: 600 !important;
+    }
+    body.dark-theme .badge.bg-success { background-color: rgba(21, 128, 61, 0.2) !important; color: #4ade80 !important; }
+    body.dark-theme .badge.bg-secondary { background-color: rgba(71, 85, 105, 0.2) !important; color: #cbd5e1 !important; }
+    body.dark-theme .badge.bg-danger { background-color: rgba(185, 28, 28, 0.2) !important; color: #f87171 !important; }
+    body.dark-theme .badge.bg-warning { background-color: rgba(180, 83, 9, 0.2) !important; color: #fbbf24 !important; }
+
+    body.dark-theme .list-group-item {
+      background-color: var(--dark-card);
+      border-color: var(--dark-border);
+      color: var(--dark-text);
+    }
+
+    /* شريط التحكم العائم (لغة / دارك مود) */
+    .theme-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: auto;
+      z-index: 1050;
+      display: flex;
+      gap: 10px;
+    }
+    html[dir="ltr"] .theme-controls {
+      left: auto;
+      right: 20px;
+    }
+    .control-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #E2E4F3;
+      padding: 8px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    body.dark-theme .control-btn {
+      background: var(--dark-card);
+      border-color: var(--dark-border);
+      color: var(--dark-text);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- السكريبت السحري: يُحقن فوراً لمنع الفلاش والريفرش تماماً من أول لحظة -->
+  <script>
+    (function injectThemeImmediately() {
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+      }
+    })();
+  </script>
+
+  <div id="global-loader">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- أزرار التحكم العائمة للغة والوضع الداكن -->
+  <div class="theme-controls">
+    <button class="control-btn" id="lang-toggle-btn" onclick="toggleLanguage()">English</button>
+    <button class="control-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <nav class="navbar navbar-dark bg-dark px-3">
+    <span class="navbar-brand d-flex align-items-center gap-2"><span class="badge bg-primary me-1">S</span> <span class="platform-name" data-platform-brand></span> <span id="nav-title">متابعة الطالب</span></span>
+    <div class="d-flex align-items-center gap-3">
+      <span id="welcomeText" class="text-white small fw-bold"></span>
+      <button class="btn btn-sm btn-outline-light" onclick="logout()" id="btn-logout">خروج</button>
+    </div>
+  </nav>
+
+  <div class="container py-4" id="content" style="display:none; position: relative; z-index: 1;">
+
+    <div id="warningsAlert" style="display:none;" class="fade-in-up"></div>
+
+    <div class="card shadow-sm mb-4 fade-in-up delay-1">
+      <div class="card-body p-3">
+        <h6 class="mb-3 text-muted fw-bold px-1" id="section-overview">📊 نظرة عامة</h6>
+        <div class="row g-2">
+          <div class="col-6 col-md-4">
+            <div class="stat-box">
+              <div class="stat-title" id="title-subject-center">📘 المادة والسنتر</div>
+              <div class="stat-value"><strong id="subjectName"></strong><br><span id="centerName" class="text-primary small"></span></div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4">
+            <div class="stat-box">
+              <div class="stat-title" id="title-balance">💰 الرصيد المتاح</div>
+              <div class="stat-value text-success" id="balanceText"></div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="stat-box">
+              <div class="stat-title" id="title-booklet">📦 حالة البوكليت</div>
+              <div class="stat-value mt-1" id="bookletBadge"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 fade-in-up delay-2">
+      <div class="card-body p-3 p-md-4">
+        <h5 class="mb-3 fw-bold" id="section-sessions-tracking">📅 متابعة الحصص</h5>
+        <p class="hint-text"><span>👉</span><span>تقدر تسحب الجدول بإصبعك يمين وشمال لو مقاسه أكبر من عرض الشاشة.</span></p>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th id="th-lesson">الحصة</th>
+                <th id="th-date">التاريخ</th>
+                <th id="th-attendance">الحضور</th>
+                <th id="th-homework">الواجب</th>
+                <th id="th-exam">الامتحان</th>
+                <th id="th-payment">دفعة</th>
+                <th id="th-comment">ملاحظة</th>
+                <th id="th-follow-up-comment">تعليق المتابعة</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsBody"></tbody>
+          </table>
+        </div>
+
+        <details class="sf-more">
+          <summary>❓ الرموز والألوان في الجدول تعني إيه؟</summary>
+          <div class="sf-more-body">
+            🟢 حضر: الطالب كان موجود في الحصة.<br>
+            🔴 غياب: الطالب لم يحضر الحصة.<br>
+            ⚪ ملغية: الحصة تم إلغاؤها من السنتر.<br>
+            الواجب والامتحان بيوضحوا مستوى الطالب في كل حصة على حدة.
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h6 class="mb-3" id="section-chart">📈 مؤشرات التطور</h6>
+        <canvas id="progressChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 fade-in-up delay-3" id="transactionsCard" style="display:none;">
+      <div class="card-body p-3 p-md-4">
+        <h6 class="mb-3 fw-bold" id="section-transactions">💳 سجل المعاملات المالية</h6>
+        <ul class="list-group list-group-flush border rounded" id="transactionsList"></ul>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const token = localStorage.getItem('portal_token');
+    const portalType = localStorage.getItem('portal_type');
+    if (!token || portalType !== 'parent') window.location.href = 'index.html';
+
+    function logout() {
+      localStorage.removeItem('portal_token');
+      localStorage.removeItem('portal_type');
+      window.location.href = 'index.html';
+    }
+
+    let globalSessionsData = [];
+    let progressChartInstance = null;
+
+    const translations = {
+      ar: {
+        pageTitle: "بوابة ولي الأمر | المتابعة",
+        navTitle: "متابعة الطالب",
+        btnLogout: "خروج",
+        welcome: "ولي أمر: ",
+        sectionOverview: "📊 نظرة عامة",
+        titleSubjectCenter: "📘 المادة والسنتر",
+        titleBalance: "💰 الرصيد المتاح",
+        titleBooklet: "📦 حالة البوكليت",
+        bookletTrue: '<span class="badge bg-success px-3 py-2">تم الشراء</span>',
+        bookletFalse: '<span class="badge bg-secondary px-3 py-2">لم يتم الشراء</span>',
+        sectionSessionsTracking: "📅 متابعة الحصص",
+        sectionChart: "📈 مؤشرات التطور",
+        sectionTransactions: "💳 سجل المعاملات المالية",
+        noSessions: "لا توجد حصص مسجلة حتى الآن",
+        serverError: "حدثت مشكلة في الاتصال بالسيرفر، يرجى المحاولة لاحقاً.",
+        thLesson: "الحصة",
+        thDate: "التاريخ",
+        thAttendance: "الحضور",
+        thHomework: "الواجب",
+        thExam: "الامتحان",
+        thPayment: "دفعة",
+        thComment: "ملاحظة",
+        thFollowUpComment: "تعليق المتابعة",
+        chartHwLabel: "الواجب %",
+        chartExamLabel: "الامتحان %",
+        currency: "ج",
+        avg: "متوسط", max: "أعلى", min: "أقل",
+        homeworkLabels: {
+          complete: '<span class="badge bg-success">كامل</span>',
+          incomplete: '<span class="badge bg-warning text-dark">مش كامل</span>',
+          no_steps: '<span class="badge bg-secondary">من غير خطوات</span>',
+          not_done: '<span class="badge bg-danger">مش معمول</span>',
+        },
+        warningTitle: "🚨 تنبيه: {count} إنذارات من 3",
+        warningTitleSingle: "🚨 تنبيه: إنذار واحد من 3",
+        warningBlocked: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ الحساب محظور، تواصل مع الإدارة فورًا</span>",
+        noReason: "بدون سبب محدد"
+      },
+      en: {
+        pageTitle: "Parent Portal | Tracking",
+        navTitle: "Student Performance",
+        btnLogout: "Logout",
+        welcome: "Parent of: ",
+        sectionOverview: "📊 Overview",
+        titleSubjectCenter: "📘 Subject & Center",
+        titleBalance: "💰 Available Balance",
+        titleBooklet: "📦 Booklet Status",
+        bookletTrue: '<span class="badge bg-success px-3 py-2">Purchased</span>',
+        bookletFalse: '<span class="badge bg-secondary px-3 py-2">Not Purchased</span>',
+        sectionSessionsTracking: "📅 Sessions History",
+        sectionChart: "📈 Progress Indicators",
+        sectionTransactions: "💳 Financial Transactions",
+        noSessions: "No sessions recorded yet",
+        serverError: "Server connection issue, please try again later.",
+        thLesson: "Session",
+        thDate: "Date",
+        thAttendance: "Attendance",
+        thHomework: "Homework",
+        thExam: "Exam",
+        thPayment: "Payment",
+        thComment: "Comment",
+        thFollowUpComment: "Follow-up Comment",
+        chartHwLabel: "Homework %",
+        chartExamLabel: "Exam %",
+        currency: "EGP",
+        avg: "Avg", max: "Max", min: "Min",
+        homeworkLabels: {
+          complete: '<span class="badge bg-success">Complete</span>',
+          incomplete: '<span class="badge bg-warning text-dark">Incomplete</span>',
+          no_steps: '<span class="badge bg-secondary">No Steps</span>',
+          not_done: '<span class="badge bg-danger">Not Done</span>',
+        },
+        warningTitle: "🚨 Alert: {count} Warnings out of 3",
+        warningTitleSingle: "🚨 Alert: 1 Warning out of 3",
+        warningBlocked: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ Account Blocked, contact management immediately</span>",
+        noReason: "No specific reason"
+      }
+    };
+
+    function applyLanguage(lang) {
+      const isEn = lang === 'en';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+      
+      const bootstrapLink = document.getElementById('bootstrap-link');
+      bootstrapLink.href = isEn 
+        ? "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        : "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css";
+
+      document.getElementById('page-title').innerText = translations[lang].pageTitle;
+      document.getElementById('nav-title').innerText = translations[lang].navTitle;
+      document.getElementById('btn-logout').innerText = translations[lang].btnLogout;
+      document.getElementById('section-overview').innerText = translations[lang].sectionOverview;
+      document.getElementById('title-subject-center').innerText = translations[lang].titleSubjectCenter;
+      document.getElementById('title-balance').innerText = translations[lang].titleBalance;
+      document.getElementById('title-booklet').innerText = translations[lang].titleBooklet;
+      document.getElementById('section-sessions-tracking').innerText = translations[lang].sectionSessionsTracking;
+      document.getElementById('section-chart').innerText = translations[lang].sectionChart;
+      document.getElementById('section-transactions').innerText = translations[lang].sectionTransactions;
+
+      document.getElementById('th-lesson').innerText = translations[lang].thLesson;
+      document.getElementById('th-date').innerText = translations[lang].thDate;
+      document.getElementById('th-attendance').innerText = translations[lang].thAttendance;
+      document.getElementById('th-homework').innerText = translations[lang].thHomework;
+      document.getElementById('th-exam').innerText = translations[lang].thExam;
+      document.getElementById('th-payment').innerText = translations[lang].thPayment;
+      document.getElementById('th-comment').innerText = translations[lang].thComment;
+      document.getElementById('th-follow-up-comment').innerText = translations[lang].thFollowUpComment;
+
+      document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
+      
+      if (window.lastFetchedData) {
+        renderData(window.lastFetchedData);
+      }
+    }
+
+    function toggleLanguage() {
+      let currentLang = localStorage.getItem('portal_lang') || 'ar';
+      let newLang = currentLang === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('portal_lang', newLang);
+      applyLanguage(newLang);
+    }
+
+    // تعديلها لتغيير الأيقونة فقط لأن كلاس البودي يتم حقنه فورا بالأعلى
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '☀️';
+      } else {
+        document.body.classList.remove('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '🌙';
+      }
+      if (globalSessionsData.length > 0) {
+        renderProgressChart(globalSessionsData);
+      }
+    }
+
+    function toggleTheme() {
+      let currentTheme = localStorage.getItem('portal_theme') || 'light';
+      let newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('portal_theme', newTheme);
+      applyTheme(newTheme);
+    }
+
+    function renderWarnings(warnings, lang) {
+      const box = document.getElementById('warningsAlert');
+      if (!warnings || warnings.length === 0) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      box.className = `alert ${warnings.length === 3 ? 'alert-danger' : 'alert-warning'} mb-4 shadow-sm fade-in-up`;
+
+      const boxes = [1, 2, 3].map(i => `
+        <div style="
+          width:45px; height:45px; border-radius:10px; display:inline-flex;
+          align-items:center; justify-content:center; font-size:1.3rem; font-weight:800;
+          border: 2px solid ${i <= warnings.length ? '#DC2626' : '#D1D5DB'};
+          background: ${i <= warnings.length ? '#FEE2E2' : '#F9FAFB'};
+          color: ${i <= warnings.length ? '#DC2626' : '#9CA3AF'};
+          margin-inline-end: 6px;
+        ">${i <= warnings.length ? '✕' : ''}</div>
+      `).join('');
+
+      let titleStr = warnings.length > 1 
+        ? translations[lang].warningTitle.replace('{count}', warnings.length)
+        : translations[lang].warningTitleSingle;
+
+      box.innerHTML = `
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <div>${boxes}</div>
+          <div>
+            <strong>${titleStr}</strong>
+            ${warnings.length === 3 ? translations[lang].warningBlocked : ''}
+            <ul class="mt-2 mb-0 small">
+              ${warnings.map(w => `<li>${w.reason || translations[lang].noReason}</li>`).join('')}
+            </ul>
+          </div>
+        </div>`;
+    }
+
+    function renderTransactions(warnings, lang) { /* متبقاة للتوافق الإسمي الداخلي في التحديث الدوري */ }
+
+    function renderTransactionsList(transactions, lang) {
+      const card = document.getElementById('transactionsCard');
+      const list = document.getElementById('transactionsList');
+      if (!transactions || transactions.length === 0) { card.style.display = 'none'; return; }
+      card.style.display = 'block';
+      list.innerHTML = transactions.map(t => `
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>${t.reason || '-'}<br>
+            <span class="text-muted" style="font-size:0.75rem">${new Date(t.time).toLocaleString(lang === 'en' ? 'en-US' : 'ar-EG')}</span>
+          </span>
+          <span class="${t.amount >= 0 ? 'text-success' : 'text-danger'} fw-bold" style="font-size: 0.95rem;">
+            ${t.amount >= 0 ? '+' : ''}${t.amount} ${translations[lang].currency}
+          </span>
+        </li>`).join('');
+    }
+
+    async function loadData() {
+      const loader = document.getElementById('global-loader');
+      const content = document.getElementById('content');
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/portal/parent/data`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = await res.json();
+        
+        if (!result.success) { logout(); return; }
+        
+        window.lastFetchedData = result.data;
+        renderData(result.data);
+        
+        loader.style.display = 'none';
+        content.style.display = 'block';
+
+      } catch (err) {
+        loader.style.display = 'none';
+        content.style.display = 'block';
+        content.innerHTML = `<div class="alert alert-danger shadow-sm fade-in-up">${translations[currentLang].serverError}</div>`;
+      }
+    }
+
+    function renderData(data) {
+      const lang = localStorage.getItem('portal_lang') || 'ar';
+      globalSessionsData = data.sessions;
+
+      // Security: parents should not see students' points history in this view
+      if (data.pointsHistory) delete data.pointsHistory;
+
+      document.getElementById('welcomeText').textContent = `${translations[lang].welcome}${data.student.name.split(' ')[0]}`;
+      document.getElementById('subjectName').textContent = data.student.subjectName;
+      document.getElementById('centerName').textContent = data.student.centerName;
+      document.getElementById('balanceText').textContent = `${data.student.balance} ${translations[lang].currency}`;
+      document.getElementById('bookletBadge').innerHTML = data.student.bookletStatus ? translations[lang].bookletTrue : translations[lang].bookletFalse;
+      
+      if (data.student.followUpAssistant) {
+  const fa = data.student.followUpAssistant;
+  const faHtml = `
+    <div class="card shadow-sm mt-3 mb-2 p-2" style="background:#EEF0FB;border-right:3px solid #4338CA;">
+      <div class="small text-muted mb-1">🎯 أسيستانت متابعة ابنك/ابنتك</div>
+      <div class="fw-bold">${fa.name}</div>
+      ${fa.phone ? `
+        <div class="small text-muted">${fa.phone}</div>
+        <a href="https://wa.me/20${fa.phone.replace(/^0/,'')}" target="_blank"
+          class="btn btn-sm mt-1" style="background:#25D366;color:#fff;font-size:0.72rem;padding:4px 10px;">
+          💬 تواصل معه على واتساب
+        </a>` : ''}
+    </div>`;
+  document.getElementById('content').insertAdjacentHTML('afterbegin', faHtml);
+}
+
+      renderWarnings(data.student.warnings, lang);
+      renderTransactionsList(data.transactions, lang);
+
+      const sessionsBody = document.getElementById('sessionsBody');
+      sessionsBody.innerHTML = '';
+      
+      if (data.sessions.length === 0) {
+        sessionsBody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-3">${translations[lang].noSessions}</td></tr>`;
+        return;
+      }
+
+      data.sessions.forEach(row => {
+        let attendanceHtml;
+        if (row.attendanceStatus === 'attended') {
+          attendanceHtml = `<span class="badge bg-success">${lang === 'en' ? 'Attended' : 'حضر'} (${row.attendedCenterName})</span>`;
+        } else if (row.attendanceStatus === 'cancelled') {
+          attendanceHtml = `<span class="badge bg-secondary">${lang === 'en' ? 'Cancelled' : 'ملغية'}</span>`;
+        } else {
+          attendanceHtml = `<span class="badge bg-danger">${lang === 'en' ? 'Absent' : 'غياب'}</span>`;
+        }
+
+        const homeworkHtml = row.homeworkStatus ? translations[lang].homeworkLabels[row.homeworkStatus] : '-';
+        
+        const examHtml = row.examScore !== null
+          ? `${row.examScore} / ${row.examMax}
+             ${row.examStats ? `<br><span style="font-size:0.7rem;color:#94a3b8;">
+                📊 ${translations[lang].avg}: ${row.examStats.avg} | ${translations[lang].max}: ${row.examStats.max} | ${translations[lang].min}: ${row.examStats.min}
+             </span>` : ''}`
+          : '-';
+          
+        const paymentHtml = row.payment > 0 ? `<span class="text-success fw-bold">${row.payment} ${translations[lang].currency}</span>` : '-';
+
+        sessionsBody.innerHTML += `
+          <tr>
+            <td class="fw-bold text-primary">#${row.lessonNumber}</td>
+            <td class="small">${row.date || '-'}</td>
+            <td>${attendanceHtml}</td>
+            <td>${homeworkHtml}</td>
+            <td>${examHtml}</td>
+            <td>${paymentHtml}</td>
+            <td class="small text-muted">${row.comment || '-'}</td>
+            <td class="small text-muted">${row.followUpComment || '-'}</td>
+          </tr>`;
+      });
+    
+      renderProgressChart(data.sessions);
+    }
+    
+    function renderProgressChart(sessions) {
+      const lang = localStorage.getItem('portal_lang') || 'ar';
+      const isDark = document.body.classList.contains('dark-theme');
+      
+      const attended = sessions.filter(s => s.attendanceStatus === 'attended' || s.attendanceStatus === 'attended_elsewhere');
+      if (attended.length === 0) return;
+
+      const labels = attended.map(s => `${lang === 'en' ? 'Session' : 'حصة'} ${s.lessonNumber}`);
+
+      const hwScores = attended.map(s => {
+        const map = { complete: 100, incomplete: 60, no_steps: 30, not_done: 0 };
+        return s.homeworkStatus ? (map[s.homeworkStatus] || 0) : null;
+      });
+
+      const examScores = attended.map(s =>
+        s.examScore !== null && s.examMax ? Math.round((s.examScore / s.examMax) * 100) : null
+      );
+
+      const ctx = document.getElementById('progressChart');
+      if (!ctx) return;
+
+      if (progressChartInstance) {
+        progressChartInstance.destroy();
+      }
+
+      const gridColor = isDark ? '#1f293d' : '#E2E4F3';
+      const textColor = isDark ? '#94a3b8' : '#64748b';
+
+      progressChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: translations[lang].chartHwLabel,
+              data: hwScores,
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99,102,241,0.1)',
+              tension: 0.3,
+              spanGaps: true,
+            },
+            {
+              label: translations[lang].chartExamLabel,
+              data: examScores,
+              borderColor: '#14B8A6',
+              backgroundColor: 'rgba(20,184,166,0.1)',
+              tension: 0.3,
+              spanGaps: true,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { 
+            legend: { 
+              position: 'bottom',
+              labels: { color: textColor }
+            } 
+          },
+          scales: { 
+            y: { 
+              min: 0, 
+              max: 100,
+              grid: { color: gridColor },
+              ticks: { color: textColor }
+            } ,
+            x: {
+              grid: { color: gridColor },
+              ticks: { color: textColor }
+            }
+          },
+        },
+      });
+    }
+
+    (function init() {
+      const savedLang = localStorage.getItem('portal_lang') || 'ar';
+      applyLanguage(savedLang);
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      applyTheme(savedTheme);
+      loadData();
+    })();
+  </script>
+</body>
+</html>

@@ -146,6 +146,7 @@
       <table class="table table-sm table-hover mb-0">
         <thead class="table-light">
           <tr>
+            <th style="width:50px;">#</th>
             <th style="width:180px;">الطالب</th>
             <th>تليفون الطالب</th>
             <th>تليفون ولي الأمر</th>
@@ -159,8 +160,9 @@
           </tr>
         </thead>
         <tbody>
-          <% sessionRows.forEach(row => { %>
+          <% sessionRows.forEach((row, index) => { %>
             <tr class="follow-up-search-item" data-search="<%= `${row.student.name} ${row.student.student_code}`.toLowerCase() %>">
+              <td><%= index + 1 %></td>
               <td>
                 <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="fw-bold d-block"><%= row.student.name %></a>
                 <span class="text-muted" style="font-size:0.7rem;"><%= row.student.student_code %></span><br>
