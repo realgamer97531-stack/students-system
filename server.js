@@ -6373,6 +6373,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       sheet.columns = [
         { header: 'الكود', key: 'student_code', width: 18 },
         { header: 'الاسم', key: 'name', width: 25 },
+        { header: 'رقم الطالب', key: 'student_phone', width: 18 },
+        { header: 'رقم ولي الأمر', key: 'parent_phone', width: 18 },
         { header: 'المركز', key: 'center', width: 20 },
         { header: 'المادة', key: 'subject', width: 20 },
       ];
@@ -6481,6 +6483,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
     sheet.columns = [
       { header: 'الكود', key: 'student_code', width: 18 },
       { header: 'الاسم', key: 'name', width: 25 },
+      { header: 'رقم الطالب', key: 'student_phone', width: 18 },
+      { header: 'رقم ولي الأمر', key: 'parent_phone', width: 18 },
       { header: 'المركز', key: 'center', width: 20 },
       { header: 'المادة', key: 'subject', width: 20 },
       { header: 'الحضور', key: 'attendance', width: 18 },
@@ -6497,6 +6501,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       sheet.addRow({
         student_code: r.student.student_code,
         name: r.student.name,
+        student_phone: r.student.phone,
+        parent_phone: r.student.parent_phone,
         center: r.student.Center ? r.student.Center.name : '-',
         subject: r.student.Subject ? r.student.Subject.name : '-',
         attendance: r.attended ? 'حاضر' : 'غائب',
