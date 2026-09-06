@@ -3608,6 +3608,15 @@ async function buildStudentData(studentId) {
     }
   });
 
+  const sessionComments = await SessionComment.findAll({
+    where: { StudentId: student.id },
+    include: [Session],
+  });
+  const commentByLesson = {};
+  sessionComments.forEach(c => {
+    if (c.Session) commentByLesson[Number(c.Session.lesson_number)] = c;
+  });
+
   // نجمع كل أرقام الحصص النسبية اللي للطالب علاقة بيها: سواء من مجموعته، أو حضرها في مكان تاني
   const lessonNumbersSet = new Set();
   ownSessions.forEach(s => lessonNumbersSet.add(s.lesson_number));
@@ -3646,6 +3655,7 @@ async function buildStudentData(studentId) {
     const att = attendanceByLesson[lessonNumber];
     const hw = homeworkByLesson[lessonNumber];
     const exam = examByLesson[lessonNumber];
+    const followUpComment = commentByLesson[lessonNumber];
 
     let attendanceStatus, attendedCenterName = null;
     if (att) {
@@ -3665,6 +3675,7 @@ async function buildStudentData(studentId) {
       attendanceUser: att ? (att.User ? att.User.name : null) : null,
       attendanceTime: att ? att.attended_at : null,
       comment: att ? att.comment : null,
+      followUpComment: followUpComment ? followUpComment.comment : null,
       payment: att ? att.payment_collected : null,
       homeworkStatus: hw ? hw.status : null,
       homeworkUser: hw ? (hw.User ? hw.User.name : null) : null,
