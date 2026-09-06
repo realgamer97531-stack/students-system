@@ -4882,12 +4882,15 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
   try {
     const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
     const centers = await RechargeCenter.findAll({ order: [['name', 'ASC']] });
+    const accounts = await RechargeCenterAccount.findAll({ attributes: ['recharge_center_id'] });
+    const accountCenterIds = new Set(accounts.map(account => String(account.recharge_center_id)));
+    const accountCenters = centers.filter(center => accountCenterIds.has(String(center.id)));
     const centerStats = await Promise.all(centers.map(async center => ({
       center,
       stats: await getRechargeCenterStats(center.id),
       account: await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id } }),
     })));
-    res.render('recharge-codes', { codes, centers, centerStats });
+    res.render('recharge-codes', { codes, centers, accountCenters, centerStats });
   } catch (error) {
     console.error('Failed to load recharge codes page:', error);
     res.status(500).send('حصلت مشكلة أثناء تحميل صفحة أكواد الشحن: ' + error.message);
@@ -4897,10 +4900,11 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
 // توليد أكواد جديدة
 app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   try {
-    const { amount, count, center_name } = req.body;
+    const { amount, count, center_id } = req.body;
     if (!amount || !count || count > 500) return res.status(400).send('❌ بيانات غير صحيحة');
-    const center = await getOrCreateRechargeCenter(center_name);
-    if (!center) return res.status(400).send('❌ اكتب اسم سنتر التوزيع قبل توليد الأكواد');
+    const center = await RechargeCenter.findByPk(center_id);
+    const account = center && await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id } });
+    if (!center || !account) return res.status(400).send('❌ اختر سنترًا لديه حساب توزيع');
 
     const generated = [];
     for (let i = 0; i < parseInt(count); i++) {

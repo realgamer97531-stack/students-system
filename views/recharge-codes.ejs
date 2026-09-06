@@ -16,7 +16,10 @@
       </div>
       <div class="col-md-3">
         <label class="form-label small">سنتر توزيع الأكواد</label>
-        <input name="center_name" class="form-control" placeholder="اكتب اسم سنتر التوزيع" required maxlength="150">
+        <select name="center_id" class="form-select" required>
+          <option value="">اختر سنتر التوزيع</option>
+          <% accountCenters.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %>
+        </select>
       </div>
       <div class="col-md-3">
         <button type="submit" class="btn btn-primary w-100">⚡ Generate + تحميل Excel</button>
