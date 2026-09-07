@@ -4018,7 +4018,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const studentLessonNumbers = [...new Set(studentSessions.map(s => s.lesson_number))];
     const sameLessonSessions = studentLessonNumbers.length > 0
       ? await Session.findAll({
-          where: { SubjectId: student.SubjectId, lesson_number: studentLessonNumbers },
+          where: { SubjectId: student.SubjectId, CenterId: student.CenterId, lesson_number: studentLessonNumbers },
           attributes: ['id', 'lesson_number', 'SubjectId', 'exam_url', 'exam_video_url'],
         })
       : [];
@@ -4233,13 +4233,17 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     const video = await Video.findOne({
       where: { id: req.params.videoId },
       include: [
-        { model: Session, required: false },
-        { model: VideoSession, required: false, include: [Session] },
+        { model: Session, required: false, include: [Center] },
+        { model: VideoSession, required: false, include: [{ model: Session, include: [Center] }] },
       ],
     });
     if (!video) return res.status(404).json({ success: false, message: 'الدرس غير موجود' });
 
-    const session = video.Session || video.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
+    const linkedSessions = [
+      video.Session,
+      ...(video.VideoSessions || []).map(videoSession => videoSession.Session),
+    ].filter(session => session && session.SubjectId === student.SubjectId && session.CenterId === student.CenterId);
+    const session = linkedSessions[0];
     if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
 
     if (allVideoAccess) {
@@ -4432,13 +4436,17 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
     const video = await Video.findOne({
       where: { id: req.params.videoId },
       include: [
-        { model: Session, required: false },
-        { model: VideoSession, required: false, include: [Session] },
+        { model: Session, required: false, include: [Center] },
+        { model: VideoSession, required: false, include: [{ model: Session, include: [Center] }] },
       ],
     });
     if (!video) return res.status(404).json({ success: false });
 
-    const session = video.Session || video.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
+    const linkedSessions = [
+      video.Session,
+      ...(video.VideoSessions || []).map(videoSession => videoSession.Session),
+    ].filter(session => session && session.SubjectId === student.SubjectId && session.CenterId === student.CenterId);
+    const session = linkedSessions[0];
     if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
 
     // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة، أو حضور فعلي حالي)
