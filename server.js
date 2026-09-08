@@ -4060,6 +4060,12 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
           attributes: ['id', 'lesson_number', 'SubjectId', 'exam_url', 'exam_video_url', 'access_duration_hours'],
         })
       : [];
+    const equivalentLessonSessions = studentLessonNumbers.length > 0
+      ? await Session.findAll({
+          where: { SubjectId: student.SubjectId, lesson_number: studentLessonNumbers },
+          attributes: ['id', 'lesson_number', 'SubjectId', 'access_duration_hours'],
+        })
+      : [];
     const lessonSessionIds = sameLessonSessions.map(s => s.id);
 
     // الفيديوهات المرتبطة بحصص مجموعته
@@ -4105,12 +4111,12 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     });
     const attendedSessionIds = new Set(attendanceRecords.map(a => a.SessionId).filter(Boolean));
     const sessionIdsByLesson = new Map();
-    sameLessonSessions.forEach(s => {
+    equivalentLessonSessions.forEach(s => {
       if (!sessionIdsByLesson.has(s.lesson_number)) sessionIdsByLesson.set(s.lesson_number, []);
       sessionIdsByLesson.get(s.lesson_number).push(s.id);
     });
     const attendedLessonNumbers = new Set(
-      sameLessonSessions.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number)
+      equivalentLessonSessions.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number)
     );
     const subjectSessionsWithExamLinks = await Session.findAll({
       where: { SubjectId: student.SubjectId },
@@ -4136,7 +4142,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         continue;
       }
 
-      const grantSession = sameLessonSessions.find(session => session.id === grant.SessionId);
+      const grantSession = equivalentLessonSessions.find(session => session.id === grant.SessionId);
       const grantHasEquivalentAttendance = grantSession && attendedLessonNumbers.has(grantSession.lesson_number);
       if (grant.method === 'attended' && !grantHasEquivalentAttendance) {
         await grant.destroy();
@@ -4207,10 +4213,13 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       if (!session) return null;
 
       const equivalentSessionIds = session ? (sessionIdsByLesson.get(session.lesson_number) || [session.id]) : [];
-      const grant = equivalentSessionIds.map(sessionId => grantBySessionId[sessionId]).find(Boolean);
+      const lessonGrants = equivalentSessionIds.map(sessionId => grantBySessionId[sessionId]).filter(Boolean);
+      const activeGrant = lessonGrants.find(candidate => isGrantActive(candidate, session));
+      const grant = activeGrant || lessonGrants[0];
       const attended = session && attendedLessonNumbers.has(session.lesson_number);
       let status, viewsUsed = 0, maxViews = 0;
       let unlimited = false;
+      let accessExpiresAt = null;
 
       if (allVideoAccess) {
         status = 'free';
@@ -4218,14 +4227,18 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         status = 'free';
         unlimited = true;
       } else if (grant) {
-        const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attended);
-        if (!isValidGrant) {
-          status = 'locked';
-        } else if (!isGrantActive(grant, session)) {
-          status = 'expired';
-        } else {
+        const validGrants = lessonGrants.filter(candidate =>
+          candidate.method === 'paid' || candidate.method === 'admin_free' || candidate.method === 'admin_paid' || (candidate.method === 'attended' && attended)
+        );
+        const validActiveGrant = validGrants.find(candidate => isGrantActive(candidate, session));
+        if (validActiveGrant) {
           status = 'granted';
           unlimited = true;
+          accessExpiresAt = getGrantAccessWindow(validActiveGrant, session).expiresAt.toISOString();
+        } else if (validGrants.length > 0) {
+          status = 'expired';
+        } else {
+          status = 'locked';
         }
       } else if (attended) {
         status = 'granted';
@@ -4250,6 +4263,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         date: session ? session.session_date : null,
         status,
         unlimited,
+        accessExpiresAt,
         viewsUsed,
         maxViews,
         price: student.price_per_session,

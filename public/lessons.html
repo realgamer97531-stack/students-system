@@ -368,6 +368,8 @@ html[dir="ltr"] .whatsapp-float {
         lessonOrder: "حصة",
         weekLabel: "الأسبوع",
         viewsCount: "مشاهدة",
+        remainingTime: "متبقي",
+        startsOnOpen: "يبدأ الحساب عند أول فتح",
         modalPaymentTitle: "تأكيد الدفع",
         btnModalReject: "رفض",
         btnModalConfirm: "موافق، ادفع وشاهد",
@@ -396,6 +398,8 @@ html[dir="ltr"] .whatsapp-float {
         lessonOrder: "Lesson",
         weekLabel: "Week",
         viewsCount: "views",
+        remainingTime: "Remaining",
+        startsOnOpen: "Timer starts on first open",
         modalPaymentTitle: "Confirm Payment",
         btnModalReject: "Reject",
         btnModalConfirm: "Accept & Watch",
@@ -471,6 +475,36 @@ html[dir="ltr"] .whatsapp-float {
           lessons: week.lessons.sort((a, b) => Number(a.lessonNumber) - Number(b.lessonNumber)),
         }))
         .sort((a, b) => a.number - b.number);
+    }
+
+    function formatRemainingTime(totalSeconds, lang) {
+      const seconds = Math.max(0, Math.floor(totalSeconds));
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+
+      if (lang === 'en') {
+        if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+      }
+
+      if (days > 0) return `${days} يوم ${hours} ساعة ${minutes} دقيقة`;
+      if (hours > 0) return `${hours} ساعة ${minutes} دقيقة`;
+      return `${minutes} دقيقة`;
+    }
+
+    function updateAccessCountdowns() {
+      const lang = localStorage.getItem('portal_lang') || 'ar';
+      document.querySelectorAll('[data-access-expires-at]').forEach((element) => {
+        const expiresAt = new Date(element.dataset.accessExpiresAt).getTime();
+        const remainingSeconds = Math.floor((expiresAt - Date.now()) / 1000);
+        if (remainingSeconds <= 0) {
+          element.textContent = translations[lang].statusLabels.expired.replace(/<[^>]+>/g, '');
+          return;
+        }
+        element.textContent = `${translations[lang].remainingTime}: ${formatRemainingTime(remainingSeconds, lang)}`;
+      });
     }
 
     function applyLanguage(lang) {
@@ -593,6 +627,13 @@ html[dir="ltr"] .whatsapp-float {
           const homeworkVideoUrl = lesson.homeworkVideoUrl || lesson.homework_video_url || extra.homeworkVideoUrl || '';
           const examUrl = lesson.examUrl || lesson.exam_url || extra.examUrl || '';
           const examVideoUrl = lesson.examVideoUrl || lesson.exam_video_url || '';
+          const accessText = lesson.status === 'expired'
+            ? `<span class="small text-secondary fw-semibold">${translations[currentLang].statusLabels.expired.replace(/<[^>]+>/g, '')}</span>`
+            : lesson.accessExpiresAt
+              ? `<span class="small text-secondary fw-semibold" data-access-expires-at="${lesson.accessExpiresAt}"></span>`
+              : lesson.status === 'granted' && lesson.unlimited
+                ? `<span class="small text-secondary fw-semibold">${translations[currentLang].startsOnOpen}</span>`
+                : '';
           const viewsText = !lesson.unlimited && (lesson.status === 'granted' || lesson.status === 'exhausted')
             ? `<span class="small" style="color: var(--sf-muted);">${lesson.viewsUsed} / ${lesson.maxViews} ${translations[currentLang].viewsCount}</span>` : '';
 
@@ -609,6 +650,7 @@ html[dir="ltr"] .whatsapp-float {
                     <h6 class="mb-0 fw-bold" style="font-size:1.05rem;">${lesson.title}</h6>
                   </div>
                   <p class="small mb-2" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
+                  ${accessText}
                   ${viewsText}
                 </div>
               </div>
@@ -673,6 +715,7 @@ html[dir="ltr"] .whatsapp-float {
 
           container.innerHTML += lessonCardHtml + examCardHtml + examVideoCardHtml + homeworkCards;
         });
+        updateAccessCountdowns();
         return;
       }
 
@@ -690,6 +733,7 @@ html[dir="ltr"] .whatsapp-float {
             </div>
           </div>`;
       });
+      updateAccessCountdowns();
     }
 
     async function openLesson(videoId) {
@@ -727,6 +771,7 @@ html[dir="ltr"] .whatsapp-float {
       applyLanguage(savedLang);
       const savedTheme = localStorage.getItem('portal_theme') || 'light';
       applyTheme(savedTheme);
+      window.setInterval(updateAccessCountdowns, 60000);
     })();
   </script>
   <!-- Floating WhatsApp Support Button -->
