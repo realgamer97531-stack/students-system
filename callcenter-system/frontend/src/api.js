@@ -70,10 +70,6 @@ export const api = {
   nextRow: (sessionId) => request(`/sessions/${sessionId}/next`, { method: 'POST' }),
   submitDisposition: (rowId, disposition, comment) =>
     request(`/rows/${rowId}/disposition`, { method: 'POST', body: { disposition, comment } }),
-  releaseOwnRow: (rowId) =>
-    request(`/rows/${rowId}/release-own`, { method: 'POST' }),
-  releaseOwnRowAndGetNext: (rowId) =>
-    request(`/rows/${rowId}/release-own-next`, { method: 'POST' }),
 };
 
 export function saveSession(token, user) {

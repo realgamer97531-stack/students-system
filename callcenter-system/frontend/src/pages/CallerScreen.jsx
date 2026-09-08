@@ -217,22 +217,15 @@ function CallCard({ session, onLeave }) {
     await doSubmit(pendingDisp);
   };
 
-  // Leave the current row pending without saving an outcome or comment.
+  // Mark the row as skipped without requiring an outcome choice or comment.
   const skipAndNext = async () => {
     if (!row || submitting) return;
     setSubmitting(true);
     setError('');
     try {
-      const res = await api.releaseOwnRowAndGetNext(row.id);
-      if (!res.row) {
-        setFinished(true);
-        setRow(null);
-      } else {
-        setRow(res.row);
-        setFinished(false);
-        setComment('');
-        setPendingDisp(null);
-      }
+      await api.submitDisposition(row.id, 'skipped', comment);
+      setHistory((h) => [...h, { ...row, disposition: 'skipped', comment }]);
+      await fetchNext();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -418,7 +411,7 @@ function CallCard({ session, onLeave }) {
                   disabled={submitting}
                   onClick={skipAndNext}
                 >
-                  {submitting ? 'Loading…' : 'Next without outcome →'}
+                  {submitting ? 'Saving…' : 'Next without outcome →'}
                 </button>
 
                 {pendingDisp && (
