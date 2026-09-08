@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { initSchema } = require('./db');
 
 const authRoutes = require('./routes/auth');
@@ -18,6 +19,13 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api', rowRoutes); // /api/sessions/:id/next, /api/rows/:id/disposition
+
+const frontendDist = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendDist));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(frontendDist, 'index.html'));
+});
 
 // Generic error handler (e.g. multer file errors)
 app.use((err, req, res, next) => {

@@ -217,6 +217,21 @@ function CallCard({ session, onLeave }) {
     await doSubmit(pendingDisp);
   };
 
+  // Leave the current row pending without saving an outcome or comment.
+  const skipAndNext = async () => {
+    if (!row || submitting) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await api.releaseOwnRow(row.id);
+      await fetchNext();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Go back to the previous completed row (read-only view).
   const [viewingPrev, setViewingPrev] = useState(false);
   const [prevIndex,   setPrevIndex]   = useState(null);
@@ -377,7 +392,7 @@ function CallCard({ session, onLeave }) {
                   ))}
                 </div>
 
-                {/* Next button — only active once an outcome is chosen */}
+                {/* Submit the outcome when one is selected */}
                 <button
                   className={pendingDisp ? 'btn-primary' : 'btn-secondary'}
                   style={{ width: '100%', marginTop: 12, padding: 13, fontSize: 14.5 }}
@@ -387,6 +402,15 @@ function CallCard({ session, onLeave }) {
                   {submitting ? 'Saving…' : pendingDisp
                     ? `Submit & Next →`
                     : 'Choose an outcome first'}
+                </button>
+
+                <button
+                  className="btn-secondary"
+                  style={{ width: '100%', marginTop: 8, padding: 11, fontSize: 13.5 }}
+                  disabled={submitting}
+                  onClick={skipAndNext}
+                >
+                  {submitting ? 'Loading…' : 'Next without outcome →'}
                 </button>
 
                 {pendingDisp && (
