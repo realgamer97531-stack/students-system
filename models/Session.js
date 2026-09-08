@@ -46,6 +46,11 @@ const Session = sequelize.define('Session', {
     allowNull: false,
     defaultValue: 3,
   },
+  access_duration_hours: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 72,
+  },
   homework_video_url: {
     type: DataTypes.TEXT,
     allowNull: true,

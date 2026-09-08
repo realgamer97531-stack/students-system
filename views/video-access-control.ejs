@@ -20,6 +20,10 @@
         <input type="number" name="views_if_paid" class="form-control" value="<%= video.Session.views_if_paid %>">
       </div>
       <div class="col-md-3">
+        <label class="form-label small">مدة الإتاحة بالساعات لكل الطلاب</label>
+        <input type="number" name="access_duration_hours" class="form-control" value="<%= video.Session.access_duration_hours || 72 %>" min="1" required>
+      </div>
+      <div class="col-md-3">
         <label class="form-label small">رابط الامتحان</label>
         <input type="url" name="exam_url" class="form-control" value="<%= video.Session.exam_url || '' %>" placeholder="https://example.com/exam">
       </div>
@@ -113,7 +117,10 @@
             <% students.forEach(student => { %>
               <% const grant = grantsMap[student.id]; %>
               <% const accessSource = manualAccessMap[student.id] ? 'وصول فردي' : 'من الحصة'; %>
-              <% const remaining = grant ? (grant.method === 'admin_free' ? 'غير محدود' : Math.max(grant.max_views - grant.views_used, 0) + ' من ' + grant.max_views) : (video.Session.is_free_for_all ? 'غير محدود' : 'لم يتم فتح بعد'); %>
+              <% const grantStart = grant && (grant.access_started_at || grant.createdAt); %>
+              <% const grantHours = grant && (grant.access_duration_hours || video.Session.access_duration_hours || 72); %>
+              <% const grantExpiry = grantStart ? new Date(grant.access_expires_at || new Date(grantStart).getTime() + grantHours * 60 * 60 * 1000) : null; %>
+              <% const remaining = grant ? 'غير محدود حتى ' + (grantExpiry ? grantExpiry.toLocaleString('ar-EG') : 'أول فتح') : (video.Session.is_free_for_all ? 'غير محدود' : 'لم يتم فتح بعد'); %>
               <tr data-search="<%= (student.name + ' ' + student.student_code).toLowerCase() %>">
                 <td><%= student.student_code %></td>
                 <td><%= student.name %></td>
@@ -130,6 +137,9 @@
                     </div>
                     <div class="col-auto">
                       <input type="number" name="max_views" class="form-control form-control-sm" style="width:100px;" value="<%= grant ? grant.max_views : 1 %>" min="1">
+                    </div>
+                    <div class="col-auto">
+                      <input type="number" name="access_duration_hours" class="form-control form-control-sm" style="width:110px;" value="<%= grant && grant.access_duration_hours ? grant.access_duration_hours : (video.Session.access_duration_hours || 72) %>" min="1" title="مدة الإتاحة بالساعات">
                     </div>
                     <div class="col-auto">
                       <button class="btn btn-sm btn-outline-primary">حفظ</button>

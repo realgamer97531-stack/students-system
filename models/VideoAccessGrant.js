@@ -20,6 +20,21 @@ const VideoAccessGrant = sequelize.define('VideoAccessGrant', {
     allowNull: false,
     defaultValue: 0,
   },
+  access_started_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  },
+  access_expires_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  },
+  access_duration_hours: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+  },
 }, {
   tableName: 'videoaccessgrants',
 });

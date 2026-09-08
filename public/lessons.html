@@ -586,7 +586,7 @@ html[dir="ltr"] .whatsapp-float {
           const homeworkVideoUrl = lesson.homeworkVideoUrl || lesson.homework_video_url || extra.homeworkVideoUrl || '';
           const examUrl = lesson.examUrl || lesson.exam_url || extra.examUrl || '';
           const examVideoUrl = lesson.examVideoUrl || lesson.exam_video_url || '';
-          const viewsText = lesson.status === 'granted' || lesson.status === 'exhausted'
+          const viewsText = !lesson.unlimited && (lesson.status === 'granted' || lesson.status === 'exhausted')
             ? `<span class="small" style="color: var(--sf-muted);">${lesson.viewsUsed} / ${lesson.maxViews} ${translations[currentLang].viewsCount}</span>` : '';
 
           const lessonCardHtml = `
@@ -613,6 +613,7 @@ html[dir="ltr"] .whatsapp-float {
                 <div class="card-body p-4">
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     <span class="badge bg-primary px-2 py-1">${translations[currentLang].examBtn}</span>
+                    <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].lessonOrder} ${lesson.lessonNumber}</span>
                   </div>
                   <div class="d-flex align-items-center gap-3 mb-3">
                     <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #4F46E5, #10B3A3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;">▶</div>
@@ -663,7 +664,7 @@ html[dir="ltr"] .whatsapp-float {
             `] : [])
           ].join('');
 
-          container.innerHTML += lessonCardHtml + homeworkCards + examCardHtml + examVideoCardHtml;
+          container.innerHTML += lessonCardHtml + examCardHtml + examVideoCardHtml + homeworkCards;
         });
         return;
       }
