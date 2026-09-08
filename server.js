@@ -47,6 +47,7 @@ const StudentBooklet = require('./models/StudentBooklet');
 const BookletReservation = require('./models/BookletReservation');
 const PaymentVerification = require('./models/PaymentVerification');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
+const ensureLessonAccessSchema = require('./utils/ensureLessonAccessSchema');
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
@@ -60,6 +61,43 @@ const centerLedgerPath = process.env.CENTER_LEDGER_PATH || path.join(__dirname, 
 
 const VideoSession = require('./models/VideoSession');
 const VideoStudentAccess = require('./models/VideoStudentAccess');
+
+const DEFAULT_ACCESS_DURATION_HOURS = 72;
+
+function getGrantAccessWindow(grant, session = null) {
+  const startedAt = grant.access_started_at || grant.createdAt;
+  if (!startedAt) return { startedAt: null, expiresAt: null };
+
+  const durationHours = Number(grant.access_duration_hours || session?.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS);
+  const expiresAt = grant.access_expires_at || new Date(new Date(startedAt).getTime() + durationHours * 60 * 60 * 1000);
+  return { startedAt: new Date(startedAt), expiresAt: new Date(expiresAt) };
+}
+
+function isGrantActive(grant, session = null) {
+  const { expiresAt } = getGrantAccessWindow(grant, session);
+  return !!expiresAt && expiresAt.getTime() > Date.now();
+}
+
+function createAccessWindow(hours) {
+  const startedAt = new Date();
+  return {
+    access_started_at: startedAt,
+    access_expires_at: new Date(startedAt.getTime() + Number(hours) * 60 * 60 * 1000),
+  };
+}
+
+async function extendGrantWindows(sessionIds, hours) {
+  const grants = await VideoAccessGrant.findAll({ where: { SessionId: sessionIds } });
+  for (const grant of grants) {
+    const { startedAt } = getGrantAccessWindow(grant);
+    const effectiveStart = startedAt || new Date();
+    await grant.update({
+      access_started_at: effectiveStart,
+      access_duration_hours: hours,
+      access_expires_at: new Date(effectiveStart.getTime() + Number(hours) * 60 * 60 * 1000),
+    });
+  }
+}
 
 function readCenterLedger() {
   try {
@@ -4019,7 +4057,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const sameLessonSessions = studentLessonNumbers.length > 0
       ? await Session.findAll({
           where: { SubjectId: student.SubjectId, CenterId: student.CenterId, lesson_number: studentLessonNumbers },
-          attributes: ['id', 'lesson_number', 'SubjectId', 'exam_url', 'exam_video_url'],
+          attributes: ['id', 'lesson_number', 'SubjectId', 'exam_url', 'exam_video_url', 'access_duration_hours'],
         })
       : [];
     const lessonSessionIds = sameLessonSessions.map(s => s.id);
@@ -4172,20 +4210,26 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       const grant = equivalentSessionIds.map(sessionId => grantBySessionId[sessionId]).find(Boolean);
       const attended = session && attendedLessonNumbers.has(session.lesson_number);
       let status, viewsUsed = 0, maxViews = 0;
+      let unlimited = false;
 
       if (allVideoAccess) {
         status = 'free';
       } else if (session.is_free_for_all) {
         status = 'free';
+        unlimited = true;
       } else if (grant) {
         const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attended);
         if (!isValidGrant) {
           status = 'locked';
+        } else if (!isGrantActive(grant, session)) {
+          return null;
         } else {
-          status = grant.views_used >= grant.max_views ? 'exhausted' : 'granted';
-          viewsUsed = grant.views_used;
-          maxViews = grant.max_views;
+          status = 'granted';
+          unlimited = true;
         }
+      } else if (attended) {
+        status = 'granted';
+        unlimited = true;
       } else {
         status = 'locked';
       }
@@ -4205,6 +4249,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         weekNumber: session ? (session.week_number ?? null) : null,
         date: session ? session.session_date : null,
         status,
+        unlimited,
         viewsUsed,
         maxViews,
         price: student.price_per_session,
@@ -4279,23 +4324,10 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       if (!isValidGrant) {
         await VideoAccessGrant.destroy({ where: { id: grant.id } });
         grant = null;
-      } else if (grant.views_used >= grant.max_views) {
-        return res.json({ success: false, message: 'لقد استهلكت كل مرات المشاهدة المتاحة لهذا الدرس' });
+      } else if (!isGrantActive(grant, session)) {
+        return res.json({ success: false, expired: true, message: 'انتهت مدة إتاحة هذه الحصة' });
       } else {
-        grant.views_used += 1;
-        await grant.save();
-
-        const methodComments = {
-          attended: '📹 حضر الحصة (سبق حضوره بالسنتر)',
-          paid: '📹 حضر عن طريق دفع ثمن مشاهدة الفيديو أونلاين',
-          admin_free: '📹 فُتحت له الحصة مجانًا من الأدمن',
-          admin_paid: '📹 فُتحت له الحصة من الأدمن (مدفوعة بدون خصم)',
-        };
-        if (grant.method !== 'attended') {
-          await ensureAttendance(student.id, session.id, methodComments[grant.method] || '📹 حضر الحصة أونلاين (فيديو)');
-        }
-
-        return res.json({ success: true, viewsUsed: grant.views_used, maxViews: grant.max_views });
+        return res.json({ success: true, unlimited: true, accessExpiresAt: getGrantAccessWindow(grant, session).expiresAt });
       }
     }
 
@@ -4310,6 +4342,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
         method: 'admin_free',
         max_views: 999,
         views_used: 1,
+        ...createAccessWindow(session.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS),
       });
       await ensureAttendance(student.id, video.SessionId, '📹 وصول فردي مخصص من الأدمن');
       return res.json({ success: true, viewsUsed: 1, maxViews: 999 });
@@ -4328,6 +4361,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
         method: 'attended',
         max_views: session.views_if_attended,
         views_used: 1,
+        ...createAccessWindow(session.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS),
       });
       // الحضور هنا مسجل بالفعل أصلاً (هو سبب الأهلية)، بس نتأكد بنفس الدالة لضمان التناسق
       return res.json({ success: true, viewsUsed: 1, maxViews: grant.max_views });
@@ -4363,6 +4397,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       method: 'paid',
       max_views: session.views_if_paid,
       views_used: 1,
+      ...createAccessWindow(session.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS),
     });
 
     await ensureAttendance(student.id, session.id, '📹 حضر عن طريق دفع ثمن مشاهدة الفيديو أونلاين');
@@ -4464,7 +4499,9 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
         grant.method === 'admin_paid' ||
         (grant.method === 'attended' && attendanceExists)
       ));
-      if (!isValidGrant && !attendanceExists) return res.status(403).json({ success: false, message: 'غير مسموح' });
+      if (!isValidGrant || !isGrantActive(grant, session)) {
+        return res.status(403).json({ success: false, expired: !!grant, message: grant ? 'انتهت مدة إتاحة هذه الحصة' : 'غير مسموح' });
+      }
     }
 
     const parts = await VideoPart.findAll({ where: { VideoId: video.id }, order: [['order_index', 'ASC']] });
@@ -4829,17 +4866,21 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
 });
 
 app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const { is_free_for_all, views_if_attended, views_if_paid, exam_url, exam_video_url } = req.body;
+  const { is_free_for_all, views_if_attended, views_if_paid, access_duration_hours, exam_url, exam_video_url } = req.body;
   const video = await Video.findByPk(req.params.id);
   const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
   const cleanExamVideoUrl = typeof exam_video_url === 'string' ? exam_video_url.trim() : '';
+  const durationHours = Math.max(1, Number.parseInt(access_duration_hours, 10) || DEFAULT_ACCESS_DURATION_HOURS);
   await Session.update({
     is_free_for_all: is_free_for_all === 'on',
     views_if_attended,
     views_if_paid,
+    access_duration_hours: durationHours,
     ...(cleanExamUrl ? { exam_url: cleanExamUrl } : {}),
     ...(cleanExamVideoUrl ? { exam_video_url: cleanExamVideoUrl } : {}),
   }, { where: { id: video.SessionId } });
+  const sessionIds = [video.SessionId, ...(await VideoSession.findAll({ where: { VideoId: video.id }, attributes: ['SessionId'] })).map(row => row.SessionId)].filter(Boolean);
+  await extendGrantWindows([...new Set(sessionIds)], durationHours);
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
 
@@ -4857,17 +4898,24 @@ app.post('/admin/videos/:id/session-link/delete', requirePermissionOrAdmin('admi
 });
 
 app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const { method, max_views } = req.body;
+  const { method, max_views, access_duration_hours } = req.body;
   const video = await Video.findByPk(req.params.id);
+  const session = await Session.findByPk(video.SessionId);
+  const durationHours = Math.max(1, Number.parseInt(access_duration_hours, 10) || Number(session?.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS);
 
   const [grant, created] = await VideoAccessGrant.findOrCreate({
     where: { StudentId: req.params.studentId, SessionId: video.SessionId },
-    defaults: { method, max_views },
+    defaults: { method, max_views, access_duration_hours: durationHours, ...createAccessWindow(durationHours) },
   });
 
   if (!created) {
     grant.method = method;
     grant.max_views = max_views;
+    const { startedAt } = getGrantAccessWindow(grant, session);
+    const effectiveStart = startedAt || new Date();
+    grant.access_duration_hours = durationHours;
+    grant.access_started_at = effectiveStart;
+    grant.access_expires_at = new Date(effectiveStart.getTime() + durationHours * 60 * 60 * 1000);
     await grant.save();
   }
 
@@ -7752,6 +7800,7 @@ async function startServer() {
     await ensureHomeworkAssignmentShowForAllColumn();
     await ensureUserProfilePhotoColumn();
     await ensureBookletReservationSchema(sequelize);
+    await ensureLessonAccessSchema(sequelize);
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
   } catch (error) {
@@ -7800,6 +7849,7 @@ async function startServer() {
           await ensureStudentBookletCustomPriceColumn();
           await ensureUserProfilePhotoColumn();
           await ensureBookletReservationSchema(sequelize);
+          await ensureLessonAccessSchema(sequelize);
           console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
           break;
         } catch (e) {
