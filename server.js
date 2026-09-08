@@ -4222,7 +4222,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         if (!isValidGrant) {
           status = 'locked';
         } else if (!isGrantActive(grant, session)) {
-          return null;
+          status = 'expired';
         } else {
           status = 'granted';
           unlimited = true;
