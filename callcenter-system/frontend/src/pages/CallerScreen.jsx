@@ -223,8 +223,16 @@ function CallCard({ session, onLeave }) {
     setSubmitting(true);
     setError('');
     try {
-      await api.releaseOwnRow(row.id);
-      await fetchNext();
+      const res = await api.releaseOwnRowAndGetNext(row.id);
+      if (!res.row) {
+        setFinished(true);
+        setRow(null);
+      } else {
+        setRow(res.row);
+        setFinished(false);
+        setComment('');
+        setPendingDisp(null);
+      }
     } catch (err) {
       setError(err.message);
     } finally {

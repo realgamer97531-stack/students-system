@@ -106,6 +106,60 @@ router.post('/rows/:id/release-own', requireAuth, async (req, res) => {
   }
 });
 
+// Release the current row and atomically claim the next different row.
+router.post('/rows/:id/release-own-next', requireAuth, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [currentRows] = await conn.query(
+      'SELECT * FROM call_rows WHERE id = ? FOR UPDATE',
+      [req.params.id]
+    );
+    const currentRow = currentRows[0];
+    if (!currentRow) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Row not found' });
+    }
+    if (currentRow.status !== 'assigned' || currentRow.assigned_to !== req.user.id) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'This row is not currently assigned to you' });
+    }
+
+    await conn.query(
+      `UPDATE call_rows SET status = 'pending', assigned_to = NULL, assigned_at = NULL WHERE id = ?`,
+      [currentRow.id]
+    );
+
+    const [pending] = await conn.query(
+      `SELECT id FROM call_rows
+       WHERE session_id = ? AND status = 'pending' AND id <> ?
+       ORDER BY row_index ASC LIMIT 1 FOR UPDATE`,
+      [currentRow.session_id, currentRow.id]
+    );
+
+    if (!pending.length) {
+      await conn.commit();
+      return res.json({ row: null, done: true });
+    }
+
+    const nextId = pending[0].id;
+    await conn.query(
+      `UPDATE call_rows SET status = 'assigned', assigned_to = ?, assigned_at = NOW()
+       WHERE id = ? AND status = 'pending'`,
+      [req.user.id, nextId]
+    );
+    const [nextRows] = await conn.query('SELECT * FROM call_rows WHERE id = ?', [nextId]);
+    await conn.commit();
+    res.json({ row: nextRows[0], resumed: false });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
 // --- Caller submits a disposition, finalizing their current row ---
 
 router.post('/rows/:id/disposition', requireAuth, async (req, res) => {
