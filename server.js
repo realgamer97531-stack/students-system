@@ -3989,7 +3989,59 @@ async function buildStudentData(studentId) {
   };
 }
 
+async function buildStudentProfileSummary(studentId) {
+  const student = await Student.findOne({
+    where: { id: studentId },
+    include: [Center, Subject],
+  });
+  if (!student) return null;
+
+  const warnings = await Warning.findAll({
+    where: { StudentId: student.id },
+    order: [['createdAt', 'ASC']],
+  });
+
+  return {
+    student: {
+      name: student.name,
+      studentCode: student.student_code,
+      subjectName: student.Subject.name,
+      centerName: student.Center.name,
+      balance: student.balance,
+      bookletStatus: student.booklet_status,
+      profilePhotoUrl: student.profile_photo_url,
+      isBlocked: student.is_blocked,
+      points: student.points,
+      warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
+      followUpAssistant: await getFollowUpAssistantForStudent(student.id),
+    },
+  };
+}
+
 // بيانات الطالب (الطالب بس يقدر يطلبها)
+app.get('/api/portal/student/profile', verifyPortalToken('student'), async (req, res) => {
+  const data = await buildStudentProfileSummary(req.portalStudentId);
+  if (!data) return res.status(404).json({ success: false, message: 'غير موجود' });
+  res.json({ success: true, data });
+});
+
+app.get('/api/portal/student/transactions', verifyPortalToken('student'), async (req, res) => {
+  const transactions = await BalanceTransaction.findAll({
+    where: { StudentId: req.portalStudentId },
+    order: [['createdAt', 'DESC']],
+    limit: 30,
+  });
+  res.json({
+    success: true,
+    transactions: transactions.map(t => ({
+      amount: t.amount,
+      reason: t.reason,
+      time: t.createdAt,
+      points: 0,
+    })),
+  });
+});
+
 app.get('/api/portal/student/data', verifyPortalToken('student'), async (req, res) => {
   const data = await buildStudentData(req.portalStudentId);
   if (!data) return res.status(404).json({ success: false, message: 'غير موجود' });
