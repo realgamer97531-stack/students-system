@@ -561,7 +561,55 @@ html[dir="ltr"] .whatsapp-float {
       applyTheme(newTheme);
     }
 
+    const videoAccessCacheKey = 'portal_video_access_cache';
+
+    function readVideoAccessCache() {
+      try {
+        return JSON.parse(sessionStorage.getItem(videoAccessCacheKey) || '{}');
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function writeVideoAccessCache(cache) {
+      sessionStorage.setItem(videoAccessCacheKey, JSON.stringify(cache));
+    }
+
+    function cacheVideoAccess(videoId, lesson) {
+      if (!lesson || !['free', 'granted'].includes(lesson.status)) return;
+      const cache = readVideoAccessCache();
+      cache[String(videoId)] = {
+        unlimited: Boolean(lesson.unlimited),
+        accessExpiresAt: lesson.accessExpiresAt || null,
+        cachedAt: Date.now(),
+      };
+      writeVideoAccessCache(cache);
+    }
+
+    function getCachedVideoAccess(videoId) {
+      const cache = readVideoAccessCache();
+      const entry = cache[String(videoId)];
+      if (!entry) return null;
+      if (entry.accessExpiresAt && new Date(entry.accessExpiresAt).getTime() <= Date.now()) {
+        delete cache[String(videoId)];
+        writeVideoAccessCache(cache);
+        return null;
+      }
+      return entry;
+    }
+
+    function clearCachedVideoAccess(videoId) {
+      const cache = readVideoAccessCache();
+      delete cache[String(videoId)];
+      writeVideoAccessCache(cache);
+    }
+
     async function openProtectedAction(videoId, onSuccess) {
+      if (getCachedVideoAccess(videoId)) {
+        onSuccess();
+        return;
+      }
+
       const result = await apiPost(`/api/portal/student/lessons/${videoId}/access`, { confirm_payment: false });
 
       if (result.requiresPayment) {
@@ -572,6 +620,7 @@ html[dir="ltr"] .whatsapp-float {
           const confirmResult = await apiPost(`/api/portal/student/lessons/${videoId}/access`, { confirm_payment: true });
           modal.hide();
           if (confirmResult.success) {
+            cacheVideoAccess(videoId, { status: 'granted', ...confirmResult });
             onSuccess();
           } else {
             document.getElementById('errorBox').innerHTML = `<div class="alert alert-danger">${confirmResult.message}</div>`;
@@ -585,6 +634,7 @@ html[dir="ltr"] .whatsapp-float {
         return;
       }
 
+      cacheVideoAccess(videoId, { status: 'granted', ...result });
       onSuccess();
     }
 
@@ -602,6 +652,7 @@ html[dir="ltr"] .whatsapp-float {
       }
 
       const weeks = buildLessonWeeks(result.lessons, currentLang);
+      result.lessons.forEach(lesson => cacheVideoAccess(lesson.videoId, lesson));
       const currentWeek = new URLSearchParams(window.location.search).get('week');
 
       if (currentWeek) {

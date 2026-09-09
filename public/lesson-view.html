@@ -278,6 +278,11 @@
       const currentLang = localStorage.getItem('portal_lang') || 'ar';
       const result = await apiGet(`/api/portal/student/lessons/${videoId}/parts`);
       if (!result.success) {
+        try {
+          const cache = JSON.parse(sessionStorage.getItem('portal_video_access_cache') || '{}');
+          delete cache[String(videoId)];
+          sessionStorage.setItem('portal_video_access_cache', JSON.stringify(cache));
+        } catch (_) {}
         alert(result.message || translations[currentLang].alertError);
         window.location.href = 'lessons.html';
         return;
