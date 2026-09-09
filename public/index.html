@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">بوابة الطالب وولي الأمر | تسجيل الدخول</title>
+  <link href="style.css" rel="stylesheet">
+  <link id="bootstrap-link" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  
+  <style>
+    /* إعدادات ألوان الوضع الداكن */
+    :root {
+      --dark-bg: #0f172a;
+      --dark-card: #1e293b;
+      --dark-text: #f8fafc;
+      --dark-muted: #94a3b8;
+      --dark-border: #334155;
+      --dark-input-bg: #1e293b;
+      --dark-input-text: #e2e8f0; /* لون كتابة فاتح وواضح */
+      --dark-placeholder: #64748b; /* لون بليس هولدر متناسق وفاتح */
+    }
+
+    body.dark-theme {
+      background-color: var(--dark-bg);
+      color: var(--dark-text);
+    }
+
+    body.dark-theme .login-wrapper {
+      background: var(--dark-bg);
+    }
+
+    body.dark-theme .card.login-card {
+      background-color: var(--dark-card);
+      border-color: var(--dark-border);
+      color: var(--dark-text);
+    }
+
+    body.dark-theme .custom-tabs {
+      background: #1e293b;
+      border-color: var(--dark-border);
+    }
+
+    body.dark-theme .custom-tabs .nav-link {
+      color: var(--dark-muted);
+    }
+
+    body.dark-theme .custom-tabs .nav-link.active {
+      background: #334155;
+      color: #fff;
+    }
+
+    /* تحسين ألوان المدخلات والكتابة في الدارك مود */
+    body.dark-theme .form-control {
+      background-color: var(--dark-input-bg) !important;
+      border-color: var(--dark-border) !important;
+      color: var(--dark-input-text) !important; /* إجبار اللون الفاتح للكتابة */
+    }
+
+    body.dark-theme .form-control:focus {
+      background-color: var(--dark-input-bg) !important;
+      color: var(--dark-input-text) !important;
+      border-color: var(--sf-primary) !important;
+      box-shadow: 0 0 0 0.25rem rgba(67, 56, 202, 0.25) !important;
+    }
+
+    /* تعديل لون الـ Placeholder في الدارك مود ليكون واضح وفاتح */
+    body.dark-theme .form-control::placeholder {
+      color: var(--dark-placeholder) !important;
+      opacity: 1;
+    }
+    body.dark-theme .form-control:-ms-input-placeholder {
+      color: var(--dark-placeholder) !important;
+    }
+    body.dark-theme .form-control::-ms-input-placeholder {
+      color: var(--dark-placeholder) !important;
+    }
+
+    body.dark-theme #global-loader {
+      background: rgba(15, 23, 42, 0.85);
+    }
+
+    /* شريط التحكم العائم (لغة / دارك مود) */
+    .theme-controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: auto;
+      z-index: 1050;
+      display: flex;
+      gap: 10px;
+    }
+    html[dir="ltr"] .theme-controls {
+      left: auto;
+      right: 20px;
+    }
+    .control-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #E2E4F3;
+      padding: 8px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    body.dark-theme .control-btn {
+      background: #1e293b;
+      border-color: var(--dark-border);
+      color: var(--dark-text);
+    }
+
+    /* إعدادات الـ Loading Spinner */
+    #global-loader {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(245, 246, 251, 0.85);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+    }
+    .spinner {
+      border: 4px solid #E2E4F3;
+      border-top: 4px solid var(--sf-primary); 
+      border-radius: 50%;
+      width: 50px; height: 50px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* أنيميشن الدخول */
+    .fade-in-up {
+      animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* خلفية المنصة الفخمة الجديدة */
+    .login-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      background: var(--sf-bg);
+      padding: 40px 0;
+    }
+    
+    /* الأشكال الجمالية في الخلفية */
+    .bg-shape {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: 0;
+      opacity: 0.5;
+      animation: float 6s ease-in-out infinite;
+    }
+    .bg-shape-1 {
+      width: 400px; height: 400px;
+      background: var(--sf-primary);
+      top: -100px; right: -100px;
+    }
+    .bg-shape-2 {
+      width: 500px; height: 500px;
+      background: var(--sf-accent);
+      bottom: -150px; left: -150px;
+      animation-delay: 2s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(20px); }
+    }
+
+    /* الـ Container الأساسي فوق الخلفية */
+    .content-container {
+      z-index: 1;
+      position: relative;
+      width: 100%;
+    }
+
+    /* تصميم الـ Tabs بتاع التبديل بين طالب وولي أمر */
+    .custom-tabs {
+      background: #EEF0FB;
+      border-radius: 12px;
+      padding: 6px;
+      gap: 5px;
+      border: 1px solid #E2E4F3;
+    }
+    .custom-tabs .nav-link {
+      border-radius: 8px;
+      color: var(--sf-muted);
+      font-weight: 700;
+      padding: 12px 20px;
+      transition: all 0.3s ease;
+      font-size: 0.95rem;
+    }
+    .custom-tabs .nav-link:hover {
+      color: var(--sf-primary);
+    }
+    .custom-tabs .nav-link.active {
+      background: #fff;
+      color: var(--sf-primary);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    /* تحسينات إضافية للمدخلات */
+    .form-control-lg {
+      font-size: 0.95rem;
+      padding: 12px 16px;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="theme-controls">
+    <button class="control-btn" id="lang-toggle-btn" onclick="toggleLanguage()">English</button>
+    <button class="control-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <div id="global-loader" style="display: none;">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="login-wrapper">
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <div class="container content-container fade-in-up">
+      <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-5">
+          
+          <div class="text-center mb-4">
+            <div class="sf-logo-mark mx-auto mb-3" style="width: 56px; height: 56px; font-size: 1.8rem; border-radius: 14px; box-shadow: 0 10px 20px rgba(67, 56, 202, 0.2);">
+              📚
+            </div>
+            <h3 class="fw-bold" style="color: var(--sf-primary-dark);" id="text-portal-title">بوابة Shady Elsharkawy</h3>
+            <p class="text-primary small fw-semibold mb-1" data-platform-brand></p>
+            <p class="text-muted small" id="text-portal-subtitle">مرحباً بك مجدداً في منصة Shady Elsharkawy التعليمية</p>
+          </div>
+          
+          <div id="errorBox"></div>
+
+          <div class="card login-card p-4 p-md-5">
+            
+            <ul class="nav nav-pills custom-tabs mb-4 justify-content-center" id="loginTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active w-100" id="student-tab" data-bs-toggle="pill" data-bs-target="#student-pane" type="button" role="tab">
+                  <span id="text-tab-student">👨‍🎓 طالب</span>
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link w-100" id="parent-tab" data-bs-toggle="pill" data-bs-target="#parent-pane" type="button" role="tab">
+                  <span id="text-tab-parent">👨‍👩‍👦 ولي أمر</span>
+                </button>
+              </li>
+            </ul>
+
+            <div class="tab-content" id="loginTabsContent">
+              
+              <div class="tab-pane fade show active" id="student-pane" role="tabpanel">
+                <form id="studentForm">
+                  <div class="mb-3">
+                    <label class="form-label" id="label-student-phone">رقم الهاتف</label>
+                    <input type="text" id="studentPhone" class="form-control form-control-lg" required>
+                  </div>
+                  <div class="mb-4">
+                    <label class="form-label" id="label-student-code">كود الطالب</label>
+                    <input type="text" id="studentCode" class="form-control form-control-lg" placeholder="مثال: STU-00001" required>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100" style="min-height: 48px; font-size: 1rem;" id="btn-student-login">دخول الطالب</button>
+                </form>
+              </div>
+
+              <div class="tab-pane fade" id="parent-pane" role="tabpanel">
+                <form id="parentForm">
+                  <div class="mb-3">
+                    <label class="form-label" id="label-parent-code">كود ابنك/ابنتك</label>
+                    <input type="text" id="parentStudentCode" class="form-control form-control-lg" placeholder="مثال: STU-00001" required>
+                  </div>
+                  <div class="mb-4">
+                    <label class="form-label" id="label-parent-phone">رقم هاتفك</label>
+                    <input type="text" id="parentPhone" class="form-control form-control-lg" required>
+                  </div>
+                  <button type="submit" class="btn btn-success w-100" style="min-height: 48px; font-size: 1rem;" id="btn-parent-login">دخول ولي الأمر</button>
+                </form>
+              </div>
+
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="config.js"></script>
+  
+  <script>
+    const translations = {
+      ar: {
+        title: "بوابة الطالب وولي الأمر | تسجيل الدخول",
+        portalTitle: "بوابة Shady Elsharkawy",
+        portalSubtitle: "مرحباً بك في منصة Shady Elsharkawy التعليمية",
+        tabStudent: "👨‍🎓 طالب",
+        tabParent: "👨‍👩‍👦 ولي أمر",
+        studentPhone: "رقم الهاتف",
+        studentCode: "كود الطالب",
+        studentPlaceholder: "مثال: STU-00001",
+        studentBtn: "دخول الطالب",
+        parentCode: "كود ابنك/ابنتك",
+        parentPhone: "رقم هاتفك",
+        parentPlaceholder: "مثال: STU-00001",
+        parentBtn: "دخول ولي الأمر",
+        errorConn: "حدث خطأ في الاتصال، يرجى المحاولة لاحقاً."
+      },
+      en: {
+        title: "Shady Elsharkawy Portal | Login",
+        portalTitle: "Shady Elsharkawy Portal",
+        portalSubtitle: "Welcome back to Shady Elsharkawy",
+        tabStudent: "👨‍🎓 Student",
+        tabParent: "👨‍👩‍👦 Parent",
+        studentPhone: "Phone Number",
+        studentCode: "Student Code",
+        studentPlaceholder: "e.g., STU-00001",
+        studentBtn: "Student Login",
+        parentCode: "Your Child's Code",
+        parentPhone: "Your Phone Number",
+        parentPlaceholder: "e.g., STU-00001",
+        parentBtn: "Parent Login",
+        errorConn: "Connection error occurred, please try again later."
+      }
+    };
+
+    function applyLanguage(lang) {
+      const isEn = lang === 'en';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+      
+      const bootstrapLink = document.getElementById('bootstrap-link');
+      if (isEn) {
+        bootstrapLink.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css";
+      } else {
+        bootstrapLink.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css";
+      }
+
+      document.getElementById('page-title').innerText = translations[lang].title;
+      document.getElementById('text-portal-title').innerText = translations[lang].portalTitle;
+      document.getElementById('text-portal-subtitle').innerText = translations[lang].portalSubtitle;
+      document.getElementById('text-tab-student').innerText = translations[lang].tabStudent;
+      document.getElementById('text-tab-parent').innerText = translations[lang].tabParent;
+      document.getElementById('label-student-phone').innerText = translations[lang].studentPhone;
+      document.getElementById('label-student-code').innerText = translations[lang].studentCode;
+      document.getElementById('studentCode').placeholder = translations[lang].studentPlaceholder;
+      document.getElementById('btn-student-login').innerText = translations[lang].studentBtn;
+      document.getElementById('label-parent-code').innerText = translations[lang].parentCode;
+      document.getElementById('parentStudentCode').placeholder = translations[lang].parentPlaceholder;
+      document.getElementById('label-parent-phone').innerText = translations[lang].parentPhone;
+      document.getElementById('btn-parent-login').innerText = translations[lang].parentBtn;
+      
+      document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
+    }
+
+    function toggleLanguage() {
+      let currentLang = localStorage.getItem('portal_lang') || 'ar';
+      let newLang = currentLang === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('portal_lang', newLang);
+      applyLanguage(newLang);
+    }
+
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '☀️';
+      } else {
+        document.body.classList.remove('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '🌙';
+      }
+    }
+
+    function toggleTheme() {
+      let currentTheme = localStorage.getItem('portal_theme') || 'light';
+      let newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('portal_theme', newTheme);
+      applyTheme(newTheme);
+    }
+
+    (function init() {
+      const savedLang = localStorage.getItem('portal_lang') || 'ar';
+      applyLanguage(savedLang);
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      applyTheme(savedTheme);
+    })();
+
+    // --- سكريبت الطالب ---
+    document.getElementById('studentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const loader = document.getElementById('global-loader');
+      loader.style.display = 'flex';
+      const phone = document.getElementById('studentPhone').value.trim();
+      const student_code = document.getElementById('studentCode').value.trim();
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/portal/student-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, student_code }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.setItem('portal_token', data.token);
+          localStorage.setItem('portal_type', 'student');
+          window.location.href = 'lessons.html';
+        } else {
+          loader.style.display = 'none';
+          document.getElementById('errorBox').innerHTML = `<div class="alert alert-danger fade-in-up">${data.message}</div>`;
+        }
+      } catch (error) {
+        loader.style.display = 'none';
+        document.getElementById('errorBox').innerHTML = `<div class="alert alert-danger fade-in-up">${translations[currentLang].errorConn}</div>`;
+      }
+    });
+
+    // --- سكريبت ولي الأمر المصلح تماماً والمحمي ---
+    document.getElementById('parentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const loader = document.getElementById('global-loader');
+      loader.style.display = 'flex';
+      
+      // عمل .trim() للتأكد إن مفيش مسافات بتتبعت وتضرب الـ Validation
+      const student_code = document.getElementById('parentStudentCode').value.trim();
+      const parent_phone = document.getElementById('parentPhone').value.trim();
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/portal/parent-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_code, parent_phone }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.setItem('portal_token', data.token);
+          localStorage.setItem('portal_type', 'parent');
+          window.location.href = 'parent.html';
+        } else {
+          loader.style.display = 'none';
+          document.getElementById('errorBox').innerHTML = `<div class="alert alert-danger fade-in-up">${data.message}</div>`;
+        }
+      } catch (error) {
+        loader.style.display = 'none';
+        document.getElementById('errorBox').innerHTML = `<div class="alert alert-danger fade-in-up">${translations[currentLang].errorConn}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>
