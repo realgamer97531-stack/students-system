@@ -4012,28 +4012,62 @@ app.get('/api/portal/student/qrcode', verifyPortalToken('student'), async (req, 
 });
 
 // تسجيل/تحديث مشاهدة فيديو (الطالب بس)
+const watchProgressWrites = new Map();
+
+function queueWatchProgress(studentId, videoPartId, watchedSeconds) {
+  const key = `${studentId}:${videoPartId}`;
+  const existing = watchProgressWrites.get(key);
+  if (existing) {
+    existing.latestSeconds = Math.max(existing.latestSeconds, watchedSeconds);
+    return existing.promise;
+  }
+
+  const state = { latestSeconds: watchedSeconds, promise: null };
+  state.promise = (async () => {
+    let processedSeconds = -1;
+    try {
+      while (state.latestSeconds > processedSeconds) {
+        const seconds = state.latestSeconds;
+        processedSeconds = seconds;
+
+        const progress = await WatchProgress.findOne({
+          where: { StudentId: studentId, VideoPartId: videoPartId },
+        });
+
+        if (!progress) {
+          await WatchProgress.create({
+            StudentId: studentId,
+            VideoPartId: videoPartId,
+            watched_seconds: seconds,
+          });
+          await addPoints(studentId, 1, 'مشاهدة فيديو', null);
+        } else if (seconds > progress.watched_seconds) {
+          await progress.update({ watched_seconds: seconds });
+        }
+      }
+    } finally {
+      if (watchProgressWrites.get(key) === state) watchProgressWrites.delete(key);
+    }
+  })();
+
+  watchProgressWrites.set(key, state);
+  return state.promise;
+}
+
 app.post('/api/portal/watch-progress', verifyPortalToken('student'), async (req, res) => {
   try {
-    const { video_part_id, watched_seconds } = req.body;
+    const videoPartId = Number.parseInt(req.body?.video_part_id, 10);
+    const watchedSeconds = Number.parseInt(req.body?.watched_seconds, 10);
     const studentId = req.portalStudentId;
 
-    const [progress, created] = await WatchProgress.findOrCreate({
-      where: { StudentId: studentId, VideoPartId: video_part_id },
-      defaults: { watched_seconds },
-    });
-
-    if (created) {
-      await addPoints(studentId, 1, 'مشاهدة فيديو', null);
+    if (!Number.isInteger(videoPartId) || !Number.isInteger(watchedSeconds) || watchedSeconds < 0) {
+      return res.status(400).json({ success: false, message: 'وقت المشاهدة غير صحيح' });
     }
 
-    if (!created && watched_seconds > progress.watched_seconds) {
-      progress.watched_seconds = watched_seconds;
-      await progress.save();
-    }
-
+    await queueWatchProgress(studentId, videoPartId, watchedSeconds);
     res.json({ success: true });
   } catch (error) {
-    console.error(error);
+    console.error('Watch progress update failed:', error.message);
     res.status(500).json({ success: false });
   }
 });
