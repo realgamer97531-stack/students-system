@@ -3873,25 +3873,52 @@ async function buildStudentData(studentId) {
     order: [['createdAt', 'DESC']],
     limit: 30,
   });
+  const pointsHistory = transactions
+    .filter(t => t.reason && t.reason.startsWith('نقاط:'))
+    .slice(0, 20)
+    .map(t => ({ reason: t.reason.replace('نقاط: ', ''), amount: t.amount, time: t.createdAt }));
 
   const ownSessionByLesson = {};
   ownSessions.forEach(s => { ownSessionByLesson[s.lesson_number] = s; });
 
-  // حساب إحصائيات الامتحانات مرة واحدة لكل الحصص
+  // Batch exam statistics instead of querying once per attended lesson.
   const examStatsMap = {};
-  for (const lessonNum of lessonNumbers) {
-    const att = attendanceByLesson[lessonNum];
-    if (!att) continue;
-    const exam = await Exam.findOne({ where: { SessionId: att.Session?.id || att.SessionId } });
-    if (!exam) continue;
-    const allResults = await ExamResult.findAll({ where: { ExamId: exam.id }, attributes: ['score'] });
-    if (allResults.length === 0) continue;
-    const scores = allResults.map(r => parseFloat(r.score));
-    examStatsMap[lessonNum] = {
-      max: Math.max(...scores),
-      min: Math.min(...scores),
-      avg: (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1),
-    };
+  const attendedSessionIds = [...new Set(Object.values(attendanceByLesson)
+    .map(att => att.Session?.id || att.SessionId)
+    .filter(Boolean))];
+  if (attendedSessionIds.length > 0) {
+    const exams = await Exam.findAll({
+      where: { SessionId: attendedSessionIds },
+      attributes: ['id', 'SessionId'],
+    });
+    const examIds = exams.map(exam => exam.id);
+    if (examIds.length > 0) {
+      const examResultsForStats = await ExamResult.findAll({
+        where: { ExamId: examIds },
+        attributes: ['ExamId', 'score'],
+      });
+      const scoresByExamId = {};
+      examResultsForStats.forEach(result => {
+        const score = Number.parseFloat(result.score);
+        if (!scoresByExamId[result.ExamId]) scoresByExamId[result.ExamId] = [];
+        scoresByExamId[result.ExamId].push(score);
+      });
+      const statsBySessionId = {};
+      exams.forEach(exam => {
+        const scores = scoresByExamId[exam.id] || [];
+        if (scores.length === 0) return;
+        if (statsBySessionId[exam.SessionId]) return;
+        statsBySessionId[exam.SessionId] = {
+          max: Math.max(...scores),
+          min: Math.min(...scores),
+          avg: (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1),
+        };
+      });
+      Object.entries(attendanceByLesson).forEach(([lessonNum, att]) => {
+        const sessionId = att.Session?.id || att.SessionId;
+        if (statsBySessionId[sessionId]) examStatsMap[lessonNum] = statsBySessionId[sessionId];
+      });
+    }
   }
 
   const sessions = lessonNumbers.map(lessonNumber => {
@@ -3930,10 +3957,7 @@ async function buildStudentData(studentId) {
       examUser: exam ? (exam.User ? exam.User.name : null) : null,
       examTime: exam ? exam.createdAt : null,
       points: student.points || 0,
-      pointsHistory: transactions
-      .filter(t => t.reason && t.reason.startsWith('نقاط:'))
-      .slice(0, 20)
-      .map(t => ({ reason: t.reason.replace('نقاط: ', ''), amount: t.amount, time: t.createdAt })),
+      pointsHistory,
     };
   });
 
