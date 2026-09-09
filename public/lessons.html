@@ -576,9 +576,10 @@ html[dir="ltr"] .whatsapp-float {
     }
 
     function cacheVideoAccess(videoId, lesson) {
-      if (!lesson || !['free', 'granted'].includes(lesson.status)) return;
+      if (!lesson || (lesson.status !== 'free' && !lesson.accessExpiresAt)) return;
       const cache = readVideoAccessCache();
       cache[String(videoId)] = {
+        status: lesson.status,
         unlimited: Boolean(lesson.unlimited),
         accessExpiresAt: lesson.accessExpiresAt || null,
         cachedAt: Date.now(),
@@ -590,6 +591,13 @@ html[dir="ltr"] .whatsapp-float {
       const cache = readVideoAccessCache();
       const entry = cache[String(videoId)];
       if (!entry) return null;
+      // Only reuse free access or a grant with a server-provided expiry.
+      // Older cache entries without this proof are deliberately invalidated.
+      if (entry.status !== 'free' && !entry.accessExpiresAt) {
+        delete cache[String(videoId)];
+        writeVideoAccessCache(cache);
+        return null;
+      }
       if (entry.accessExpiresAt && new Date(entry.accessExpiresAt).getTime() <= Date.now()) {
         delete cache[String(videoId)];
         writeVideoAccessCache(cache);
