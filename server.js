@@ -190,7 +190,7 @@ async function sendStudentsToCallCenter(name, students) {
   return result;
 }
 
-function callCenterStudent(student) {
+function callCenterStudent(student, details = {}) {
   return {
     student_id: student.student_code || student.id,
     name: student.name,
@@ -198,6 +198,9 @@ function callCenterStudent(student) {
     parent_phone: student.parent_phone,
     center: student.Center?.name,
     subject: student.Subject?.name,
+    homework_status: details.homeworkStatus || null,
+    exam_score: details.examScore ?? null,
+    exam_max: details.examMax ?? null,
   };
 }
 
@@ -2274,9 +2277,42 @@ async function handleSessionReportCallExport(req, res, scope) {
     const students = await getSessionReportCallStudents(session, scope);
     if (!students.length) return res.status(400).json({ error: `No ${scope} students found` });
 
+    const studentIds = students.map(student => student.id).filter(Boolean);
+    const enrichedStudents = await Student.findAll({
+      where: { id: studentIds },
+      include: [Center, Subject],
+    });
+    const studentById = new Map(enrichedStudents.map(student => [student.id, student]));
+    const studentsWithDetails = students.map(student => ({
+      student: studentById.get(student.id) || student,
+      details: {},
+    }));
+
+    if (scope === 'present' && studentIds.length > 0) {
+      const homeworkRecords = await HomeworkCheck.findAll({ where: { SessionId: session.id } });
+      const homeworkByStudentId = new Map(homeworkRecords.map(record => [record.StudentId, record.status]));
+      const linkedExam = await Exam.findOne({ where: { SessionId: session.id } });
+      const examByStudentId = new Map();
+      if (linkedExam) {
+        const examResults = await ExamResult.findAll({ where: { ExamId: linkedExam.id } });
+        examResults.forEach(result => examByStudentId.set(result.StudentId, {
+          score: result.score,
+          max: linkedExam.max_score,
+        }));
+      }
+      studentsWithDetails.forEach(item => {
+        const exam = examByStudentId.get(item.student.id);
+        item.details = {
+          homeworkStatus: homeworkByStudentId.get(item.student.id) || null,
+          examScore: exam ? exam.score : null,
+          examMax: exam ? exam.max : null,
+        };
+      });
+    }
+
     const result = await sendStudentsToCallCenter(
       buildCallCenterSessionName({ session, scope: scope === 'present' ? 'Present' : 'Absent' }),
-      students.map(callCenterStudent)
+      studentsWithDetails.map(item => callCenterStudent(item.student, item.details))
     );
     res.json({ success: true, sessionId: result.id, imported: result.imported });
   } catch (error) {
