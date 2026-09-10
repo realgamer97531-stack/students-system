@@ -4117,7 +4117,9 @@ app.get('/api/portal/parent/data', verifyPortalToken('parent'), async (req, res)
 
 // Call-center comment bridge. Call-center failures must not block a call.
 function normalizeCallCenterIdentity(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ');
+  const normalized = String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (['online', 'on-line', 'أونلاين', 'اونلاين', 'online center'].includes(normalized)) return 'online';
+  return normalized;
 }
 
 app.post('/api/internal/callcenter/session-comment', async (req, res) => {
@@ -4141,10 +4143,11 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
       where: { lesson_number: Number(relative) },
       include: [Center, Subject],
     });
-    const matchingSession = candidateSessions.find(session =>
+    const matchingSessions = candidateSessions.filter(session =>
       normalizeCallCenterIdentity(session.Center?.name) === normalizedCenter
       && normalizeCallCenterIdentity(session.Subject?.name) === normalizedSubject
     );
+    const matchingSession = matchingSessions[0];
     if (!matchingSession) return res.status(404).json({ success: false, message: 'Matching session not found' });
 
     const configuredUserId = Number.parseInt(process.env.CALLCENTER_COMMENT_USER_ID, 10);
@@ -4171,7 +4174,7 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
       await sessionComment.save();
     }
 
-    res.json({ success: true, updated: true });
+    res.json({ success: true, updated: true, session_id: matchingSession.id });
   } catch (error) {
     console.error('Call-center session comment bridge failed:', error.message);
     res.status(500).json({ success: false, message: 'Could not save session comment' });
