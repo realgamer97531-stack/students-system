@@ -177,6 +177,20 @@ new call session, and returns its ID and imported count. It is optional and
 can be disabled from the student system without changing the call-center
 database.
 
+### Follow-up comment sync
+
+To copy caller outcomes/comments into the matching student follow-up session,
+set these backend environment variables:
+
+```text
+CALLCENTER_COMMENT_CALLBACK_URL=https://your-student-system.example.com/api/internal/callcenter/session-comment
+CALLCENTER_SERVICE_TOKEN=<same-shared-secret-used-by-the-student-system>
+```
+
+The callback is best-effort: completing a call still succeeds if the student
+system is temporarily unavailable. The student system matches by Student ID,
+relative number, center, and subject.
+
 ## Accounts
 
 - The **admin** account is created via `npm run seed` in the backend.

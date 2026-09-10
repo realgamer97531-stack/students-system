@@ -6,6 +6,39 @@ const router = express.Router();
 
 const VALID_DISPOSITIONS = ['no_answer', 'busy', 'wrong_number', 'follow_up', 'rejected', 'skipped', 'deal_done'];
 
+function syncCommentToStudentSystem(row, session, disposition, comment) {
+  const callbackUrl = process.env.CALLCENTER_COMMENT_CALLBACK_URL;
+  const serviceToken = process.env.CALLCENTER_SERVICE_TOKEN;
+  const relativeMatch = String(session.name || '').match(/Relative\s+(\d+)/i);
+  if (!callbackUrl || !serviceToken || !row.student_id || !row.center || !row.subject || !relativeMatch) {
+    return Promise.resolve();
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  return fetch(callbackUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Callcenter-Service-Token': serviceToken,
+    },
+    body: JSON.stringify({
+      student_id: row.student_id,
+      relative: Number(relativeMatch[1]),
+      center: row.center,
+      subject: row.subject,
+      disposition,
+      comment: comment && comment.trim() ? comment.trim() : '',
+    }),
+    signal: controller.signal,
+  }).then(async (response) => {
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.message || `Student-system callback failed (${response.status})`);
+    }
+  }).finally(() => clearTimeout(timeout));
+}
+
 /*
  * ATOMICITY NOTE:
  * This runs inside a single MySQL/InnoDB transaction using SELECT ... FOR
@@ -101,11 +134,17 @@ router.post('/rows/:id/disposition', requireAuth, async (req, res) => {
     if (row.status !== 'assigned' || row.assigned_to !== req.user.id) {
       return res.status(403).json({ error: 'This row is not currently assigned to you' });
     }
+    const [sessionRows] = await pool.query('SELECT name FROM sessions WHERE id = ?', [row.session_id]);
+    const session = sessionRows[0];
 
     await pool.query(
       `UPDATE call_rows SET status = 'done', disposition = ?, comment = ?, completed_at = NOW() WHERE id = ?`,
       [disposition, comment && comment.trim() ? comment.trim() : null, row.id]
     );
+
+    // Keep the existing call completion independent from the optional bridge.
+    syncCommentToStudentSystem(row, session, disposition, comment)
+      .catch((err) => console.error('Student-system comment sync failed:', err.message));
 
     res.json({ ok: true });
   } catch (err) {
