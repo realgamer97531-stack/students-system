@@ -10,7 +10,12 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
   const callbackUrl = process.env.CALLCENTER_COMMENT_CALLBACK_URL;
   const serviceToken = process.env.CALLCENTER_SERVICE_TOKEN;
   const relativeMatch = String(session.name || '').match(/Relative\s+(\d+)/i);
-  if (!callbackUrl || !serviceToken || !row.student_id || !row.center || !row.subject || !relativeMatch) {
+  const centerMatch = String(session.name || '').match(/\|\s*Center:\s*(.*?)\s*(?:\|\s*Type:|$)/i);
+  const center = row.center || (centerMatch && centerMatch[1]);
+  const subjectMatch = String(session.name || '').match(/\|\s*Relative\s+\d+\s*\|\s*(.*?)\s*\|\s*Center:/i);
+  const subject = row.subject || (subjectMatch && subjectMatch[1]);
+  if (!callbackUrl || !serviceToken || !row.student_id || !center || !subject || !relativeMatch) {
+    console.warn('Student-system comment sync skipped: missing callback configuration or row identity');
     return Promise.resolve();
   }
 
@@ -25,8 +30,8 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
     body: JSON.stringify({
       student_id: row.student_id,
       relative: Number(relativeMatch[1]),
-      center: row.center,
-      subject: row.subject,
+      center,
+      subject,
       disposition,
       comment: comment && comment.trim() ? comment.trim() : '',
     }),
