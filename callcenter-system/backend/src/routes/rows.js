@@ -7,15 +7,22 @@ const router = express.Router();
 const VALID_DISPOSITIONS = ['no_answer', 'busy', 'wrong_number', 'follow_up', 'rejected', 'skipped', 'deal_done'];
 
 function syncCommentToStudentSystem(row, session, disposition, comment) {
-  const callbackUrl = process.env.CALLCENTER_COMMENT_CALLBACK_URL;
+  const callbackUrl = process.env.CALLCENTER_COMMENT_CALLBACK_URL
+    || 'https://students-system-production-6b89.up.railway.app/api/internal/callcenter/session-comment';
   const serviceToken = process.env.CALLCENTER_SERVICE_TOKEN;
   const relativeMatch = String(session.name || '').match(/Relative\s+(\d+)/i);
   const centerMatch = String(session.name || '').match(/\|\s*Center:\s*(.*?)\s*(?:\|\s*Type:|$)/i);
-  const center = row.center || (centerMatch && centerMatch[1]);
+  const center = String(row.center || (centerMatch && centerMatch[1]) || '').trim();
   const subjectMatch = String(session.name || '').match(/\|\s*Relative\s+\d+\s*\|\s*(.*?)\s*\|\s*Center:/i);
-  const subject = row.subject || (subjectMatch && subjectMatch[1]);
+  const subject = String(row.subject || (subjectMatch && subjectMatch[1]) || '').trim();
   if (!callbackUrl || !serviceToken || !row.student_id || !center || !subject || !relativeMatch) {
-    console.warn('Student-system comment sync skipped: missing callback configuration or row identity');
+    console.warn('Student-system comment sync skipped: missing token or row identity', {
+      hasToken: Boolean(serviceToken),
+      studentId: row.student_id || null,
+      center,
+      subject,
+      sessionName: session.name,
+    });
     return Promise.resolve();
   }
 
@@ -41,6 +48,7 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
       const result = await response.json().catch(() => ({}));
       throw new Error(result.message || `Student-system callback failed (${response.status})`);
     }
+    console.log(`Student-system comment synced for row ${row.id}`);
   }).finally(() => clearTimeout(timeout));
 }
 
