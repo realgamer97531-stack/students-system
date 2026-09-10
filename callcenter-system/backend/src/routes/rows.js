@@ -10,11 +10,16 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
   const callbackUrl = process.env.CALLCENTER_COMMENT_CALLBACK_URL
     || 'https://students-system-production-6b89.up.railway.app/api/internal/callcenter/session-comment';
   const serviceToken = process.env.CALLCENTER_SERVICE_TOKEN;
+  const sessionParts = String(session.name || '').split('|').map(part => part.trim());
   const relativeMatch = String(session.name || '').match(/Relative\s+(\d+)/i);
-  const centerMatch = String(session.name || '').match(/\|\s*Center:\s*(.*?)\s*(?:\|\s*Type:|$)/i);
-  const center = String(row.center || (centerMatch && centerMatch[1]) || '').trim();
-  const subjectMatch = String(session.name || '').match(/\|\s*Relative\s+\d+\s*\|\s*(.*?)\s*\|\s*Center:/i);
-  const subject = String(row.subject || (subjectMatch && subjectMatch[1]) || '').trim();
+  const relativeIndex = sessionParts.findIndex(part => /^Relative\s+\d+$/i.test(part));
+  const sessionSubject = relativeIndex >= 0 ? sessionParts[relativeIndex + 1] : '';
+  const sessionCenterPart = sessionParts.find(part => /^Center:\s*/i.test(part));
+  const sessionCenter = sessionCenterPart
+    ? sessionCenterPart.replace(/^Center:\s*/i, '')
+    : sessionParts.find(part => /^Online$/i.test(part)) || '';
+  const center = String(row.center || sessionCenter).trim();
+  const subject = String(row.subject || sessionSubject).trim();
   if (!callbackUrl || !serviceToken || !row.student_id || !center || !subject || !relativeMatch) {
     console.warn('Student-system comment sync skipped: missing token or row identity', {
       hasToken: Boolean(serviceToken),
