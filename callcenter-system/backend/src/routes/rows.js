@@ -20,7 +20,7 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
     : sessionParts.find(part => /^Online$/i.test(part)) || '';
   const center = String(row.center || sessionCenter).trim();
   const subject = String(row.subject || sessionSubject).trim();
-  if (!callbackUrl || !serviceToken || !row.student_id || !center || !subject || !relativeMatch) {
+  if (!callbackUrl || !serviceToken || !row.student_id || !relativeMatch) {
     console.warn('Student-system comment sync skipped: missing token or row identity', {
       hasToken: Boolean(serviceToken),
       studentId: row.student_id || null,
@@ -161,8 +161,11 @@ router.post('/rows/:id/disposition', requireAuth, async (req, res) => {
     );
 
     // Keep the existing call completion independent from the optional bridge.
-    syncCommentToStudentSystem(row, session, disposition, comment)
-      .catch((err) => console.error('Student-system comment sync failed:', err.message));
+    try {
+      await syncCommentToStudentSystem(row, session, disposition, comment);
+    } catch (err) {
+      console.error('Student-system comment sync failed:', err.message);
+    }
 
     res.json({ ok: true });
   } catch (err) {
