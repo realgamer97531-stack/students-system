@@ -43,15 +43,19 @@ async function bulkInsertRows(conn, sessionId, startIndex, students, withSourceI
         s.name,
         s.phone || null,
         s.parent_phone || null,
+        s.center || null,
         s.grade || null,
         s.subject || null,
+        s.homework_status || null,
+        s.exam_score === '' || s.exam_score === undefined ? null : s.exam_score,
+        s.exam_max === '' || s.exam_max === undefined ? null : s.exam_max,
         withSourceId ? s.id : null
       );
-      return '(?, ?, ?, ?, ?, ?, ?, ?, ?)';
+      return '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     })
     .join(', ');
   await conn.query(
-    `INSERT INTO call_rows (session_id, row_index, student_id, name, phone, parent_phone, grade, subject, source_row_id)
+    `INSERT INTO call_rows (session_id, row_index, student_id, name, phone, parent_phone, center, grade, subject, homework_status, exam_score, exam_max, source_row_id)
      VALUES ${placeholders}`,
     values
   );
@@ -138,8 +142,12 @@ router.post('/internal', async (req, res) => {
       name: String(student.name).trim(),
       phone: student.phone || null,
       parent_phone: student.parent_phone || null,
-      grade: student.grade || student.center || null,
+      center: student.center || null,
+      grade: student.grade || null,
       subject: student.subject || null,
+      homework_status: student.homework_status || null,
+      exam_score: student.exam_score ?? null,
+      exam_max: student.exam_max ?? null,
     }));
 
   if (normalizedStudents.length === 0) {

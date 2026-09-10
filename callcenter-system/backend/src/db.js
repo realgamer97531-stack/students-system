@@ -53,8 +53,12 @@ async function initSchema() {
         name VARCHAR(255) NOT NULL,
         phone VARCHAR(50),
         parent_phone VARCHAR(50),
+        center VARCHAR(100),
         grade VARCHAR(100),
         subject VARCHAR(100),
+        homework_status VARCHAR(50),
+        exam_score DECIMAL(10,2) NULL,
+        exam_max DECIMAL(10,2) NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
         assigned_to INT NULL,
         assigned_at DATETIME NULL,
@@ -78,6 +82,23 @@ async function initSchema() {
     );
     if (existingCols.length === 0) {
       await conn.query('ALTER TABLE call_rows ADD COLUMN comment TEXT NULL');
+    }
+
+    const [rowColumns] = await conn.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'call_rows'`
+    );
+    const existingColumnNames = new Set(rowColumns.map((column) => column.COLUMN_NAME));
+    const migrations = [
+      ['center', 'VARCHAR(100) NULL'],
+      ['homework_status', 'VARCHAR(50) NULL'],
+      ['exam_score', 'DECIMAL(10,2) NULL'],
+      ['exam_max', 'DECIMAL(10,2) NULL'],
+    ];
+    for (const [column, definition] of migrations) {
+      if (!existingColumnNames.has(column)) {
+        await conn.query(`ALTER TABLE call_rows ADD COLUMN ${column} ${definition}`);
+      }
     }
   } finally {
     conn.release();

@@ -80,7 +80,7 @@ function DataTab({ sessionId, callers }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--line)', color: 'var(--muted)' }}>
-              {['#', 'Student ID', 'Name', 'Phone', 'Parent phone', 'Grade', 'Subject', 'Status', 'Outcome', 'Comment', 'Assigned to', 'Completed'].map((h) => (
+              {['#', 'Student ID', 'Name', 'Phone', 'Parent phone', 'Center', 'Subject', 'Homework', 'Exam degree', 'Status', 'Outcome', 'Comment', 'Assigned to', 'Completed'].map((h) => (
                 <th key={h} style={{ padding: '10px 14px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -93,8 +93,10 @@ function DataTab({ sessionId, callers }) {
                 <td style={{ padding: '9px 14px', fontWeight: 600 }}>{r.name}</td>
                 <td className="mono" style={{ padding: '9px 14px' }}>{r.phone}</td>
                 <td className="mono" style={{ padding: '9px 14px' }}>{r.parent_phone}</td>
-                <td style={{ padding: '9px 14px' }}>{r.grade}</td>
+                <td style={{ padding: '9px 14px' }}>{r.center || r.grade || '—'}</td>
                 <td style={{ padding: '9px 14px' }}>{r.subject}</td>
+                <td style={{ padding: '9px 14px' }}>{r.homework_status || '—'}</td>
+                <td style={{ padding: '9px 14px' }}>{r.exam_score !== null && r.exam_score !== undefined ? `${r.exam_score}${r.exam_max ? ` / ${r.exam_max}` : ''}` : '—'}</td>
                 <td style={{ padding: '9px 14px' }}><StatusPill status={r.status} /></td>
                 <td style={{ padding: '9px 14px' }}>{r.disposition ? DISPOSITION_LABEL[r.disposition] : '—'}</td>
                 <td style={{ padding: '9px 14px', maxWidth: 220, color: r.comment ? 'inherit' : 'var(--muted)' }}>
@@ -107,7 +109,7 @@ function DataTab({ sessionId, callers }) {
               </tr>
             ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={12} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>No rows match these filters.</td></tr>
+              <tr><td colSpan={14} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>No rows match these filters.</td></tr>
             )}
           </tbody>
         </table>

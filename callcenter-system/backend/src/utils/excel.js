@@ -21,8 +21,12 @@ function buildColumnMap() {
       ...envSynonym('COLUMN_HEADER_PARENT_PHONE'),
       'parent phone', 'parent number', 'guardian phone', 'parentphone',
     ],
+    center: [...envSynonym('COLUMN_HEADER_CENTER'), 'center', 'centre', 'main center'],
     grade: [...envSynonym('COLUMN_HEADER_GRADE'), 'grade', 'grade level', 'class'],
     subject: [...envSynonym('COLUMN_HEADER_SUBJECT'), 'subject', 'course'],
+    homework_status: [...envSynonym('COLUMN_HEADER_HOMEWORK_STATUS'), 'homework status', 'homework'],
+    exam_score: [...envSynonym('COLUMN_HEADER_EXAM_SCORE'), 'exam score', 'exam degree', 'score'],
+    exam_max: [...envSynonym('COLUMN_HEADER_EXAM_MAX'), 'exam max', 'maximum score', 'max score'],
   };
 }
 
@@ -115,8 +119,12 @@ function parseStudentsExcel(buffer) {
       name,
       phone:        normalisePhone(cell(row, resolved.phone)),
       parent_phone: normalisePhone(cell(row, resolved.parent_phone)),
+      center: cell(row, resolved.center),
       grade:   cell(row, resolved.grade),
       subject: cell(row, resolved.subject),
+      homework_status: cell(row, resolved.homework_status),
+      exam_score: cell(row, resolved.exam_score),
+      exam_max: cell(row, resolved.exam_max),
     });
   }
 
@@ -133,8 +141,12 @@ function buildExportExcel(rowsData) {
     Name: r.name,
     Phone: r.phone,
     'Parent Phone': r.parent_phone,
+    Center: r.center || r.grade || '',
     Grade: r.grade,
     Subject: r.subject,
+    'Homework Status': r.homework_status || '',
+    'Exam Score': r.exam_score ?? '',
+    'Exam Max': r.exam_max ?? '',
     Status: r.status,
     Disposition: r.disposition || '',
     Comment: r.comment || '',

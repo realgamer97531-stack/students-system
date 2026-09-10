@@ -37,6 +37,10 @@ function digitsOnly(phone) {
   return (phone || '').replace(/[^\d+]/g, '');
 }
 
+function isAttendanceSession(session) {
+  return /type:\s*present/i.test(session?.name || '');
+}
+
 function copyText(value) {
   const text = value || '';
   if (navigator.clipboard && window.isSecureContext) {
@@ -260,6 +264,7 @@ function CallCard({ session, onLeave }) {
 
   const displayRow    = viewingPrev ? history[prevIndex] : row;
   const isPrevView    = viewingPrev;
+  const showAttendanceDetails = isAttendanceSession(session);
 
   return (
     <div className="call-shell">
@@ -318,8 +323,19 @@ function CallCard({ session, onLeave }) {
             <div className="student-name">{displayRow.name}</div>
             <div className="student-sub">
               {displayRow.student_id ? `ID ${displayRow.student_id} · ` : ''}
-              {displayRow.grade || '—'} · {displayRow.subject || '—'}
+              {displayRow.center || displayRow.grade || '—'} · {displayRow.subject || '—'}
             </div>
+
+            {showAttendanceDetails && (displayRow.homework_status || displayRow.exam_score !== null && displayRow.exam_score !== undefined) && (
+              <div className="contact-line" style={{ display: 'block' }}>
+                {displayRow.homework_status && (
+                  <div><span className="label">Homework</span><div className="value">{displayRow.homework_status}</div></div>
+                )}
+                {displayRow.exam_score !== null && displayRow.exam_score !== undefined && (
+                  <div style={{ marginTop: 8 }}><span className="label">Exam degree</span><div className="value">{displayRow.exam_score}{displayRow.exam_max ? ` / ${displayRow.exam_max}` : ''}</div></div>
+                )}
+              </div>
+            )}
 
             <div className="contact-line">
               <div>
