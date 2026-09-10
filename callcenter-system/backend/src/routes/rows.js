@@ -44,11 +44,11 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
     }),
     signal: controller.signal,
   }).then(async (response) => {
+    const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
       throw new Error(result.message || `Student-system callback failed (${response.status})`);
     }
-    console.log(`Student-system comment synced for row ${row.id}`);
+    console.log(`Student-system comment synced for row ${row.id}, session ${result.session_id || 'unknown'}`);
   }).finally(() => clearTimeout(timeout));
 }
 
