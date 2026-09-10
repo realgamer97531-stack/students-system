@@ -4116,6 +4116,10 @@ app.get('/api/portal/parent/data', verifyPortalToken('parent'), async (req, res)
 });
 
 // Call-center comment bridge. Call-center failures must not block a call.
+function normalizeCallCenterIdentity(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
 app.post('/api/internal/callcenter/session-comment', async (req, res) => {
   const configuredToken = process.env.CALLCENTER_SERVICE_TOKEN;
   if (!configuredToken || req.headers['x-callcenter-service-token'] !== configuredToken) {
@@ -4131,12 +4135,15 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
     const student = await Student.findOne({ where: { student_code: String(student_id) } });
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
+    const normalizedCenter = normalizeCallCenterIdentity(center);
+    const normalizedSubject = normalizeCallCenterIdentity(subject);
     const candidateSessions = await Session.findAll({
       where: { lesson_number: Number(relative) },
       include: [Center, Subject],
     });
     const matchingSession = candidateSessions.find(session =>
-      session.Center?.name === String(center) && session.Subject?.name === String(subject)
+      normalizeCallCenterIdentity(session.Center?.name) === normalizedCenter
+      && normalizeCallCenterIdentity(session.Subject?.name) === normalizedSubject
     );
     if (!matchingSession) return res.status(404).json({ success: false, message: 'Matching session not found' });
 
