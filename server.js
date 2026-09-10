@@ -4115,6 +4115,62 @@ app.get('/api/portal/parent/data', verifyPortalToken('parent'), async (req, res)
   res.json({ success: true, data });
 });
 
+// Call-center comment bridge. Call-center failures must not block a call.
+app.post('/api/internal/callcenter/session-comment', async (req, res) => {
+  const configuredToken = process.env.CALLCENTER_SERVICE_TOKEN;
+  if (!configuredToken || req.headers['x-callcenter-service-token'] !== configuredToken) {
+    return res.status(401).json({ success: false, message: 'Invalid service token' });
+  }
+
+  try {
+    const { student_id, relative, center, subject, comment, disposition } = req.body || {};
+    if (!student_id || !relative || !center || !subject) {
+      return res.status(400).json({ success: false, message: 'Student and session identity are required' });
+    }
+
+    const student = await Student.findOne({ where: { student_code: String(student_id) } });
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+    const candidateSessions = await Session.findAll({
+      where: { lesson_number: Number(relative) },
+      include: [Center, Subject],
+    });
+    const matchingSession = candidateSessions.find(session =>
+      session.Center?.name === String(center) && session.Subject?.name === String(subject)
+    );
+    if (!matchingSession) return res.status(404).json({ success: false, message: 'Matching session not found' });
+
+    const configuredUserId = Number.parseInt(process.env.CALLCENTER_COMMENT_USER_ID, 10);
+    const commentUser = configuredUserId
+      ? await User.findByPk(configuredUserId, { attributes: ['id'] })
+      : await User.findOne({ where: { active: true }, order: [['id', 'ASC']], attributes: ['id'] });
+    if (!commentUser) return res.status(503).json({ success: false, message: 'No comment owner is configured' });
+
+    const normalizedComment = String(comment || '').trim();
+    const normalizedDisposition = String(disposition || '').trim();
+    const combinedComment = [
+      normalizedDisposition ? `Call outcome: ${normalizedDisposition}` : '',
+      normalizedComment,
+    ].filter(Boolean).join(' | ');
+    if (!combinedComment) return res.json({ success: true, updated: false });
+
+    const [sessionComment] = await SessionComment.findOrCreate({
+      where: { StudentId: student.id, SessionId: matchingSession.id },
+      defaults: { UserId: commentUser.id, comment: combinedComment },
+    });
+    if (sessionComment.comment !== combinedComment) {
+      sessionComment.comment = combinedComment;
+      sessionComment.UserId = commentUser.id;
+      await sessionComment.save();
+    }
+
+    res.json({ success: true, updated: true });
+  } catch (error) {
+    console.error('Call-center session comment bridge failed:', error.message);
+    res.status(500).json({ success: false, message: 'Could not save session comment' });
+  }
+});
+
 // QR Code بصيغة صورة Base64 (الطالب بس)
 app.get('/api/portal/student/qrcode', verifyPortalToken('student'), async (req, res) => {
   const student = await Student.findByPk(req.portalStudentId);
