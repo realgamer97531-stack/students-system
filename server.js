@@ -5123,17 +5123,27 @@ app.post('/admin/videos/:id/session-link/delete', requirePermissionOrAdmin('admi
 app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   const { method, max_views, access_duration_hours } = req.body;
   const video = await Video.findByPk(req.params.id);
-  const session = await Session.findByPk(video.SessionId);
+  if (!video) return res.status(404).send('❌ الفيديو غير موجود');
+
+  const linkedSessionIds = (await VideoSession.findAll({
+    where: { VideoId: video.id },
+    attributes: ['SessionId'],
+  })).map(row => row.SessionId);
+  const allowedSessionIds = new Set([video.SessionId, ...linkedSessionIds].filter(Boolean));
+  const requestedSessionId = Number.parseInt(req.body.session_id, 10);
+  const sessionId = allowedSessionIds.has(requestedSessionId) ? requestedSessionId : video.SessionId;
+  const session = await Session.findByPk(sessionId);
   const durationHours = Math.max(1, Number.parseInt(access_duration_hours, 10) || Number(session?.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS);
+  const maxViews = Math.max(1, Number.parseInt(max_views, 10) || 1);
 
   const [grant, created] = await VideoAccessGrant.findOrCreate({
-    where: { StudentId: req.params.studentId, SessionId: video.SessionId },
-    defaults: { method, max_views, access_duration_hours: durationHours, ...createAccessWindow(durationHours) },
+    where: { StudentId: req.params.studentId, SessionId: sessionId },
+    defaults: { method, max_views: maxViews, access_duration_hours: durationHours, ...createAccessWindow(durationHours) },
   });
 
   if (!created) {
     grant.method = method;
-    grant.max_views = max_views;
+    grant.max_views = maxViews;
     const { startedAt } = getGrantAccessWindow(grant, session);
     const effectiveStart = startedAt || new Date();
     grant.access_duration_hours = durationHours;
