@@ -5068,9 +5068,16 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
     where: {
       SessionId: videoSessions.map(vs => vs.SessionId).concat(video.SessionId).filter(Boolean),
     },
+    include: [{ model: Session, attributes: ['id', 'SubjectId', 'CenterId'] }],
   });
   const grantsMap = {};
-  grants.forEach(g => { grantsMap[g.StudentId] = g; });
+  students.forEach(student => {
+    grantsMap[student.id] = grants.find(grant =>
+      grant.StudentId === student.id &&
+      grant.Session?.SubjectId === student.SubjectId &&
+      grant.Session?.CenterId === student.CenterId,
+    ) || grants.find(grant => grant.StudentId === student.id);
+  });
 
   const allSessions = await Session.findAll({
     include: [Center, Subject],
@@ -5142,14 +5149,15 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   });
 
   if (!created) {
-    grant.method = method;
-    grant.max_views = maxViews;
     const { startedAt } = getGrantAccessWindow(grant, session);
     const effectiveStart = startedAt || new Date();
-    grant.access_duration_hours = durationHours;
-    grant.access_started_at = effectiveStart;
-    grant.access_expires_at = new Date(effectiveStart.getTime() + durationHours * 60 * 60 * 1000);
-    await grant.save();
+    await VideoAccessGrant.update({
+      method,
+      max_views: maxViews,
+      access_duration_hours: durationHours,
+      access_started_at: effectiveStart,
+      access_expires_at: new Date(effectiveStart.getTime() + durationHours * 60 * 60 * 1000),
+    }, { where: { id: grant.id } });
   }
 
   res.redirect('/admin/videos/' + req.params.id + '/access');
