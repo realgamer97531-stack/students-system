@@ -131,15 +131,6 @@
                   <form action="/admin/videos/<%= video.id %>/grant/<%= student.id %>" method="POST" class="row g-1 align-items-center">
                     <input type="hidden" name="session_id" value="<%= grant ? grant.SessionId : video.SessionId %>">
                     <div class="col-auto">
-                      <select name="method" class="form-select form-select-sm">
-                        <option value="admin_free" <%= grant && grant.method === 'admin_free' ? 'selected' : '' %>>اجعله يحضر مجانًا</option>
-                        <option value="admin_paid" <%= grant && grant.method === 'admin_paid' ? 'selected' : '' %>>اجعله يحضر بعدد مرات</option>
-                      </select>
-                    </div>
-                    <div class="col-auto">
-                      <input type="number" name="max_views" class="form-control form-control-sm" style="width:100px;" value="<%= grant ? grant.max_views : 1 %>" min="1">
-                    </div>
-                    <div class="col-auto">
                       <input type="number" name="access_duration_hours" class="form-control form-control-sm" style="width:110px;" value="<%= grant && grant.access_duration_hours ? grant.access_duration_hours : (video.Session.access_duration_hours || 72) %>" min="1" title="مدة الإتاحة بالساعات">
                     </div>
                     <div class="col-auto">

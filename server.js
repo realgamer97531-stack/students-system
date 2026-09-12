@@ -5128,7 +5128,7 @@ app.post('/admin/videos/:id/session-link/delete', requirePermissionOrAdmin('admi
 });
 
 app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const { method, max_views, access_duration_hours } = req.body;
+  const { access_duration_hours } = req.body;
   const video = await Video.findByPk(req.params.id);
   if (!video) return res.status(404).send('❌ الفيديو غير موجود');
 
@@ -5141,19 +5141,16 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   const sessionId = allowedSessionIds.has(requestedSessionId) ? requestedSessionId : video.SessionId;
   const session = await Session.findByPk(sessionId);
   const durationHours = Math.max(1, Number.parseInt(access_duration_hours, 10) || Number(session?.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS);
-  const maxViews = Math.max(1, Number.parseInt(max_views, 10) || 1);
 
   const [grant, created] = await VideoAccessGrant.findOrCreate({
     where: { StudentId: req.params.studentId, SessionId: sessionId },
-    defaults: { method, max_views: maxViews, access_duration_hours: durationHours, ...createAccessWindow(durationHours) },
+    defaults: { method: 'admin_free', max_views: 999, access_duration_hours: durationHours, ...createAccessWindow(durationHours) },
   });
 
   if (!created) {
     const { startedAt } = getGrantAccessWindow(grant, session);
     const effectiveStart = startedAt || new Date();
     await VideoAccessGrant.update({
-      method,
-      max_views: maxViews,
       access_duration_hours: durationHours,
       access_started_at: effectiveStart,
       access_expires_at: new Date(effectiveStart.getTime() + durationHours * 60 * 60 * 1000),
