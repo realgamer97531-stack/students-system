@@ -2850,6 +2850,18 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
     if (existing) return res.json({ success: false, message: `${student.name} مسجل حضوره من قبل` });
 
+    const independentExamResults = await ExamResult.findAll({
+      where: { StudentId: student.id },
+      attributes: ['ExamId', 'score'],
+      include: [{
+        model: Exam,
+        where: { SessionId: null },
+        attributes: ['name', 'max_score', 'exam_date'],
+        required: true,
+      }],
+      order: [[Exam, 'exam_date', 'DESC']],
+    });
+
     // الحصص اللي بتاعت مجموعة الطالب الأصلية
     const ownSessions = await Session.findAll({
       where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
@@ -2956,6 +2968,12 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         bookletStatus: resolvedBookletStatus,
       },
       summary,
+      independentExamResults: independentExamResults.map(result => ({
+        name: result.Exam.name,
+        score: result.score,
+        maxScore: result.Exam.max_score,
+        examDate: result.Exam.exam_date,
+      })),
       bookletStatuses,
       pendingBooklets: bookletStatuses.filter(b => !b.isFullyPaid && !b.isDelivered),
       followUpAssistant,
