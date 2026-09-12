@@ -3164,12 +3164,15 @@ app.get('/exams/:id', async (req, res) => {
       // الامتحان مرتبط بحصة معينة → بس الطلاب اللي حضروا هذه الحصة بالذات
       const attendances = await Attendance.findAll({
         where: { SessionId: exam.SessionId },
+        attributes: ['StudentId'],
+        raw: true,
       });
-      const attendedStudentIds = attendances.map(a => a.StudentId);
+      const attendedStudentIds = [...new Set(attendances.map(a => a.StudentId))];
 
       students = await Student.findAll({
         where: { id: attendedStudentIds }, // لو القائمة فاضية، هيرجع مفيش طلاب وهو ده المنطقي
         include: [Center],
+        attributes: ['id', 'student_code', 'name'],
         order: [['name', 'ASC']],
       });
     } else {
@@ -3177,11 +3180,16 @@ app.get('/exams/:id', async (req, res) => {
       students = await Student.findAll({
         where: { SubjectId: exam.SubjectId },
         include: [Center],
+        attributes: ['id', 'student_code', 'name'],
         order: [['name', 'ASC']],
       });
     }
 
-    const results = await ExamResult.findAll({ where: { ExamId: exam.id } });
+    const results = await ExamResult.findAll({
+      where: { ExamId: exam.id },
+      attributes: ['StudentId', 'score'],
+      raw: true,
+    });
     const existingScores = {};
     results.forEach(r => { existingScores[r.StudentId] = r.score; });
 
@@ -3194,35 +3202,77 @@ app.get('/exams/:id', async (req, res) => {
 
 // حفظ كل الدرجات دفعة واحدة
 app.post('/exams/:id/scores', async (req, res) => {
+  let transaction;
   try {
     const examId = req.params.id;
     const exam = await Exam.findByPk(examId);
+    if (!exam) return res.status(404).send('❌ الامتحان غير موجود');
 
-    for (const key in req.body) {
-      if (key.startsWith('score_')) {
-        const studentId = key.replace('score_', '');
-        const score = req.body[key];
+    const submittedScores = Object.entries(req.body)
+      .filter(([key, score]) => key.startsWith('score_') && score !== '' && score !== null && score !== undefined)
+      .map(([key, score]) => ({ StudentId: Number(key.replace('score_', '')), score: Number(score) }))
+      .filter(({ StudentId, score }) => Number.isInteger(StudentId) && Number.isFinite(score));
 
-        if (score === '' || score === null) continue; // تخطي الفاضي
+    if (submittedScores.length === 0) return res.redirect('/exams/' + examId);
 
-        const [result, created] = await ExamResult.findOrCreate({
-          where: { StudentId: studentId, ExamId: examId },
-          defaults: { score, UserId: req.session.userId },
-        });
+    const studentIds = submittedScores.map(({ StudentId }) => StudentId);
+    const existingResults = await ExamResult.findAll({
+      where: { ExamId: examId, StudentId: studentIds },
+      attributes: ['id', 'StudentId', 'score'],
+      raw: true,
+    });
+    const existingByStudentId = new Map(existingResults.map(result => [result.StudentId, result]));
+    const scoreByStudentId = new Map(submittedScores.map(item => [item.StudentId, item.score]));
+    const newResults = [];
+    const updatedResults = [];
+    const pointDeltas = new Map();
 
-        if (!created) {
-          result.score = score;
-          result.UserId = req.session.userId;
-          await result.save();
-        }
-        const previousScore = created ? 0 : Math.round(parseFloat(result.previous('score')) || 0);
-        const currentScore = Math.round(parseFloat(score) || 0);
-        await addPoints(studentId, currentScore - previousScore, `درجة امتحان: ${exam?.name || examId}`, req.session.userId);
-      }
+    for (const [studentId, score] of scoreByStudentId) {
+      const existing = existingByStudentId.get(studentId);
+      const previousScore = existing ? Math.round(Number(existing.score) || 0) : 0;
+      const currentScore = Math.round(score);
+      pointDeltas.set(studentId, currentScore - previousScore);
+
+      if (existing) updatedResults.push({ id: existing.id, score });
+      else newResults.push({ ExamId: examId, StudentId: studentId, score, UserId: req.session.userId });
     }
+
+    transaction = await sequelize.transaction();
+
+    if (newResults.length > 0) {
+      await ExamResult.bulkCreate(newResults, { transaction });
+    }
+
+    if (updatedResults.length > 0) {
+      const scoreCase = updatedResults.map(result => `WHEN ${result.id} THEN ${sequelize.escape(result.score)}`).join(' ');
+      const userCase = updatedResults.map(result => `WHEN ${result.id} THEN ${sequelize.escape(req.session.userId)}`).join(' ');
+      await sequelize.query(
+        `UPDATE examresults SET score = CASE id ${scoreCase} END, UserId = CASE id ${userCase} END WHERE id IN (${updatedResults.map(result => result.id).join(',')})`,
+        { transaction },
+      );
+    }
+
+    const nonZeroDeltas = [...pointDeltas.entries()].filter(([, delta]) => delta !== 0);
+    if (nonZeroDeltas.length > 0) {
+      const deltaCase = nonZeroDeltas.map(([studentId, delta]) => `WHEN ${studentId} THEN ${sequelize.escape(delta)}`).join(' ');
+      const deltaIds = nonZeroDeltas.map(([studentId]) => studentId).join(',');
+      await sequelize.query(
+        `UPDATE students SET points = points + CASE id ${deltaCase} END WHERE id IN (${deltaIds})`,
+        { transaction },
+      );
+      await BalanceTransaction.bulkCreate(nonZeroDeltas.map(([studentId, delta]) => ({
+        StudentId: studentId,
+        amount: delta,
+        reason: `نقاط: درجة امتحان: ${exam.name || examId}`,
+        UserId: req.session.userId,
+      })), { transaction });
+    }
+
+    await transaction.commit();
 
     res.redirect('/exams/' + examId);
   } catch (error) {
+    if (transaction) await transaction.rollback();
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
   }
