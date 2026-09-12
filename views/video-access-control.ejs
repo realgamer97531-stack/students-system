@@ -129,6 +129,7 @@
                 <td><%= remaining %></td>
                 <td>
                   <form action="/admin/videos/<%= video.id %>/grant/<%= student.id %>" method="POST" class="row g-1 align-items-center">
+                    <input type="hidden" name="session_id" value="<%= grant ? grant.SessionId : video.SessionId %>">
                     <div class="col-auto">
                       <select name="method" class="form-select form-select-sm">
                         <option value="admin_free" <%= grant && grant.method === 'admin_free' ? 'selected' : '' %>>اجعله يحضر مجانًا</option>
