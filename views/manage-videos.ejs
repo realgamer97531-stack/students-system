@@ -28,14 +28,14 @@
 
 <div class="card mb-4">
   <div class="card-body">
-    <h5 class="mb-3 fw-bold">🔗 روابط الامتحان للحصة</h5>
+    <h5 class="mb-3 fw-bold">🔗 روابط الامتحان لفيديو</h5>
     <form action="/admin/videos/session/exam" method="POST" class="row g-2 align-items-end">
       <div class="col-md-4">
-        <label class="form-label small">اختر الحصة</label>
-        <select name="session_id" class="form-select" required>
-          <option value="">-- اختر حصة --</option>
-          <% allSessions.forEach(s => { %>
-            <option value="<%= s.id %>"><%= s.Subject.name %> - <%= s.Center.name %> (حصة <%= s.lesson_number %> | سيريال <%= s.serial_number %>)</option>
+        <label class="form-label small">اختر الفيديو</label>
+        <select name="video_id" class="form-select" required>
+          <option value="">-- اختر فيديو --</option>
+          <% videos.forEach(video => { %>
+            <option value="<%= video.id %>"><%= video.title %> (ID: <%= video.id %>)</option>
           <% }) %>
         </select>
       </div>
@@ -51,7 +51,7 @@
         <button type="submit" class="btn btn-warning w-100">حفظ روابط الاختبار</button>
       </div>
     </form>
-    <p class="text-muted small mt-2 mb-0">أضف رابط الاختبار الآن. أضف رابط فيديو الإجابة لاحقًا بعد تسليم الجلسات والواجب والاختبار، وسيظهر حينها في بطاقة مستقلة.</p>
+    <p class="text-muted small mt-2 mb-0">سيتم تطبيق الرابط على كل الحصص المرتبطة بهذا الفيديو، وسيظهر للطلاب في بطاقة فيديو إجابة الاختبار.</p>
   </div>
 </div>
 
@@ -71,9 +71,15 @@
                 <button type="submit" class="btn btn-sm btn-outline-danger border-0 py-1 px-2" title="حذف الدرس بالكامل">🗑️</button>
               </form>
             </div>
+            <% const linkedSessions = [v.Session, ...(v.VideoSessions || []).map(videoSession => videoSession.Session)].filter(Boolean); %>
             <p class="text-muted small mb-3">
-              <%= v.Session.Subject.name %> - <%= v.Session.Center.name %><br>
-              حصة رقم <%= v.Session.lesson_number %> • <%= v.Session.session_date %>
+              <% if (linkedSessions.length) { %>
+                <% linkedSessions.forEach(session => { %>
+                  <%= session.Subject?.name %> - <%= session.Center?.name %> (حصة <%= session.lesson_number %>)<br>
+                <% }) %>
+              <% } else { %>
+                لا توجد حصص مرتبطة
+              <% } %>
             </p>
           </div>
           <div class="d-flex gap-2 mt-2">
@@ -81,13 +87,14 @@
             <a href="/admin/videos/<%= v.id %>/access" class="btn btn-sm btn-outline-secondary flex-grow-1">التحكم</a>
           </div>
 
-          <% const examUrl = v.Session && v.Session.exam_url ? v.Session.exam_url : ''; %>
-          <% const examVideoUrl = v.Session && v.Session.exam_video_url ? v.Session.exam_video_url : ''; %>
+          <% const examSession = linkedSessions.find(session => session.exam_url || session.exam_video_url); %>
+          <% const examUrl = examSession?.exam_url || ''; %>
+          <% const examVideoUrl = examSession?.exam_video_url || ''; %>
           <% if (examUrl) { %>
             <div class="mt-2">
               <a href="<%= examUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning w-100">🔗 فتح رابط الامتحان</a>
               <form action="/admin/videos/session/exam/delete" method="POST" class="mt-1" onsubmit="return confirm('حذف رابط الاختبار؟')">
-                <input type="hidden" name="session_id" value="<%= v.Session.id %>">
+                <input type="hidden" name="video_id" value="<%= v.id %>">
                 <input type="hidden" name="field" value="exam_url">
                 <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف رابط الاختبار</button>
               </form>
@@ -97,7 +104,7 @@
             <div class="mt-2">
               <a href="<%= examVideoUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-info w-100">▶ فتح فيديو إجابة الاختبار</a>
               <form action="/admin/videos/session/exam/delete" method="POST" class="mt-1" onsubmit="return confirm('حذف فيديو إجابة الاختبار؟')">
-                <input type="hidden" name="session_id" value="<%= v.Session.id %>">
+                <input type="hidden" name="video_id" value="<%= v.id %>">
                 <input type="hidden" name="field" value="exam_video_url">
                 <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف فيديو الإجابة</button>
               </form>
