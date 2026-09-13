@@ -4833,9 +4833,20 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
 // ===== إدارة الفيديوهات (أدمن بس) =====
 
 app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const allSessions = await Session.findAll({ include: [Center, Subject], order: [['createdAt', 'DESC']] });
+  const allSessions = await Session.findAll({
+    attributes: ['id', 'lesson_number', 'serial_number', 'SubjectId', 'CenterId'],
+    include: [
+      { model: Center, attributes: ['id', 'name'] },
+      { model: Subject, attributes: ['id', 'name'] },
+    ],
+    order: [['createdAt', 'DESC']],
+    limit: 200,
+  });
   const videos = await Video.findAll({
-    include: [{ model: Session, required: true, include: [Center, Subject] }], // required: true يستبعد أي فيديو مالوش حصة مرتبطة
+    include: [
+      { model: Session, required: false, include: [Center, Subject] },
+      { model: VideoSession, required: false, include: [{ model: Session, include: [Center, Subject] }] },
+    ],
     order: [['createdAt', 'DESC']],
   });
   res.render('manage-videos', { allSessions, videos });
@@ -4843,21 +4854,28 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
 
 app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
-    const { session_id, exam_url, exam_video_url } = req.body;
-    const sessionId = Number(session_id);
-    if (!sessionId) return res.status(400).send('❌ اختر حصة أولاً');
+    const { video_id, exam_url, exam_video_url } = req.body;
+    const videoId = Number(video_id);
+    if (!videoId) return res.status(400).send('❌ اختر فيديو أولاً');
 
     const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
     const cleanExamVideoUrl = typeof exam_video_url === 'string' ? exam_video_url.trim() : '';
     if (!cleanExamUrl && !cleanExamVideoUrl) return res.status(400).send('❌ أضف رابط الاختبار أو رابط فيديو الإجابة');
 
-    const session = await Session.findByPk(sessionId);
-    if (!session) return res.status(404).send('❌ الحصة غير موجودة');
+    const video = await Video.findByPk(videoId, { attributes: ['id', 'SessionId'] });
+    if (!video) return res.status(404).send('❌ الفيديو غير موجود');
 
-    await session.update({
+    const linkedSessionRows = await VideoSession.findAll({
+      where: { VideoId: video.id },
+      attributes: ['SessionId'],
+    });
+    const sessionIds = [...new Set([video.SessionId, ...linkedSessionRows.map(row => row.SessionId)].filter(Boolean))];
+    if (sessionIds.length === 0) return res.status(400).send('❌ الفيديو غير مرتبط بأي حصة');
+
+    await Session.update({
       ...(cleanExamUrl ? { exam_url: cleanExamUrl } : {}),
       ...(cleanExamVideoUrl ? { exam_video_url: cleanExamVideoUrl } : {}),
-    });
+    }, { where: { id: sessionIds } });
     res.redirect('/admin/videos');
   } catch (error) {
     console.error(error);
@@ -4867,16 +4885,22 @@ app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'),
 
 app.post('/admin/videos/session/exam/delete', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
-    const sessionId = Number(req.body.session_id);
+    const videoId = Number(req.body.video_id);
     const field = req.body.field;
-    if (!sessionId || !['exam_url', 'exam_video_url'].includes(field)) {
+    if (!videoId || !['exam_url', 'exam_video_url'].includes(field)) {
       return res.status(400).send('❌ بيانات الحذف غير صحيحة');
     }
 
-    const session = await Session.findByPk(sessionId);
-    if (!session) return res.status(404).send('❌ الحصة غير موجودة');
+    const video = await Video.findByPk(videoId, { attributes: ['id', 'SessionId'] });
+    if (!video) return res.status(404).send('❌ الفيديو غير موجود');
+    const linkedSessionRows = await VideoSession.findAll({
+      where: { VideoId: video.id },
+      attributes: ['SessionId'],
+    });
+    const sessionIds = [...new Set([video.SessionId, ...linkedSessionRows.map(row => row.SessionId)].filter(Boolean))];
+    if (sessionIds.length === 0) return res.status(400).send('❌ الفيديو غير مرتبط بأي حصة');
 
-    await session.update({ [field]: null });
+    await Session.update({ [field]: null }, { where: { id: sessionIds } });
     res.redirect('/admin/videos');
   } catch (error) {
     console.error(error);
@@ -5169,6 +5193,11 @@ app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_v
   const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
   const cleanExamVideoUrl = typeof exam_video_url === 'string' ? exam_video_url.trim() : '';
   const durationHours = Math.max(1, Number.parseInt(access_duration_hours, 10) || DEFAULT_ACCESS_DURATION_HOURS);
+  const linkedSessionIds = (await VideoSession.findAll({
+    where: { VideoId: video.id },
+    attributes: ['SessionId'],
+  })).map(row => row.SessionId);
+  const sessionIds = [...new Set([video.SessionId, ...linkedSessionIds].filter(Boolean))];
   await Session.update({
     is_free_for_all: is_free_for_all === 'on',
     views_if_attended,
@@ -5176,8 +5205,7 @@ app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_v
     access_duration_hours: durationHours,
     ...(cleanExamUrl ? { exam_url: cleanExamUrl } : {}),
     ...(cleanExamVideoUrl ? { exam_video_url: cleanExamVideoUrl } : {}),
-  }, { where: { id: video.SessionId } });
-  const sessionIds = [video.SessionId, ...(await VideoSession.findAll({ where: { VideoId: video.id }, attributes: ['SessionId'] })).map(row => row.SessionId)].filter(Boolean);
+  }, { where: { id: sessionIds } });
   await extendGrantWindows([...new Set(sessionIds)], durationHours);
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
@@ -5189,9 +5217,14 @@ app.post('/admin/videos/:id/session-link/delete', requirePermissionOrAdmin('admi
   }
 
   const video = await Video.findByPk(req.params.id);
-  if (!video || !video.SessionId) return res.status(404).send('❌ الفيديو أو الحصة غير موجودة');
+  if (!video) return res.status(404).send('❌ الفيديو غير موجود');
 
-  await Session.update({ [field]: null }, { where: { id: video.SessionId } });
+  const linkedSessionIds = (await VideoSession.findAll({
+    where: { VideoId: video.id },
+    attributes: ['SessionId'],
+  })).map(row => row.SessionId);
+  const sessionIds = [...new Set([video.SessionId, ...linkedSessionIds].filter(Boolean))];
+  await Session.update({ [field]: null }, { where: { id: sessionIds } });
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
 
