@@ -45,9 +45,9 @@
 
 <h5 class="mb-3">آخر 100 كود تم إنشاؤهم</h5>
 <% codesByCenter.forEach(group => { group.codes.forEach((codeGroup, groupIndex) => { %>
-  <div class="card shadow-sm mb-4">
+  <details class="card shadow-sm mb-4">
+    <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">سنتر التوزيع: <%= group.center.name %> <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span></summary>
     <div class="card-body">
-      <h6 class="mb-3">سنتر التوزيع: <%= group.center.name %> <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span></h6>
       <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
         <div class="col-md-4">
@@ -78,14 +78,15 @@
         </table>
       </div>
     </div>
-  </div>
+    </div>
+  </details>
 <% }) }) %>
 
 <% if (unassignedGroups.length) { %>
   <% unassignedGroups.forEach((codeGroup, groupIndex) => { %>
-  <div class="card shadow-sm mb-4">
+  <details class="card shadow-sm mb-4">
+    <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">أكواد بدون سنتر توزيع <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span></summary>
     <div class="card-body">
-      <h6 class="mb-3">أكواد بدون سنتر توزيع <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span></h6>
       <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
         <div class="col-md-8">
@@ -108,7 +109,8 @@
         </table>
       </div>
     </div>
-  </div>
+    </div>
+  </details>
   <% }) %>
 <% } %>
 
