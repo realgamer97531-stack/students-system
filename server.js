@@ -5407,10 +5407,26 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
       account: await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id } }),
     })));
     const codesByCenter = centers
-      .map(center => ({ center, codes: codes.filter(code => String(code.recharge_center_id) === String(center.id)) }))
+      .map(center => ({
+        center,
+        codes: codes
+          .filter(code => String(code.recharge_center_id) === String(center.id))
+          .reduce((groups, code, index) => {
+            const groupIndex = Math.floor(index / 10);
+            if (!groups[groupIndex]) groups[groupIndex] = [];
+            groups[groupIndex].push(code);
+            return groups;
+          }, []),
+      }))
       .filter(group => group.codes.length > 0);
     const unassignedCodes = codes.filter(code => !code.recharge_center_id);
-    res.render('recharge-codes', { codes, centers, accountCenters, centerStats, codesByCenter, unassignedCodes });
+    const unassignedGroups = unassignedCodes.reduce((groups, code, index) => {
+      const groupIndex = Math.floor(index / 10);
+      if (!groups[groupIndex]) groups[groupIndex] = [];
+      groups[groupIndex].push(code);
+      return groups;
+    }, []);
+    res.render('recharge-codes', { codes, centers, accountCenters, centerStats, codesByCenter, unassignedCodes, unassignedGroups });
   } catch (error) {
     console.error('Failed to load recharge codes page:', error);
     res.status(500).send('حصلت مشكلة أثناء تحميل صفحة أكواد الشحن: ' + error.message);
@@ -5420,16 +5436,14 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
 // توليد أكواد جديدة
 app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   try {
-    const { amount, count, center_id } = req.body;
-    if (!amount || !count || count > 500) return res.status(400).send('❌ بيانات غير صحيحة');
-    const center = await RechargeCenter.findByPk(center_id);
-    const account = center && await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id } });
-    if (!center || !account) return res.status(400).send('❌ اختر سنترًا لديه حساب توزيع');
+    const { amount } = req.body;
+    const count = 10;
+    if (!amount || Number(amount) <= 0) return res.status(400).send('❌ بيانات غير صحيحة');
 
     const generated = [];
-    for (let i = 0; i < parseInt(count); i++) {
+    for (let i = 0; i < count; i++) {
       const code = crypto.randomBytes(6).toString('hex').toUpperCase(); // كود 12 حرف
-      await RechargeCode.create({ code, amount: parseFloat(amount), recharge_center_id: center.id });
+      await RechargeCode.create({ code, amount: parseFloat(amount), recharge_center_id: null });
       generated.push({ code, amount });
     }
 
@@ -5450,6 +5464,49 @@ app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+app.post('/admin/recharge-codes/link', requireAdmin, async (req, res) => {
+  try {
+    const requestedIds = Array.isArray(req.body.code_ids) ? req.body.code_ids : [req.body.code_ids];
+    const codeIds = [...new Set(requestedIds.map(Number).filter(Number.isInteger))];
+    const centerId = req.body.center_id ? Number(req.body.center_id) : null;
+    const adminPassword = String(req.body.admin_password || '');
+
+    if (codeIds.length === 0) return res.status(400).send('❌ لم يتم اختيار أكواد');
+    if (centerId !== null) {
+      const center = await RechargeCenter.findByPk(centerId);
+      const account = center && await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id } });
+      if (!center || !account) return res.status(400).send('❌ اختر سنترًا لديه حساب توزيع');
+    }
+
+    const selectedCodes = await RechargeCode.findAll({
+      where: { id: codeIds },
+      attributes: ['id', 'recharge_center_id'],
+      raw: true,
+    });
+    if (selectedCodes.length !== codeIds.length) return res.status(400).send('❌ بعض الأكواد غير موجودة');
+
+    const assignedCenterIds = [...new Set(selectedCodes.map(code => code.recharge_center_id).filter(Boolean).map(Number))];
+    const hasUnassigned = selectedCodes.some(code => !code.recharge_center_id);
+    const hasAssigned = assignedCenterIds.length > 0;
+    if (hasUnassigned && hasAssigned) return res.status(400).send('❌ لا يمكن تعديل مجموعة مختلطة');
+
+    if (hasAssigned) {
+      const verified = await verifyAdminPassword(req.session.userId, adminPassword);
+      if (!verified) return res.status(403).send('❌ كلمة مرور الأدمن غير صحيحة');
+      if (assignedCenterIds.length !== 1) return res.status(400).send('❌ المجموعة مرتبطة بأكثر من سنتر');
+    }
+
+    await RechargeCode.update(
+      { recharge_center_id: centerId },
+      { where: { id: codeIds } },
+    );
+    res.redirect('/admin/recharge-codes');
+  } catch (error) {
+    console.error('Failed to link recharge codes:', error);
+    res.status(500).send('❌ حصلت مشكلة أثناء ربط الأكواد: ' + error.message);
   }
 });
 

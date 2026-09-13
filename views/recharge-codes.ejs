@@ -12,20 +12,13 @@
       </div>
       <div class="col-md-3">
         <label class="form-label small">عدد الأكواد</label>
-        <input type="number" name="count" class="form-control" placeholder="مثال: 50" required min="1" max="500">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label small">سنتر توزيع الأكواد</label>
-        <select name="center_id" class="form-select" required>
-          <option value="">اختر سنتر التوزيع</option>
-          <% accountCenters.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %>
-        </select>
+        <input type="text" class="form-control" value="10 أكواد ثابتة" disabled>
       </div>
       <div class="col-md-3">
         <button type="submit" class="btn btn-primary w-100">⚡ Generate + تحميل Excel</button>
       </div>
     </form>
-    <p class="text-muted small mt-2">⚠️ بمجرد الضغط على Generate، هيتم إنشاء الأكواد وتحميل ملف Excel فوراً.</p>
+    <p class="text-muted small mt-2">⚠️ كل ضغطة تنشئ 10 أكواد بدون سنتر، ثم يمكنك ربط المجموعة بسنتر واحد.</p>
   </div>
 </div>
 
@@ -51,17 +44,29 @@
 </div>
 
 <h5 class="mb-3">آخر 100 كود تم إنشاؤهم</h5>
-<% codesByCenter.forEach(group => { %>
+<% codesByCenter.forEach(group => { group.codes.forEach((codeGroup, groupIndex) => { %>
   <div class="card shadow-sm mb-4">
     <div class="card-body">
-      <h6 class="mb-3">سنتر التوزيع: <%= group.center.name %></h6>
+      <h6 class="mb-3">سنتر التوزيع: <%= group.center.name %> <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span></h6>
+      <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
+        <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
+        <div class="col-md-4">
+          <label class="form-label small">تغيير السنتر</label>
+          <select name="center_id" class="form-select">
+            <option value="">إزالة الربط</option>
+            <% accountCenters.forEach(center => { %><option value="<%= center.id %>" <%= String(center.id) === String(group.center.id) ? 'selected' : '' %>><%= center.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-md-4"><label class="form-label small">كلمة مرور الأدمن للتغيير</label><input type="password" name="admin_password" class="form-control" required></div>
+        <div class="col-md-4"><button class="btn btn-outline-danger w-100">🔐 حفظ تغيير الربط</button></div>
+      </form>
       <div class="table-responsive">
         <table class="table table-sm">
           <thead class="table-light">
             <tr><th>الكود</th><th>القيمة</th><th>الحالة</th><th>تاريخ الإنشاء</th></tr>
           </thead>
           <tbody>
-            <% group.codes.forEach(c => { %>
+            <% codeGroup.forEach(c => { %>
               <tr>
                 <td><code><%= c.code %></code></td>
                 <td><%= c.amount %> ج</td>
@@ -74,17 +79,29 @@
       </div>
     </div>
   </div>
-<% }) %>
+<% }) }) %>
 
-<% if (unassignedCodes.length) { %>
+<% if (unassignedGroups.length) { %>
+  <% unassignedGroups.forEach((codeGroup, groupIndex) => { %>
   <div class="card shadow-sm mb-4">
     <div class="card-body">
-      <h6 class="mb-3">أكواد بدون سنتر توزيع</h6>
+      <h6 class="mb-3">أكواد بدون سنتر توزيع <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span></h6>
+      <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
+        <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
+        <div class="col-md-8">
+          <label class="form-label small">اختر السنتر لربط الأكواد</label>
+          <select name="center_id" class="form-select" required>
+            <option value="">اختر سنتر التوزيع</option>
+            <% accountCenters.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-md-4"><button class="btn btn-success w-100">🔗 ربط المجموعة</button></div>
+      </form>
       <div class="table-responsive">
         <table class="table table-sm">
           <thead class="table-light"><tr><th>الكود</th><th>القيمة</th><th>الحالة</th><th>تاريخ الإنشاء</th></tr></thead>
           <tbody>
-            <% unassignedCodes.forEach(c => { %>
+            <% codeGroup.forEach(c => { %>
               <tr><td><code><%= c.code %></code></td><td><%= c.amount %> ج</td><td><span class="badge <%= c.is_used ? 'bg-secondary' : 'bg-success' %>"><%= c.is_used ? 'مستخدم' : 'متاح' %></span></td><td class="small text-muted"><%= new Date(c.createdAt).toLocaleString('ar-EG') %></td></tr>
             <% }) %>
           </tbody>
@@ -92,6 +109,7 @@
       </div>
     </div>
   </div>
+  <% }) %>
 <% } %>
 
 <%- include('partials/footer') %>
