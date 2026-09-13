@@ -4386,6 +4386,24 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       order: [['createdAt', 'DESC']],
     });
 
+    const linkedSessionIdsByVideoId = new Map();
+    const allLinkedSessionIds = new Set();
+    videos.forEach(video => {
+      const sessionIds = [
+        video.SessionId,
+        ...(video.VideoSessions || []).map(videoSession => videoSession.SessionId),
+      ].filter(Boolean);
+      linkedSessionIdsByVideoId.set(video.id, [...new Set(sessionIds)]);
+      sessionIds.forEach(sessionId => allLinkedSessionIds.add(sessionId));
+    });
+    const linkedSessionsForVideos = allLinkedSessionIds.size > 0
+      ? await Session.findAll({
+          where: { id: [...allLinkedSessionIds] },
+          attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'],
+        })
+      : [];
+    const linkedSessionById = new Map(linkedSessionsForVideos.map(session => [session.id, session]));
+
     const attendanceRecords = await Attendance.findAll({
       where: { StudentId: student.id },
       attributes: ['SessionId'],
@@ -4490,10 +4508,9 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     });
 
     const lessons = videos.map(v => {
-      const linkedVideoSessions = [
-        v.Session,
-        ...(v.VideoSessions || []).map(videoSession => videoSession.Session),
-      ].filter(Boolean);
+      const linkedVideoSessions = (linkedSessionIdsByVideoId.get(v.id) || [])
+        .map(sessionId => linkedSessionById.get(sessionId))
+        .filter(Boolean);
       const session = linkedVideoSessions.find(candidate => candidate.CenterId === student.CenterId) || linkedVideoSessions[0];
       if (!session) return null;
 
