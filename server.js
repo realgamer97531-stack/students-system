@@ -4377,7 +4377,11 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       ...(allVideoAccess ? {} : { where: { id: allAccessibleVideoIds } }),
       include: [
         { model: Session, required: false, include: [Center] },
-        { model: VideoSession, required: false, include: [Session] },
+        {
+          model: VideoSession,
+          required: false,
+          include: [{ model: Session, attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'] }],
+        },
       ],
       order: [['createdAt', 'DESC']],
     });
@@ -4486,8 +4490,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     });
 
     const lessons = videos.map(v => {
-      const session = v.Session || v.VideoSessions?.map(videoSession => videoSession.Session).find(Boolean);
+      const linkedVideoSessions = [
+        v.Session,
+        ...(v.VideoSessions || []).map(videoSession => videoSession.Session),
+      ].filter(Boolean);
+      const session = linkedVideoSessions.find(candidate => candidate.CenterId === student.CenterId) || linkedVideoSessions[0];
       if (!session) return null;
+
+      const linkedExamSession = linkedVideoSessions.find(candidate => candidate.exam_url || candidate.exam_video_url);
 
       const equivalentSessionIds = session ? (sessionIdsByLesson.get(session.lesson_number) || [session.id]) : [];
       const lessonGrants = equivalentSessionIds.map(sessionId => grantBySessionId[sessionId]).filter(Boolean);
@@ -4547,8 +4557,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         homeworkVideoUrl,
         realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
         homeworkItems,
-        examUrl: (examLinksByLesson.get(session.lesson_number)?.examUrl) || (session && session.exam_url ? session.exam_url : null),
-        examVideoUrl: (examLinksByLesson.get(session.lesson_number)?.examVideoUrl) || (session && session.exam_video_url ? session.exam_video_url : null),
+        examUrl: linkedExamSession?.exam_url || examLinksByLesson.get(session.lesson_number)?.examUrl || null,
+        examVideoUrl: linkedExamSession?.exam_video_url || examLinksByLesson.get(session.lesson_number)?.examVideoUrl || null,
       };
     }).filter(Boolean);
 
