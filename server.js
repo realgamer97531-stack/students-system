@@ -2834,7 +2834,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     await syncStudentBookletStatus(student);
 
-    const activeSession = await Session.findByPk(sessionId);
+    const activeSession = await Session.findByPk(sessionId, { include: [Center] });
     if (!activeSession) return res.json({ success: false, message: '⚠️ مفيش حصة شغالة' });
     if (activeSession.status === 'cancelled') {
       return res.json({ success: false, message: '⚠️ هذه الحصة ملغية' });
@@ -2966,6 +2966,12 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         pricePerSession: student.price_per_session,
         adminNote: student.admin_note,
         bookletStatus: resolvedBookletStatus,
+        centerId: student.CenterId,
+        centerName: student.Center?.name || 'غير محدد',
+      },
+      activeSession: {
+        centerId: activeSession.CenterId,
+        centerName: activeSession.Center?.name || 'غير محدد',
       },
       summary,
       independentExamResults: independentExamResults.map(result => ({
