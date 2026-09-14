@@ -31,6 +31,7 @@
 
     <div id="summaryBox" style="display:none;" class="text-start mt-3">
       <div class="alert alert-secondary small" id="adminNoteBox" style="display:none;"></div>
+      <div id="centerStatusBox" class="alert small mb-2" style="display:none;"></div>
       <h6 id="summaryStudentName" class="mb-2 fw-bold"></h6>
       <div id="bookletDeliveredBox"></div>
       <table class="table table-sm">
@@ -231,14 +232,21 @@
       noteBox.style.display = 'none';
     }
 
-    // ضيف ده في showSummary بعد adminNoteBox
-if (data.followUpAssistant) {
-  const fuBox = document.createElement('div');
-  fuBox.className = 'alert mb-2 small';
-  fuBox.style.background = '#EEF0FB';
-  fuBox.innerHTML = `🎯 أسيستانت المتابعة: <strong>${data.followUpAssistant.name}</strong>`;
-  document.getElementById('summaryBox').insertBefore(fuBox, document.getElementById('summaryStudentName'));
-}
+    const centerMismatch = Number(data.student.centerId) !== Number(data.activeSession?.centerId);
+    const centerStatusBox = document.getElementById('centerStatusBox');
+    centerStatusBox.className = `alert small mb-2 ${centerMismatch ? 'alert-danger' : 'alert-success'}`;
+    centerStatusBox.style.display = 'block';
+    centerStatusBox.innerHTML = centerMismatch
+      ? `🚨 السنتر المرتبط بالطالب: <strong>${data.student.centerName}</strong> — لا يطابق الحصة الحالية <strong>${data.activeSession?.centerName || 'غير محدد'}</strong>`
+      : `✅ السنتر المرتبط بالطالب: <strong>${data.student.centerName}</strong> — مطابق للحصة الحالية <strong>${data.activeSession?.centerName || 'غير محدد'}</strong>`;
+
+    if (data.followUpAssistant) {
+      const fuBox = document.createElement('div');
+      fuBox.className = 'alert mb-2 small';
+      fuBox.style.background = '#EEF0FB';
+      fuBox.innerHTML = `🎯 أسيستانت المتابعة: <strong>${data.followUpAssistant.name}</strong>`;
+      document.getElementById('summaryBox').insertBefore(fuBox, document.getElementById('summaryStudentName'));
+    }
 
     scanBookletDelivered = false;
     const bookletDeliveredBox = document.getElementById('bookletDeliveredBox');
