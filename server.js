@@ -3966,12 +3966,13 @@ async function buildStudentData(studentId) {
     where: { StudentId: student.id },
     include: [Session],
   });
-  const commentByLesson = {};
+  const commentBySessionId = {};
   sessionComments.forEach(c => {
-    if (c.Session) commentByLesson[Number(c.Session.lesson_number)] = c;
+    const sessionId = c.SessionId || (c.Session && c.Session.id);
+    if (sessionId) commentBySessionId[String(sessionId)] = c;
   });
 
-  // نجمع كل أرقام الحصص النسبية اللي للطالب علاقة بيها: سواء من مجموعته، أو حضرها في مكان تاني
+  // نجمع كل أرقام الحصص النسبية اللي للطالب علاقة بيها: سواء من مجموعتها، أو حضرها في مكان تاني
   const lessonNumbersSet = new Set();
   ownSessions.forEach(s => lessonNumbersSet.add(s.lesson_number));
   Object.keys(attendanceByLesson).forEach(n => lessonNumbersSet.add(parseInt(n)));
@@ -4036,7 +4037,10 @@ async function buildStudentData(studentId) {
     const att = attendanceByLesson[lessonNumber];
     const hw = homeworkByLesson[lessonNumber];
     const exam = examByLesson[lessonNumber];
-    const followUpComment = commentByLesson[lessonNumber];
+    const commentSessionId = ownSession
+      ? ownSession.id
+      : (att ? (att.Session?.id || att.SessionId) : null);
+    const followUpComment = commentSessionId ? commentBySessionId[String(commentSessionId)] : null;
 
     let attendanceStatus, attendedCenterName = null;
     if (att) {
@@ -7564,7 +7568,8 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
     });
     const commentMap = {};
     sessionComments.forEach(c => {
-      if (c.Session) commentMap[c.Session.lesson_number] = c;
+      const sessionId = c.SessionId || (c.Session && c.Session.id);
+      if (sessionId) commentMap[String(sessionId)] = c;
     });
 
     const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
@@ -7582,7 +7587,7 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       const att = attMap[s.lesson_number];
       const hw = hwMap[s.lesson_number];
       const exam = examMap[s.lesson_number];
-      const comment = commentMap[s.lesson_number];
+      const comment = commentMap[String(s.id)] || null;
       const video = videoByLesson[s.lesson_number];
 
       let videoWatch = {};
