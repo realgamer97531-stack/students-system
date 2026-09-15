@@ -888,7 +888,8 @@ app.get('/logout', (req, res) => {
 // أي صفحة بعد السطر ده هتكون محمية - لازم تسجيل دخول الأول
 function requireLogin(req, res, next) {
   // مسارات API بتاعة بوابة الطالب/ولي الأمر مستقلة تمامًا، ومحمية بـ Token بدل الجلسة
-  if (req.path.startsWith('/api/portal')) {
+  // The call-center bridge authenticates with its own server-to-server token.
+  if (req.path.startsWith('/api/portal') || req.path === '/api/internal/callcenter/session-comment') {
     return next();
   }
   if (!req.session.userId) {
