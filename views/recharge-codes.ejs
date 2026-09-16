@@ -40,22 +40,20 @@
         button.disabled = true;
         const originalText = button.textContent;
         try {
-          for (let index = 0; index < count; index++) {
-            button.textContent = `جاري توليد الملف ${index + 1} من ${count}`;
-            const response = await fetch('/admin/recharge-codes/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ amount }),
-            });
-            if (!response.ok) throw new Error('فشل توليد أحد الملفات');
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `recharge_codes_${Date.now()}_${index + 1}.xlsx`;
-            link.click();
-            URL.revokeObjectURL(url);
-          }
+          button.textContent = `جاري توليد ${count} ملف`;
+          const response = await fetch('/admin/recharge-codes/generate-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ amount, file_count: count }),
+          });
+          if (!response.ok) throw new Error('فشل توليد الملفات');
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `recharge_codes_${Date.now()}.zip`;
+          link.click();
+          URL.revokeObjectURL(url);
         } catch (error) {
           alert(error.message);
         } finally {

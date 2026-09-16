@@ -36,6 +36,7 @@ const ExamResult = require('./models/ExamResult');
 const User = require('./models/User');
 const bcrypt = require('bcryptjs');
 const ExcelJS = require('exceljs');
+const archiver = require('archiver');
 const Video = require('./models/Video');
 const VideoPart = require('./models/VideoPart');
 const WatchProgress = require('./models/WatchProgress');
@@ -5624,6 +5625,50 @@ app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+app.post('/admin/recharge-codes/generate-batch', requireAdmin, async (req, res) => {
+  try {
+    const amount = Number(req.body.amount);
+    const fileCount = Number(req.body.file_count);
+    if (!amount || amount <= 0 || !Number.isInteger(fileCount) || fileCount < 1 || fileCount > 50) {
+      return res.status(400).send('❌ بيانات غير صحيحة');
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', error => {
+      console.error('Failed to create recharge codes archive:', error);
+      res.destroy(error);
+    });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=recharge_codes_${Date.now()}.zip`);
+    archive.pipe(res);
+
+    for (let fileIndex = 0; fileIndex < fileCount; fileIndex++) {
+      const generated = [];
+      for (let codeIndex = 0; codeIndex < 10; codeIndex++) {
+        const code = crypto.randomBytes(6).toString('hex').toUpperCase();
+        await RechargeCode.create({ code, amount, recharge_center_id: null });
+        generated.push({ code, amount });
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('أكواد الشحن');
+      sheet.columns = [
+        { header: 'الكود', key: 'code', width: 20 },
+        { header: 'القيمة (ج)', key: 'amount', width: 15 },
+      ];
+      generated.forEach(code => sheet.addRow(code));
+      sheet.getRow(1).font = { bold: true };
+      archive.append(await workbook.xlsx.writeBuffer(), { name: `recharge_codes_${fileIndex + 1}.xlsx` });
+    }
+
+    await archive.finalize();
+  } catch (error) {
+    console.error('Failed to generate recharge codes batch:', error);
+    if (!res.headersSent) res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+    else res.destroy(error);
   }
 });
 
