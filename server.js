@@ -7660,7 +7660,18 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       callCenterIntegrationEnabled: isCallCenterIntegrationEnabled(),
       followUpSelectionToken: createFollowUpSelectionToken(
         filteredRows.map(row => row.student.id),
-        { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id: session_id || selectedSession.id, show_all, show_attended, show_only_attended, center_id, subject_id }
+        {
+          filter_video_type: filter_video_type || '',
+          filter_video_max: filter_video_max || '',
+          filter_hw_status: filter_hw_status || '',
+          filter_exam_max: filter_exam_max || '',
+          session_id: session_id || selectedSession.id,
+          show_all: show_all || '',
+          show_attended: show_attended || '',
+          show_only_attended: show_only_attended || '',
+          center_id: center_id || '',
+          subject_id: subject_id || '',
+        }
       ),
     });
   } catch (e) {
