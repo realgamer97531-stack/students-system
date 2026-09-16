@@ -19,6 +19,51 @@
       </div>
     </form>
     <p class="text-muted small mt-2">⚠️ كل ضغطة تنشئ 10 أكواد بدون سنتر، ثم يمكنك ربط المجموعة بسنتر واحد.</p>
+    <form id="batch-generate-form" class="row g-2 align-items-end mt-3">
+      <div class="col-md-3">
+        <label class="form-label small">عدد الملفات</label>
+        <input type="number" name="file_count" class="form-control" placeholder="مثال: 5" required min="1" max="50">
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-outline-primary w-100">📁 توليد عدة ملفات</button>
+      </div>
+    </form>
+    <script>
+      document.getElementById('batch-generate-form').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const count = Number(form.file_count.value);
+        const amount = form.closest('.card-body').querySelector('input[name="amount"]').value;
+        const button = form.querySelector('button');
+        if (!amount || !count || count < 1 || count > 50) return;
+
+        button.disabled = true;
+        const originalText = button.textContent;
+        try {
+          for (let index = 0; index < count; index++) {
+            button.textContent = `جاري توليد الملف ${index + 1} من ${count}`;
+            const response = await fetch('/admin/recharge-codes/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ amount }),
+            });
+            if (!response.ok) throw new Error('فشل توليد أحد الملفات');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `recharge_codes_${Date.now()}_${index + 1}.xlsx`;
+            link.click();
+            URL.revokeObjectURL(url);
+          }
+        } catch (error) {
+          alert(error.message);
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      });
+    </script>
   </div>
 </div>
 

@@ -181,9 +181,16 @@ async function sendStudentsToCallCenter(name, students, mainSessionId = null) {
     },
     body: JSON.stringify({ name, main_session_id: mainSessionId, students }),
   });
-  const result = await response.json().catch(() => ({}));
+  const responseText = await response.text();
+  let result = {};
+  try {
+    result = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    result = { raw: responseText.slice(0, 500) };
+  }
   if (!response.ok) {
-    const error = new Error(result.error || `Call-center returned ${response.status}`);
+    const detail = result.error || result.message || result.raw;
+    const error = new Error(detail || `Call-center returned ${response.status}`);
     error.status = response.status;
     throw error;
   }
