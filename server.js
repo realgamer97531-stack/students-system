@@ -4324,9 +4324,9 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
     }
 
     const configuredUserId = Number.parseInt(process.env.CALLCENTER_COMMENT_USER_ID, 10);
-    const commentUser = configuredUserId
-      ? await User.findByPk(configuredUserId, { attributes: ['id'] })
-      : await User.findOne({ where: { active: true }, order: [['id', 'ASC']], attributes: ['id'] });
+    const commentUser = (configuredUserId && await User.findByPk(configuredUserId, { attributes: ['id'] }))
+      || await User.findOne({ where: { role: 'admin' }, order: [['id', 'ASC']], attributes: ['id'] })
+      || await User.findOne({ order: [['id', 'ASC']], attributes: ['id'] });
     if (!commentUser) return res.status(503).json({ success: false, message: 'No comment owner is configured' });
 
     const normalizedComment = String(comment || '').trim();
