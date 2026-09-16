@@ -88,10 +88,40 @@
   </div>
 </div>
 
-<h5 class="mb-3">آخر 100 كود تم إنشاؤهم</h5>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">كل أكواد الشحن</h5>
+  <form id="bulk-delete-form" action="/admin/recharge-codes/delete" method="POST" onsubmit="return prepareBulkDelete(event);">
+    <button type="submit" class="btn btn-outline-danger">🗑️ حذف المجموعات المحددة</button>
+  </form>
+</div>
+<script>
+  function prepareBulkDelete(event) {
+    const form = event.currentTarget;
+    form.querySelectorAll('input[name="code_ids"]').forEach(input => input.remove());
+    const selectedGroups = document.querySelectorAll('.code-group-checkbox:checked');
+    if (!selectedGroups.length) {
+      alert('اختر مجموعة واحدة على الأقل');
+      return false;
+    }
+    if (!confirm('هل أنت متأكد من حذف المجموعات المحددة؟')) return false;
+    selectedGroups.forEach(group => {
+      group.dataset.codeIds.split(',').forEach(codeId => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'code_ids';
+        input.value = codeId;
+        form.appendChild(input);
+      });
+    });
+    return true;
+  }
+</script>
 <% codesByCenter.forEach(group => { group.codes.forEach((codeGroup, groupIndex) => { %>
   <details class="card shadow-sm mb-4">
-    <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">سنتر التوزيع: <%= group.center.name %> <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span></summary>
+    <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">
+      <input type="checkbox" class="code-group-checkbox me-2" data-code-ids="<%= codeGroup.map(c => c.id).join(',') %>" aria-label="تحديد مجموعة الأكواد" onclick="event.stopPropagation()">
+      سنتر التوزيع: <%= group.center.name %> <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span>
+    </summary>
     <div class="card-body">
       <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
@@ -133,7 +163,10 @@
 <% if (unassignedGroups.length) { %>
   <% unassignedGroups.forEach((codeGroup, groupIndex) => { %>
   <details class="card shadow-sm mb-4">
-    <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">أكواد بدون سنتر توزيع <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span></summary>
+    <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">
+      <input type="checkbox" class="code-group-checkbox me-2" data-code-ids="<%= codeGroup.map(c => c.id).join(',') %>" aria-label="تحديد مجموعة الأكواد" onclick="event.stopPropagation()">
+      أكواد بدون سنتر توزيع <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span>
+    </summary>
     <div class="card-body">
       <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>

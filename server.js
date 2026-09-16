@@ -5556,7 +5556,7 @@ if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
 // صفحة إدارة الأكواد (أدمن بس)
 app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
   try {
-    const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
+    const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']] });
     const centers = await RechargeCenter.findAll({ order: [['name', 'ASC']] });
     const accounts = await RechargeCenterAccount.findAll({ attributes: ['recharge_center_id'] });
     const accountCenterIds = new Set(accounts.map(account => String(account.recharge_center_id)));
