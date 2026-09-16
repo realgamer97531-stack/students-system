@@ -5670,6 +5670,30 @@ app.post('/admin/recharge-codes/link', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/admin/recharge-codes/delete', requireAdmin, async (req, res) => {
+  try {
+    const requestedIds = Array.isArray(req.body.code_ids) ? req.body.code_ids : [req.body.code_ids];
+    const codeIds = [...new Set(requestedIds.map(Number).filter(Number.isInteger))];
+    if (codeIds.length === 0) return res.status(400).send('❌ لم يتم اختيار أكواد');
+
+    const selectedCodes = await RechargeCode.findAll({
+      where: { id: codeIds },
+      attributes: ['id', 'is_used'],
+      raw: true,
+    });
+    if (selectedCodes.length !== codeIds.length) return res.status(400).send('❌ بعض الأكواد غير موجودة');
+    if (selectedCodes.some(code => code.is_used)) {
+      return res.status(400).send('❌ لا يمكن حذف مجموعة تحتوي على أكواد مستخدمة');
+    }
+
+    await RechargeCode.destroy({ where: { id: codeIds, is_used: false } });
+    res.redirect('/admin/recharge-codes');
+  } catch (error) {
+    console.error('Failed to delete recharge codes:', error);
+    res.status(500).send('❌ حصلت مشكلة أثناء حذف الأكواد: ' + error.message);
+  }
+});
+
 app.post('/admin/recharge-codes/accounts', requireAdmin, async (req, res) => {
   const { center_name, username, password } = req.body;
   const center = await getOrCreateRechargeCenter(center_name);

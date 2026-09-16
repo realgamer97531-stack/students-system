@@ -105,6 +105,10 @@
         <div class="col-md-4"><label class="form-label small">كلمة مرور الأدمن للتغيير</label><input type="password" name="admin_password" class="form-control" required></div>
         <div class="col-md-4"><button class="btn btn-outline-danger w-100">🔐 حفظ تغيير الربط</button></div>
       </form>
+      <form action="/admin/recharge-codes/delete" method="POST" class="mb-3" onsubmit="return confirm('هل أنت متأكد من حذف هذه المجموعة؟');">
+        <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
+        <button class="btn btn-outline-danger">🗑️ حذف المجموعة</button>
+      </form>
       <div class="table-responsive">
         <table class="table table-sm">
           <thead class="table-light">
@@ -141,6 +145,10 @@
           </select>
         </div>
         <div class="col-md-4"><button class="btn btn-success w-100">🔗 ربط المجموعة</button></div>
+      </form>
+      <form action="/admin/recharge-codes/delete" method="POST" class="mb-3" onsubmit="return confirm('هل أنت متأكد من حذف هذه المجموعة؟');">
+        <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
+        <button class="btn btn-outline-danger">🗑️ حذف المجموعة</button>
       </form>
       <div class="table-responsive">
         <table class="table table-sm">
