@@ -36,7 +36,7 @@ const ExamResult = require('./models/ExamResult');
 const User = require('./models/User');
 const bcrypt = require('bcryptjs');
 const ExcelJS = require('exceljs');
-const archiver = require('archiver');
+const { ZipArchive } = require('archiver');
 const Video = require('./models/Video');
 const VideoPart = require('./models/VideoPart');
 const WatchProgress = require('./models/WatchProgress');
@@ -4285,7 +4285,10 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
         ],
       },
     });
-    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+    if (!student) {
+      console.warn('Call-center comment bridge: student not found', { student_id, identity });
+      return res.status(404).json({ success: false, message: `Student not found for ID "${identity}"` });
+    }
 
     let matchingSession = null;
     if (main_session_id) {
@@ -4293,7 +4296,11 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
         where: { id: Number(main_session_id) },
         include: [Center, Subject],
       });
-    } else {
+    }
+    // Fall back to relative/center/subject matching if there was no
+    // main_session_id (older call-center rows) or it pointed at a session
+    // that no longer matches anything, instead of failing outright.
+    if (!matchingSession) {
       const candidateSessions = await Session.findAll({
         where: { lesson_number: Number(relative) },
         include: [Center, Subject],
@@ -4311,7 +4318,10 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
         candidate.CenterId === student.CenterId && candidate.SubjectId === student.SubjectId
       ));
     }
-    if (!matchingSession) return res.status(404).json({ success: false, message: 'Matching session not found' });
+    if (!matchingSession) {
+      console.warn('Call-center comment bridge: no matching session', { student_id, main_session_id, relative, center, subject });
+      return res.status(404).json({ success: false, message: `Matching session not found (relative ${relative}, center "${center || '-'}", subject "${subject || '-'}")` });
+    }
 
     const configuredUserId = Number.parseInt(process.env.CALLCENTER_COMMENT_USER_ID, 10);
     const commentUser = configuredUserId
@@ -5636,7 +5646,7 @@ app.post('/admin/recharge-codes/generate-batch', requireAdmin, async (req, res) 
       return res.status(400).send('❌ بيانات غير صحيحة');
     }
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
     archive.on('error', error => {
       console.error('Failed to create recharge codes archive:', error);
       res.destroy(error);
