@@ -564,7 +564,11 @@ async function connectWithRetry(maxAttempts = 5, delayMs = 5000) {
       return;
     } catch (error) {
       if (attempt === 1 || attempt === maxAttempts) {
-        console.error(`⚠️ اتصال قاعدة البيانات فشل (${attempt}/${maxAttempts}):`, error.message);
+        console.error(`⚠️ اتصال قاعدة البيانات فشل (${attempt}/${maxAttempts}):`, {
+          name: error.name,
+          code: error.original?.code || error.parent?.code || error.code,
+          message: error.message || error.original?.message || error.parent?.message || 'Unknown database error',
+        });
       }
       if (attempt === maxAttempts) {
         throw error;
@@ -8318,7 +8322,11 @@ async function startServer() {
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
   } catch (error) {
-    console.error('❌ فشل الاتصال بقاعدة البيانات أثناء التشغيل الابتدائي:', error.message);
+    console.error('❌ فشل الاتصال بقاعدة البيانات أثناء التشغيل الابتدائي:', {
+      name: error.name,
+      code: error.original?.code || error.parent?.code || error.code,
+      message: error.message || error.original?.message || error.parent?.message || 'Unknown database error',
+    });
     console.error('السيرفر سيبدأ بدون اتصال قاعدة البيانات. سأحاول إعادة الاتصال في الخلفية.');
   }
 
