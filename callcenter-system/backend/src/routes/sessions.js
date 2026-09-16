@@ -40,6 +40,7 @@ async function bulkInsertRows(conn, sessionId, startIndex, students, withSourceI
         sessionId,
         startIndex + i,
         s.student_id || null,
+        s.main_session_id || null,
         s.name,
         s.phone || null,
         s.parent_phone || null,
@@ -51,11 +52,11 @@ async function bulkInsertRows(conn, sessionId, startIndex, students, withSourceI
         s.exam_max === '' || s.exam_max === undefined ? null : s.exam_max,
         withSourceId ? s.id : null
       );
-      return '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+      return '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     })
     .join(', ');
   await conn.query(
-    `INSERT INTO call_rows (session_id, row_index, student_id, name, phone, parent_phone, center, grade, subject, homework_status, exam_score, exam_max, source_row_id)
+    `INSERT INTO call_rows (session_id, row_index, student_id, main_session_id, name, phone, parent_phone, center, grade, subject, homework_status, exam_score, exam_max, source_row_id)
      VALUES ${placeholders}`,
     values
   );
@@ -157,7 +158,7 @@ router.post('/', requireAuth, requireAdmin, upload.single('file'), async (req, r
 router.post('/internal', async (req, res) => {
   if (!hasValidServiceToken(req)) return res.status(401).json({ error: 'Invalid service token' });
 
-  const { name, students } = req.body || {};
+  const { name, main_session_id, students } = req.body || {};
   if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Session name is required' });
   if (!Array.isArray(students) || students.length === 0) {
     return res.status(400).json({ error: 'At least one student is required' });
@@ -167,6 +168,7 @@ router.post('/internal', async (req, res) => {
     .filter(student => student && String(student.name || '').trim())
     .map(student => ({
       student_id: student.student_id || student.id || null,
+      main_session_id: student.main_session_id || main_session_id || null,
       name: String(student.name).trim(),
       phone: student.phone || null,
       parent_phone: student.parent_phone || null,
@@ -186,8 +188,8 @@ router.post('/internal', async (req, res) => {
   try {
     await conn.beginTransaction();
     const [result] = await conn.query(
-      'INSERT INTO sessions (name, status, created_by) VALUES (?, ?, ?)',
-      [name.trim(), 'active', null]
+      'INSERT INTO sessions (name, main_session_id, status, created_by) VALUES (?, ?, ?, ?)',
+      [name.trim(), main_session_id || null, 'active', null]
     );
     await bulkInsertRows(conn, result.insertId, 1, normalizedStudents, false);
     await conn.commit();

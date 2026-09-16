@@ -41,6 +41,7 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
     },
     body: JSON.stringify({
       student_id: row.student_id,
+      main_session_id: row.main_session_id || session.main_session_id || null,
       relative: Number(relativeMatch[1]),
       center,
       subject,

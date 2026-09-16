@@ -34,6 +34,7 @@ async function initSchema() {
       CREATE TABLE IF NOT EXISTS sessions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
+        main_session_id INT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'active',
         parent_session_id INT NULL,
         filter_applied VARCHAR(255),
@@ -50,6 +51,7 @@ async function initSchema() {
         session_id INT NOT NULL,
         row_index INT NOT NULL,
         student_id VARCHAR(100),
+        main_session_id INT NULL,
         name VARCHAR(255) NOT NULL,
         phone VARCHAR(50),
         parent_phone VARCHAR(50),
@@ -90,6 +92,7 @@ async function initSchema() {
     );
     const existingColumnNames = new Set(rowColumns.map((column) => column.COLUMN_NAME));
     const migrations = [
+      ['main_session_id', 'INT NULL'],
       ['center', 'VARCHAR(100) NULL'],
       ['homework_status', 'VARCHAR(50) NULL'],
       ['exam_score', 'DECIMAL(10,2) NULL'],
@@ -99,6 +102,14 @@ async function initSchema() {
       if (!existingColumnNames.has(column)) {
         await conn.query(`ALTER TABLE call_rows ADD COLUMN ${column} ${definition}`);
       }
+    }
+
+    const [sessionColumns] = await conn.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sessions' AND COLUMN_NAME = 'main_session_id'`
+    );
+    if (sessionColumns.length === 0) {
+      await conn.query('ALTER TABLE sessions ADD COLUMN main_session_id INT NULL');
     }
   } finally {
     conn.release();

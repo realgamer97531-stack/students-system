@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  main_session_id INT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   parent_session_id INT NULL,
   filter_applied VARCHAR(255),
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS call_rows (
   session_id INT NOT NULL,
   row_index INT NOT NULL,
   student_id VARCHAR(100),
+  main_session_id INT NULL,
   name VARCHAR(255) NOT NULL,
   phone VARCHAR(50),
   parent_phone VARCHAR(50),
