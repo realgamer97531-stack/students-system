@@ -206,7 +206,7 @@ function CallCard({ session, onLeave }) {
       setHistory((h) => [...h, { ...row, disposition, comment }]);
       await fetchNext();
       if (!result.studentSystemSync) {
-        setError('Saved in call center, but the student follow-up dashboard was not updated. Check the call-center integration settings.');
+        setError(`Saved in call center, but the student follow-up dashboard was not updated${result.studentSystemSyncError ? `: ${result.studentSystemSyncError}` : '.'}`);
       }
     } catch (err) {
       setError(err.message);
@@ -234,7 +234,7 @@ function CallCard({ session, onLeave }) {
       setHistory((h) => [...h, { ...row, disposition: 'skipped', comment }]);
       await fetchNext();
       if (!result.studentSystemSync) {
-        setError('Saved in call center, but the student follow-up dashboard was not updated. Check the call-center integration settings.');
+        setError(`Saved in call center, but the student follow-up dashboard was not updated${result.studentSystemSyncError ? `: ${result.studentSystemSyncError}` : '.'}`);
       }
     } catch (err) {
       setError(err.message);

@@ -20,15 +20,14 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
     : sessionParts.find(part => /^Online$/i.test(part)) || '';
   const center = String(row.center || sessionCenter).trim();
   const subject = String(row.subject || sessionSubject).trim();
-  if (!callbackUrl || !serviceToken || !row.student_id || !relativeMatch) {
-    console.warn('Student-system comment sync skipped: missing token or row identity', {
-      hasToken: Boolean(serviceToken),
-      studentId: row.student_id || null,
-      center,
-      subject,
-      sessionName: session.name,
-    });
-    return Promise.resolve(false);
+  if (!serviceToken) {
+    return Promise.reject(new Error('CALLCENTER_SERVICE_TOKEN is not configured on the call-center backend'));
+  }
+  if (!row.student_id) {
+    return Promise.reject(new Error('This row has no Student ID, so it cannot be matched to a student in the student system'));
+  }
+  if (!relativeMatch) {
+    return Promise.reject(new Error(`Could not read a relative/lesson number from session name "${session.name}"`));
   }
 
   const controller = new AbortController();
@@ -157,7 +156,7 @@ router.post('/rows/:id/disposition', requireAuth, async (req, res) => {
     if (row.status !== 'assigned' || row.assigned_to !== req.user.id) {
       return res.status(403).json({ error: 'This row is not currently assigned to you' });
     }
-    const [sessionRows] = await pool.query('SELECT name FROM sessions WHERE id = ?', [row.session_id]);
+    const [sessionRows] = await pool.query('SELECT * FROM sessions WHERE id = ?', [row.session_id]);
     const session = sessionRows[0];
 
     await pool.query(
@@ -167,13 +166,15 @@ router.post('/rows/:id/disposition', requireAuth, async (req, res) => {
 
     // Keep the existing call completion independent from the optional bridge.
     let studentSystemSync = false;
+    let studentSystemSyncError = null;
     try {
       studentSystemSync = await syncCommentToStudentSystem(row, session, disposition, comment);
     } catch (err) {
-      console.error('Student-system comment sync failed:', err.message);
+      studentSystemSyncError = err.message;
+      console.error(`Student-system comment sync failed for row ${row.id}:`, err.message);
     }
 
-    res.json({ ok: true, studentSystemSync });
+    res.json({ ok: true, studentSystemSync, studentSystemSyncError });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
