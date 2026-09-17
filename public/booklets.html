@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">البوكليتس</title>
+  <link href="style.css" rel="stylesheet">
+  <link id="bootstrap-link" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+  <style>
+    /* 🎨 المتغيرات ولوحة الألوان الثنائية */
+    :root {
+      --sf-bg: #F7F8FD;
+      --sf-card: #ffffff;
+      --sf-text: #1E293B;
+      --sf-muted: #64748B;
+      --sf-border: #E2E8F0;
+      --sf-primary: #4F46E5;
+      --sf-accent: #10B3A3;
+      --sf-warm: #F59E0B;
+      --loader-bg: rgba(245, 246, 251, 0.85);
+      --card-gradient: linear-gradient(135deg, #10B3A3, #4F46E5);
+    }
+
+    /* 🌙 توافقات وثيم الدارك مود الفخم */
+    body.dark-theme {
+      --sf-bg: #0b0f19;          
+      --sf-card: #141b2d;        
+      --sf-text: #f1f5f9;        
+      --sf-muted: #94a3b8;       
+      --sf-border: #1f293d;      
+      --sf-primary: #6366f1;      
+      --loader-bg: rgba(11, 15, 25, 0.9);
+      --card-gradient: linear-gradient(135deg, #0f766e, #4f46e5);
+    }
+
+    body {
+      background-color: var(--sf-bg) !important;
+      color: var(--sf-text);
+      font-family: system-ui, -apple-system, sans-serif;
+      position: relative;
+      min-height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* إعدادات الـ Loading Spinner */
+    #global-loader {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--loader-bg);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+      transition: background 0.3s ease;
+    }
+    .spinner {
+      border: 4px solid var(--sf-border);
+      border-top: 4px solid var(--sf-primary);
+      border-radius: 50%;
+      width: 50px; height: 50px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* أنيميشن دخول العناصر تتابعياً */
+    .fade-in-up {
+      animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(25px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* أشكال الخلفية الهلامية المحدثة */
+    .bg-shape {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      z-index: -1;
+      opacity: 0.25;
+      animation: float 7s ease-in-out infinite;
+    }
+    body.dark-theme .bg-shape {
+      opacity: 0.12;
+    }
+    .bg-shape-1 {
+      width: 350px; height: 350px;
+      background: var(--sf-primary);
+      top: -60px; right: -60px;
+    }
+    .bg-shape-2 {
+      width: 450px; height: 450px;
+      background: var(--sf-accent);
+      bottom: -120px; left: -120px;
+      animation-delay: 2.5s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(25px); }
+    }
+
+    /* الهيدر والقائمة العلوية */
+    .navbar {
+      background: #0F172A !important;
+      padding: 14px 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+    body.dark-theme .navbar {
+      background-color: #0b0f19 !important;
+      border-bottom: 1px solid var(--sf-border);
+    }
+    .navbar-brand {
+      font-weight: 800;
+      color: #ffffff !important;
+    }
+    
+    /* ستايل المنيو الجانبية للموبايل في الدارك مود */
+    body.dark-theme .offcanvas {
+      background-color: var(--sf-card) !important;
+      color: var(--sf-text) !important;
+      border-color: var(--sf-border) !important;
+    }
+    body.dark-theme .offcanvas-header {
+      border-bottom: 1px solid var(--sf-border) !important;
+    }
+    
+    /* 📱 تظبيط ألوان الأزرار في القائمة الجانبية للموبايل فقط */
+    @media (max-width: 767px) {
+      /* زر الصفحة الحالية (Active) */
+      .nav-tabs-custom .btn-light {
+        background-color: var(--sf-primary) !important;
+        color: #ffffff !important;
+        border: none !important;
+      }
+      /* الأزرار العادية */
+      .nav-tabs-custom .btn-outline-light {
+        color: var(--sf-text) !important;
+        border-color: var(--sf-border) !important;
+        background-color: transparent !important;
+      }
+      /* تأثير مرور الماوس على الأزرار */
+      .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(0,0,0,0.05) !important;
+      }
+      /* التوافق مع الدارك مود عند مرور الماوس */
+      body.dark-theme .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(255,255,255,0.05) !important;
+      }
+    }
+
+    .nav-tabs-custom .btn {
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.25s ease;
+    }
+
+    /* الكروت العامّة */
+    .card {
+      background-color: var(--sf-card) !important;
+      border: 1px solid var(--sf-border) !important;
+      color: var(--sf-text) !important;
+      border-radius: 20px !important;
+    }
+    
+    .list-group-item {
+      background-color: var(--sf-card) !important;
+      border-color: var(--sf-border) !important;
+      color: var(--sf-text) !important;
+    }
+    .badge {
+      font-weight: 600 !important;
+      border-radius: 8px !important;
+    }
+    .badge.bg-success { background-color: #DCFCE7 !important; color: #15803D !important; }
+    .badge.bg-secondary { background-color: #F1F5F9 !important; color: #475569 !important; }
+    body.dark-theme .badge.bg-success { background-color: rgba(21, 128, 61, 0.2) !important; color: #4ade80 !important; }
+    body.dark-theme .badge.bg-secondary { background-color: rgba(71, 85, 105, 0.2) !important; color: #cbd5e1 !important; }
+
+    /* بروجرس بار مخصص */
+    .progress {
+      background-color: var(--sf-border) !important;
+      border-radius: 10px;
+    }
+
+    /* المودالات */
+    .modal-content {
+      background-color: var(--sf-card) !important;
+      color: var(--sf-text) !important;
+      border: 1px solid var(--sf-border) !important;
+      border-radius: 18px;
+    }
+    .modal-header, .modal-footer { border-color: var(--sf-border) !important; }
+    .form-control {
+      background-color: var(--sf-bg) !important;
+      border-color: var(--sf-border) !important;
+      color: var(--sf-text) !important;
+    }
+    .form-control::placeholder { color: var(--sf-muted) !important; }
+    body.dark-theme .btn-close { filter: invert(1) grayscale(1) brightness(2); }
+
+    /* 🛠️ أزرار التحكم والواتساب العائمة */
+    .theme-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: auto;
+      z-index: 1050;
+      display: flex;
+      gap: 10px;
+    }
+    html[dir="ltr"] .theme-controls { left: auto; right: 20px; }
+    
+    .control-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #E2E4F3;
+      padding: 8px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #1E293B;
+    }
+    body.dark-theme .control-btn {
+      background: var(--sf-card);
+      border-color: var(--sf-border);
+      color: var(--sf-text);
+    }
+
+    /* 🟢 Floating WhatsApp Button */
+    .floating-whatsapp {
+      position: fixed;
+      bottom: 25px;
+      right: 25px;
+      background: linear-gradient(135deg, #25D366, #128C7E);
+      color: white !important;
+      padding: 12px 20px;
+      border-radius: 50px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+      z-index: 1040;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      text-decoration: none;
+    }
+    .floating-whatsapp:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+    }
+    html[dir="ltr"] .floating-whatsapp { right: auto; left: 25px; }
+    
+    @media (max-width: 768px) {
+      .floating-whatsapp { bottom: 80px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="theme-controls">
+    <button class="control-btn" id="lang-toggle-btn" onclick="toggleLanguage()">English</button>
+    <button class="control-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <!-- زر الدعم العائم -->
+  <a id="supportBtn" target="_blank" class="floating-whatsapp fade-in-up delay-3">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" class="bi bi-whatsapp" viewBox="0 0 16 16">
+      <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.949h.004c4.368 0 7.926-3.559 7.93-7.925a7.9 7.9 0 0 0-2.327-5.613l-.001-.002zM7.994 14.52a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c1.11-6.285 5.837-11.514 11.536-11.514a6.56 6.56 0 0 1 4.637 1.92 6.56 6.56 0 0 1 1.93 4.646c-.002 3.61-2.961 6.528-6.57 6.528"/>
+    </svg>
+    <span id="supportText">Contact Support</span>
+  </a>
+
+  <div id="global-loader" style="display: none;">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="bg-shape bg-shape-1"></div>
+  <div class="bg-shape bg-shape-2"></div>
+
+  <!-- الناف بار المتجاوب مع القائمة الجانبية للموبايل -->
+  <nav class="navbar navbar-expand-md px-3 sticky-top">
+    <div class="container-fluid">
+      <span class="navbar-brand d-flex align-items-center gap-2" id="welcomeText"><span class="sf-logo-mark">S</span> <span class="platform-name" data-platform-brand></span> <span id="nav-title">البوكليتس</span></span>
+      
+      <!-- زر إظهار القائمة الجانبية للموبايل -->
+      <button class="navbar-toggler p-1 border-0 shadow-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#ffffff" class="bi bi-list" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+        </svg>
+      </button>
+
+      <!-- القائمة الجانبية (Offcanvas) -->
+      <div class="offcanvas offcanvas-end" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+        <div class="offcanvas-header">
+          <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">القائمة</h5>
+          <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <div class="d-flex flex-column flex-md-row align-items-md-center gap-2 nav-tabs-custom ms-auto mt-2 mt-md-0 w-100">
+            <a href="student.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-profile">بياناتي</a>
+            <a href="sessions.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-sessions">حصصي</a>
+            <a href="lessons.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-lessons">الفيديوهات</a>
+            <a href="homework.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-homework">الواجب</a>
+            <a href="booklets.html" class="btn btn-light w-100 w-md-auto text-start text-md-center me-md-1" id="nav-booklets">البوكليتس</a>
+            <button class="btn btn-outline-danger mt-3 mt-md-0 ms-md-2 w-100 w-md-auto text-start text-md-center" onclick="logout()" id="nav-logout">خروج</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4" id="content" style="position: relative; z-index: 1;">
+    <div id="bookletsContainer" class="fade-in-up"></div>
+  </div>
+
+  <div class="modal fade" id="reserveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="reserveModalTitle">حجز بوكليت</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="reserveMsg"></div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold" id="label-pay-method">طريقة الدفع</label>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-primary flex-grow-1" id="btnCenter" onclick="selectMethod('center')">🏫 في السنتر</button>
+              <button class="btn btn-outline-success flex-grow-1" id="btnVoda" onclick="selectMethod('vodafone')">📱 فودافون كاش</button>
+            </div>
+          </div>
+          <div id="vodafoneBox" style="display:none;">
+            <div class="alert alert-info small" id="alert-voda-instructions">
+              اتحول الفلوس على رقم الفودافون كاش، وبعدين ارفع صورة الإيصال هنا.
+            </div>
+            <input type="file" id="transferImage" class="form-control" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btn-cancel">إلغاء</button>
+          <button type="button" class="btn btn-primary" id="confirmReserveBtn" disabled onclick="confirmReserve()">تأكيد الحجز</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="shared.js"></script>
+  
+  <script>
+    // Initialize WhatsApp button dynamically using CONFIG
+    document.getElementById("supportBtn").href = `https://wa.me/${CONFIG.SUPPORT_PHONE}?text=${encodeURIComponent(CONFIG.SUPPORT_TEXT)}`;
+
+    let selectedBookletId = null;
+    let selectedMethod = null;
+
+    // ==========================================
+    // سيستم الترجمة والـ Dark Mode المشترك
+    // ==========================================
+    const translations = {
+      ar: {
+        pageTitle: "البوكليتس",
+        navTitle: "البوكليتس",
+        navProfile: "بياناتي",
+        navSessions: "حصصي",
+        navLessons: "الفيديوهات",
+        navHomework: "الواجب",
+        navBooklets: "البوكليتس",
+        navLogout: "خروج",
+        menuLabel: "القائمة",
+        supportBtn: "تواصل مع الدعم",
+        noBooklets: "لا يوجد بوكليتس متاحة حالياً",
+        priceLabel: "السعر:",
+        paidLabel: "مدفوع:",
+        remainingLabel: "متبقي:",
+        currency: "ج",
+        deliveredBadge: "✓ استلمته",
+        fullPaidBadge: "✓ مدفوع بالكامل",
+        btnReserve: "📦 حجز البوكليت",
+        btnReReserve: "إعادة الحجز",
+        statusLabels: {
+          pending: '⏳ في انتظار التحقق',
+          verified: '✓ محقق',
+          rejected: '✗ مرفوض'
+        },
+        payMethodLabel: "طريقة الدفع",
+        vodaInstructions: "اتحول الفلوس على رقم الفودافون كاش، وبعدين ارفع صورة الإيصال هنا.",
+        cancel: "إلغاء",
+        confirmBtn: "تأكيد الحجز",
+        vodaAlertMsg: "ارفع صورة التحويل الأول",
+        aiProcessing: "🤖 جاري مراجعة الإيصال بالذكاء الاصطناعي... لحظات من فضلك.",
+        connError: "❌ حصلت مشكلة في الاتصال"
+      },
+      en: {
+        pageTitle: "Booklets",
+        navTitle: "Booklets",
+        navProfile: "My Profile",
+        navSessions: "My Sessions",
+        navLessons: "Videos",
+        navHomework: "Homework",
+        navBooklets: "Booklets",
+        navLogout: "Logout",
+        menuLabel: "Menu",
+        supportBtn: "Contact Support",
+        noBooklets: "No booklets currently available",
+        priceLabel: "Price:",
+        paidLabel: "Paid:",
+        remainingLabel: "Remaining:",
+        currency: "EGP",
+        deliveredBadge: "✓ Delivered",
+        fullPaidBadge: "✓ Paid in Full",
+        btnReserve: "📦 Reserve Booklet",
+        btnReReserve: "Re-reserve",
+        statusLabels: {
+          pending: '⏳ Pending verification',
+          verified: '✓ Verified',
+          rejected: '✗ Rejected'
+        },
+        payMethodLabel: "Payment Method",
+        vodaInstructions: "Transfer the amount to the Vodafone Cash number, then upload the receipt image here.",
+        cancel: "Cancel",
+        confirmBtn: "Confirm Reservation",
+        vodaAlertMsg: "Please upload the transfer image first",
+        aiProcessing: "🤖 AI is reviewing the receipt... Please wait a moment.",
+        connError: "❌ Connection error occurred"
+      }
+    };
+
+    function applyLanguage(lang) {
+      const isEn = lang === 'en';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+      
+      const bootstrapLink = document.getElementById('bootstrap-link');
+      bootstrapLink.href = isEn 
+        ? "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        : "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css";
+
+      const t = translations[lang];
+      document.title = t.pageTitle;
+      document.getElementById('nav-title').innerText = t.navTitle;
+      document.getElementById('nav-profile').innerText = t.navProfile;
+      document.getElementById('nav-sessions').innerText = t.navSessions;
+      document.getElementById('nav-lessons').innerText = t.navLessons;
+      document.getElementById('nav-homework').innerText = t.navHomework;
+      document.getElementById('nav-booklets').innerText = t.navBooklets;
+      document.getElementById('nav-logout').innerText = t.navLogout;
+      document.getElementById('mobileSidebarLabel').innerText = t.menuLabel;
+      document.getElementById('supportText').innerText = t.supportBtn;
+
+      document.getElementById('label-pay-method').innerText = t.payMethodLabel;
+      document.getElementById('alert-voda-instructions').innerText = t.vodaInstructions;
+      document.getElementById('btn-cancel').innerText = t.cancel;
+      document.getElementById('confirmReserveBtn').innerText = t.confirmBtn;
+
+      document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
+      
+      loadBooklets();
+    }
+
+    function toggleLanguage() {
+      let currentLang = localStorage.getItem('portal_lang') || 'ar';
+      let newLang = currentLang === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('portal_lang', newLang);
+      applyLanguage(newLang);
+    }
+
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '☀️';
+      } else {
+        document.body.classList.remove('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '🌙';
+      }
+    }
+
+    function toggleTheme() {
+      let currentTheme = localStorage.getItem('portal_theme') || 'light';
+      let newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('portal_theme', newTheme);
+      applyTheme(newTheme);
+    }
+
+    async function loadBooklets() {
+      const loader = document.getElementById('global-loader');
+      if (loader) loader.style.display = 'flex';
+
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const result = await apiGet('/api/portal/booklets');
+      const container = document.getElementById('bookletsContainer');
+      
+      if (loader) loader.style.display = 'none';
+
+      if (!result.success || result.booklets.length === 0) {
+        container.innerHTML = `<p class="text-muted text-center">${translations[currentLang].noBooklets}</p>`;
+        return;
+      }
+
+      container.innerHTML = result.booklets.map(b => {
+        const progressPct = Math.min(100, (b.paidAmount / b.sellPrice) * 100);
+        let statusBadge = '', actionBtn = '';
+
+        if (b.isDelivered) {
+          statusBadge = `<span class="badge bg-success">${translations[currentLang].deliveredBadge}</span>`;
+        } else if (b.reservation) {
+          const resColors = { pending: '#FEF3C7', verified: '#D1FAE5', rejected: '#FEE2E2' };
+          const darkResColors = { pending: 'rgba(254, 243, 199, 0.2)', verified: 'rgba(209, 250, 229, 0.2)', rejected: 'rgba(254, 226, 226, 0.2)' };
+          const resText = translations[currentLang].statusLabels;
+          
+          const isDark = document.body.classList.contains('dark-theme');
+          const finalBg = isDark ? darkResColors[b.reservation.status] : resColors[b.reservation.status];
+          const finalColor = b.reservation.status === 'rejected' ? '#EF4444' : (b.reservation.status === 'verified' ? '#10B981' : '#F59E0B');
+
+          statusBadge = `<span class="badge" style="background:${finalBg};color:${finalColor};">${resText[b.reservation.status]}</span>`;
+          
+          if (b.reservation.status === 'rejected') {
+            actionBtn = `<button class="btn btn-sm btn-outline-primary mt-2 w-100 fw-bold" onclick="openReserve(${b.id}, '${b.name}')">${translations[currentLang].btnReReserve}</button>`;
+          }
+        } else if (b.remaining <= 0) {
+          statusBadge = `<span class="badge bg-success">${translations[currentLang].fullPaidBadge}</span>`;
+        } else {
+          actionBtn = `<button class="btn btn-sm btn-primary mt-2 w-100 fw-bold" onclick="openReserve(${b.id}, '${b.name}')">${translations[currentLang].btnReserve}</button>`;
+        }
+
+        // Remove any action button from the card (reserve buttons disabled on this page)
+        actionBtn = '';
+
+        const alignDir = document.documentElement.dir === 'ltr' ? 'border-left' : 'border-right';
+
+        return `
+          <div class="card shadow-sm mb-3" style="${alignDir}: 4px solid ${b.remaining <= 0 ? '#14B8A6' : 'var(--sf-primary)'};">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="mb-0 fw-bold">${b.name}</h6>
+                ${statusBadge}
+              </div>
+              <div class="d-flex justify-content-between small text-muted mb-2">
+                <span>${translations[currentLang].priceLabel} <strong style="color:var(--sf-text);">${b.sellPrice} ${translations[currentLang].currency}</strong></span>
+                <span>${translations[currentLang].paidLabel} <strong class="text-success">${b.paidAmount} ${translations[currentLang].currency}</strong></span>
+                <span>${translations[currentLang].remainingLabel} <strong class="${b.remaining > 0 ? 'text-danger' : 'text-success'}">${Math.max(0, b.remaining)} ${translations[currentLang].currency}</strong></span>
+              </div>
+              <div class="progress mb-2" style="height:6px;">
+                <div class="progress-bar" style="width:${progressPct}%;background:var(--sf-accent);"></div>
+              </div>
+              ${actionBtn}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function openReserve(bookletId, name) {
+      selectedBookletId = bookletId;
+      selectedMethod = null;
+      document.getElementById('reserveModalTitle').textContent = `${translations[localStorage.getItem('portal_lang') || 'ar'].btnReserve.split(' ')[0]} ${name}`;
+      document.getElementById('reserveMsg').innerHTML = '';
+      document.getElementById('vodafoneBox').style.display = 'none';
+      document.getElementById('confirmReserveBtn').disabled = true;
+      
+      const btnCenter = document.getElementById('btnCenter');
+      const btnVoda = document.getElementById('btnVoda');
+      
+      btnCenter.classList.remove('active', 'btn-primary');
+      btnVoda.classList.remove('active', 'btn-success');
+      btnCenter.classList.add('btn-outline-primary');
+      btnVoda.classList.add('btn-outline-success');
+      
+      new bootstrap.Modal(document.getElementById('reserveModal')).show();
+    }
+
+    function selectMethod(method) {
+      selectedMethod = method;
+      document.getElementById('vodafoneBox').style.display = method === 'vodafone' ? 'block' : 'none';
+      document.getElementById('confirmReserveBtn').disabled = false;
+      document.getElementById('btnCenter').className = `btn flex-grow-1 fw-bold ${method === 'center' ? 'btn-primary' : 'btn-outline-primary'}`;
+      document.getElementById('btnVoda').className = `btn flex-grow-1 fw-bold ${method === 'vodafone' ? 'btn-success' : 'btn-outline-success'}`;
+    }
+
+    async function confirmReserve() {
+      if (!selectedMethod) return;
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      document.getElementById('confirmReserveBtn').disabled = true;
+      document.getElementById('reserveMsg').innerHTML = `<div class="alert alert-secondary small py-2">${translations[currentLang].aiProcessing}</div>`;
+
+      const formData = new FormData();
+      // Enforce offline payment only: if user selected 'vodafone', do not accept uploaded image — show instruction instead.
+      const methodToSend = selectedMethod === 'center' ? 'center' : 'center';
+      formData.append('payment_method', methodToSend);
+      if (selectedMethod === 'vodafone') {
+        // Ignore uploaded image; inform user that payments must be done at center.
+        document.getElementById('reserveMsg').innerHTML = `<div class="alert alert-info small py-2">${translations[currentLang].vodaInstructions} — الدفع عبر الإنترنت غير متاح، الرجاء إتمام الدفع في السنتر.</div>`;
+        // Delay to allow user to read message and then re-enable confirm button
+        setTimeout(() => { document.getElementById('confirmReserveBtn').disabled = false; }, 1200);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/portal/booklets/${selectedBookletId}/reserve`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${localStorage.getItem('portal_token')}` },
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('reserveMsg').innerHTML = `<div class="alert alert-success small py-2">${data.message}</div>`;
+          setTimeout(() => {
+            bootstrap.Modal.getInstance(document.getElementById('reserveModal')).hide();
+            loadBooklets();
+          }, 1500);
+        } else {
+          document.getElementById('reserveMsg').innerHTML = `<div class="alert alert-danger small py-2">${data.message}</div>`;
+          document.getElementById('confirmReserveBtn').disabled = false;
+        }
+      } catch (e) {
+        document.getElementById('reserveMsg').innerHTML = `<div class="alert alert-danger small py-2">${translations[currentLang].connError}</div>`;
+        document.getElementById('confirmReserveBtn').disabled = false;
+      }
+    }
+
+    (function init() {
+      const savedLang = localStorage.getItem('portal_lang') || 'ar';
+      applyLanguage(savedLang);
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      applyTheme(savedTheme);
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

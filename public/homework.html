@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">الواجبات</title>
+  <link href="style.css" rel="stylesheet">
+  <link id="bootstrap-link" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+  <style>
+    /* 🎨 المتغيرات ولوحة الألوان الثنائية */
+    :root {
+      /* السيم الافتراضي الفاتح - ألوان دافية ومناسبة لطالب المرحلة الثانوية */
+      --sf-bg: #F7F8FD;
+      --sf-card: #ffffff;
+      --sf-text: #1E293B;
+      --sf-muted: #64748B;
+      --sf-border: #E2E8F0;
+      --sf-primary: #4F46E5;
+      --sf-accent: #10B3A3;
+      --sf-warm: #F59E0B;
+      --loader-bg: rgba(245, 246, 251, 0.85);
+      --card-gradient: linear-gradient(135deg, #10B3A3, #4F46E5);
+    }
+
+    /* 🌙 توافقات وثيم الدارك مود الفخم (Premium Slate) */
+    body.dark-theme {
+      --sf-bg: #0b0f19;          /* خلفية ليلية عميقة */
+      --sf-card: #141b2d;        /* لون الكروت والمودال */
+      --sf-text: #f1f5f9;        /* كتابة فاتحة */
+      --sf-muted: #94a3b8;       /* النصوص الجانبية والتفاصيل */
+      --sf-border: #1f293d;      /* حدود ناعمة */
+      --sf-primary: #6366f1;     /* بنفسجي ليلي ناعم */
+      --loader-bg: rgba(11, 15, 25, 0.9);
+      --card-gradient: linear-gradient(135deg, #0f766e, #4f46e5);
+    }
+
+    body {
+      background-color: var(--sf-bg) !important;
+      color: var(--sf-text);
+      font-family: system-ui, -apple-system, sans-serif;
+      position: relative;
+      min-height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* إعدادات الـ Loading Spinner */
+    #global-loader {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--loader-bg);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+      transition: background 0.3s ease;
+    }
+    .spinner {
+      border: 4px solid var(--sf-border);
+      border-top: 4px solid var(--sf-primary);
+      border-radius: 50%;
+      width: 50px; height: 50px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* أنيميشن دخول العناصر تتابعياً */
+    .fade-in-up {
+      animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(25px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* أشكال الخلفية الهلامية المحدثة للوضعين */
+    .bg-shape {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      z-index: -1;
+      opacity: 0.25;
+      animation: float 7s ease-in-out infinite;
+    }
+    body.dark-theme .bg-shape {
+      opacity: 0.12;
+    }
+    .bg-shape-1 {
+      width: 350px; height: 350px;
+      background: var(--sf-primary);
+      top: -60px; right: -60px;
+    }
+    .bg-shape-2 {
+      width: 450px; height: 450px;
+      background: var(--sf-accent);
+      bottom: -120px; left: -120px;
+      animation-delay: 2.5s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(25px); }
+    }
+
+    /* الهيدر والقائمة العلوية */
+    .navbar {
+      background: #0F172A !important;
+      padding: 14px 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+    body.dark-theme .navbar {
+      background-color: #0b0f19 !important;
+      border-bottom: 1px solid var(--sf-border);
+    }
+    .navbar-brand {
+      font-weight: 800;
+      color: #ffffff !important;
+    }
+
+    body.dark-theme .offcanvas {
+      background-color: var(--sf-card) !important;
+      color: var(--sf-text) !important;
+      border-color: var(--sf-border) !important;
+    }
+    body.dark-theme .offcanvas-header {
+      border-bottom: 1px solid var(--sf-border) !important;
+    }
+
+    @media (max-width: 767px) {
+      .nav-tabs-custom .btn-light {
+        background-color: var(--sf-primary) !important;
+        color: #ffffff !important;
+        border: none !important;
+      }
+      .nav-tabs-custom .btn-outline-light {
+        color: var(--sf-text) !important;
+        border-color: var(--sf-border) !important;
+        background-color: transparent !important;
+      }
+      .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(0,0,0,0.05) !important;
+      }
+      body.dark-theme .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(255,255,255,0.05) !important;
+      }
+    }
+
+    .nav-tabs-custom .btn {
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.25s ease;
+    }
+
+    /* الكروت العامّة وقفل البوتستراب للدارك مود */
+    .card {
+      background-color: var(--sf-card) !important;
+      border: 1px solid var(--sf-border) !important;
+      color: var(--sf-text) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.04);
+    }
+    body.dark-theme .card {
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
+    }
+
+    /* البادجات المعدلة للدارك واللايت مود */
+    .badge {
+      font-weight: 600 !important;
+      border-radius: 8px !important;
+    }
+    .badge.bg-success { background-color: #DCFCE7 !important; color: #15803D !important; }
+    .badge.bg-secondary { background-color: #F1F5F9 !important; color: #475569 !important; }
+    body.dark-theme .badge.bg-success { background-color: rgba(21, 128, 61, 0.2) !important; color: #4ade80 !important; }
+    body.dark-theme .badge.bg-secondary { background-color: rgba(71, 85, 105, 0.2) !important; color: #cbd5e1 !important; }
+
+    /* المودالات المتجاوبة للوضعين */
+    .modal-content {
+      background-color: var(--sf-card) !important;
+      color: var(--sf-text) !important;
+      border: 1px solid var(--sf-border) !important;
+      border-radius: 18px;
+    }
+    .modal-header, .modal-footer {
+      border-color: var(--sf-border) !important;
+    }
+    .form-control {
+      background-color: var(--sf-bg) !important;
+      border-color: var(--sf-border) !important;
+      color: var(--sf-text) !important;
+    }
+    .form-control::placeholder {
+      color: var(--sf-muted) !important;
+    }
+    body.dark-theme .btn-close {
+      filter: invert(1) grayscale(1) brightness(2);
+    }
+
+    /* 🛠️ شريط التحكم العائم السفلي (لغة / دارك مود) */
+    .theme-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: auto;
+      z-index: 1050;
+      display: flex;
+      gap: 10px;
+    }
+    html[dir="ltr"] .theme-controls {
+      left: auto;
+      right: 20px;
+    }
+    .control-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #E2E4F3;
+      padding: 8px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #1E293B;
+    }
+    body.dark-theme .control-btn {
+      background: var(--sf-card);
+      border-color: var(--sf-border);
+      color: var(--sf-text);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- منع الـ Flicker -->
+  <script>
+    (function injectThemeImmediately() {
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+      }
+    })();
+  </script>
+
+  <div id="global-loader" style="display: none;">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="bg-shape bg-shape-1"></div>
+  <div class="bg-shape bg-shape-2"></div>
+
+  <div class="theme-controls">
+    <button class="control-btn" id="lang-toggle-btn" onclick="toggleLanguage()">English</button>
+    <button class="control-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <!-- الناف بار المتجاوب مع القائمة الجانبية للموبايل -->
+  <nav class="navbar navbar-expand-md px-3 sticky-top">
+    <div class="container-fluid">
+      <span class="navbar-brand d-flex align-items-center gap-2"><span class="sf-logo-mark">S</span> <span class="platform-name" data-platform-brand></span> <span id="nav-title">الواجبات</span></span>
+      
+      <button class="navbar-toggler p-1 border-0 shadow-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#ffffff" class="bi bi-list" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+        </svg>
+      </button>
+
+      <div class="offcanvas offcanvas-end" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+        <div class="offcanvas-header">
+          <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">القائمة</h5>
+          <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <div class="d-flex flex-column flex-md-row align-items-md-center gap-2 nav-tabs-custom ms-auto mt-2 mt-md-0 w-100">
+            <a href="student.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-profile">بياناتي</a>
+            <a href="sessions.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-sessions">حصصي</a>
+            <a href="lessons.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-lessons">الفيديوهات</a>   
+            <a href="homework.html" class="btn btn-light w-100 w-md-auto text-start text-md-center" id="nav-homework">الواجب</a>
+            <a href="booklets.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center me-md-1" id="nav-booklets">البوكليتس</a>
+            <button class="btn btn-outline-danger mt-3 mt-md-0 ms-md-2 w-100 w-md-auto text-start text-md-center" onclick="logout()" id="nav-logout">خروج</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4 fade-in-up" id="content" style="position: relative; z-index: 1;">
+    <div id="hwList"></div>
+  </div>
+
+  <div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="uploadModalTitle">رفع الواجب</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="uploadMsg"></div>
+          <div id="previewsBox" class="d-flex flex-wrap gap-2 mb-3"></div>
+          <button class="btn btn-outline-primary w-100 mb-2" onclick="addFileInput()" id="btn-add-image">
+            📷 إضافة صورة
+          </button>
+          <div id="imageInputs"></div>
+          <div class="mb-2 mt-3">
+            <label class="form-label small" id="label-comment">ملاحظة للمصحح (اختياري)</label>
+            <textarea id="hwComment" class="form-control" rows="2" placeholder="اكتب أي ملاحظة..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btn-cancel">إلغاء</button>
+          <button type="button" class="btn btn-success" onclick="submitHomework()" id="btn-submit-hw">✅ إرسال الواجب</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="config.js"></script>
+  <script src="shared.js"></script>
+  
+  <script>
+    let currentAssignmentId = null;
+    let selectedFiles = [];
+
+    // ==========================================
+    // سيستم الترجمة والـ Dark Mode المشترك
+    // ==========================================
+    const translations = {
+      ar: {
+        pageTitle: "الواجبات",
+        navTitle: "الواجبات",
+        menuLabel: "القائمة",
+        navProfile: "بياناتي",
+        navSessions: "حصصي",
+        navLessons: "الفيديوهات",
+        navHomework: "الواجب",
+        navBooklets: "البوكليتس",
+        navLogout: "خروج",
+        noHomework: "لا يوجد واجبات حالياً",
+        hwOrder: "واجب",
+        centerCorrected: "صُحِّح في السنتر",
+        onlineCorrected: "اتصحح اونلاين",
+        submittedText: "تم الإرسال",
+        uploadBtn: "📤 رفع الواجب",
+        expiredText: "انتهى وقت التسليم",
+        deadlineText: "📅 التسليم: X ← Y",
+        uploadTitle: "رفع الواجب",
+        uploadTitlePrefix: "رفع: ",
+        addImage: "📷 إضافة صورة",
+        commentLabel: "ملاحظة للمصحح (اختياري)",
+        commentPlaceholder: "اكتب أي ملاحظة...",
+        cancel: "إلغاء",
+        submitBtn: "✅ إرسال الواجب",
+        alertMinImage: "ارفع صورة واحدة على الأقل",
+        alertUploading: "⏳ جاري الرفع...",
+        uploadSuccess: "تم بنجاح",
+        alertConnError: "❌ حصلت مشكلة في الاتصال",
+        maxImages: "لا يمكن رفع أكثر من 10 صور",
+        statusLabels: {
+          submitted: 'تم التسليم ⏳',
+          complete: 'كامل ✅',
+          incomplete: 'مش كامل ⚠️',
+          no_steps: 'من غير خطوات 📝',
+          not_done: 'مش معمول ❌',
+          center: 'صُحِّح في السنتر',
+          online: 'اتصحح اونلاين',
+        }
+      },
+      en: {
+        pageTitle: "Homework",
+        navTitle: "Homework",
+        menuLabel: "Menu",
+        navProfile: "My Profile",
+        navSessions: "My Sessions",
+        navLessons: "Videos",
+        navHomework: "Homework",
+        navBooklets: "Booklets",
+        navLogout: "Logout",
+        noHomework: "No homework currently available",
+        hwOrder: "Homework",
+        centerCorrected: "Corrected in Center",
+        onlineCorrected: "Corrected Online",
+        submittedText: "Submitted",
+        uploadBtn: "📤 Upload Homework",
+        expiredText: "Submission time expired",
+        deadlineText: "📅 Deadline: X → Y",
+        uploadTitle: "Upload Homework",
+        uploadTitlePrefix: "Upload: ",
+        addImage: "📷 Add Image",
+        commentLabel: "Comment for corrector (Optional)",
+        commentPlaceholder: "Write any note...",
+        cancel: "Cancel",
+        submitBtn: "✅ Submit Homework",
+        alertMinImage: "Please upload at least one image",
+        alertUploading: "⏳ Uploading...",
+        uploadSuccess: "Success",
+        alertConnError: "❌ Connection error occurred",
+        maxImages: "No more than 10 images can be uploaded",
+        statusLabels: {
+          submitted: 'Submitted ⏳',
+          complete: 'Complete ✅',
+          incomplete: 'Incomplete ⚠️',
+          no_steps: 'No steps 📝',
+          not_done: 'Not done ❌',
+          center: 'Corrected in Center',
+          online: 'Corrected Online',
+        }
+      }
+    };
+
+    const statusColors = {
+      submitted: '#6B7280', complete: '#059669', incomplete: '#D97706',
+      no_steps: '#6B7280', not_done: '#DC2626',
+      center: '#2563EB', online: '#0EA5E9',
+    };
+
+    function applyLanguage(lang) {
+      const isEn = lang === 'en';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+      
+      const bootstrapLink = document.getElementById('bootstrap-link');
+      bootstrapLink.href = isEn 
+        ? "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        : "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css";
+
+      document.getElementById('page-title').innerText = translations[lang].pageTitle;
+      document.getElementById('nav-title').innerText = translations[lang].navTitle;
+      if(document.getElementById('mobileSidebarLabel')) document.getElementById('mobileSidebarLabel').innerText = translations[lang].menuLabel;
+      document.getElementById('nav-profile').innerText = translations[lang].navProfile;
+      document.getElementById('nav-sessions').innerText = translations[lang].navSessions;
+      document.getElementById('nav-lessons').innerText = translations[lang].navLessons;
+      document.getElementById('nav-homework').innerText = translations[lang].navHomework;
+      if(document.getElementById('nav-booklets')) document.getElementById('nav-booklets').innerText = translations[lang].navBooklets;
+      document.getElementById('nav-logout').innerText = translations[lang].navLogout;
+
+      document.getElementById('uploadModalTitle').innerText = translations[lang].uploadTitle;
+      document.getElementById('btn-add-image').innerHTML = translations[lang].addImage;
+      document.getElementById('label-comment').innerText = translations[lang].commentLabel;
+      document.getElementById('hwComment').placeholder = translations[lang].commentPlaceholder;
+      document.getElementById('btn-cancel').innerText = translations[lang].cancel;
+      document.getElementById('btn-submit-hw').innerText = translations[lang].submitBtn;
+
+      document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
+      
+      loadHomework();
+    }
+
+    function toggleLanguage() {
+      let currentLang = localStorage.getItem('portal_lang') || 'ar';
+      let newLang = currentLang === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('portal_lang', newLang);
+      applyLanguage(newLang);
+    }
+
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '☀️';
+      } else {
+        document.body.classList.remove('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '🌙';
+      }
+    }
+
+    function toggleTheme() {
+      let currentTheme = localStorage.getItem('portal_theme') || 'light';
+      let newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('portal_theme', newTheme);
+      applyTheme(newTheme);
+    }
+
+    async function loadHomework() {
+      const loader = document.getElementById('global-loader');
+      if (loader) loader.style.display = 'flex';
+
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const result = await apiGet('/api/portal/homework');
+      const container = document.getElementById('hwList');
+      
+      if (loader) loader.style.display = 'none';
+
+      if (!result.success || result.assignments.length === 0) {
+        container.innerHTML = `<p class="text-muted text-center">${translations[currentLang].noHomework}</p>`;
+        return;
+      }
+
+      container.innerHTML = result.assignments.map(a => {
+        const today = new Date().toISOString().slice(0, 10);
+        const expired = today > a.endDate;
+        const isCenterCorrected = a.centerStatus === 'center' || a.centerStatus === 'center_corrected' || a.centerStatus === true;
+        const isOnlineCorrected = a.centerStatus === 'online' || a.centerStatus === 'online_corrected' || a.onlineStatus === true || a.correctionMethod === 'online' || a.correctionType === 'online';
+        const correctionMethod = isCenterCorrected ? 'center' : isOnlineCorrected ? 'online' : null;
+        const effectiveStatus = correctionMethod || (a.submitted ? a.submissionStatus : null);
+
+        let statusBadge = '';
+        if (effectiveStatus) {
+          const label = translations[currentLang].statusLabels[effectiveStatus] || effectiveStatus;
+          statusBadge = `<span class="badge ms-2" style="background:${statusColors[effectiveStatus]}20;color:${statusColors[effectiveStatus]};">${label}</span>`;
+        }
+
+        let actionBtn = '';
+        if (correctionMethod === 'center') {
+          actionBtn = `<span class="badge bg-secondary">${translations[currentLang].centerCorrected}</span>`;
+        } else if (correctionMethod === 'online') {
+          actionBtn = `<span class="badge bg-info text-dark">${translations[currentLang].onlineCorrected}</span>`;
+        } else if (a.submitted) {
+          const subText = translations[currentLang].submittedText;
+          actionBtn = `<span class="badge" style="background:rgba(79, 70, 229, 0.15);color:var(--sf-primary);">${subText}</span>`;
+        } else if (!expired) {
+          actionBtn = `<button class="btn btn-primary btn-sm" onclick="openUpload(${a.id}, '${a.title}')">${translations[currentLang].uploadBtn}</button>`;
+        } else {
+          actionBtn = `<span class="badge bg-danger">${translations[currentLang].expiredText}</span>`;
+        }
+
+        const dateText = translations[currentLang].deadlineText.replace('X', a.startDate).replace('Y', a.endDate);
+
+        return `
+          <div class="card shadow-sm mb-3" style="border-right: 4px solid ${effectiveStatus ? statusColors[effectiveStatus] : '#E5E7EB'}; border-left: ${document.documentElement.dir === 'ltr' ? '4px solid ' + (effectiveStatus ? statusColors[effectiveStatus] : '#E5E7EB') : ''};">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="badge mb-1" style="background:rgba(79, 70, 229, 0.15);color:var(--sf-primary);">${translations[currentLang].hwOrder} ${a.orderNumber}</span>
+                  ${statusBadge}
+                  <h6 class="mb-1 fw-bold">${a.title}</h6>
+                  ${a.description ? `<p class="small text-muted mb-1">${a.description}</p>` : ''}
+                  <p class="small text-muted mb-0">${dateText}</p>
+                </div>
+                <div>${actionBtn}</div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function openUpload(assignmentId, title) {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      currentAssignmentId = assignmentId;
+      selectedFiles = [];
+      document.getElementById('uploadModalTitle').textContent = `${translations[currentLang].uploadTitlePrefix}${title}`;
+      document.getElementById('imageInputs').innerHTML = '';
+      document.getElementById('previewsBox').innerHTML = '';
+      document.getElementById('uploadMsg').innerHTML = '';
+      document.getElementById('hwComment').value = '';
+      addFileInput();
+      new bootstrap.Modal(document.getElementById('uploadModal')).show();
+    }
+
+    function addFileInput() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.name = 'files[]';
+      input.multiple = true;
+      input.accept = 'image/*,.pdf';
+      input.className = 'form-control mb-2';
+      input.onchange = function() {
+        Array.from(this.files).forEach(file => {
+          if (!file) return;
+
+          if (file.type.startsWith('image/') && selectedFiles.filter(selectedFile => selectedFile.type.startsWith('image/')).length >= 10) {
+            document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-warning small py-2">${translations[localStorage.getItem('portal_lang') || 'ar'].maxImages}</div>`;
+            return;
+          }
+
+          const duplicate = selectedFiles.some(existingFile =>
+            existingFile.name === file.name && existingFile.size === file.size && existingFile.lastModified === file.lastModified
+          );
+          if (duplicate) return;
+
+          selectedFiles.push(file);
+
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = e => {
+              const preview = document.createElement('img');
+              preview.src = e.target.result;
+              preview.style = 'width:70px;height:70px;object-fit:cover;border-radius:8px;border:2px solid var(--sf-primary);';
+              document.getElementById('previewsBox').appendChild(preview);
+            };
+            reader.readAsDataURL(file);
+          } else {
+            const preview = document.createElement('div');
+            preview.className = 'd-inline-flex align-items-center gap-2 px-2 py-1 rounded border';
+            preview.innerHTML = `<span style="font-size:1rem;">📄</span><span class="small">${file.name}</span>`;
+            document.getElementById('previewsBox').appendChild(preview);
+          }
+        });
+      };
+      document.getElementById('imageInputs').appendChild(input);
+    }
+
+    async function submitHomework() {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const maxFileSize = 10 * 1024 * 1024;
+
+      if (selectedFiles.length === 0) {
+        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-warning small py-2">ارفع صورة أو ملف PDF واحد على الأقل</div>';
+        return;
+      }
+
+      const oversizedFile = selectedFiles.find(file => file.size > maxFileSize);
+      if (oversizedFile) {
+        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-warning small py-2">حجم كل ملف يجب أن يكون 10 ميجابايت أو أقل</div>';
+        return;
+      }
+
+      document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-secondary small py-2">⏳ جاري رفع الملفات على المنصة...</div>';
+
+      try {
+        const formData = new FormData();
+        selectedFiles.forEach(f => {
+          formData.append('files[]', f);
+        });
+
+        async function sendUpload(url) {
+          return fetch(url, {
+            method: 'POST',
+            body: formData,
+          });
+        }
+
+        let uploadRes;
+        try {
+          uploadRes = await sendUpload(`${PLATFORM_BASE_URL}/upload.php`);
+        } catch (primaryError) {
+          uploadRes = await sendUpload('./upload.php');
+        }
+
+        if (!uploadRes.ok) {
+          uploadRes = await sendUpload('./upload.php');
+        }
+
+        let uploadData;
+        try {
+          uploadData = await uploadRes.json();
+        } catch (err) {
+          if (uploadRes.url.endsWith('upload.php')) {
+            uploadRes = await sendUpload('./upload.php');
+            uploadData = await uploadRes.json();
+          } else {
+            throw err;
+          }
+        }
+
+        if (!uploadData.success) {
+          document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-danger small py-2">❌ فشل رفع الصور: ${uploadData.message}</div>`;
+          return;
+        }
+
+        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-secondary small py-2">⏳ جاري حفظ الواجب...</div>';
+
+        const res = await fetch(`${API_BASE_URL}/api/portal/homework/${currentAssignmentId}/submit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('portal_token')}`,
+          },
+          body: JSON.stringify({
+            imagePaths: uploadData.paths?.filter(path => !path.toLowerCase().endsWith('.pdf')) || [],
+            pdfPaths: uploadData.paths?.filter(path => path.toLowerCase().endsWith('.pdf')) || [],
+            comment: document.getElementById('hwComment').value,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-success small py-2">${translations[currentLang].uploadSuccess}</div>`;
+          setTimeout(() => {
+            bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+            loadHomework();
+          }, 1500);
+        } else {
+          document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-danger small py-2">${data.message}</div>`;
+        }
+      } catch (e) {
+        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-danger small py-2">❌ حصلت مشكلة في الاتصال</div>';
+        console.error(e);
+      }
+    }
+
+    (function init() {
+      const savedLang = localStorage.getItem('portal_lang') || 'ar';
+      applyLanguage(savedLang);
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      applyTheme(savedTheme);
+    })();
+  </script>
+</body>
+</html>

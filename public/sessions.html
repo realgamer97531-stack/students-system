@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">بوابة الطالب | حصصي</title>
+  <link href="style.css" rel="stylesheet">
+  <link id="bootstrap-link" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  
+  <style>
+    /* 🎨 المتغيرات ولوحة الألوان الثنائية (Premium Slate Theme) */
+    :root {
+      --sf-bg: #F7F8FD;
+      --sf-card: #ffffff;
+      --sf-text: #1E293B;
+      --sf-muted: #64748B;
+      --sf-border: #E2E8F0;
+      --sf-primary: #4F46E5;
+      --sf-accent: #10B3A3;
+      --sf-warm: #F59E0B;
+      --loader-bg: rgba(245, 246, 251, 0.85);
+      --card-gradient: linear-gradient(135deg, #10B3A3, #4F46E5);
+    }
+
+    /* 🌙 توافقات وثيم الدارك مود الفخم */
+    body.dark-theme {
+      --sf-bg: #0b0f19;          
+      --sf-card: #141b2d;        
+      --sf-text: #f1f5f9;        
+      --sf-muted: #94a3b8;       
+      --sf-border: #1f293d;      
+      --sf-primary: #6366f1;      
+      --loader-bg: rgba(11, 15, 25, 0.9);
+      --card-gradient: linear-gradient(135deg, #0f766e, #4f46e5);
+    }
+
+    body {
+      background-color: var(--sf-bg) !important;
+      color: var(--sf-text);
+      font-family: system-ui, -apple-system, sans-serif;
+      position: relative;
+      min-height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* إعدادات الـ Loading Spinner */
+    #global-loader {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--loader-bg);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+      transition: background 0.3s ease;
+    }
+    .spinner {
+      border: 4px solid var(--sf-border);
+      border-top: 4px solid var(--sf-primary);
+      border-radius: 50%;
+      width: 50px; height: 50px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* أنيميشن دخول العناصر تتابعياً */
+    .fade-in-up {
+      animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(25px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* أشكال الخلفية الهلامية */
+    .bg-shape {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      z-index: -1;
+      opacity: 0.25;
+      animation: float 7s ease-in-out infinite;
+    }
+    body.dark-theme .bg-shape {
+      opacity: 0.12;
+    }
+    .bg-shape-1 {
+      width: 350px; height: 350px;
+      background: var(--sf-primary);
+      top: -60px; right: -60px;
+    }
+    .bg-shape-2 {
+      width: 450px; height: 450px;
+      background: var(--sf-accent);
+      bottom: -120px; left: -120px;
+      animation-delay: 2.5s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(25px); }
+    }
+
+    /* الهيدر والقائمة العلوية */
+    .navbar {
+      background: #0F172A !important;
+      padding: 14px 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+    body.dark-theme .navbar {
+      background-color: #0b0f19 !important;
+      border-bottom: 1px solid var(--sf-border);
+    }
+    .navbar-brand {
+      font-weight: 800;
+      color: #ffffff !important;
+    }
+    
+    body.dark-theme .offcanvas {
+      background-color: var(--sf-card) !important;
+      color: var(--sf-text) !important;
+      border-color: var(--sf-border) !important;
+    }
+    body.dark-theme .offcanvas-header {
+      border-bottom: 1px solid var(--sf-border) !important;
+    }
+    
+    @media (max-width: 767px) {
+      .nav-tabs-custom .btn-light {
+        background-color: var(--sf-primary) !important;
+        color: #ffffff !important;
+        border: none !important;
+      }
+      .nav-tabs-custom .btn-outline-light {
+        color: var(--sf-text) !important;
+        border-color: var(--sf-border) !important;
+        background-color: transparent !important;
+      }
+      .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(0,0,0,0.05) !important;
+      }
+      body.dark-theme .nav-tabs-custom .btn-outline-light:hover {
+        background-color: rgba(255,255,255,0.05) !important;
+      }
+    }
+
+    .nav-tabs-custom .btn {
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.25s ease;
+    }
+
+    /* الكارد الأساسي */
+    .card {
+      background-color: var(--sf-card) !important;
+      border: 1px solid var(--sf-border) !important;
+      color: var(--sf-text) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.04);
+    }
+    body.dark-theme .card {
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
+    }
+    .card-body h5 {
+      color: var(--sf-text) !important;
+      font-weight: 700;
+    }
+
+    /* 📱 تحسين الجدول ليقبل السحب أفقيًا بشكل سلس وواضح على الموبايل */
+    .table-responsive {
+      border: 1px solid var(--sf-border);
+      border-radius: 14px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      background-color: var(--sf-card) !important;
+      display: block;
+      width: 100%;
+    }
+    
+    .table {
+      margin-bottom: 0 !important;
+      background-color: transparent !important;
+      --bs-table-bg: transparent !important;
+      white-space: nowrap; /* يمنع تداخل الكلام ويسمح بالسحب الأفقي السلس */
+      min-width: 600px;    /* يضمن وجود مساحة عرض كافية تظهر شريط السحب عند الشاشات الضيقة */
+    }
+
+    .table thead.table-light th {
+      background-color: rgba(79, 70, 229, 0.05) !important;
+      color: var(--sf-muted) !important;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 14px 16px;
+      border: none;
+    }
+    body.dark-theme .table thead.table-light th {
+      background-color: rgba(99, 102, 241, 0.1) !important;
+      color: var(--sf-muted) !important;
+    }
+
+    .table tbody td {
+      padding: 16px;
+      font-size: 0.9rem;
+      color: var(--sf-text) !important;
+      background-color: var(--sf-card) !important;
+      border-bottom: 1px solid var(--sf-border);
+    }
+
+    .table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table tbody tr:hover td {
+      background-color: rgba(79, 70, 229, 0.02) !important;
+    }
+    body.dark-theme .table tbody tr:hover td {
+      background-color: rgba(255, 255, 255, 0.02) !important;
+    }
+
+    .lesson-no { 
+      color: var(--sf-primary) !important; 
+    }
+
+    /* الـ Badges */
+    .badge {
+      font-weight: 600 !important;
+      font-size: 0.8rem !important;
+      padding: 6px 12px !important;
+      border-radius: 8px !important;
+    }
+
+    /* 🛠️ أزرار التحكم العائمة */
+    .theme-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: auto;
+      z-index: 1050;
+      display: flex;
+      gap: 10px;
+    }
+    html[dir="ltr"] .theme-controls { left: auto; right: 20px; }
+    
+    .control-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #E2E4F3;
+      padding: 8px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #1E293B;
+    }
+    body.dark-theme .control-btn {
+      background: var(--sf-card);
+      border-color: var(--sf-border);
+      color: var(--sf-text);
+    }
+    
+    /* 💬 ستايل زر دعم واتساب العائم */
+.whatsapp-float {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #25D366;
+  color: #FFF;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 26px;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+  z-index: 1040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* عكس مكان الزر إذا كانت الصفحة تدعم الإنجليزية (LTR) */
+html[dir="ltr"] .whatsapp-float {
+  right: auto;
+  left: 20px;
+}
+
+.whatsapp-float:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.6);
+  color: #FFF;
+}
+  </style>
+</head>
+<body>
+
+  <!-- منع الـ Flicker -->
+  <script>
+    (function injectThemeImmediately() {
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+      }
+    })();
+  </script>
+
+  <div id="global-loader">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="bg-shape bg-shape-1"></div>
+  <div class="bg-shape bg-shape-2"></div>
+
+  <div class="theme-controls">
+    <button class="control-btn" id="lang-toggle-btn" onclick="toggleLanguage()">English</button>
+    <button class="control-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <!-- الناف بار المتجاوب مع القائمة الجانبية للموبايل -->
+  <nav class="navbar navbar-expand-md px-3 sticky-top">
+    <div class="container-fluid">
+      <span class="navbar-brand d-flex align-items-center gap-2"><span class="sf-logo-mark">S</span> <span class="platform-name" data-platform-brand></span> <span id="nav-brand-title">حصصي</span></span>
+      
+      <button class="navbar-toggler p-1 border-0 shadow-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#ffffff" class="bi bi-list" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+        </svg>
+      </button>
+
+      <div class="offcanvas offcanvas-end" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+        <div class="offcanvas-header">
+          <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">القائمة</h5>
+          <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <div class="d-flex flex-column flex-md-row align-items-md-center gap-2 nav-tabs-custom ms-auto mt-2 mt-md-0 w-100">
+            <a href="student.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-profile">بياناتي</a>
+            <a href="sessions.html" class="btn btn-light w-100 w-md-auto text-start text-md-center" id="nav-sessions">حصصي</a>
+            <a href="lessons.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-lessons">الفيديوهات</a>
+            <a href="homework.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center" id="nav-homework">الواجب</a>
+            <a href="booklets.html" class="btn btn-outline-light w-100 w-md-auto text-start text-md-center me-md-1" id="nav-booklets">البوكليتس</a>
+            <button class="btn btn-outline-danger mt-3 mt-md-0 ms-md-2 w-100 w-md-auto text-start text-md-center" onclick="logout()" id="nav-logout">خروج</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-5 fade-in-up" style="position: relative; z-index: 1;">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h5 class="mb-3" id="section-title">حصصي المنهجية</h5>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th id="th-lesson">رقم الحصة</th>
+                <th id="th-date">التاريخ</th>
+                <th id="th-attendance">الحضور</th>
+                <th id="th-homework">الواجب</th>
+                <th id="th-exam">الامتحان</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="config.js"></script>
+  <script src="shared.js"></script>
+  <script>
+    let lastFetchedSessions = [];
+
+    const translations = {
+      ar: {
+        pageTitle: "بوابة الطالب | حصصي",
+        navBrandTitle: "حصصي",
+        menuLabel: "القائمة",
+        navProfile: "بياناتي",
+        navSessions: "حصصي",
+        navLessons: "الفيديوهات",
+        navHomework: "الواجب",
+        navBooklets: "البوكليتس",
+        navLogout: "خروج",
+        sectionTitle: "حصصي المنهجية",
+        thLesson: "رقم الحصة",
+        thDate: "التاريخ",
+        thAttendance: "الحضور",
+        thHomework: "الواجب",
+        thExam: "الامتحان",
+        attendedText: "حضرت",
+        cancelledText: "ملغية",
+        absentText: "غياب",
+        homeworkLabels: {
+          complete: '<span class="badge bg-success">كامل</span>',
+          incomplete: '<span class="badge bg-warning text-dark">مش كامل</span>',
+          no_steps: '<span class="badge bg-secondary">من غير خطوات</span>',
+          not_done: '<span class="badge bg-danger">مش معمول</span>',
+        }
+      },
+      en: {
+        pageTitle: "Student Portal | Sessions",
+        navBrandTitle: "My Sessions",
+        menuLabel: "Menu",
+        navProfile: "My Profile",
+        navSessions: "Sessions",
+        navLessons: "Videos",
+        navHomework: "Homework",
+        navBooklets: "Booklets",
+        navLogout: "Logout",
+        sectionTitle: "Academic Sessions",
+        thLesson: "Session No.",
+        thDate: "Date",
+        thAttendance: "Attendance",
+        thHomework: "Homework",
+        thExam: "Exam",
+        attendedText: "Attended",
+        cancelledText: "Cancelled",
+        absentText: "Absent",
+        homeworkLabels: {
+          complete: '<span class="badge bg-success">Complete</span>',
+          incomplete: '<span class="badge bg-warning text-dark">Incomplete</span>',
+          no_steps: '<span class="badge bg-secondary">No Steps</span>',
+          not_done: '<span class="badge bg-danger">Not Done</span>',
+        }
+      }
+    };
+
+    function applyLanguage(lang) {
+      const isEn = lang === 'en';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+      
+      const bootstrapLink = document.getElementById('bootstrap-link');
+      bootstrapLink.href = isEn 
+        ? "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        : "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css";
+
+      document.getElementById('page-title').innerText = translations[lang].pageTitle;
+      document.getElementById('nav-brand-title').innerText = translations[lang].navBrandTitle;
+      if(document.getElementById('mobileSidebarLabel')) document.getElementById('mobileSidebarLabel').innerText = translations[lang].menuLabel;
+      document.getElementById('nav-profile').innerText = translations[lang].navProfile;
+      document.getElementById('nav-sessions').innerText = translations[lang].navSessions;
+      document.getElementById('nav-lessons').innerText = translations[lang].navLessons;
+      
+      if(document.getElementById('nav-homework')) document.getElementById('nav-homework').innerText = translations[lang].navHomework;
+      if(document.getElementById('nav-booklets')) document.getElementById('nav-booklets').innerText = translations[lang].navBooklets;
+
+      document.getElementById('nav-logout').innerText = translations[lang].navLogout;
+      document.getElementById('section-title').innerText = translations[lang].sectionTitle;
+
+      document.getElementById('th-lesson').innerText = translations[lang].thLesson;
+      document.getElementById('th-date').innerText = translations[lang].thDate;
+      document.getElementById('th-attendance').innerText = translations[lang].thAttendance;
+      document.getElementById('th-homework').innerText = translations[lang].thHomework;
+      document.getElementById('th-exam').innerText = translations[lang].thExam;
+
+      document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
+      
+      renderSessions(lastFetchedSessions);
+    }
+
+    function toggleLanguage() {
+      let currentLang = localStorage.getItem('portal_lang') || 'ar';
+      let newLang = currentLang === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('portal_lang', newLang);
+      applyLanguage(newLang);
+    }
+
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '☀️';
+      } else {
+        document.body.classList.remove('dark-theme');
+        document.getElementById('theme-toggle-btn').innerText = '🌙';
+      }
+    }
+
+    function toggleTheme() {
+      let currentTheme = localStorage.getItem('portal_theme') || 'light';
+      let newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('portal_theme', newTheme);
+      applyTheme(newTheme);
+    }
+
+    async function loadSessions() {
+      try {
+        const result = await apiGet('/api/portal/student/data');
+        if (!result.success) { logout(); return; }
+
+        lastFetchedSessions = result.data.sessions || [];
+        renderSessions(lastFetchedSessions);
+      } catch (error) {
+        console.error('Failed to load sessions:', error);
+      } finally {
+        document.getElementById('global-loader').style.display = 'none';
+      }
+    }
+
+    function renderSessions(sessions) {
+      const lang = localStorage.getItem('portal_lang') || 'ar';
+      const sessionsBody = document.getElementById('sessionsBody');
+      sessionsBody.innerHTML = '';
+
+      sessions.forEach(row => {
+        let attendanceHtml = row.attendanceStatus === 'attended'
+          ? `<span class="badge bg-success">${translations[lang].attendedText} (${row.attendedCenterName})</span>`
+          : row.attendanceStatus === 'cancelled'
+          ? `<span class="badge bg-secondary">${translations[lang].cancelledText}</span>`
+          : `<span class="badge bg-danger">${translations[lang].absentText}</span>`;
+
+        const homeworkHtml = row.homeworkStatus 
+          ? (translations[lang].homeworkLabels[row.homeworkStatus] || '') 
+          : '-';
+          
+        const examHtml = row.examScore !== null ? `${row.examScore} / ${row.examMax}` : '-';
+        
+        sessionsBody.innerHTML += `
+          <tr>
+            <td class="lesson-no" style="font-weight: 700;">#${row.lessonNumber}</td>
+            <td>${row.date}</td>
+            <td>${attendanceHtml}</td>
+            <td>${homeworkHtml}</td>
+            <td>${examHtml}</td>
+          </tr>`;
+      });
+    }
+
+    (function init() {
+      const savedLang = localStorage.getItem('portal_lang') || 'ar';
+      applyLanguage(savedLang);
+      
+      const savedTheme = localStorage.getItem('portal_theme') || 'light';
+      applyTheme(savedTheme);
+      
+      loadSessions();
+    })();
+    
+
+  </script>
+  <!-- Floating WhatsApp Support Button -->
+  <a id="whatsapp-support"
+   class="whatsapp-float"
+   target="_blank"
+   rel="noopener noreferrer"
+   aria-label="WhatsApp Support">
+  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="bi bi-whatsapp" viewBox="0 0 16 16">
+    <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.955-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.558 6.558 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.348.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.342-.116-.007-.249-.008-.382-.008-.133 0-.348.05-.53.248-.183.198-.7.683-.7 1.664 0 .98.718 1.925.818 2.059.1.133 1.41 2.154 3.415 3.018.477.206.85.33 1.141.424.481.153.921.132 1.268.08.388-.058 1.17-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.379-.232z"/>
+  </svg>
+</a>
+<script>
+  (() => {
+    const whatsappLink = document.getElementById('whatsapp-support');
+    const supportPhone = String(
+      window.CONFIG?.SUPPORT_PHONE ||
+      (typeof CONFIG !== 'undefined' ? CONFIG.SUPPORT_PHONE : '') ||
+      ''
+    ).replace(/\D/g, '');
+
+    if (!whatsappLink || !supportPhone) {
+      console.error('WhatsApp support configuration is missing.');
+      return;
+    }
+
+    const message = 'مرحباً، لدي استفسار بخصوص منصة الدروس';
+
+    whatsappLink.href =
+      `https://wa.me/${supportPhone}?text=${encodeURIComponent(message)}`;
+  })();
+</script>
+
+</body>
+</html>
