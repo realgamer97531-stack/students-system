@@ -475,6 +475,13 @@
       </div>
     </div>
 
+    <div class="card shadow-sm mb-4 fade-in-up" id="examsCard" style="display:none;">
+      <div class="card-body p-4">
+        <h6 class="mb-4 fw-bold" id="lbl-exams-title">📝 درجات امتحانات الشامل</h6>
+        <div id="examsBox" class="d-flex flex-column gap-3"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Online payment modals removed: payments are handled offline at the center -->
@@ -587,6 +594,7 @@
         lblWallet: "المحفظة المتاحة", lblBooklet: "حالة تسليم البوكليت",
         btnModalCode: "💳 إضافة رصيد باستخدام الكود", btnModalReceipt: "🧾 إضافة رصيد باستخدام صورة التحويل",
         lblLeaderboardTitle: "🏆 مراكز التميز والترتيب", lblTransactionsTitle: "💳 كشف الحساب والعمليات الأخيرة",
+        lblExamsTitle: "📝 درجات امتحانات الشامل", examHighest: "أعلى درجة", examLowest: "أقل درجة", examAverage: "المتوسط", noExamDate: "بدون تاريخ",
         m1Title: "💳 إضافة رصيد باستخدام الكود", m2Title: "🧾 رفع إثبات التحويل", m2Desc: "ارفع صورة واضحة للتحويل وسيتم التحقق منها وإضافة الرصيد تلقائياً.",
         cancelText: "إلغاء", confirmText: "تأكيد", btnVerifyText: "تحقق وأضف الرصيد",
         bookletReceived: '<span class="badge bg-success px-3 py-2">تم الاستلام</span>',
@@ -603,6 +611,7 @@
         lblWallet: "Available Balance", lblBooklet: "Booklet Delivery Status",
         btnModalCode: "💳 Top-up via Code", btnModalReceipt: "🧾 Top-up via Receipt Image",
         lblLeaderboardTitle: "🏆 Excellence Centers & Rankings", lblTransactionsTitle: "💳 Statement & Recent Transactions",
+        lblExamsTitle: "📝 Shamel Exam Grades", examHighest: "Highest", examLowest: "Lowest", examAverage: "Average", noExamDate: "No date",
         m1Title: "💳 Top-up via Code", m2Title: "🧾 Upload Transfer Receipt", m2Desc: "Upload a clear image of the transfer. It will be verified and added automatically.",
         cancelText: "Cancel", confirmText: "Confirm", btnVerifyText: "Verify & Add Balance",
         bookletReceived: '<span class="badge bg-success px-3 py-2">Received</span>',
@@ -646,6 +655,7 @@
         setTextIfExists('lbl-booklet', t.lblBooklet);
         setTextIfExists('lbl-leaderboard-title', t.lblLeaderboardTitle);
         setTextIfExists('lbl-transactions-title', t.lblTransactionsTitle);
+        setTextIfExists('lbl-exams-title', t.lblExamsTitle);
         setTextIfExists('qrLoadButton', isEn ? 'Show student code' : 'عرض كود الطالب');
         setTextIfExists('qrPlaceholder', isEn ? 'Click to show the student code' : 'اضغط لعرض كود الطالب');
         setTextIfExists('leaderboardLoadButton', isEn ? '🏆 Show ranking and points' : '🏆 عرض الترتيب والنقاط');
@@ -846,6 +856,49 @@
             </li>`).join('');
         }
       }
+
+      renderShamelExams(data.shamelExams);
+    }
+
+    function renderShamelExams(exams) {
+      const lang = localStorage.getItem('portal_lang') || 'ar';
+      const t = translations[lang];
+      const card = document.getElementById('examsCard');
+      const box = document.getElementById('examsBox');
+      if (!Array.isArray(exams) || exams.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'block';
+      box.innerHTML = exams.map(exam => {
+        const score = Number(exam.score);
+        const maxScore = Number(exam.maxScore) || 0;
+        const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+        const color = pct >= 85 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444';
+        const dateStr = exam.examDate
+          ? new Date(exam.examDate).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')
+          : t.noExamDate;
+        const statsHtml = exam.stats ? `
+          <div class="d-flex gap-2 mt-3 flex-wrap">
+            <span class="badge" style="background: rgba(16,185,129,0.12); color:#10B981;">🔼 ${t.examHighest}: ${exam.stats.max}</span>
+            <span class="badge" style="background: rgba(239,68,68,0.12); color:#EF4444;">🔽 ${t.examLowest}: ${exam.stats.min}</span>
+            <span class="badge" style="background: rgba(79,70,229,0.12); color: var(--sf-primary);">📊 ${t.examAverage}: ${exam.stats.avg}</span>
+          </div>` : '';
+        return `
+          <div class="p-3 rounded" style="border:1px solid var(--sf-border); background: var(--sf-bg);">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div>
+                <div class="fw-bold" style="color: var(--sf-text);">${exam.name}</div>
+                <div class="small" style="color: var(--sf-muted);">${dateStr}</div>
+              </div>
+              <div class="text-center">
+                <div style="font-size:1.6rem; font-weight:800; color:${color};">${exam.score}<span style="font-size:1rem; color: var(--sf-muted);"> / ${exam.maxScore}</span></div>
+                <div class="small fw-bold" style="color:${color};">${pct}%</div>
+              </div>
+            </div>
+            ${statsHtml}
+          </div>`;
+      }).join('');
     }
 
     function renderLeaderboard(result) {

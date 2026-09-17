@@ -3975,6 +3975,47 @@ async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
   }
 }
 
+// درجات امتحانات الشامل: امتحانات مستقلة مش مرتبطة بحصة معينة (SessionId = null)
+// بترجع لكل امتحان درجة الطالب + أعلى/أقل/متوسط درجة بين كل الطلاب اللي دخلوا نفس الامتحان
+async function getShamelExams(studentId) {
+  const results = await ExamResult.findAll({
+    where: { StudentId: studentId },
+    include: [{ model: Exam, where: { SessionId: null }, required: true }],
+    order: [[Exam, 'exam_date', 'DESC']],
+  });
+  if (results.length === 0) return [];
+
+  const examIds = results.map(r => r.ExamId);
+  const allResultsForExams = await ExamResult.findAll({
+    where: { ExamId: examIds },
+    attributes: ['ExamId', 'score'],
+  });
+  const scoresByExamId = {};
+  allResultsForExams.forEach(r => {
+    const score = Number.parseFloat(r.score);
+    if (!scoresByExamId[r.ExamId]) scoresByExamId[r.ExamId] = [];
+    scoresByExamId[r.ExamId].push(score);
+  });
+
+  return results.map(r => {
+    const scores = scoresByExamId[r.ExamId] || [];
+    const stats = scores.length > 0 ? {
+      max: Math.max(...scores),
+      min: Math.min(...scores),
+      avg: Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)),
+      count: scores.length,
+    } : null;
+    return {
+      id: r.Exam.id,
+      name: r.Exam.name,
+      score: r.score,
+      maxScore: r.Exam.max_score,
+      examDate: r.Exam.exam_date,
+      stats,
+    };
+  });
+}
+
 async function buildStudentData(studentId) {
   const student = await Student.findOne({
     where: { id: studentId },
@@ -4181,6 +4222,7 @@ async function buildStudentData(studentId) {
     sessions,
     videos: videosData,
     warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
+    shamelExams: await getShamelExams(student.id),
     transactions: transactions.map(t => ({
       amount: t.amount,
       reason: t.reason,
@@ -4217,6 +4259,7 @@ async function buildStudentProfileSummary(studentId) {
       warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
       followUpAssistant: await getFollowUpAssistantForStudent(student.id),
     },
+    shamelExams: await getShamelExams(student.id),
   };
 }
 

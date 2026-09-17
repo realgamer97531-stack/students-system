@@ -305,6 +305,13 @@
       </div>
     </div>
 
+    <div class="card shadow-sm mb-4 fade-in-up" id="shamelExamsCard" style="display:none;">
+      <div class="card-body p-3 p-md-4">
+        <h6 class="mb-3 fw-bold" id="section-shamel-exams">📝 درجات امتحانات الشامل</h6>
+        <div id="shamelExamsBox" class="d-flex flex-column gap-3"></div>
+      </div>
+    </div>
+
     <div class="card shadow-sm mb-4">
       <div class="card-body">
         <h6 class="mb-3" id="section-chart">📈 مؤشرات التطور</h6>
@@ -350,8 +357,10 @@
         bookletTrue: '<span class="badge bg-success px-3 py-2">تم الشراء</span>',
         bookletFalse: '<span class="badge bg-secondary px-3 py-2">لم يتم الشراء</span>',
         sectionSessionsTracking: "📅 متابعة الحصص",
+        sectionShamelExams: "📝 درجات امتحانات الشامل",
         sectionChart: "📈 مؤشرات التطور",
         sectionTransactions: "💳 سجل المعاملات المالية",
+        examHighest: "أعلى درجة", examLowest: "أقل درجة", examAverage: "المتوسط", noExamDate: "بدون تاريخ",
         noSessions: "لا توجد حصص مسجلة حتى الآن",
         serverError: "حدثت مشكلة في الاتصال بالسيرفر، يرجى المحاولة لاحقاً.",
         thLesson: "الحصة",
@@ -389,8 +398,10 @@
         bookletTrue: '<span class="badge bg-success px-3 py-2">Purchased</span>',
         bookletFalse: '<span class="badge bg-secondary px-3 py-2">Not Purchased</span>',
         sectionSessionsTracking: "📅 Sessions History",
+        sectionShamelExams: "📝 Shamel Exam Grades",
         sectionChart: "📈 Progress Indicators",
         sectionTransactions: "💳 Financial Transactions",
+        examHighest: "Highest", examLowest: "Lowest", examAverage: "Average", noExamDate: "No date",
         noSessions: "No sessions recorded yet",
         serverError: "Server connection issue, please try again later.",
         thLesson: "Session",
@@ -436,6 +447,7 @@
       document.getElementById('title-balance').innerText = translations[lang].titleBalance;
       document.getElementById('title-booklet').innerText = translations[lang].titleBooklet;
       document.getElementById('section-sessions-tracking').innerText = translations[lang].sectionSessionsTracking;
+      document.getElementById('section-shamel-exams').innerText = translations[lang].sectionShamelExams;
       document.getElementById('section-chart').innerText = translations[lang].sectionChart;
       document.getElementById('section-transactions').innerText = translations[lang].sectionTransactions;
 
@@ -519,6 +531,46 @@
 
     function renderTransactions(warnings, lang) { /* متبقاة للتوافق الإسمي الداخلي في التحديث الدوري */ }
 
+    function renderShamelExams(exams, lang) {
+      const card = document.getElementById('shamelExamsCard');
+      const box = document.getElementById('shamelExamsBox');
+      if (!Array.isArray(exams) || exams.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'block';
+      const t = translations[lang];
+      box.innerHTML = exams.map(exam => {
+        const score = Number(exam.score);
+        const maxScore = Number(exam.maxScore) || 0;
+        const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+        const color = pct >= 85 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444';
+        const dateStr = exam.examDate
+          ? new Date(exam.examDate).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-EG')
+          : t.noExamDate;
+        const statsHtml = exam.stats ? `
+          <div class="d-flex gap-2 mt-3 flex-wrap">
+            <span class="badge" style="background: rgba(16,185,129,0.12); color:#10B981;">🔼 ${t.examHighest}: ${exam.stats.max}</span>
+            <span class="badge" style="background: rgba(239,68,68,0.12); color:#EF4444;">🔽 ${t.examLowest}: ${exam.stats.min}</span>
+            <span class="badge" style="background: rgba(99,102,241,0.12); color: var(--dark-accent);">📊 ${t.examAverage}: ${exam.stats.avg}</span>
+          </div>` : '';
+        return `
+          <div class="p-3 rounded stat-box" style="text-align:start; display:block;">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div>
+                <div class="fw-bold">${exam.name}</div>
+                <div class="small text-muted">${dateStr}</div>
+              </div>
+              <div class="text-center">
+                <div style="font-size:1.6rem; font-weight:800; color:${color};">${exam.score}<span class="small text-muted"> / ${exam.maxScore}</span></div>
+                <div class="small fw-bold" style="color:${color};">${pct}%</div>
+              </div>
+            </div>
+            ${statsHtml}
+          </div>`;
+      }).join('');
+    }
+
     function renderTransactionsList(transactions, lang) {
       const card = document.getElementById('transactionsCard');
       const list = document.getElementById('transactionsList');
@@ -592,6 +644,7 @@
 
       renderWarnings(data.student.warnings, lang);
       renderTransactionsList(data.transactions, lang);
+      renderShamelExams(data.shamelExams, lang);
 
       const sessionsBody = document.getElementById('sessionsBody');
       sessionsBody.innerHTML = '';
