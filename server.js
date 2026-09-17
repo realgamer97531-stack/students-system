@@ -5471,7 +5471,7 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
 
 // ===== نظام الإنذارات والحظر =====
 
-app.post('/students/:id/warning/add', requireAdmin, async (req, res) => {
+app.post('/students/:id/warning/add', requirePermissionOrAdmin('give_warning'), async (req, res) => {
   try {
     const count = await Warning.count({ where: { StudentId: req.params.id } });
     if (count >= 3) return res.status(400).send('❌ الطالب وصل للحد الأقصى من الإنذارات');

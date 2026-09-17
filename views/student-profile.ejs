@@ -52,7 +52,7 @@
               <% }) %>
             </ul>
 
-            <% if (warnings.length < 3 && userRole === 'admin') { %>
+            <% if (warnings.length < 3 && (userRole === 'admin' || userPermissions.includes('give_warning'))) { %>
               <form action="/students/<%= student.id %>/warning/add" method="POST" class="d-flex gap-2">
                 <input type="text" name="reason" class="form-control form-control-sm" placeholder="سبب الإنذار (اختياري)">
                 <button class="btn btn-sm btn-warning text-white" style="white-space:nowrap;">إضافة إنذار</button>

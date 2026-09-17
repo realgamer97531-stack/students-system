@@ -11,4 +11,5 @@ module.exports = [
   { key: 'exams', label: 'الامتحانات والدرجات', path: '/exams' },
   { key: 'admin_videos', label: 'إدارة الفيديوهات', path: '/admin/videos' },
   { key: 'follow_up', label: 'متابعة الطلاب', path: '/follow-up-dashboard' },
+  { key: 'give_warning', label: 'إعطاء إنذار للطالب', path: null },
 ];
