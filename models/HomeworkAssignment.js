@@ -11,6 +11,8 @@ const HomeworkAssignment = sequelize.define('HomeworkAssignment', {
   SubjectId: { type: DataTypes.INTEGER, allowNull: true },
   SessionId: { type: DataTypes.INTEGER, allowNull: true },
   show_for_all: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+  submission_type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'upload' }, // 'upload' | 'link'
+  external_link: { type: DataTypes.TEXT, allowNull: true },
 });
 
 module.exports = HomeworkAssignment;

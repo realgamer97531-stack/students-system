@@ -315,7 +315,9 @@
     <div class="card shadow-sm mb-4">
       <div class="card-body">
         <h6 class="mb-3" id="section-chart">📈 مؤشرات التطور</h6>
-        <canvas id="progressChart"></canvas>
+        <div style="position: relative; height: 320px;">
+          <canvas id="progressChart"></canvas>
+        </div>
       </div>
     </div>
 
@@ -720,45 +722,44 @@
       const textColor = isDark ? '#94a3b8' : '#64748b';
 
       progressChartInstance = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
           labels,
           datasets: [
             {
               label: translations[lang].chartHwLabel,
               data: hwScores,
-              borderColor: '#6366f1',
-              backgroundColor: 'rgba(99,102,241,0.1)',
-              tension: 0.3,
-              spanGaps: true,
+              backgroundColor: '#6366f1',
+              borderRadius: 6,
+              borderSkipped: false,
             },
             {
               label: translations[lang].chartExamLabel,
               data: examScores,
-              borderColor: '#14B8A6',
-              backgroundColor: 'rgba(20,184,166,0.1)',
-              tension: 0.3,
-              spanGaps: true,
+              backgroundColor: '#14B8A6',
+              borderRadius: 6,
+              borderSkipped: false,
             },
           ],
         },
         options: {
           responsive: true,
-          plugins: { 
-            legend: { 
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
               position: 'bottom',
               labels: { color: textColor }
-            } 
+            }
           },
-          scales: { 
-            y: { 
-              min: 0, 
+          scales: {
+            y: {
+              min: 0,
               max: 100,
               grid: { color: gridColor },
               ticks: { color: textColor }
             } ,
             x: {
-              grid: { color: gridColor },
+              grid: { display: false },
               ticks: { color: textColor }
             }
           },

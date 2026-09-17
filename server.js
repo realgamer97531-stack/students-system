@@ -528,6 +528,33 @@ async function ensureHomeworkAssignmentShowForAllColumn() {
   }
 }
 
+async function ensureHomeworkAssignmentLinkColumns() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('HomeworkAssignments');
+    if (!tableInfo.submission_type) {
+      await queryInterface.addColumn('HomeworkAssignments', 'submission_type', {
+        type: sequelize.Sequelize.STRING,
+        allowNull: false,
+        defaultValue: 'upload',
+      });
+      console.log('✅ Added submission_type column to HomeworkAssignments table');
+    }
+    if (!tableInfo.external_link) {
+      await queryInterface.addColumn('HomeworkAssignments', 'external_link', {
+        type: sequelize.Sequelize.TEXT,
+        allowNull: true,
+      });
+      console.log('✅ Added external_link column to HomeworkAssignments table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure HomeworkAssignments link columns:', error.message);
+  }
+}
+
 async function ensureUserProfilePhotoColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -5920,12 +5947,18 @@ app.get('/hw/assignments', requirePermission('homework_online'), async (req, res
 
 app.post('/hw/assignments/create', requirePermission('homework_online'), async (req, res) => {
   try {
-    const { title, description, order_number, start_date, end_date, subject_id, session_ids, show_for_all } = req.body;
+    const { title, description, order_number, start_date, end_date, subject_id, session_ids, show_for_all, submission_type, external_link } = req.body;
     const sessionIdList = Array.isArray(session_ids)
       ? session_ids.filter(Boolean)
       : (session_ids ? [session_ids] : []);
     const uniqueSessionIds = [...new Set(sessionIdList.map(id => Number(id)).filter(id => Number.isInteger(id)))];
     const showForAll = show_for_all === '1' || show_for_all === 'on';
+    const submissionType = submission_type === 'link' ? 'link' : 'upload';
+    const externalLink = submissionType === 'link' ? String(external_link || '').trim() : null;
+
+    if (submissionType === 'link' && !externalLink) {
+      return res.status(400).send('❌ لازم تكتب الرابط لما يكون نوع التسليم رابط خارجي');
+    }
 
     const assignment = await HomeworkAssignment.create({
       title,
@@ -5936,6 +5969,8 @@ app.post('/hw/assignments/create', requirePermission('homework_online'), async (
       SubjectId: subject_id || null,
       SessionId: uniqueSessionIds.length ? uniqueSessionIds[0] : null,
       show_for_all: showForAll,
+      submission_type: submissionType,
+      external_link: externalLink,
     });
 
     const linkedSessionIds = uniqueSessionIds.filter(id => id !== assignment.SessionId);
@@ -6330,6 +6365,8 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
         submissionStatus: submission ? submission.status : null,
         centerStatus,
         imagesCount: submission ? JSON.parse(submission.images || '[]').length : 0,
+        submissionType: a.submission_type || 'upload',
+        externalLink: a.submission_type === 'link' ? a.external_link : null,
       };
     }));
 
@@ -8456,6 +8493,7 @@ async function startServer() {
     await ensureStudentBookletCustomPriceColumn();
     await ensureBalanceTransactionSessionColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
+    await ensureHomeworkAssignmentLinkColumns();
     await ensureUserProfilePhotoColumn();
     await ensureBookletReservationSchema(sequelize);
     await ensureLessonAccessSchema(sequelize);

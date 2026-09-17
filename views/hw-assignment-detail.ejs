@@ -15,6 +15,11 @@
     🔗 حصص مرتبطة: <%= linkedSessions.map(s => `${s.Subject?.name || 'غير معروف'} - ${s.Center?.name || 'غير معروف'} (حصة ${s.lesson_number})`).join('، ') %>
   <% } %>
 </p>
+<% if (assignment.submission_type === 'link') { %>
+  <div class="alert alert-info py-2">
+    🔗 ده واجب "رابط خارجي": الطالب بيتحول مباشرة للرابط <a href="<%= assignment.external_link %>" target="_blank" rel="noopener"><%= assignment.external_link %></a> بدل ما يرفع الواجب على المنصة، فمفيش تتبع للتسليم هنا.
+  </div>
+<% } %>
 <% if (assistantOnlyView) { %>
   <div class="alert alert-info py-2">
     هذا العرض يعرض طلابك المتابعين فقط.

@@ -87,6 +87,18 @@
         <label class="form-label small">نهاية التسليم</label>
         <input type="date" name="end_date" class="form-control" required>
       </div>
+      <div class="col-md-3">
+        <label class="form-label small">طريقة التسليم</label>
+        <select name="submission_type" id="submissionTypeSelect" class="form-select" onchange="document.getElementById('externalLinkField').style.display = this.value === 'link' ? 'block' : 'none';">
+          <option value="upload">رفع على المنصة</option>
+          <option value="link">رابط خارجي (تسليم برة المنصة)</option>
+        </select>
+      </div>
+      <div class="col-md-6" id="externalLinkField" style="display:none;">
+        <label class="form-label small">رابط التسليم الخارجي</label>
+        <input type="url" name="external_link" class="form-control" placeholder="https://...">
+        <small class="text-muted">لما الطالب يدوس على الواجب هيتحول للرابط ده مباشرة بدل الرفع على المنصة</small>
+      </div>
       <div class="col-md-1 d-flex align-items-end">
         <button type="submit" class="btn btn-primary w-100">إنشاء</button>
       </div>
@@ -110,6 +122,9 @@
             </form>
           </div>
           <h6 class="mb-1"><%= a.title %></h6>
+          <% if (a.submission_type === 'link') { %>
+            <span class="badge bg-info text-dark mb-2">🔗 رابط خارجي</span>
+          <% } %>
           <p class="small text-muted mb-2"><%= a.description || '' %></p>
           <p class="small text-muted mb-3">
             📅 <%= a.start_date %> → <%= a.end_date %><br>
