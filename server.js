@@ -6299,6 +6299,7 @@ app.post('/hw/submissions/:id/grade', requirePermission('homework_online'), asyn
 // --- API البوابة: قائمة الواجبات للطالب ---
 
 app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   try {
     const student = await Student.findByPk(req.portalStudentId);
     let assignments = await HomeworkAssignment.findAll({

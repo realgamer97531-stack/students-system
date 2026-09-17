@@ -63,7 +63,7 @@ function logout() {
 }
 
 async function apiGet(path) {
-  const res = await fetch(`${API_BASE_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`${API_BASE_URL}${path}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
   return res.json();
 }
 
@@ -72,6 +72,7 @@ async function apiPost(path, body) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body || {}),
+    cache: 'no-store',
   });
   return res.json();
 }
