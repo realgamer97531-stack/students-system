@@ -1,0 +1,426 @@
+<%- include('partials/header') %>
+
+<%
+  const d = (ad && ad.design) ? ad.design : {};
+  const targetCenterIds = ad ? ad.target_center_ids : [];
+  const targetSubjectIds = ad ? ad.target_subject_ids : [];
+  const isEdit = !!ad;
+  const formAction = isEdit ? ('/admin/ads/' + ad.id) : '/admin/ads';
+%>
+
+<h3 class="mb-4"><%= isEdit ? '✏️ تعديل إعلان' : '➕ إعلان جديد' %></h3>
+
+<form action="<%= formAction %>" method="POST" enctype="multipart/form-data" id="adForm">
+  <div class="row g-4">
+    <div class="col-lg-7">
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3">معلومات أساسية</h5>
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">الاسم الداخلي (للأدمن فقط، الطالب لا يراه)</label>
+              <input type="text" name="title" class="form-control" required value="<%= isEdit ? ad.title : '' %>">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">الأولوية</label>
+              <input type="number" name="priority" class="form-control" value="<%= isEdit ? ad.priority : 0 %>">
+              <small class="text-muted">الأصغر يظهر أولاً</small>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="is_active" id="is_active" <%= (!isEdit || ad.is_active) ? 'checked' : '' %>>
+                <label class="form-check-label" for="is_active">فعّال</label>
+              </div>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">رابط عند الضغط على الإعلان (اختياري)</label>
+              <input type="url" name="link_url" class="form-control" placeholder="https://..." value="<%= isEdit && ad.link_url ? ad.link_url : '' %>">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3">محتوى الإعلان</h5>
+          <div class="btn-group mb-3" role="group">
+            <input type="radio" class="btn-check" name="ad_type" id="ad_type_image" value="image" <%= (!isEdit || ad.ad_type === 'image') ? 'checked' : '' %>>
+            <label class="btn btn-outline-primary" for="ad_type_image">🖼️ رفع صورة جاهزة</label>
+            <input type="radio" class="btn-check" name="ad_type" id="ad_type_design" value="design" <%= (isEdit && ad.ad_type === 'design') ? 'checked' : '' %>>
+            <label class="btn btn-outline-primary" for="ad_type_design">🎨 تصميم إعلان</label>
+          </div>
+
+          <div id="imagePanel">
+            <label class="form-label">صورة الإعلان</label>
+            <input type="file" name="image" id="imageFile" accept="image/*" class="form-control">
+            <% if (isEdit && ad.image_url) { %>
+              <small class="text-muted d-block mt-1">اتركه فارغًا للاحتفاظ بالصورة الحالية</small>
+            <% } %>
+          </div>
+
+          <div id="designPanel" style="display:none;">
+
+            <h6 class="fw-bold mt-2">الخلفية</h6>
+            <div class="row g-3 align-items-end mb-2">
+              <div class="col-auto">
+                <label class="form-label small">لون الخلفية</label>
+                <input type="color" name="design_backgroundColor" class="form-control form-control-color" value="<%= d.backgroundColor || '#4338CA' %>">
+              </div>
+              <div class="col-auto">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="design_useGradient" id="design_useGradient" <%= d.backgroundGradientTo ? 'checked' : '' %>>
+                  <label class="form-check-label small" for="design_useGradient">تدرج لوني</label>
+                </div>
+              </div>
+              <div class="col-auto" id="gradientColorWrap" style="display:<%= d.backgroundGradientTo ? 'block' : 'none' %>;">
+                <label class="form-label small">اللون الثاني</label>
+                <input type="color" name="design_backgroundGradientTo" class="form-control form-control-color" value="<%= d.backgroundGradientTo || '#14B8A6' %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small">صورة خلفية (اختياري، تلغي اللون)</label>
+                <input type="file" name="design_background_image" id="designBgFile" accept="image/*" class="form-control form-control-sm">
+              </div>
+              <% if (d.backgroundImageUrl) { %>
+                <div class="col-auto">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="design_backgroundImageUrl_clear" value="1" id="clearBg">
+                    <label class="form-check-label small" for="clearBg">حذف صورة الخلفية الحالية</label>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+
+            <h6 class="fw-bold mt-3">الشارة العلوية (Badge)</h6>
+            <div class="row g-3 mb-2">
+              <div class="col-md-8">
+                <input type="text" name="design_badgeText" class="form-control" placeholder="مثال: عرض محدود" value="<%= d.badgeText || '' %>">
+              </div>
+              <div class="col-auto">
+                <input type="color" name="design_badgeColor" class="form-control form-control-color" value="<%= d.badgeColor || '#14B8A6' %>">
+              </div>
+            </div>
+
+            <h6 class="fw-bold mt-3">العنوان</h6>
+            <div class="row g-3 mb-2">
+              <div class="col-md-6">
+                <input type="text" name="design_heading" class="form-control" placeholder="العنوان الرئيسي" value="<%= d.heading || '' %>">
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">اللون</label>
+                <input type="color" name="design_headingColor" class="form-control form-control-color" value="<%= d.headingColor || '#ffffff' %>">
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">حجم الخط</label>
+                <input type="number" name="design_headingSize" class="form-control" style="width:90px" value="<%= d.headingSize || 22 %>">
+              </div>
+            </div>
+
+            <h6 class="fw-bold mt-3">النص</h6>
+            <div class="row g-3 mb-2">
+              <div class="col-md-6">
+                <textarea name="design_body" class="form-control" rows="3" placeholder="تفاصيل الإعلان"><%= d.body || '' %></textarea>
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">اللون</label>
+                <input type="color" name="design_bodyColor" class="form-control form-control-color" value="<%= d.bodyColor || '#ffffff' %>">
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">حجم الخط</label>
+                <input type="number" name="design_bodySize" class="form-control" style="width:90px" value="<%= d.bodySize || 15 %>">
+              </div>
+            </div>
+
+            <h6 class="fw-bold mt-3">صورة داخل التصميم (اختياري)</h6>
+            <div class="row g-3 mb-2 align-items-end">
+              <div class="col-md-5">
+                <input type="file" name="design_image" id="designImgFile" accept="image/*" class="form-control form-control-sm">
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">مكانها</label>
+                <select name="design_imagePosition" class="form-select form-select-sm">
+                  <option value="top" <%= d.imagePosition !== 'bottom' ? 'selected' : '' %>>أعلى</option>
+                  <option value="bottom" <%= d.imagePosition === 'bottom' ? 'selected' : '' %>>أسفل</option>
+                </select>
+              </div>
+              <% if (d.imageUrl) { %>
+                <div class="col-auto">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="design_imageUrl_clear" value="1" id="clearImg">
+                    <label class="form-check-label small" for="clearImg">حذف الصورة الحالية</label>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+
+            <h6 class="fw-bold mt-3">الزر</h6>
+            <div class="row g-3 mb-2 align-items-end">
+              <div class="col-auto">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="design_buttonEnabled" id="design_buttonEnabled" <%= d.buttonEnabled ? 'checked' : '' %>>
+                  <label class="form-check-label small" for="design_buttonEnabled">إظهار زر</label>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <input type="text" name="design_buttonText" class="form-control" placeholder="نص الزر" value="<%= d.buttonText || '' %>">
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">لون الزر</label>
+                <input type="color" name="design_buttonColor" class="form-control form-control-color" value="<%= d.buttonColor || '#14B8A6' %>">
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">لون النص</label>
+                <input type="color" name="design_buttonTextColor" class="form-control form-control-color" value="<%= d.buttonTextColor || '#ffffff' %>">
+              </div>
+              <div class="col-md-3">
+                <input type="url" name="design_buttonUrl" class="form-control" placeholder="رابط الزر (اختياري)" value="<%= d.buttonUrl || '' %>">
+              </div>
+            </div>
+
+            <h6 class="fw-bold mt-3">التخطيط</h6>
+            <div class="row g-3 mb-2">
+              <div class="col-auto">
+                <label class="form-label small mb-0">محاذاة النص</label>
+                <select name="design_textAlign" class="form-select form-select-sm">
+                  <option value="right" <%= d.textAlign === 'right' ? 'selected' : '' %>>يمين</option>
+                  <option value="center" <%= (!d.textAlign || d.textAlign === 'center') ? 'selected' : '' %>>وسط</option>
+                  <option value="left" <%= d.textAlign === 'left' ? 'selected' : '' %>>يسار</option>
+                </select>
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">استدارة الحواف (px)</label>
+                <input type="number" name="design_borderRadius" class="form-control form-control-sm" style="width:100px" value="<%= d.borderRadius != null ? d.borderRadius : 18 %>">
+              </div>
+              <div class="col-auto">
+                <label class="form-label small mb-0">أقصى عرض (px)</label>
+                <input type="number" name="design_maxWidth" class="form-control form-control-sm" style="width:100px" value="<%= d.maxWidth || 420 %>">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3">الفئة المستهدفة</h5>
+
+          <div class="btn-group mb-3" role="group">
+            <input type="radio" class="btn-check" name="target_mode" id="target_mode_all" value="all" <%= (isEdit && ad.target_mode === 'all') ? 'checked' : '' %>>
+            <label class="btn btn-outline-secondary" for="target_mode_all">كل الطلاب</label>
+            <input type="radio" class="btn-check" name="target_mode" id="target_mode_filtered" value="filtered" <%= (!isEdit || ad.target_mode === 'filtered') ? 'checked' : '' %>>
+            <label class="btn btn-outline-secondary" for="target_mode_filtered">فئة محددة</label>
+          </div>
+
+          <div id="filteredPanel">
+            <p class="text-muted small">الطالب يظهر له الإعلان لو حقق <strong>كل</strong> الشروط المفعّلة تحت، أو لو كان ضمن قائمة "طلاب محددين بالاسم".</p>
+
+            <label class="form-label small fw-bold">السناتر (اتركها بدون اختيار = كل السناتر)</label>
+            <div class="mb-3">
+              <% centers.forEach(c => { %>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" name="center_ids" value="<%= c.id %>" id="center_<%= c.id %>" <%= targetCenterIds.includes(c.id) ? 'checked' : '' %>>
+                  <label class="form-check-label" for="center_<%= c.id %>"><%= c.name %></label>
+                </div>
+              <% }) %>
+            </div>
+
+            <label class="form-label small fw-bold">المواد (اتركها بدون اختيار = كل المواد)</label>
+            <div class="mb-3">
+              <% subjects.forEach(s => { %>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" name="subject_ids" value="<%= s.id %>" id="subject_<%= s.id %>" <%= targetSubjectIds.includes(s.id) ? 'checked' : '' %>>
+                  <label class="form-check-label" for="subject_<%= s.id %>"><%= s.name %></label>
+                </div>
+              <% }) %>
+            </div>
+
+            <div class="row g-3 mb-2">
+              <div class="col-md-6">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="balance_filter_enabled" id="balance_filter_enabled" <%= (isEdit && ad.balance_filter_enabled) ? 'checked' : '' %>>
+                  <label class="form-check-label" for="balance_filter_enabled">فقط لو رصيد الطالب أقل من</label>
+                </div>
+                <input type="number" step="0.01" name="balance_max" class="form-control" value="<%= isEdit && ad.balance_max != null ? ad.balance_max : '' %>">
+              </div>
+              <div class="col-md-6">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="booklet_filter_enabled" id="booklet_filter_enabled" <%= (isEdit && ad.booklet_filter_enabled) ? 'checked' : '' %>>
+                  <label class="form-check-label" for="booklet_filter_enabled">فقط لو مدفوع البوكليت أقل من</label>
+                </div>
+                <input type="number" step="0.01" name="booklet_paid_max" class="form-control" value="<%= isEdit && ad.booklet_paid_max != null ? ad.booklet_paid_max : '' %>">
+              </div>
+            </div>
+
+            <label class="form-label small fw-bold">طلاب محددين بالاسم (يظهر لهم الإعلان دائمًا)</label>
+            <div class="position-relative mb-2">
+              <input type="text" id="studentSearchInput" class="form-control" placeholder="اكتب اسم الطالب أو كوده أو رقمه...">
+              <div id="studentSearchResults" class="list-group position-absolute w-100" style="z-index:10;display:none;max-height:220px;overflow-y:auto;"></div>
+            </div>
+            <div id="studentChips" class="d-flex flex-wrap gap-2 mb-2"></div>
+            <input type="hidden" name="target_student_ids_json" id="target_student_ids_json" value="[]">
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg">💾 حفظ الإعلان</button>
+      <a href="/admin/ads" class="btn btn-outline-secondary btn-lg">إلغاء</a>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card" style="position:sticky; top:20px;">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3">👀 معاينة حية</h5>
+          <div style="background:#0f172a; border-radius:16px; padding:30px 16px; min-height:320px; display:flex; align-items:center; justify-content:center;">
+            <div id="adPreviewContent" style="width:100%; display:flex; align-items:center; justify-content:center;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script src="/ad-render.js"></script>
+<script>
+  const form = document.getElementById('adForm');
+  const existingImageUrl = <%- JSON.stringify(isEdit && ad.image_url ? ad.image_url : null) %>;
+  const existingDesignBgUrl = <%- JSON.stringify(d.backgroundImageUrl || null) %>;
+  const existingDesignImgUrl = <%- JSON.stringify(d.imageUrl || null) %>;
+  let imageFilePreviewUrl = null;
+  let designBgFilePreviewUrl = null;
+  let designImgFilePreviewUrl = null;
+
+  function togglePanels() {
+    const adType = form.querySelector('input[name="ad_type"]:checked').value;
+    document.getElementById('imagePanel').style.display = adType === 'image' ? 'block' : 'none';
+    document.getElementById('designPanel').style.display = adType === 'design' ? 'block' : 'none';
+
+    const targetMode = form.querySelector('input[name="target_mode"]:checked').value;
+    document.getElementById('filteredPanel').style.display = targetMode === 'filtered' ? 'block' : 'none';
+
+    document.getElementById('gradientColorWrap').style.display = document.getElementById('design_useGradient').checked ? 'block' : 'none';
+  }
+
+  form.querySelectorAll('input[name="ad_type"], input[name="target_mode"], #design_useGradient').forEach(el => {
+    el.addEventListener('change', () => { togglePanels(); updatePreview(); });
+  });
+
+  document.getElementById('imageFile').addEventListener('change', (e) => {
+    imageFilePreviewUrl = e.target.files[0] ? URL.createObjectURL(e.target.files[0]) : null;
+    updatePreview();
+  });
+  document.getElementById('designBgFile').addEventListener('change', (e) => {
+    designBgFilePreviewUrl = e.target.files[0] ? URL.createObjectURL(e.target.files[0]) : null;
+    updatePreview();
+  });
+  document.getElementById('designImgFile').addEventListener('change', (e) => {
+    designImgFilePreviewUrl = e.target.files[0] ? URL.createObjectURL(e.target.files[0]) : null;
+    updatePreview();
+  });
+
+  function getFormAdObject() {
+    const adType = form.querySelector('input[name="ad_type"]:checked').value;
+    if (adType === 'image') {
+      return { ad_type: 'image', image_url: imageFilePreviewUrl || existingImageUrl || '' };
+    }
+
+    const clearBg = form.querySelector('[name="design_backgroundImageUrl_clear"]');
+    const clearImg = form.querySelector('[name="design_imageUrl_clear"]');
+    const useGradient = document.getElementById('design_useGradient').checked;
+
+    const design = {
+      backgroundColor: form.design_backgroundColor.value,
+      backgroundGradientTo: useGradient ? form.design_backgroundGradientTo.value : '',
+      backgroundImageUrl: designBgFilePreviewUrl || ((clearBg && clearBg.checked) ? null : existingDesignBgUrl),
+      badgeText: form.design_badgeText.value,
+      badgeColor: form.design_badgeColor.value,
+      heading: form.design_heading.value,
+      headingColor: form.design_headingColor.value,
+      headingSize: parseInt(form.design_headingSize.value, 10) || 22,
+      body: form.design_body.value,
+      bodyColor: form.design_bodyColor.value,
+      bodySize: parseInt(form.design_bodySize.value, 10) || 15,
+      imageUrl: designImgFilePreviewUrl || ((clearImg && clearImg.checked) ? null : existingDesignImgUrl),
+      imagePosition: form.design_imagePosition.value,
+      buttonEnabled: form.design_buttonEnabled.checked,
+      buttonText: form.design_buttonText.value,
+      buttonColor: form.design_buttonColor.value,
+      buttonTextColor: form.design_buttonTextColor.value,
+      buttonUrl: form.design_buttonUrl.value,
+      textAlign: form.design_textAlign.value,
+      borderRadius: parseInt(form.design_borderRadius.value, 10) || 18,
+      maxWidth: parseInt(form.design_maxWidth.value, 10) || 420,
+    };
+    return { ad_type: 'design', design };
+  }
+
+  function updatePreview() {
+    const previewEl = document.getElementById('adPreviewContent');
+    const content = renderAdPopupContent(getFormAdObject());
+    previewEl.innerHTML = content || '<p class="text-muted text-center mb-0">املأ الحقول لمعاينة الإعلان</p>';
+  }
+
+  form.querySelectorAll('#designPanel input, #designPanel textarea, #designPanel select').forEach(el => {
+    el.addEventListener('input', updatePreview);
+    el.addEventListener('change', updatePreview);
+  });
+
+  // ===== طلاب محددين بالاسم =====
+  let selectedStudents = <%- JSON.stringify(selectedStudents.map(s => ({ id: s.id, name: s.name, student_code: s.student_code }))) %>;
+
+  function renderStudentChips() {
+    const container = document.getElementById('studentChips');
+    container.innerHTML = '';
+    selectedStudents.forEach(s => {
+      const chip = document.createElement('span');
+      chip.className = 'badge bg-primary d-inline-flex align-items-center gap-2 p-2';
+      chip.style.fontSize = '0.85rem';
+      chip.textContent = s.name + ' (' + s.student_code + ') ';
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn-close btn-close-white';
+      removeBtn.style.fontSize = '0.6rem';
+      removeBtn.addEventListener('click', () => {
+        selectedStudents = selectedStudents.filter(x => x.id !== s.id);
+        renderStudentChips();
+      });
+      chip.appendChild(removeBtn);
+      container.appendChild(chip);
+    });
+    document.getElementById('target_student_ids_json').value = JSON.stringify(selectedStudents.map(s => s.id));
+  }
+
+  let studentSearchTimeout = null;
+  document.getElementById('studentSearchInput').addEventListener('input', function () {
+    clearTimeout(studentSearchTimeout);
+    const q = this.value.trim();
+    const resultsBox = document.getElementById('studentSearchResults');
+    if (!q) { resultsBox.innerHTML = ''; resultsBox.style.display = 'none'; return; }
+    studentSearchTimeout = setTimeout(async () => {
+      const res = await fetch('/admin/ads/students/search?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      resultsBox.innerHTML = '';
+      (data.students || []).forEach(s => {
+        if (selectedStudents.some(x => x.id === s.id)) return;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'list-group-item list-group-item-action';
+        item.textContent = s.name + ' (' + s.student_code + ')';
+        item.addEventListener('click', () => {
+          selectedStudents.push(s);
+          renderStudentChips();
+          resultsBox.innerHTML = '';
+          resultsBox.style.display = 'none';
+          document.getElementById('studentSearchInput').value = '';
+        });
+        resultsBox.appendChild(item);
+      });
+      resultsBox.style.display = resultsBox.children.length ? 'block' : 'none';
+    }, 250);
+  });
+
+  togglePanels();
+  updatePreview();
+  renderStudentChips();
+</script>
+
+<%- include('partials/footer') %>

@@ -771,15 +771,23 @@ span.text-muted {
         <span class="en-only" style="display:none;">📊 Exams & Scores</span>
       </a>
     <% } %>
-    <% if (canShow('admin_videos')) { %>
+    <% if (canShow('admin_videos') || canShow('admin_ads')) { %>
       <hr>
       <div class="sf-nav-label">
         <span class="ar-only">المحتوى</span>
         <span class="en-only" style="display:none;">Content</span>
       </div>
+    <% } %>
+    <% if (canShow('admin_videos')) { %>
       <a href="/admin/videos">
         <span class="ar-only">🎬 إدارة الفيديوهات</span>
         <span class="en-only" style="display:none;">🎬 Manage Videos</span>
+      </a>
+    <% } %>
+    <% if (canShow('admin_ads')) { %>
+      <a href="/admin/ads">
+        <span class="ar-only">📢 إدارة الإعلانات</span>
+        <span class="en-only" style="display:none;">📢 Manage Ads</span>
       </a>
     <% } %>
     <% if (userRole === 'admin') { %>

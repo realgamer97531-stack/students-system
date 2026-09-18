@@ -1,0 +1,86 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="mb-1">📢 إدارة الإعلانات</h3>
+    <p class="text-muted mb-0">إعلانات تظهر كـ Popup للطلاب/أولياء الأمور عند فتح البوابة، حسب الفلاتر اللي تحددها.</p>
+  </div>
+  <a href="/admin/ads/new" class="btn btn-primary">➕ إعلان جديد</a>
+</div>
+
+<%
+  const centersMap = new Map(centers.map(c => [c.id, c.name]));
+  const subjectsMap = new Map(subjects.map(s => [s.id, s.name]));
+
+  function describeTargeting(adRow) {
+    if (adRow.target_mode === 'all') return 'كل الطلاب';
+    const parts = [];
+    const centerIds = safeParseJsonArray(adRow.target_center_ids);
+    const subjectIds = safeParseJsonArray(adRow.target_subject_ids);
+    const studentIds = safeParseJsonArray(adRow.target_student_ids);
+    if (centerIds.length) parts.push('سناتر: ' + centerIds.map(id => centersMap.get(id) || id).join('، '));
+    if (subjectIds.length) parts.push('مواد: ' + subjectIds.map(id => subjectsMap.get(id) || id).join('، '));
+    if (adRow.balance_filter_enabled) parts.push('رصيد أقل من ' + adRow.balance_max);
+    if (adRow.booklet_filter_enabled) parts.push('مدفوع بوكليت أقل من ' + adRow.booklet_paid_max);
+    if (studentIds.length) parts.push(studentIds.length + ' طالب محدد بالاسم');
+    return parts.length ? parts.join(' + ') : 'لا يوجد فلتر (لن يظهر لأحد)';
+  }
+%>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>الاسم الداخلي</th>
+          <th>النوع</th>
+          <th>يستهدف</th>
+          <th>الأولوية</th>
+          <th>الحالة</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!ads.length) { %>
+          <tr><td colspan="6" class="text-center text-muted py-4">لا توجد إعلانات بعد</td></tr>
+        <% } %>
+        <% ads.forEach(adRow => { %>
+          <tr>
+            <td><%= adRow.title %></td>
+            <td>
+              <% if (adRow.ad_type === 'image') { %>
+                <span class="badge bg-info">صورة</span>
+              <% } else { %>
+                <span class="badge bg-primary">تصميم</span>
+              <% } %>
+            </td>
+            <td class="small"><%= describeTargeting(adRow) %></td>
+            <td><%= adRow.priority %></td>
+            <td>
+              <% if (adRow.is_active) { %>
+                <span class="badge bg-success">فعّال</span>
+              <% } else { %>
+                <span class="badge bg-secondary">متوقف</span>
+              <% } %>
+            </td>
+            <td>
+              <div class="d-flex gap-2">
+                <a href="/admin/ads/<%= adRow.id %>/edit" class="btn btn-sm btn-outline-primary">تعديل</a>
+                <form action="/admin/ads/<%= adRow.id %>/toggle" method="POST">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <%= adRow.is_active ? 'إيقاف' : 'تفعيل' %>
+                  </button>
+                </form>
+                <form action="/admin/ads/<%= adRow.id %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف هذا الإعلان؟')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -45,6 +45,7 @@ const VideoAccessGrant = require('./models/VideoAccessGrant');
 const Warning = require('./models/Warning');
 const Booklet = require('./models/Booklet');
 const StudentBooklet = require('./models/StudentBooklet');
+const Ad = require('./models/Ad');
 const BookletReservation = require('./models/BookletReservation');
 const PaymentVerification = require('./models/PaymentVerification');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
@@ -58,6 +59,7 @@ const XLSX = require('xlsx');
 const bulkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const databaseBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const profilePhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const adImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const centerLedgerPath = process.env.CENTER_LEDGER_PATH || path.join(__dirname, 'data', 'center-recharge-ledger.json');
 
 const VideoSession = require('./models/VideoSession');
@@ -383,6 +385,8 @@ Booklet.hasMany(StudentBooklet, { foreignKey: 'BookletId' });
 BookletReservation.belongsTo(Student, { foreignKey: 'StudentId' });
 BookletReservation.belongsTo(Booklet, { foreignKey: 'BookletId' });
 Student.hasMany(BookletReservation, { foreignKey: 'StudentId' });
+User.hasMany(Ad);
+Ad.belongsTo(User);
 
 require('./models/associations')();
 
@@ -4327,6 +4331,73 @@ app.get('/api/portal/parent/data', verifyPortalToken('parent'), async (req, res)
   res.json({ success: true, data });
 });
 
+// الإعلانات: منطق التوزيع بيحسب أي إعلانات فعّالة تستهدف هذا الطالب
+function safeParseJsonArray(text) {
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+async function getMatchingAdsForStudent(studentId) {
+  const student = await Student.findByPk(studentId);
+  if (!student) return [];
+
+  const ads = await Ad.findAll({ where: { is_active: true }, order: [['priority', 'ASC'], ['createdAt', 'DESC']] });
+  if (ads.length === 0) return [];
+
+  let totalBookletPaid = 0;
+  if (ads.some((ad) => ad.booklet_filter_enabled)) {
+    totalBookletPaid = (await StudentBooklet.sum('paid_amount', { where: { StudentId: studentId } })) || 0;
+  }
+
+  const matching = ads.filter((ad) => {
+    if (ad.target_mode === 'all') return true;
+
+    if (safeParseJsonArray(ad.target_student_ids).includes(student.id)) return true;
+
+    const conditions = [];
+    const centerIds = safeParseJsonArray(ad.target_center_ids);
+    if (centerIds.length > 0) conditions.push(centerIds.includes(student.CenterId));
+    const subjectIds = safeParseJsonArray(ad.target_subject_ids);
+    if (subjectIds.length > 0) conditions.push(subjectIds.includes(student.SubjectId));
+    if (ad.balance_filter_enabled) conditions.push(student.balance < ad.balance_max);
+    if (ad.booklet_filter_enabled) conditions.push(totalBookletPaid < ad.booklet_paid_max);
+
+    return conditions.length > 0 && conditions.every(Boolean);
+  });
+
+  return matching.map((ad) => ({
+    id: ad.id,
+    ad_type: ad.ad_type,
+    image_url: ad.image_url,
+    link_url: ad.link_url,
+    design: ad.design ? JSON.parse(ad.design) : null,
+  }));
+}
+
+app.get('/api/portal/student/ads', verifyPortalToken('student'), async (req, res) => {
+  try {
+    const ads = await getMatchingAdsForStudent(req.portalStudentId);
+    res.json({ success: true, ads });
+  } catch (e) {
+    console.error('Failed to load student ads:', e);
+    res.json({ success: true, ads: [] });
+  }
+});
+
+app.get('/api/portal/parent/ads', verifyPortalToken('parent'), async (req, res) => {
+  try {
+    const ads = await getMatchingAdsForStudent(req.portalStudentId);
+    res.json({ success: true, ads });
+  } catch (e) {
+    console.error('Failed to load parent ads:', e);
+    res.json({ success: true, ads: [] });
+  }
+});
+
 // Call-center comment bridge. Call-center failures must not block a call.
 function normalizeCallCenterIdentity(value) {
   const normalized = String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -5467,6 +5538,231 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   }
 
   res.redirect('/admin/videos/' + req.params.id + '/access');
+});
+
+// ===== نظام إدارة الإعلانات (Ads) =====
+
+function uploadBufferToCloudinary(buffer, folder) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image' },
+      (error, result) => (error ? reject(error) : resolve(result))
+    );
+    const readable = new Readable();
+    readable.push(buffer);
+    readable.push(null);
+    readable.pipe(stream);
+  });
+}
+
+function parseAdFormBody(body) {
+  const ad_type = body.ad_type === 'design' ? 'design' : 'image';
+  const target_mode = body.target_mode === 'all' ? 'all' : 'filtered';
+
+  const toIntArray = (value) => {
+    const arr = Array.isArray(value) ? value : (value ? [value] : []);
+    return arr.map((v) => parseInt(v, 10)).filter((n) => Number.isInteger(n));
+  };
+
+  const balance_filter_enabled = body.balance_filter_enabled === 'on' || body.balance_filter_enabled === 'true';
+  const booklet_filter_enabled = body.booklet_filter_enabled === 'on' || body.booklet_filter_enabled === 'true';
+  const is_active = body.is_active === 'on' || body.is_active === 'true';
+
+  let targetStudentIds = [];
+  try {
+    const parsed = JSON.parse(body.target_student_ids_json || '[]');
+    if (Array.isArray(parsed)) targetStudentIds = parsed;
+  } catch (e) {
+    targetStudentIds = [];
+  }
+  targetStudentIds = targetStudentIds.map((v) => parseInt(v, 10)).filter((n) => Number.isInteger(n));
+
+  return {
+    title: String(body.title || '').trim() || 'إعلان بدون اسم',
+    ad_type,
+    link_url: body.link_url ? String(body.link_url).trim() : null,
+    target_mode,
+    target_center_ids: JSON.stringify(toIntArray(body.center_ids)),
+    target_subject_ids: JSON.stringify(toIntArray(body.subject_ids)),
+    balance_filter_enabled,
+    balance_max: balance_filter_enabled ? (parseFloat(body.balance_max) || 0) : null,
+    booklet_filter_enabled,
+    booklet_paid_max: booklet_filter_enabled ? (parseFloat(body.booklet_paid_max) || 0) : null,
+    target_student_ids: JSON.stringify(targetStudentIds),
+    is_active,
+    priority: parseInt(body.priority, 10) || 0,
+  };
+}
+
+async function buildAdDesignFromBody(body, files, existing) {
+  const useGradient = body.design_useGradient === 'on' || body.design_useGradient === 'true';
+  const design = {
+    backgroundColor: body.design_backgroundColor || '#4338CA',
+    backgroundGradientTo: useGradient ? (body.design_backgroundGradientTo || '') : '',
+    backgroundImageUrl: existing?.backgroundImageUrl || null,
+    badgeText: body.design_badgeText || '',
+    badgeColor: body.design_badgeColor || '',
+    heading: body.design_heading || '',
+    headingColor: body.design_headingColor || '#ffffff',
+    headingSize: parseInt(body.design_headingSize, 10) || 22,
+    body: body.design_body || '',
+    bodyColor: body.design_bodyColor || '#ffffff',
+    bodySize: parseInt(body.design_bodySize, 10) || 15,
+    imageUrl: existing?.imageUrl || null,
+    imagePosition: body.design_imagePosition === 'bottom' ? 'bottom' : 'top',
+    buttonEnabled: body.design_buttonEnabled === 'on' || body.design_buttonEnabled === 'true',
+    buttonText: body.design_buttonText || '',
+    buttonColor: body.design_buttonColor || '#14B8A6',
+    buttonTextColor: body.design_buttonTextColor || '#ffffff',
+    buttonUrl: body.design_buttonUrl || '',
+    textAlign: ['right', 'center', 'left'].includes(body.design_textAlign) ? body.design_textAlign : 'center',
+    borderRadius: parseInt(body.design_borderRadius, 10) || 18,
+    maxWidth: parseInt(body.design_maxWidth, 10) || 420,
+  };
+
+  if (files?.design_background_image?.[0]) {
+    const uploaded = await uploadBufferToCloudinary(files.design_background_image[0].buffer, 'studyisfunny/ads');
+    design.backgroundImageUrl = uploaded.secure_url;
+  } else if (body.design_backgroundImageUrl_clear === '1') {
+    design.backgroundImageUrl = null;
+  }
+
+  if (files?.design_image?.[0]) {
+    const uploaded = await uploadBufferToCloudinary(files.design_image[0].buffer, 'studyisfunny/ads');
+    design.imageUrl = uploaded.secure_url;
+  } else if (body.design_imageUrl_clear === '1') {
+    design.imageUrl = null;
+  }
+
+  return design;
+}
+
+app.get('/admin/ads', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
+  const ads = await Ad.findAll({ order: [['priority', 'ASC'], ['createdAt', 'DESC']] });
+  const centers = await Center.findAll();
+  const subjects = await Subject.findAll();
+  res.render('manage-ads', { ads, centers, subjects, safeParseJsonArray });
+});
+
+app.get('/admin/ads/new', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
+  const centers = await Center.findAll();
+  const subjects = await Subject.findAll();
+  res.render('ad-form', { ad: null, centers, subjects, selectedStudents: [] });
+});
+
+app.get('/admin/ads/:id/edit', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
+  const adRow = await Ad.findByPk(req.params.id);
+  if (!adRow) return res.status(404).send('❌ الإعلان غير موجود');
+  const centers = await Center.findAll();
+  const subjects = await Subject.findAll();
+  const targetStudentIds = safeParseJsonArray(adRow.target_student_ids);
+  const selectedStudents = targetStudentIds.length
+    ? await Student.findAll({ where: { id: targetStudentIds }, attributes: ['id', 'name', 'student_code'] })
+    : [];
+
+  const ad = {
+    id: adRow.id,
+    title: adRow.title,
+    ad_type: adRow.ad_type,
+    image_url: adRow.image_url,
+    link_url: adRow.link_url,
+    design: adRow.design ? JSON.parse(adRow.design) : {},
+    target_mode: adRow.target_mode,
+    target_center_ids: safeParseJsonArray(adRow.target_center_ids),
+    target_subject_ids: safeParseJsonArray(adRow.target_subject_ids),
+    balance_filter_enabled: adRow.balance_filter_enabled,
+    balance_max: adRow.balance_max,
+    booklet_filter_enabled: adRow.booklet_filter_enabled,
+    booklet_paid_max: adRow.booklet_paid_max,
+    target_student_ids: targetStudentIds,
+    is_active: adRow.is_active,
+    priority: adRow.priority,
+  };
+
+  res.render('ad-form', { ad, centers, subjects, selectedStudents });
+});
+
+app.get('/admin/ads/students/search', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
+  const search = String(req.query.q || '').trim();
+  if (!search) return res.json({ success: true, students: [] });
+  const like = `%${search}%`;
+  const students = await Student.findAll({
+    where: {
+      [Op.or]: [
+        { name: { [Op.like]: like } },
+        { student_code: { [Op.like]: like } },
+        { phone: { [Op.like]: like } },
+      ],
+    },
+    attributes: ['id', 'name', 'student_code'],
+    limit: 20,
+  });
+  res.json({ success: true, students });
+});
+
+const adUploadFields = [
+  { name: 'image', maxCount: 1 },
+  { name: 'design_background_image', maxCount: 1 },
+  { name: 'design_image', maxCount: 1 },
+];
+
+app.post('/admin/ads', requirePermissionOrAdmin('admin_ads'), adImageUpload.fields(adUploadFields), async (req, res) => {
+  try {
+    const fields = parseAdFormBody(req.body);
+
+    if (fields.ad_type === 'image') {
+      if (!req.files?.image?.[0]) return res.status(400).send('❌ لازم ترفع صورة للإعلان');
+      const uploaded = await uploadBufferToCloudinary(req.files.image[0].buffer, 'studyisfunny/ads');
+      fields.image_url = uploaded.secure_url;
+    } else {
+      fields.design = JSON.stringify(await buildAdDesignFromBody(req.body, req.files, null));
+    }
+
+    fields.UserId = req.session.userId;
+    await Ad.create(fields);
+    res.redirect('/admin/ads');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/admin/ads/:id', requirePermissionOrAdmin('admin_ads'), adImageUpload.fields(adUploadFields), async (req, res) => {
+  try {
+    const adRow = await Ad.findByPk(req.params.id);
+    if (!adRow) return res.status(404).send('❌ الإعلان غير موجود');
+
+    const fields = parseAdFormBody(req.body);
+
+    if (fields.ad_type === 'image') {
+      if (req.files?.image?.[0]) {
+        const uploaded = await uploadBufferToCloudinary(req.files.image[0].buffer, 'studyisfunny/ads');
+        fields.image_url = uploaded.secure_url;
+      } else {
+        fields.image_url = adRow.image_url;
+      }
+    } else {
+      const existingDesign = adRow.design ? JSON.parse(adRow.design) : null;
+      fields.design = JSON.stringify(await buildAdDesignFromBody(req.body, req.files, existingDesign));
+    }
+
+    await adRow.update(fields);
+    res.redirect('/admin/ads');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/admin/ads/:id/toggle', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
+  const adRow = await Ad.findByPk(req.params.id);
+  if (adRow) await adRow.update({ is_active: !adRow.is_active });
+  res.redirect('/admin/ads');
+});
+
+app.post('/admin/ads/:id/delete', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
+  await Ad.destroy({ where: { id: req.params.id } });
+  res.redirect('/admin/ads');
 });
 
 // ===== نظام الإنذارات والحظر =====
@@ -8486,6 +8782,7 @@ async function startServer() {
     await RechargeCenter.sync();
     await RechargeCenterAccount.sync();
     await RechargeCode.sync();
+    await Ad.sync();
     await ensureRechargeCodeCenterColumn();
     await migrateRechargeLedgerToDatabase();
     await ensureUserPhoneColumn();
@@ -8542,6 +8839,7 @@ async function startServer() {
           await RechargeCenter.sync();
           await RechargeCenterAccount.sync();
           await RechargeCode.sync();
+          await Ad.sync();
           await ensureRechargeCodeCenterColumn();
           await migrateRechargeLedgerToDatabase();
           await ensureUserPhoneColumn();
