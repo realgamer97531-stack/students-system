@@ -6,3 +6,5 @@ backups/
 public/*
 !public/register.html
 !public/center.html
+!public/ad-render.js
+!public/ads-popup.js
