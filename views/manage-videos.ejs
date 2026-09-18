@@ -55,10 +55,48 @@
   </div>
 </div>
 
+<%
+  const centersMap = new Map();
+  const subjectsMap = new Map();
+  videos.forEach(v => {
+    const linked = [v.Session, ...(v.VideoSessions || []).map(vs => vs.Session)].filter(Boolean);
+    linked.forEach(s => {
+      if (s.Center) centersMap.set(s.Center.id, s.Center.name);
+      if (s.Subject) subjectsMap.set(s.Subject.id, s.Subject.name);
+    });
+  });
+%>
+
+<div class="card mb-3">
+  <div class="card-body d-flex flex-wrap gap-3 align-items-end">
+    <div>
+      <label class="form-label small mb-1">فلترة حسب السنتر</label>
+      <select id="filterCenter" class="form-select form-select-sm" onchange="applyVideoFilters()">
+        <option value="">كل السناتر</option>
+        <% [...centersMap.entries()].forEach(([id, name]) => { %>
+          <option value="<%= id %>"><%= name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label small mb-1">فلترة حسب المادة</label>
+      <select id="filterSubject" class="form-select form-select-sm" onchange="applyVideoFilters()">
+        <option value="">كل المواد</option>
+        <% [...subjectsMap.entries()].forEach(([id, name]) => { %>
+          <option value="<%= id %>"><%= name %></option>
+        <% }) %>
+      </select>
+    </div>
+  </div>
+</div>
+
 <h5 class="mb-3 fw-bold">الدروس الموجودة</h5>
-<div class="row g-3">
+<div class="row g-3" id="videosContainer">
   <% videos.forEach(v => { %>
-    <div class="col-md-4">
+    <% const linkedSessions = [v.Session, ...(v.VideoSessions || []).map(videoSession => videoSession.Session)].filter(Boolean); %>
+    <% const cardCenterIds = [...new Set(linkedSessions.map(s => s.Center?.id).filter(Boolean))].join(','); %>
+    <% const cardSubjectIds = [...new Set(linkedSessions.map(s => s.Subject?.id).filter(Boolean))].join(','); %>
+    <div class="col-md-4 video-card-col" data-centers="<%= cardCenterIds %>" data-subjects="<%= cardSubjectIds %>">
       <div class="card h-100">
         <div class="card-body d-flex flex-column justify-content-between">
           <div>
@@ -71,7 +109,6 @@
                 <button type="submit" class="btn btn-sm btn-outline-danger border-0 py-1 px-2" title="حذف الدرس بالكامل">🗑️</button>
               </form>
             </div>
-            <% const linkedSessions = [v.Session, ...(v.VideoSessions || []).map(videoSession => videoSession.Session)].filter(Boolean); %>
             <p class="text-muted small mb-3">
               <% if (linkedSessions.length) { %>
                 <% linkedSessions.forEach(session => { %>
@@ -118,5 +155,24 @@
     </div>
   <% }) %>
 </div>
+<p id="noVideosMsg" class="text-muted text-center mt-3" style="display:none;">لا توجد دروس مطابقة لهذا الفلتر</p>
+
+<script>
+  function applyVideoFilters() {
+    const center = document.getElementById('filterCenter').value;
+    const subject = document.getElementById('filterSubject').value;
+    let visibleCount = 0;
+    document.querySelectorAll('.video-card-col').forEach(col => {
+      const centers = col.dataset.centers ? col.dataset.centers.split(',') : [];
+      const subjects = col.dataset.subjects ? col.dataset.subjects.split(',') : [];
+      const centerMatch = !center || centers.includes(center);
+      const subjectMatch = !subject || subjects.includes(subject);
+      const visible = centerMatch && subjectMatch;
+      col.style.display = visible ? '' : 'none';
+      if (visible) visibleCount++;
+    });
+    document.getElementById('noVideosMsg').style.display = visibleCount === 0 ? 'block' : 'none';
+  }
+</script>
 
 <%- include('partials/footer') %>
