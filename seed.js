@@ -17,6 +17,7 @@ async function seed() {
       'صقر ميامي',
       'محرم بيك',
       'أونلاين',
+      'No Follow up Online',
     ];
 
     for (const name of centers) {
@@ -45,6 +46,7 @@ async function seed() {
       'صقر ميامي': 5000,
       'محرم بيك': 6000,
       'أونلاين': 9000,
+      'No Follow up Online': 7000,
     };
 
     const allCenters = await Center.findAll();
