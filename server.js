@@ -6906,7 +6906,7 @@ app.post('/admin/booklets/:id/delete', requireAdmin, async (req, res) => {
 
 // ===== ADMIN: تسجيل دفع بوكليت لطالب من ملفه =====
 
-app.post('/students/:studentId/booklet-payment', requireAdmin, async (req, res) => {
+app.post('/students/:studentId/booklet-payment', requirePermissionOrAdmin('students_view'), async (req, res) => {
   try {
     const { booklet_id, paid_amount, notes } = req.body;
     const student = await Student.findByPk(req.params.studentId);

@@ -253,7 +253,7 @@
                   <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
                   <span>متبقي: <span class="<%= bookletRemaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= bookletRemaining %> ج</span></span>
                 </div>
-                <% if (bookletRemaining > 0 && userRole === 'admin') { %>
+                <% if (bookletRemaining > 0 && (userRole === 'admin' || userPermissions.includes('students_view'))) { %>
                   <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1 mt-1">
                     <input type="hidden" name="booklet_id" value="<%= b.id %>">
                     <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ" min="1" max="<%= bookletRemaining %>" required style="font-size: 0.75rem; padding: 2px 5px;">
