@@ -8,7 +8,7 @@
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h6 class="mb-3">إضافة فيديو جديد لهذا الدرس</h6>
-    <form action="/admin/videos/<%= video.id %>/add-part" method="POST" enctype="multipart/form-data" class="row g-2">
+    <form action="/admin/videos/<%= video.id %>/add-part" method="POST" enctype="multipart/form-data" class="row g-2" onsubmit="return combineDuration()">
       <div class="col-md-3">
         <select name="category" class="form-select" required>
           <option value="explanation">فيديو الشرح</option>
@@ -31,8 +31,23 @@
       <div class="col-md-3" id="uploadInputBox" style="display:none;">
         <input type="file" name="video_file" class="form-control" accept="video/*">
       </div>
-      <div class="col-md-2">
-        <input type="number" name="duration_seconds" class="form-control" placeholder="المدة بالثواني" required>
+      <div class="col-md-3">
+        <label class="form-label small text-muted mb-1 d-block">مدة الفيديو</label>
+        <div class="d-flex gap-1">
+          <div>
+            <input type="number" id="durHours" class="form-control" placeholder="ساعة" min="0" value="0" style="width:75px;">
+            <span class="small text-muted d-block text-center">ساعة</span>
+          </div>
+          <div>
+            <input type="number" id="durMinutes" class="form-control" placeholder="دقيقة" min="0" max="59" value="0" style="width:75px;">
+            <span class="small text-muted d-block text-center">دقيقة</span>
+          </div>
+          <div>
+            <input type="number" id="durSeconds" class="form-control" placeholder="ثانية" min="0" max="59" value="0" style="width:75px;">
+            <span class="small text-muted d-block text-center">ثانية</span>
+          </div>
+        </div>
+        <input type="hidden" name="duration_seconds" id="durationSecondsHidden" required>
       </div>
       <div class="col-md-2">
         <button type="submit" class="btn btn-success w-100">إضافة</button>
@@ -62,7 +77,12 @@
                   <a href="<%= p.video_url %>" target="_blank" class="text-decoration-none">🔗 لينك خارجي</a>
                 <% } else { %>📁 ملف مرفوع<% } %>
               </td>
-              <td><%= Math.floor(p.duration_seconds / 60) %>:<%= String(p.duration_seconds % 60).padStart(2, '0') %></td>
+              <td>
+                <% const h = Math.floor(p.duration_seconds / 3600); %>
+                <% const m = Math.floor((p.duration_seconds % 3600) / 60); %>
+                <% const s = p.duration_seconds % 60; %>
+                <%= h > 0 ? String(h).padStart(2, '0') + ':' : '' %><%= String(m).padStart(2, '0') %>:<%= String(s).padStart(2, '0') %>
+              </td>
               <td>
                 <form action="/admin/videos/part/<%= p.id %>/delete" method="POST" onsubmit="return confirm('متأكد من الحذف؟')">
                   <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
@@ -168,6 +188,19 @@
     const type = document.getElementById('sourceType').value;
     document.getElementById('linkInputBox').style.display = type === 'link' ? 'block' : 'none';
     document.getElementById('uploadInputBox').style.display = type === 'upload' ? 'block' : 'none';
+  }
+
+  function combineDuration() {
+    const h = parseInt(document.getElementById('durHours').value, 10) || 0;
+    const m = parseInt(document.getElementById('durMinutes').value, 10) || 0;
+    const s = parseInt(document.getElementById('durSeconds').value, 10) || 0;
+    const total = (h * 3600) + (m * 60) + s;
+    if (total <= 0) {
+      alert('من فضلك حدد مدة الفيديو');
+      return false;
+    }
+    document.getElementById('durationSecondsHidden').value = total;
+    return true;
   }
 </script>
 
