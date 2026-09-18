@@ -493,6 +493,25 @@ async function ensureStudentBookletCustomPriceColumn() {
   }
 }
 
+async function ensureAdUserIdColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('Ads');
+    if (!tableInfo.UserId) {
+      await queryInterface.addColumn('Ads', 'UserId', {
+        type: sequelize.Sequelize.INTEGER,
+        allowNull: true,
+      });
+      console.log('✅ Added UserId column to Ads table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure Ads.UserId column:', error.message);
+  }
+}
+
 async function ensureBalanceTransactionSessionColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -8783,6 +8802,7 @@ async function startServer() {
     await RechargeCenterAccount.sync();
     await RechargeCode.sync();
     await Ad.sync();
+    await ensureAdUserIdColumn();
     await ensureRechargeCodeCenterColumn();
     await migrateRechargeLedgerToDatabase();
     await ensureUserPhoneColumn();
@@ -8840,6 +8860,7 @@ async function startServer() {
           await RechargeCenterAccount.sync();
           await RechargeCode.sync();
           await Ad.sync();
+          await ensureAdUserIdColumn();
           await ensureRechargeCodeCenterColumn();
           await migrateRechargeLedgerToDatabase();
           await ensureUserPhoneColumn();
