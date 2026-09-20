@@ -202,6 +202,21 @@
 
       <div class="card mb-4">
         <div class="card-body">
+          <h5 class="fw-bold mb-3">أماكن الظهور</h5>
+          <p class="text-muted small">اختر الصفحات اللي يظهر فيها الإعلان (اتركها بدون اختيار = يظهر في كل الصفحات).</p>
+          <div class="mb-2">
+            <% pages.forEach(p => { %>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" name="target_pages" value="<%= p.key %>" id="page_<%= p.key %>" <%= (isEdit && ad.target_pages.includes(p.key)) ? 'checked' : '' %>>
+                <label class="form-check-label" for="page_<%= p.key %>"><%= p.label %></label>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
           <h5 class="fw-bold mb-3">الفئة المستهدفة</h5>
 
           <div class="btn-group mb-3" role="group">

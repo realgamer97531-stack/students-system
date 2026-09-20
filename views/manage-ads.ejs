@@ -11,6 +11,12 @@
 <%
   const centersMap = new Map(centers.map(c => [c.id, c.name]));
   const subjectsMap = new Map(subjects.map(s => [s.id, s.name]));
+  const pagesMap = new Map(AD_TARGETABLE_PAGES.map(p => [p.key, p.label]));
+
+  function describePages(adRow) {
+    const pageKeys = safeParseJsonArray(adRow.target_pages);
+    return pageKeys.length ? pageKeys.map(k => pagesMap.get(k) || k).join('، ') : 'كل الصفحات';
+  }
 
   function describeTargeting(adRow) {
     if (adRow.target_mode === 'all') return 'كل الطلاب';
@@ -35,6 +41,7 @@
           <th>الاسم الداخلي</th>
           <th>النوع</th>
           <th>يستهدف</th>
+          <th>الصفحات</th>
           <th>الأولوية</th>
           <th>الحالة</th>
           <th>إجراءات</th>
@@ -42,7 +49,7 @@
       </thead>
       <tbody>
         <% if (!ads.length) { %>
-          <tr><td colspan="6" class="text-center text-muted py-4">لا توجد إعلانات بعد</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-4">لا توجد إعلانات بعد</td></tr>
         <% } %>
         <% ads.forEach(adRow => { %>
           <tr>
@@ -55,6 +62,7 @@
               <% } %>
             </td>
             <td class="small"><%= describeTargeting(adRow) %></td>
+            <td class="small"><%= describePages(adRow) %></td>
             <td><%= adRow.priority %></td>
             <td>
               <% if (adRow.is_active) { %>

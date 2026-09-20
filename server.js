@@ -512,6 +512,26 @@ async function ensureAdUserIdColumn() {
   }
 }
 
+async function ensureAdTargetPagesColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('Ads');
+    if (!tableInfo.target_pages) {
+      await queryInterface.addColumn('Ads', 'target_pages', {
+        type: sequelize.Sequelize.TEXT,
+        allowNull: false,
+        defaultValue: '[]',
+      });
+      console.log('✅ Added target_pages column to Ads table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure Ads.target_pages column:', error.message);
+  }
+}
+
 async function ensureBalanceTransactionSessionColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -4360,7 +4380,18 @@ function safeParseJsonArray(text) {
   }
 }
 
-async function getMatchingAdsForStudent(studentId) {
+// الصفحات اللي ممكن الإعلان يظهر فيها بالبوابة (فاضي في الإعلان = كل الصفحات)
+const AD_TARGETABLE_PAGES = [
+  { key: 'student', label: 'صفحة الطالب الرئيسية' },
+  { key: 'lessons', label: 'الدروس' },
+  { key: 'lesson-view', label: 'عرض الدرس' },
+  { key: 'homework', label: 'الواجبات' },
+  { key: 'sessions', label: 'الحصص' },
+  { key: 'booklets', label: 'البوكليتس' },
+  { key: 'parent', label: 'بوابة ولي الأمر' },
+];
+
+async function getMatchingAdsForStudent(studentId, page) {
   const student = await Student.findByPk(studentId);
   if (!student) return [];
 
@@ -4373,6 +4404,9 @@ async function getMatchingAdsForStudent(studentId) {
   }
 
   const matching = ads.filter((ad) => {
+    const pages = safeParseJsonArray(ad.target_pages);
+    if (pages.length > 0 && page && !pages.includes(page)) return false;
+
     if (ad.target_mode === 'all') return true;
 
     if (safeParseJsonArray(ad.target_student_ids).includes(student.id)) return true;
@@ -4399,7 +4433,7 @@ async function getMatchingAdsForStudent(studentId) {
 
 app.get('/api/portal/student/ads', verifyPortalToken('student'), async (req, res) => {
   try {
-    const ads = await getMatchingAdsForStudent(req.portalStudentId);
+    const ads = await getMatchingAdsForStudent(req.portalStudentId, req.query.page);
     res.json({ success: true, ads });
   } catch (e) {
     console.error('Failed to load student ads:', e);
@@ -4409,7 +4443,7 @@ app.get('/api/portal/student/ads', verifyPortalToken('student'), async (req, res
 
 app.get('/api/portal/parent/ads', verifyPortalToken('parent'), async (req, res) => {
   try {
-    const ads = await getMatchingAdsForStudent(req.portalStudentId);
+    const ads = await getMatchingAdsForStudent(req.portalStudentId, req.query.page);
     res.json({ success: true, ads });
   } catch (e) {
     console.error('Failed to load parent ads:', e);
@@ -5583,6 +5617,12 @@ function parseAdFormBody(body) {
     return arr.map((v) => parseInt(v, 10)).filter((n) => Number.isInteger(n));
   };
 
+  const toPageKeyArray = (value) => {
+    const arr = Array.isArray(value) ? value : (value ? [value] : []);
+    const validKeys = new Set(AD_TARGETABLE_PAGES.map((p) => p.key));
+    return arr.filter((v) => validKeys.has(v));
+  };
+
   const balance_filter_enabled = body.balance_filter_enabled === 'on' || body.balance_filter_enabled === 'true';
   const booklet_filter_enabled = body.booklet_filter_enabled === 'on' || body.booklet_filter_enabled === 'true';
   const is_active = body.is_active === 'on' || body.is_active === 'true';
@@ -5603,6 +5643,7 @@ function parseAdFormBody(body) {
     target_mode,
     target_center_ids: JSON.stringify(toIntArray(body.center_ids)),
     target_subject_ids: JSON.stringify(toIntArray(body.subject_ids)),
+    target_pages: JSON.stringify(toPageKeyArray(body.target_pages)),
     balance_filter_enabled,
     balance_max: balance_filter_enabled ? (parseFloat(body.balance_max) || 0) : null,
     booklet_filter_enabled,
@@ -5660,13 +5701,13 @@ app.get('/admin/ads', requirePermissionOrAdmin('admin_ads'), async (req, res) =>
   const ads = await Ad.findAll({ order: [['priority', 'ASC'], ['createdAt', 'DESC']] });
   const centers = await Center.findAll();
   const subjects = await Subject.findAll();
-  res.render('manage-ads', { ads, centers, subjects, safeParseJsonArray });
+  res.render('manage-ads', { ads, centers, subjects, safeParseJsonArray, AD_TARGETABLE_PAGES });
 });
 
 app.get('/admin/ads/new', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
   const centers = await Center.findAll();
   const subjects = await Subject.findAll();
-  res.render('ad-form', { ad: null, centers, subjects, selectedStudents: [] });
+  res.render('ad-form', { ad: null, centers, subjects, selectedStudents: [], pages: AD_TARGETABLE_PAGES });
 });
 
 app.get('/admin/ads/:id/edit', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
@@ -5689,6 +5730,7 @@ app.get('/admin/ads/:id/edit', requirePermissionOrAdmin('admin_ads'), async (req
     target_mode: adRow.target_mode,
     target_center_ids: safeParseJsonArray(adRow.target_center_ids),
     target_subject_ids: safeParseJsonArray(adRow.target_subject_ids),
+    target_pages: safeParseJsonArray(adRow.target_pages),
     balance_filter_enabled: adRow.balance_filter_enabled,
     balance_max: adRow.balance_max,
     booklet_filter_enabled: adRow.booklet_filter_enabled,
@@ -5698,7 +5740,7 @@ app.get('/admin/ads/:id/edit', requirePermissionOrAdmin('admin_ads'), async (req
     priority: adRow.priority,
   };
 
-  res.render('ad-form', { ad, centers, subjects, selectedStudents });
+  res.render('ad-form', { ad, centers, subjects, selectedStudents, pages: AD_TARGETABLE_PAGES });
 });
 
 app.get('/admin/ads/students/search', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
@@ -8803,6 +8845,7 @@ async function startServer() {
     await RechargeCode.sync();
     await Ad.sync();
     await ensureAdUserIdColumn();
+    await ensureAdTargetPagesColumn();
     await ensureRechargeCodeCenterColumn();
     await migrateRechargeLedgerToDatabase();
     await ensureUserPhoneColumn();
@@ -8861,6 +8904,7 @@ async function startServer() {
           await RechargeCode.sync();
           await Ad.sync();
           await ensureAdUserIdColumn();
+          await ensureAdTargetPagesColumn();
           await ensureRechargeCodeCenterColumn();
           await migrateRechargeLedgerToDatabase();
           await ensureUserPhoneColumn();

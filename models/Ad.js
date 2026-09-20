@@ -66,6 +66,11 @@ const Ad = sequelize.define('Ad', {
     allowNull: false,
     defaultValue: '[]',
   },
+  target_pages: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+    defaultValue: '[]', // JSON array من مفاتيح الصفحات (فاضي = كل الصفحات)
+  },
   is_active: {
     type: DataTypes.BOOLEAN,
     allowNull: false,

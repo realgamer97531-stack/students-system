@@ -2,13 +2,20 @@
 // closeable popup on page load. Closing only dismisses the current page view
 // (nothing is persisted), so an active ad can reappear on the next page load.
 (function () {
+  function getCurrentPageKey() {
+    const path = window.location.pathname;
+    const file = path.substring(path.lastIndexOf('/') + 1) || 'student.html';
+    return file.replace(/\.html$/, '') || 'student';
+  }
+
   async function loadAndShowAds() {
     try {
       const adsToken = localStorage.getItem('portal_token');
       const adsPortalType = localStorage.getItem('portal_type');
       if (!adsToken || (adsPortalType !== 'student' && adsPortalType !== 'parent')) return;
 
-      const res = await fetch(`${API_BASE_URL}/api/portal/${adsPortalType}/ads`, {
+      const page = encodeURIComponent(getCurrentPageKey());
+      const res = await fetch(`${API_BASE_URL}/api/portal/${adsPortalType}/ads?page=${page}`, {
         headers: { Authorization: `Bearer ${adsToken}` },
         cache: 'no-store',
       });
