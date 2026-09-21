@@ -82,8 +82,9 @@
 
               <div class="col-md-6">
                 <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" name="register_attendance" value="on" id="registerAttendance">
-                  <label class="form-check-label fw-semibold" for="registerAttendance">تسجيل حضور في الحصة الحالية</label>
+                  <input type="hidden" name="register_attendance" value="on" id="registerAttendanceHidden">
+                  <input class="form-check-input" type="checkbox" id="notAttendingCheck">
+                  <label class="form-check-label fw-semibold" for="notAttendingCheck">الطالب لم يحضر الحصة الحالية</label>
                 </div>
               </div>
             </div>
@@ -141,6 +142,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   subjectSelect.addEventListener('change', updatePriceFromSubject);
   updatePriceFromSubject();
+
+  const notAttendingCheck = document.getElementById('notAttendingCheck');
+  const registerAttendanceHidden = document.getElementById('registerAttendanceHidden');
+  notAttendingCheck.addEventListener('change', () => {
+    registerAttendanceHidden.disabled = notAttendingCheck.checked;
+  });
 
   function isPhoneValid(v) {
     if (!v) return false;

@@ -538,8 +538,8 @@
             <input type="text" name="comment" class="form-control" placeholder="ملاحظة...">
           </div>
           <div class="mb-2 form-check">
-            <input type="checkbox" name="register_attendance" class="form-check-input" id="quickRegisterAttendanceCheck">
-            <label class="form-check-label" for="quickRegisterAttendanceCheck">سجل الطالب حاضر في الحصة الشغالة الآن</label>
+            <input type="checkbox" class="form-check-input" id="quickNotAttendingCheck">
+            <label class="form-check-label" for="quickNotAttendingCheck">الطالب لم يحضر الحصة الشغالة الآن</label>
           </div>
           <div class="mb-2">
             <label class="form-label">رصيد ابتدائي (اختياري)</label>
@@ -561,6 +561,17 @@
     if (price) document.getElementById('quickPriceInput').value = price;
   });
 
+  document.getElementById('newStudentModal').addEventListener('show.bs.modal', function () {
+    const form = document.getElementById('quickAddForm');
+    form.reset();
+    form.style.display = '';
+    form.querySelector('button[type="submit"]').disabled = false;
+    document.getElementById('quickAddError').innerHTML = '';
+    const resultBox = document.getElementById('quickAddResult');
+    resultBox.style.display = 'none';
+    resultBox.innerHTML = '';
+  });
+
   document.getElementById('quickAddForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const submitButton = this.querySelector('button[type="submit"]');
@@ -568,6 +579,9 @@
     submitButton.disabled = true;
     const formData = new FormData(this);
     const payload = Object.fromEntries(formData.entries());
+    if (!document.getElementById('quickNotAttendingCheck').checked) {
+      payload.register_attendance = 'on';
+    }
 
     try {
       const res = await fetch('/students/quick-add', {
