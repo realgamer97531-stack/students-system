@@ -771,7 +771,7 @@ span.text-muted {
         <span class="en-only" style="display:none;">📊 Exams & Scores</span>
       </a>
     <% } %>
-    <% if (canShow('admin_videos') || canShow('admin_ads')) { %>
+    <% if (canShow('admin_videos') || canShow('admin_ads') || canShow('admin_video_broadcasts')) { %>
       <hr>
       <div class="sf-nav-label">
         <span class="ar-only">المحتوى</span>
@@ -788,6 +788,12 @@ span.text-muted {
       <a href="/admin/ads">
         <span class="ar-only">📢 إدارة الإعلانات</span>
         <span class="en-only" style="display:none;">📢 Manage Ads</span>
+      </a>
+    <% } %>
+    <% if (canShow('admin_video_broadcasts')) { %>
+      <a href="/admin/video-broadcasts">
+        <span class="ar-only">📺 التحكم في عرض الفيديوهات</span>
+        <span class="en-only" style="display:none;">📺 Video Broadcast Control</span>
       </a>
     <% } %>
     <% if (userRole === 'admin') { %>

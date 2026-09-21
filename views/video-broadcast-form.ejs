@@ -1,0 +1,116 @@
+<%- include('partials/header') %>
+
+<%
+  const isEdit = !!broadcast;
+  const formAction = isEdit ? ('/admin/video-broadcasts/' + broadcast.id) : '/admin/video-broadcasts';
+  const targetPages = isEdit ? broadcast.target_pages : [];
+%>
+
+<h3 class="mb-4"><%= isEdit ? '✏️ تعديل فيديو' : '➕ فيديو جديد' %></h3>
+
+<form action="<%= formAction %>" method="POST" id="videoBroadcastForm">
+  <div class="row g-4">
+    <div class="col-lg-8">
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3">معلومات أساسية</h5>
+          <div class="row g-3">
+            <div class="col-md-9">
+              <label class="form-label">عنوان الفيديو</label>
+              <input type="text" name="title" class="form-control" required value="<%= isEdit ? broadcast.title : '' %>">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">الأولوية</label>
+              <input type="number" name="priority" class="form-control" value="<%= isEdit ? broadcast.priority : 0 %>">
+              <small class="text-muted">الأصغر يظهر أولاً</small>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">وصف مختصر (اختياري)</label>
+              <textarea name="description" class="form-control" rows="2"><%= isEdit && broadcast.description ? broadcast.description : '' %></textarea>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">رابط الفيديو (يوتيوب / فيميو / رابط ملف فيديو مباشر)</label>
+              <input type="url" name="video_url" class="form-control" required placeholder="https://..." value="<%= isEdit ? broadcast.video_url : '' %>">
+            </div>
+            <div class="col-md-12 d-flex align-items-center gap-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="is_active" id="is_active" <%= (!isEdit || broadcast.is_active) ? 'checked' : '' %>>
+                <label class="form-check-label" for="is_active">فعّال</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3">أماكن الظهور</h5>
+          <p class="text-muted small">اختر الصفحات اللي يظهر فيها الفيديو (اتركها بدون اختيار = يظهر في كل الصفحات).</p>
+          <div class="mb-2">
+            <% pages.forEach(p => { %>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" name="target_pages" value="<%= p.key %>" id="page_<%= p.key %>" <%= targetPages.includes(p.key) ? 'checked' : '' %>>
+                <label class="form-check-label" for="page_<%= p.key %>"><%= p.label %></label>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="fw-bold mb-3">الوصول: مجاني أم مدفوع</h5>
+
+          <div class="btn-group mb-3" role="group">
+            <input type="radio" class="btn-check" name="access_type" id="access_type_free" value="free" <%= (!isEdit || broadcast.access_type === 'free') ? 'checked' : '' %>>
+            <label class="btn btn-outline-success" for="access_type_free">🆓 مجاني للجميع</label>
+            <input type="radio" class="btn-check" name="access_type" id="access_type_paid" value="paid" <%= (isEdit && broadcast.access_type === 'paid') ? 'checked' : '' %>>
+            <label class="btn btn-outline-warning" for="access_type_paid">💰 مدفوع</label>
+          </div>
+
+          <div id="paidPanel">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">الحصة المرتبطة</label>
+                <select name="SessionId" class="form-select">
+                  <option value="">-- اختر الحصة --</option>
+                  <% sessions.forEach(s => { %>
+                    <option value="<%= s.id %>" <%= (isEdit && broadcast.SessionId === s.id) ? 'selected' : '' %>>
+                      <%= (s.Subject ? s.Subject.name : '') %> - حصة رقم <%= s.lesson_number %> - <%= s.session_date %> (<%= s.Center ? s.Center.name : '' %>)
+                    </option>
+                  <% }) %>
+                </select>
+                <small class="text-muted">الطالب هيدفع سعر الفيديو من رصيده، ويُسجَّل ضمن كشف حساب هذه الحصة.</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">السعر (جنيه)</label>
+                <input type="number" step="0.01" name="price" class="form-control" value="<%= isEdit && broadcast.price != null ? broadcast.price : '' %>">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg">💾 حفظ الفيديو</button>
+      <a href="/admin/video-broadcasts" class="btn btn-outline-secondary btn-lg">إلغاء</a>
+    </div>
+  </div>
+</form>
+
+<script>
+  const form = document.getElementById('videoBroadcastForm');
+
+  function togglePaidPanel() {
+    const accessType = form.querySelector('input[name="access_type"]:checked').value;
+    document.getElementById('paidPanel').style.display = accessType === 'paid' ? 'block' : 'none';
+  }
+
+  form.querySelectorAll('input[name="access_type"]').forEach(el => {
+    el.addEventListener('change', togglePaidPanel);
+  });
+
+  togglePaidPanel();
+</script>
+
+<%- include('partials/footer') %>

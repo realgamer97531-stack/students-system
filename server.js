@@ -65,6 +65,10 @@ const centerLedgerPath = process.env.CENTER_LEDGER_PATH || path.join(__dirname, 
 const VideoSession = require('./models/VideoSession');
 const VideoStudentAccess = require('./models/VideoStudentAccess');
 
+// نظام بث الفيديوهات الجديد - قسم منفصل تمامًا عن نظام الفيديوهات القديم أعلاه (لا يُستخدم في أي مكان آخر)
+const VideoBroadcast = require('./models/VideoBroadcast');
+const VideoBroadcastAccess = require('./models/VideoBroadcastAccess');
+
 const DEFAULT_ACCESS_DURATION_HOURS = 72;
 
 function getGrantAccessWindow(grant, session = null) {
@@ -5824,6 +5828,280 @@ app.post('/admin/ads/:id/toggle', requirePermissionOrAdmin('admin_ads'), async (
 app.post('/admin/ads/:id/delete', requirePermissionOrAdmin('admin_ads'), async (req, res) => {
   await Ad.destroy({ where: { id: req.params.id } });
   res.redirect('/admin/ads');
+});
+
+// ===== نظام بث الفيديوهات الجديد (قسم منفصل تمامًا - لوحة تحكم كاملة لمكان عرض الفيديو ومجاني/مدفوع وربطه بحصة) =====
+
+VideoBroadcast.belongsTo(Session, { foreignKey: 'SessionId' });
+VideoBroadcast.hasMany(VideoBroadcastAccess, { foreignKey: 'VideoBroadcastId' });
+VideoBroadcastAccess.belongsTo(VideoBroadcast, { foreignKey: 'VideoBroadcastId' });
+VideoBroadcastAccess.belongsTo(Student, { foreignKey: 'StudentId' });
+sequelize.sync({ alter: false }).catch(() => {});
+
+// نفس أسماء الصفحات المستهدفة المستخدمة في نظام الإعلانات (قائمة منفصلة لعزل النظامين عن بعض)
+const VIDEO_BROADCAST_TARGETABLE_PAGES = [
+  { key: 'student', label: 'صفحة الطالب الرئيسية' },
+  { key: 'lessons', label: 'الدروس' },
+  { key: 'lesson-view', label: 'عرض الدرس' },
+  { key: 'homework', label: 'الواجبات' },
+  { key: 'sessions', label: 'الحصص' },
+  { key: 'booklets', label: 'البوكليتس' },
+  { key: 'parent', label: 'بوابة ولي الأمر' },
+];
+
+function parseVideoBroadcastFormBody(body) {
+  const access_type = body.access_type === 'paid' ? 'paid' : 'free';
+
+  const toPageKeyArray = (value) => {
+    const arr = Array.isArray(value) ? value : (value ? [value] : []);
+    const validKeys = new Set(VIDEO_BROADCAST_TARGETABLE_PAGES.map((p) => p.key));
+    return arr.filter((v) => validKeys.has(v));
+  };
+
+  const is_active = body.is_active === 'on' || body.is_active === 'true';
+  const sessionId = body.SessionId ? parseInt(body.SessionId, 10) : null;
+
+  return {
+    title: String(body.title || '').trim() || 'فيديو بدون اسم',
+    description: body.description ? String(body.description).trim() : null,
+    video_url: String(body.video_url || '').trim(),
+    target_pages: JSON.stringify(toPageKeyArray(body.target_pages)),
+    access_type,
+    SessionId: access_type === 'paid' && Number.isInteger(sessionId) ? sessionId : null,
+    price: access_type === 'paid' ? (parseFloat(body.price) || 0) : null,
+    is_active,
+    priority: parseInt(body.priority, 10) || 0,
+  };
+}
+
+app.get('/admin/video-broadcasts', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  const broadcasts = await VideoBroadcast.findAll({
+    include: [{ model: Session, required: false, include: [Subject, Center] }],
+    order: [['priority', 'ASC'], ['createdAt', 'DESC']],
+  });
+  res.render('manage-video-broadcasts', { broadcasts, safeParseJsonArray, VIDEO_BROADCAST_TARGETABLE_PAGES });
+});
+
+app.get('/admin/video-broadcasts/new', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  const sessions = await Session.findAll({ include: [Subject, Center], order: [['session_date', 'DESC']], limit: 300 });
+  res.render('video-broadcast-form', { broadcast: null, sessions, pages: VIDEO_BROADCAST_TARGETABLE_PAGES });
+});
+
+app.get('/admin/video-broadcasts/:id/edit', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  const row = await VideoBroadcast.findByPk(req.params.id);
+  if (!row) return res.status(404).send('❌ الفيديو غير موجود');
+  const sessions = await Session.findAll({ include: [Subject, Center], order: [['session_date', 'DESC']], limit: 300 });
+  const broadcast = {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    video_url: row.video_url,
+    target_pages: safeParseJsonArray(row.target_pages),
+    access_type: row.access_type,
+    SessionId: row.SessionId,
+    price: row.price,
+    is_active: row.is_active,
+    priority: row.priority,
+  };
+  res.render('video-broadcast-form', { broadcast, sessions, pages: VIDEO_BROADCAST_TARGETABLE_PAGES });
+});
+
+app.post('/admin/video-broadcasts', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  try {
+    const fields = parseVideoBroadcastFormBody(req.body);
+    if (!fields.video_url) return res.status(400).send('❌ لازم تدخل رابط الفيديو');
+    await VideoBroadcast.create(fields);
+    res.redirect('/admin/video-broadcasts');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/admin/video-broadcasts/:id', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  try {
+    const row = await VideoBroadcast.findByPk(req.params.id);
+    if (!row) return res.status(404).send('❌ الفيديو غير موجود');
+    const fields = parseVideoBroadcastFormBody(req.body);
+    if (!fields.video_url) return res.status(400).send('❌ لازم تدخل رابط الفيديو');
+    await row.update(fields);
+    res.redirect('/admin/video-broadcasts');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/admin/video-broadcasts/:id/toggle', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  const row = await VideoBroadcast.findByPk(req.params.id);
+  if (row) await row.update({ is_active: !row.is_active });
+  res.redirect('/admin/video-broadcasts');
+});
+
+app.post('/admin/video-broadcasts/:id/delete', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  await VideoBroadcastAccess.destroy({ where: { VideoBroadcastId: req.params.id } });
+  await VideoBroadcast.destroy({ where: { id: req.params.id } });
+  res.redirect('/admin/video-broadcasts');
+});
+
+// صفحة التحكم في صلاحيات الوصول لفيديو مدفوع (مين فتحه + منح وصول مجاني يدوي)
+app.get('/admin/video-broadcasts/:id/access', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  const row = await VideoBroadcast.findByPk(req.params.id);
+  if (!row) return res.status(404).send('❌ الفيديو غير موجود');
+  const accessList = await VideoBroadcastAccess.findAll({
+    where: { VideoBroadcastId: row.id },
+    include: [{ model: Student, attributes: ['id', 'name', 'student_code'] }],
+    order: [['granted_at', 'DESC']],
+  });
+  res.render('video-broadcast-access', { broadcast: row, accessList });
+});
+
+app.post('/admin/video-broadcasts/:id/grant', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  const row = await VideoBroadcast.findByPk(req.params.id);
+  if (!row) return res.status(404).send('❌ الفيديو غير موجود');
+  const studentId = parseInt(req.body.student_id, 10);
+  const student = Number.isInteger(studentId) ? await Student.findByPk(studentId) : null;
+  if (!student) return res.status(404).send('❌ الطالب غير موجود');
+  await VideoBroadcastAccess.findOrCreate({
+    where: { VideoBroadcastId: row.id, StudentId: student.id },
+    defaults: { method: 'admin_free', granted_at: new Date() },
+  });
+  res.redirect('/admin/video-broadcasts/' + row.id + '/access');
+});
+
+app.post('/admin/video-broadcasts/:id/access/:accessId/revoke', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  await VideoBroadcastAccess.destroy({ where: { id: req.params.accessId, VideoBroadcastId: req.params.id } });
+  res.redirect('/admin/video-broadcasts/' + req.params.id + '/access');
+});
+
+app.get('/admin/video-broadcasts/students/search', requirePermissionOrAdmin('admin_video_broadcasts'), async (req, res) => {
+  const search = String(req.query.q || '').trim();
+  if (!search) return res.json({ success: true, students: [] });
+  const like = `%${search}%`;
+  const students = await Student.findAll({
+    where: {
+      [Op.or]: [
+        { name: { [Op.like]: like } },
+        { student_code: { [Op.like]: like } },
+        { phone: { [Op.like]: like } },
+      ],
+    },
+    attributes: ['id', 'name', 'student_code'],
+    limit: 20,
+  });
+  res.json({ success: true, students });
+});
+
+// ----- تسليم الفيديوهات للطالب في البوابة (API منفصل تمامًا عن /api/portal/student/lessons القديم) -----
+
+function describeVideoBroadcastSession(session) {
+  if (!session) return null;
+  const subjectName = session.Subject ? session.Subject.name : '';
+  return `${subjectName} - حصة رقم ${session.lesson_number}`.trim();
+}
+
+async function getMatchingVideoBroadcastsForStudent(studentId, page) {
+  const student = await Student.findByPk(studentId);
+  if (!student) return [];
+
+  const broadcasts = await VideoBroadcast.findAll({
+    where: { is_active: true },
+    include: [{ model: Session, required: false, include: [Subject] }],
+    order: [['priority', 'ASC'], ['createdAt', 'DESC']],
+  });
+  if (broadcasts.length === 0) return [];
+
+  const matching = broadcasts.filter((broadcast) => {
+    const pages = safeParseJsonArray(broadcast.target_pages);
+    if (pages.length > 0 && page && !pages.includes(page)) return false;
+    return true;
+  });
+  if (matching.length === 0) return [];
+
+  const paidIds = matching.filter((broadcast) => broadcast.access_type === 'paid').map((broadcast) => broadcast.id);
+  let grantedIds = new Set();
+  if (paidIds.length > 0) {
+    const grants = await VideoBroadcastAccess.findAll({ where: { StudentId: student.id, VideoBroadcastId: paidIds } });
+    grantedIds = new Set(grants.map((grant) => grant.VideoBroadcastId));
+  }
+
+  return matching.map((broadcast) => {
+    const locked = broadcast.access_type === 'paid' && !grantedIds.has(broadcast.id);
+    return {
+      id: broadcast.id,
+      title: broadcast.title,
+      description: broadcast.description,
+      access_type: broadcast.access_type,
+      locked,
+      price: broadcast.access_type === 'paid' ? broadcast.price : null,
+      session_label: describeVideoBroadcastSession(broadcast.Session),
+      video_url: locked ? null : broadcast.video_url,
+    };
+  });
+}
+
+app.get('/api/portal/student/video-broadcasts', verifyPortalToken('student'), async (req, res) => {
+  try {
+    const videos = await getMatchingVideoBroadcastsForStudent(req.portalStudentId, req.query.page);
+    res.json({ success: true, videos });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
+  }
+});
+
+app.post('/api/portal/student/video-broadcasts/:id/purchase', verifyPortalToken('student'), async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.portalStudentId);
+    if (!student) return res.status(404).json({ success: false });
+
+    const broadcast = await VideoBroadcast.findOne({ where: { id: req.params.id, is_active: true } });
+    if (!broadcast) return res.status(404).json({ success: false, message: 'الفيديو غير موجود' });
+
+    if (broadcast.access_type !== 'paid') {
+      return res.json({ success: true, video_url: broadcast.video_url });
+    }
+
+    const existing = await VideoBroadcastAccess.findOne({ where: { VideoBroadcastId: broadcast.id, StudentId: student.id } });
+    if (existing) {
+      return res.json({ success: true, video_url: broadcast.video_url });
+    }
+
+    if (!req.body.confirm_payment) {
+      return res.json({
+        success: false,
+        requiresPayment: true,
+        price: broadcast.price,
+        message: `هل توافق على دفع ${broadcast.price} ج من رصيدك لمشاهدة هذا الفيديو؟`,
+      });
+    }
+
+    if (student.balance < broadcast.price) {
+      return res.json({ success: false, message: 'رصيدك غير كافٍ لدفع ثمن هذا الفيديو' });
+    }
+
+    student.balance -= broadcast.price;
+    await student.save();
+
+    await BalanceTransaction.create({
+      StudentId: student.id,
+      SessionId: broadcast.SessionId,
+      amount: -broadcast.price,
+      reason: `دفع لمشاهدة فيديو: ${broadcast.title}`,
+    });
+
+    await VideoBroadcastAccess.create({
+      VideoBroadcastId: broadcast.id,
+      StudentId: student.id,
+      method: 'paid',
+      granted_at: new Date(),
+    });
+
+    res.json({ success: true, video_url: broadcast.video_url, remainingBalance: student.balance });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
+  }
 });
 
 // ===== نظام الإنذارات والحظر =====

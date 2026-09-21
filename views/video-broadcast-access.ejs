@@ -1,0 +1,97 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="mb-1">🔑 صلاحيات الوصول: <%= broadcast.title %></h3>
+    <p class="text-muted mb-0">الطلاب اللي فتحوا هذا الفيديو المدفوع (بالدفع أو بمنح يدوي من الأدمن).</p>
+  </div>
+  <a href="/admin/video-broadcasts" class="btn btn-outline-secondary">رجوع للقائمة</a>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="fw-bold mb-3">منح وصول مجاني لطالب</h5>
+    <form action="/admin/video-broadcasts/<%= broadcast.id %>/grant" method="POST" class="d-flex gap-2">
+      <div class="position-relative flex-grow-1">
+        <input type="text" id="studentSearchInput" class="form-control" placeholder="اكتب اسم الطالب أو كوده أو رقمه..." autocomplete="off">
+        <div id="studentSearchResults" class="list-group position-absolute w-100" style="z-index:10;display:none;max-height:220px;overflow-y:auto;"></div>
+      </div>
+      <input type="hidden" name="student_id" id="student_id" required>
+      <button type="submit" class="btn btn-success">منح الوصول</button>
+    </form>
+    <small class="text-muted d-block mt-2" id="selectedStudentLabel"></small>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>الطالب</th>
+          <th>الكود</th>
+          <th>طريقة الوصول</th>
+          <th>تاريخ المنح</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!accessList.length) { %>
+          <tr><td colspan="5" class="text-center text-muted py-4">لا يوجد طلاب لديهم وصول بعد</td></tr>
+        <% } %>
+        <% accessList.forEach(access => { %>
+          <tr>
+            <td><%= access.Student ? access.Student.name : '—' %></td>
+            <td><%= access.Student ? access.Student.student_code : '—' %></td>
+            <td>
+              <% if (access.method === 'paid') { %>
+                <span class="badge bg-warning text-dark">دفع من الرصيد</span>
+              <% } else { %>
+                <span class="badge bg-info">منح يدوي</span>
+              <% } %>
+            </td>
+            <td><%= new Date(access.granted_at).toLocaleString('ar-EG') %></td>
+            <td>
+              <form action="/admin/video-broadcasts/<%= broadcast.id %>/access/<%= access.id %>/revoke" method="POST" onsubmit="return confirm('سحب صلاحية الوصول من هذا الطالب؟')">
+                <button type="submit" class="btn btn-sm btn-outline-danger">سحب الوصول</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let studentSearchTimeout = null;
+  document.getElementById('studentSearchInput').addEventListener('input', function () {
+    clearTimeout(studentSearchTimeout);
+    const q = this.value.trim();
+    document.getElementById('student_id').value = '';
+    const resultsBox = document.getElementById('studentSearchResults');
+    if (!q) { resultsBox.innerHTML = ''; resultsBox.style.display = 'none'; return; }
+    studentSearchTimeout = setTimeout(async () => {
+      const res = await fetch('/admin/video-broadcasts/students/search?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      resultsBox.innerHTML = '';
+      (data.students || []).forEach(s => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'list-group-item list-group-item-action';
+        item.textContent = s.name + ' (' + s.student_code + ')';
+        item.addEventListener('click', () => {
+          document.getElementById('student_id').value = s.id;
+          document.getElementById('studentSearchInput').value = s.name + ' (' + s.student_code + ')';
+          document.getElementById('selectedStudentLabel').textContent = 'تم اختيار: ' + s.name;
+          resultsBox.innerHTML = '';
+          resultsBox.style.display = 'none';
+        });
+        resultsBox.appendChild(item);
+      });
+      resultsBox.style.display = resultsBox.children.length ? 'block' : 'none';
+    }, 250);
+  });
+</script>
+
+<%- include('partials/footer') %>

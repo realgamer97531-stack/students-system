@@ -1,0 +1,91 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="mb-1">📺 التحكم في عرض الفيديوهات</h3>
+    <p class="text-muted mb-0">قسم منفصل تمامًا عن نظام إدارة الفيديوهات القديم — تحكم في مكان عرض كل فيديو، وهل هو مجاني للجميع أو مدفوع ومربوط بحصة معينة.</p>
+  </div>
+  <a href="/admin/video-broadcasts/new" class="btn btn-primary">➕ فيديو جديد</a>
+</div>
+
+<%
+  const pagesMap = new Map(VIDEO_BROADCAST_TARGETABLE_PAGES.map(p => [p.key, p.label]));
+
+  function describeBroadcastPages(row) {
+    const pageKeys = safeParseJsonArray(row.target_pages);
+    return pageKeys.length ? pageKeys.map(k => pagesMap.get(k) || k).join('، ') : 'كل الصفحات';
+  }
+
+  function describeBroadcastSession(row) {
+    if (row.access_type !== 'paid') return '-';
+    if (!row.Session) return '⚠️ غير مربوط بحصة';
+    const subjectName = row.Session.Subject ? row.Session.Subject.name : '';
+    const centerName = row.Session.Center ? row.Session.Center.name : '';
+    return `${subjectName} - حصة رقم ${row.Session.lesson_number} (${centerName})`;
+  }
+%>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>العنوان</th>
+          <th>النوع</th>
+          <th>الحصة المرتبطة</th>
+          <th>السعر</th>
+          <th>الصفحات</th>
+          <th>الأولوية</th>
+          <th>الحالة</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!broadcasts.length) { %>
+          <tr><td colspan="8" class="text-center text-muted py-4">لا توجد فيديوهات بعد</td></tr>
+        <% } %>
+        <% broadcasts.forEach(row => { %>
+          <tr>
+            <td><%= row.title %></td>
+            <td>
+              <% if (row.access_type === 'free') { %>
+                <span class="badge bg-success">مجاني للجميع</span>
+              <% } else { %>
+                <span class="badge bg-warning text-dark">مدفوع</span>
+              <% } %>
+            </td>
+            <td class="small"><%= describeBroadcastSession(row) %></td>
+            <td><%= row.access_type === 'paid' ? (row.price + ' ج') : '-' %></td>
+            <td class="small"><%= describeBroadcastPages(row) %></td>
+            <td><%= row.priority %></td>
+            <td>
+              <% if (row.is_active) { %>
+                <span class="badge bg-success">فعّال</span>
+              <% } else { %>
+                <span class="badge bg-secondary">متوقف</span>
+              <% } %>
+            </td>
+            <td>
+              <div class="d-flex gap-2">
+                <a href="/admin/video-broadcasts/<%= row.id %>/edit" class="btn btn-sm btn-outline-primary">تعديل</a>
+                <% if (row.access_type === 'paid') { %>
+                  <a href="/admin/video-broadcasts/<%= row.id %>/access" class="btn btn-sm btn-outline-info">الصلاحيات</a>
+                <% } %>
+                <form action="/admin/video-broadcasts/<%= row.id %>/toggle" method="POST">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <%= row.is_active ? 'إيقاف' : 'تفعيل' %>
+                  </button>
+                </form>
+                <form action="/admin/video-broadcasts/<%= row.id %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف هذا الفيديو؟')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
