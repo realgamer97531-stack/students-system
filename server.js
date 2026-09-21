@@ -880,7 +880,6 @@ app.post('/api/public/student-register', async (req, res) => {
     if (!subject || !center) return res.status(400).json({ success: false, message: 'المادة أو السنتر غير صحيح.' });
     const existingStudent = await Student.findOne({
       where: {
-        name: studentName,
         phone: phoneDigits,
         parent_phone: parentDigits,
         SubjectId: subject.id,
