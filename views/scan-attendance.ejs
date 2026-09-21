@@ -57,7 +57,7 @@
         </div>
       </div>
       
-      <button class="btn btn-success w-100 mt-2" onclick="confirmAttendance()">✅ تأكيد تسجيل الحضور</button>
+      <button id="confirmAttendanceBtn" class="btn btn-success w-100 mt-2" onclick="confirmAttendance()">✅ تأكيد تسجيل الحضور</button>
       <button class="btn btn-outline-secondary w-100 mt-2" onclick="cancelSummary()">إلغاء</button>
     </div>
 
@@ -353,6 +353,7 @@
       }
     }
 
+    document.getElementById('confirmAttendanceBtn').disabled = false;
     document.getElementById('summaryBox').style.display = 'block';
   }
 
@@ -406,6 +407,10 @@
   }
 
   function confirmAttendance() {
+    const confirmBtn = document.getElementById('confirmAttendanceBtn');
+    if (confirmBtn.disabled) return;
+    confirmBtn.disabled = true;
+
     const comment = document.getElementById('commentInput').value.trim();
     const payment = document.getElementById('paymentInput').value.trim();
     const bookletPayments = [];
@@ -443,6 +448,11 @@
         document.getElementById('commentInput').value = '';
         document.getElementById('paymentInput').value = '';
         pendingCode = null;
+        confirmBtn.disabled = false;
+      })
+      .catch(() => {
+        confirmBtn.disabled = false;
+        resultBox.innerHTML = '<div class="alert alert-danger">حصلت مشكلة في الاتصال، حاول تاني</div>';
       });
   }
 

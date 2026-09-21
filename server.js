@@ -2177,10 +2177,25 @@ app.get('/sessions/:id/report', async (req, res) => {
     });
     if (!session) return res.status(404).send('❌ الحصة غير موجودة');
 
-    const attendances = await Attendance.findAll({
+    let attendances = await Attendance.findAll({
       where: { SessionId: session.id },
       include: [{ model: Student }, User],
     });
+
+    // Guard against duplicate attendance rows for the same student in this session
+    // (e.g. a double-tap / double-submit on the scan screen). Keep only the earliest
+    // row per student so the report doesn't show them twice or double-count revenue.
+    // This never deletes anything from the database — it only affects this view.
+    {
+      const seenStudentIds = new Set();
+      attendances = [...attendances]
+        .sort((a, b) => a.id - b.id)
+        .filter(a => {
+          if (seenStudentIds.has(a.StudentId)) return false;
+          seenStudentIds.add(a.StudentId);
+          return true;
+        });
+    }
 
     // Also get center students who attended this lesson online
     const onlineAttendances = await Attendance.findAll({
@@ -3158,18 +3173,28 @@ app.post('/attendance/scan', async (req, res) => {
       return res.json({ success: false, message: `⛔ الطالب ${student.name} محظور من النظام. تواصل مع الأدمن.` });
     }
 
-    const existingAttendance = await Attendance.findOne({
+    const paymentAmount = parseFloat(payment_collected) || 0;
+
+    // Claim the attendance slot atomically (single findOrCreate call) instead of a
+    // separate findOne-then-create, so two near-simultaneous submits (double-tap,
+    // scanner double-fire) can't both slip past the check and create duplicate rows.
+    const [attendanceRecord, attendanceCreated] = await Attendance.findOrCreate({
       where: { StudentId: student.id, SessionId: sessionId },
+      defaults: {
+        StudentId: student.id,
+        SessionId: sessionId,
+        UserId: req.session.userId,
+        comment: comment || null,
+        payment_collected: paymentAmount,
+      },
     });
 
-    if (existingAttendance) {
+    if (!attendanceCreated) {
       return res.json({
         success: false,
         message: `الطالب ${student.name} مسجل حضوره في هذه الحصة من قبل`,
       });
     }
-
-    const paymentAmount = parseFloat(payment_collected) || 0;
 
     // لو فيه مبلغ مدفوع وقت الحضور، يتضاف للرصيد ويتسجل في سجل المعاملات
     if (paymentAmount > 0) {
@@ -3183,6 +3208,7 @@ app.post('/attendance/scan', async (req, res) => {
     }
 
     if (student.balance < student.price_per_session) {
+      await attendanceRecord.destroy();
       return res.json({
         success: false,
         message: `رصيد الطالب ${student.name} غير كافٍ (الرصيد الحالي: ${student.balance} ج)`,
@@ -3194,14 +3220,6 @@ app.post('/attendance/scan', async (req, res) => {
       await markDefaultBookletDelivered(student);
     }
     await student.save();
-
-    await Attendance.create({
-      StudentId: student.id,
-      SessionId: sessionId,
-      UserId: req.session.userId,
-      comment: comment || null,
-      payment_collected: paymentAmount,
-    });
     // معالجة مدفوعات البوكليتس
     if (req.body.booklet_payments && req.body.booklet_payments.length > 0) {
       await processBookletPayments(student.id, req.body.booklet_payments, req.session.userId, sessionId);
@@ -3248,19 +3266,22 @@ app.post('/attendance/scan/force', requirePermission('attendance_scan'), async (
       });
     }
 
-    const existingAttendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
-    if (existingAttendance) {
+    // Atomic claim (see /attendance/scan above) instead of findOne-then-create,
+    // to avoid duplicate rows from a double-tap/double-submit.
+    const [, attendanceCreated] = await Attendance.findOrCreate({
+      where: { StudentId: student.id, SessionId: sessionId },
+      defaults: {
+        StudentId: student.id,
+        SessionId: sessionId,
+        UserId: req.session.userId,
+        comment: '⚠️ تسجيل حضور بالقوة من الأدمن رغم نقص الرصيد',
+      },
+    });
+    if (!attendanceCreated) {
       return res.json({ success: false, message: 'الطالب مسجل حضوره من قبل' });
     }
 
     await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور (قوة)');
-
-    await Attendance.create({
-      StudentId: student.id,
-      SessionId: sessionId,
-      UserId: req.session.userId,
-      comment: '⚠️ تسجيل حضور بالقوة من الأدمن رغم نقص الرصيد',
-    });
 
     res.json({ success: true, message: `تم تسجيل حضور ${student.name} (الرصيد الآن: ${student.balance} ج)` });
   } catch (error) {
@@ -5084,9 +5105,11 @@ app.get('/api/portal/leaderboard', verifyPortalToken('student'), async (req, res
 
 // دالة موحّدة: تتأكد إن الطالب له سجل حضور في الحصة، ولو مش موجود تعمله
 async function ensureAttendance(studentId, sessionId, comment) {
-  const existing = await Attendance.findOne({ where: { StudentId: studentId, SessionId: sessionId } });
-  if (existing) return existing;
-  return await Attendance.create({ StudentId: studentId, SessionId: sessionId, comment });
+  const [attendance] = await Attendance.findOrCreate({
+    where: { StudentId: studentId, SessionId: sessionId },
+    defaults: { StudentId: studentId, SessionId: sessionId, comment },
+  });
+  return attendance;
 }
 
 // جلب فيديوهات الدرس (شرح/أسئلة/حل واجب) - بعد التأكد من وجود صلاحية فعلية
