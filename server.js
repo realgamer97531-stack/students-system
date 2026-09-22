@@ -814,6 +814,23 @@ app.use(express.json());
 // عشان نقدر نستخدم ملفات CSS / JS / صور من فولدر public
 app.use(express.static(path.join(__dirname, 'public')));
 
+// TEMPORARY diagnostic route - remove after confirming public/ deploy contents
+app.get('/_debug-public-files', (req, res) => {
+  const fs = require('fs');
+  try {
+    const dir = path.join(__dirname, 'public');
+    const files = fs.readdirSync(dir);
+    res.json({
+      dir,
+      hasVideoEmbedJs: files.includes('video-embed.js'),
+      fileCount: files.length,
+      files,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/_health', (req, res) => {
   res.json({
     ok: true,
