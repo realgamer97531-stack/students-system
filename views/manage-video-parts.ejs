@@ -85,6 +85,9 @@
       <table class="table table-sm">
         <tbody>
           <% parts.forEach(p => { %>
+            <% const h = Math.floor(p.duration_seconds / 3600); %>
+            <% const m = Math.floor((p.duration_seconds % 3600) / 60); %>
+            <% const s = p.duration_seconds % 60; %>
             <tr>
               <td>الجزء <%= p.order_index %></td>
               <td class="small">
@@ -93,14 +96,52 @@
                 <% } else { %>📁 ملف مرفوع<% } %>
               </td>
               <td>
-                <% const h = Math.floor(p.duration_seconds / 3600); %>
-                <% const m = Math.floor((p.duration_seconds % 3600) / 60); %>
-                <% const s = p.duration_seconds % 60; %>
                 <%= h > 0 ? String(h).padStart(2, '0') + ':' : '' %><%= String(m).padStart(2, '0') %>:<%= String(s).padStart(2, '0') %>
               </td>
-              <td>
+              <td class="d-flex gap-1">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleEditRow('<%= p.id %>')">تعديل</button>
                 <form action="/admin/videos/part/<%= p.id %>/delete" method="POST" onsubmit="return confirm('متأكد من الحذف؟')">
                   <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                </form>
+              </td>
+            </tr>
+            <tr id="editRow<%= p.id %>" style="display:none;">
+              <td colspan="4">
+                <form action="/admin/videos/part/<%= p.id %>/update" method="POST" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return combineEditDuration('<%= p.id %>')">
+                  <input type="hidden" name="category" value="<%= p.category %>">
+                  <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1 d-block">الترتيب</label>
+                    <input type="number" name="order_index" class="form-control" value="<%= p.order_index %>" min="1" required>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1 d-block">النوع</label>
+                    <select name="source_type" id="editSourceType<%= p.id %>" class="form-select" onchange="toggleEditSource('<%= p.id %>')">
+                      <option value="link" <%= p.source_type === 'link' ? 'selected' : '' %>>لينك</option>
+                      <option value="upload" <%= p.source_type === 'upload' ? 'selected' : '' %>>رفع ملف</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3" id="editLinkBox<%= p.id %>" style="<%= p.source_type === 'upload' ? 'display:none;' : '' %>">
+                    <label class="form-label small text-muted mb-1 d-block">لينك الفيديو</label>
+                    <input type="text" name="video_url" class="form-control" placeholder="لينك الفيديو" value="<%= p.source_type === 'link' ? p.video_url : '' %>">
+                  </div>
+                  <div class="col-md-3" id="editUploadBox<%= p.id %>" style="<%= p.source_type === 'upload' ? '' : 'display:none;' %>">
+                    <label class="form-label small text-muted mb-1 d-block">ملف جديد (اختياري)</label>
+                    <input type="file" name="video_file" class="form-control" accept="video/*">
+                    <% if (p.source_type === 'upload') { %><p class="small text-muted mb-0 mt-1">اترك فاضي للاحتفاظ بالملف الحالي</p><% } %>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1 d-block">مدة الفيديو</label>
+                    <div class="d-flex gap-1">
+                      <input type="number" id="editDurHours<%= p.id %>" class="form-control" placeholder="ساعة" min="0" value="<%= h %>" style="width:70px;">
+                      <input type="number" id="editDurMinutes<%= p.id %>" class="form-control" placeholder="دقيقة" min="0" max="59" value="<%= m %>" style="width:70px;">
+                      <input type="number" id="editDurSeconds<%= p.id %>" class="form-control" placeholder="ثانية" min="0" max="59" value="<%= s %>" style="width:70px;">
+                    </div>
+                    <input type="hidden" name="duration_seconds" id="editDurationSecondsHidden<%= p.id %>" required>
+                  </div>
+                  <div class="col-md-2 d-flex gap-1">
+                    <button type="submit" class="btn btn-sm btn-primary">حفظ</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleEditRow('<%= p.id %>')">إلغاء</button>
+                  </div>
                 </form>
               </td>
             </tr>
@@ -215,6 +256,30 @@
       return false;
     }
     document.getElementById('durationSecondsHidden').value = total;
+    return true;
+  }
+
+  function toggleEditRow(partId) {
+    const row = document.getElementById('editRow' + partId);
+    row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+  }
+
+  function toggleEditSource(partId) {
+    const type = document.getElementById('editSourceType' + partId).value;
+    document.getElementById('editLinkBox' + partId).style.display = type === 'link' ? 'block' : 'none';
+    document.getElementById('editUploadBox' + partId).style.display = type === 'upload' ? 'block' : 'none';
+  }
+
+  function combineEditDuration(partId) {
+    const h = parseInt(document.getElementById('editDurHours' + partId).value, 10) || 0;
+    const m = parseInt(document.getElementById('editDurMinutes' + partId).value, 10) || 0;
+    const s = parseInt(document.getElementById('editDurSeconds' + partId).value, 10) || 0;
+    const total = (h * 3600) + (m * 60) + s;
+    if (total <= 0) {
+      alert('من فضلك حدد مدة الفيديو');
+      return false;
+    }
+    document.getElementById('editDurationSecondsHidden' + partId).value = total;
     return true;
   }
 </script>

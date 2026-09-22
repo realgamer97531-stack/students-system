@@ -5476,6 +5476,30 @@ app.post('/admin/videos/part/:id/delete', requirePermissionOrAdmin('admin_videos
   res.redirect('/admin/videos/' + videoId);
 });
 
+app.post('/admin/videos/part/:id/update', requirePermissionOrAdmin('admin_videos'), videoUpload.single('video_file'), async (req, res) => {
+  try {
+    const part = await VideoPart.findByPk(req.params.id);
+    if (!part) return res.status(404).send('❌ الجزء غير موجود');
+
+    const { category, order_index, source_type, video_url, duration_seconds } = req.body;
+    const updateData = { category, order_index, source_type, duration_seconds };
+
+    if (source_type === 'upload') {
+      if (req.file) updateData.file_path = `/uploads/videos/${req.file.filename}`;
+      updateData.video_url = null;
+    } else {
+      updateData.video_url = video_url;
+      updateData.file_path = null;
+    }
+
+    await part.update(updateData);
+    res.redirect('/admin/videos/' + part.VideoId);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
 app.post('/admin/videos/delete/:id', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
     const video = await Video.findByPk(req.params.id);
