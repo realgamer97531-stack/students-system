@@ -11,6 +11,11 @@ const Video = sequelize.define('Video', {
     type: DataTypes.STRING,
     allowNull: false, // مثال: "التفاضل - الجزء الأول"
   },
+  questions_display: {
+    type: DataTypes.ENUM('inside', 'outside', 'both'),
+    allowNull: false,
+    defaultValue: 'inside', // فين تظهر فيديوهات الأسئلة: جوه الدرس / برا جنب الحصة / الاتنين
+  },
 }, {
   tableName: 'videos',
 });

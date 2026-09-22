@@ -7,6 +7,21 @@
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
+    <h6 class="mb-1">❓ مكان ظهور فيديو الأسئلة</h6>
+    <p class="text-muted small mb-3">تحكم في ظهور فيديو "الأسئلة" جوه صفحة الدرس، أو كـ كارت منفصل جنب الدرس في صفحة الدروس قبل ما الطالب يدخل، أو الاتنين. نفس صلاحية الوصول للحصة بتتطبق في الحالتين.</p>
+    <form action="/admin/videos/<%= video.id %>/questions-display" method="POST" class="d-flex gap-2 align-items-center">
+      <select name="questions_display" class="form-select" style="max-width:280px;">
+        <option value="inside" <%= video.questions_display === 'inside' ? 'selected' : '' %>>جوه صفحة الدرس بس</option>
+        <option value="outside" <%= video.questions_display === 'outside' ? 'selected' : '' %>>برا جنب الحصة بس (قبل الدخول)</option>
+        <option value="both" <%= video.questions_display === 'both' ? 'selected' : '' %>>الاتنين مع بعض</option>
+      </select>
+      <button type="submit" class="btn btn-sm btn-primary">حفظ</button>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
     <h6 class="mb-3">إضافة فيديو جديد لهذا الدرس</h6>
     <form action="/admin/videos/<%= video.id %>/add-part" method="POST" enctype="multipart/form-data" class="row g-2" onsubmit="return combineDuration()">
       <div class="col-md-3">

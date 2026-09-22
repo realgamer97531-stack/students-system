@@ -73,12 +73,14 @@
   <script src="ad-render.js"></script>
   <script src="ads-popup.js"></script>
   <script src="video-broadcasts.js"></script>
+  <script src="video-embed.js"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const videoId = urlParams.get('videoId');
     if (!videoId) window.location.href = 'lessons.html';
 
     let currentParts = {};
+    let questionsDisplayMode = 'inside';
     let currentCategory = 'explanation';
     let currentIndex = 0;
     let ytPlayer = null;
@@ -106,8 +108,9 @@
     }
 
     function resolveCategory(category) {
-      const categories = ['explanation', 'questions', 'homework_solution'];
-      if (category && getCategoryParts(category).length > 0) return normalizeCategory(category);
+      const questionsEligible = questionsDisplayMode !== 'outside';
+      const categories = ['explanation', 'questions', 'homework_solution'].filter(cat => cat !== 'questions' || questionsEligible);
+      if (category && categories.includes(normalizeCategory(category)) && getCategoryParts(category).length > 0) return normalizeCategory(category);
       return categories.find(cat => getCategoryParts(cat).length > 0) || 'explanation';
     }
 
@@ -170,62 +173,7 @@
       document.getElementById('playerContainer').innerHTML = '';
     }
 
-    function normalizeMediaDeliveryUrl(url) {
-      try {
-        const parsed = new URL(url);
-        if (parsed.hostname.toLowerCase().includes('mediadelivery.net')) {
-          parsed.searchParams.set('autoplay', 'true');
-          parsed.searchParams.set('muted', 'true');
-          parsed.searchParams.set('responsive', 'true');
-          return parsed.toString();
-        }
-      } catch (_) {
-        return url;
-      }
-      return url;
-    }
-
-    function normalizeVimeoUrl(url) {
-      try {
-        const parsed = new URL(url);
-        const hostname = parsed.hostname.toLowerCase();
-        if (hostname !== 'vimeo.com' && !hostname.endsWith('.vimeo.com')) return null;
-
-        const pathParts = parsed.pathname.split('/').filter(Boolean);
-        const videoIdMatch = parsed.pathname.match(/(?:^|\/)(\d+)(?:$|\/)/);
-        if (!videoIdMatch) return null;
-
-        const playerUrl = new URL(`https://player.vimeo.com/video/${videoIdMatch[1]}`);
-        const videoIdIndex = pathParts.indexOf(videoIdMatch[1]);
-        const pathHash = videoIdIndex >= 0 ? pathParts[videoIdIndex + 1] : null;
-        const privateHash = parsed.searchParams.get('h') || pathHash;
-        if (privateHash) playerUrl.searchParams.set('h', privateHash);
-        for (const parameter of ['app_id', 'referrer']) {
-          const value = parsed.searchParams.get(parameter);
-          if (value) playerUrl.searchParams.set(parameter, value);
-        }
-        playerUrl.searchParams.set('autoplay', '0');
-        playerUrl.searchParams.set('playsinline', '1');
-        return playerUrl.toString();
-      } catch (_) {
-        return null;
-      }
-    }
-
-    function detectVideoSource(url) {
-      if (!url) return { type: 'unknown' };
-      const trimmedUrl = String(url).trim();
-      const ytMatch = trimmedUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
-      if (ytMatch) return { type: 'youtube', id: ytMatch[1] };
-      const driveMatch = trimmedUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
-      if (driveMatch) return { type: 'drive', id: driveMatch[1] };
-      const vimeoUrl = normalizeVimeoUrl(trimmedUrl);
-      if (vimeoUrl) return { type: 'vimeo', url: vimeoUrl };
-      const mediaMatch = trimmedUrl.match(/mediadelivery\.net/i);
-      if (mediaMatch) return { type: 'mediadelivery', url: normalizeMediaDeliveryUrl(trimmedUrl) };
-      if (/^https?:\/\//i.test(trimmedUrl)) return { type: 'iframe', url: trimmedUrl };
-      return { type: 'direct', url: trimmedUrl };
-    }
+    // detectVideoSource / normalizeVimeoUrl / normalizeMediaDeliveryUrl now live in video-embed.js
 
     const progressRequests = new Map();
 
@@ -312,6 +260,11 @@
         homework_solution: currentParts.homework_solution.length,
       });
       document.getElementById('lessonTitle').textContent = result.title || 'Lesson';
+
+      questionsDisplayMode = result.questionsDisplay || 'inside';
+      const showQuestionsTab = currentParts.questions.length > 0 && questionsDisplayMode !== 'outside';
+      document.getElementById('catQuestions').style.display = showQuestionsTab ? 'inline-block' : 'none';
+
       switchCategory('explanation');
     }
 

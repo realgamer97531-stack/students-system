@@ -349,12 +349,32 @@ html[dir="ltr"] .whatsapp-float {
     </div>
   </div>
 
+  <div class="modal fade" id="questionsPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="questionsPreviewTitle">❓</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="questionsPreviewContainer"></div>
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <button class="btn btn-outline-secondary" id="questionsPrevBtn" onclick="changeQuestionsPart(-1)" style="display:none;">⬅</button>
+            <span class="text-muted" id="questionsPartIndicator"></span>
+            <button class="btn btn-outline-secondary" id="questionsNextBtn" onclick="changeQuestionsPart(1)" style="display:none;">➡</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="config.js"></script>
   <script src="shared.js"></script>
   <script src="ad-render.js"></script>
   <script src="ads-popup.js"></script>
   <script src="video-broadcasts.js"></script>
+  <script src="video-embed.js"></script>
   <script>
     const translations = {
       ar: {
@@ -380,6 +400,7 @@ html[dir="ltr"] .whatsapp-float {
         homeworkBtn: "فيديو الواجب",
         examBtn: "الاختبار",
         examVideoBtn: "فيديو إجابة الاختبار",
+        questionsBtn: "الأسئلة",
         statusLabels: {
           free: '<span class="badge bg-success px-2 py-1">مجانية</span>',
           granted: '<span class="badge bg-primary px-2 py-1">متاحة</span>',
@@ -412,6 +433,7 @@ html[dir="ltr"] .whatsapp-float {
         homeworkBtn: "Homework Video",
         examBtn: "Quiz",
         examVideoBtn: "Quiz Answer Video",
+        questionsBtn: "Questions",
         statusLabels: {
           free: '<span class="badge bg-success px-2 py-1">Free</span>',
           granted: '<span class="badge bg-primary px-2 py-1">Available</span>',
@@ -764,6 +786,24 @@ html[dir="ltr"] .whatsapp-float {
             </div>
           ` : '';
 
+          const questionsCardHtml = (lesson.hasQuestions && (lesson.questionsDisplay === 'outside' || lesson.questionsDisplay === 'both')) ? `
+            <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.1) * 0.08}s">
+              <div class="card lesson-card h-100" data-status="${lesson.status || 'locked'}" onclick="event.stopPropagation(); openQuestionsPreview(${lesson.videoId});" style="border-top: 4px solid #EC4899;">
+                <div class="card-body p-4">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    ${translations[currentLang].statusLabels[lesson.status] || ''}
+                    <span class="badge" style="background: rgba(236, 72, 153, 0.12); color: #BE185D;">${translations[currentLang].lessonOrder} ${lesson.lessonNumber}</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #EC4899, #F59E0B);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;">❓</div>
+                    <h6 class="mb-0 fw-bold" style="font-size:1.05rem;">${translations[currentLang].questionsBtn}</h6>
+                  </div>
+                  <p class="small mb-0" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
+                </div>
+              </div>
+            </div>
+          ` : '';
+
           const homeworkCards = [
             // ONLY show homework video card if this lesson REALLY has homework (realHomeworkUrl is NOT from global fallback)
             ...(lesson.realHomeworkUrl ? [`
@@ -785,7 +825,7 @@ html[dir="ltr"] .whatsapp-float {
             `] : [])
           ].join('');
 
-          container.innerHTML += lessonCardHtml + examCardHtml + examVideoCardHtml + homeworkCards;
+          container.innerHTML += lessonCardHtml + questionsCardHtml + examCardHtml + examVideoCardHtml + homeworkCards;
         });
         updateAccessCountdowns();
         return;
@@ -813,6 +853,53 @@ html[dir="ltr"] .whatsapp-float {
         window.location.href = `lesson-view.html?videoId=${videoId}`;
       });
     }
+
+    let questionsPreviewParts = [];
+    let questionsPreviewIndex = 0;
+
+    function renderQuestionsPreviewPart() {
+      const container = document.getElementById('questionsPreviewContainer');
+      container.innerHTML = '';
+      const part = questionsPreviewParts[questionsPreviewIndex];
+      if (part) container.appendChild(buildEmbedElement(part, API_BASE_URL));
+
+      const hasMultiple = questionsPreviewParts.length > 1;
+      document.getElementById('questionsPrevBtn').style.display = hasMultiple ? 'inline-block' : 'none';
+      document.getElementById('questionsNextBtn').style.display = hasMultiple ? 'inline-block' : 'none';
+      document.getElementById('questionsPartIndicator').textContent = hasMultiple
+        ? `${questionsPreviewIndex + 1} / ${questionsPreviewParts.length}` : '';
+    }
+
+    function changeQuestionsPart(direction) {
+      const newIndex = questionsPreviewIndex + direction;
+      if (newIndex >= 0 && newIndex < questionsPreviewParts.length) {
+        questionsPreviewIndex = newIndex;
+        renderQuestionsPreviewPart();
+      }
+    }
+
+    async function showQuestionsModal(videoId) {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      const result = await apiGet(`/api/portal/student/lessons/${videoId}/parts`);
+      if (!result.success || !Array.isArray(result.parts?.questions) || result.parts.questions.length === 0) {
+        return;
+      }
+      questionsPreviewParts = result.parts.questions;
+      questionsPreviewIndex = 0;
+      document.getElementById('questionsPreviewTitle').textContent = `❓ ${translations[currentLang].questionsBtn}`;
+      renderQuestionsPreviewPart();
+      new bootstrap.Modal(document.getElementById('questionsPreviewModal')).show();
+    }
+
+    async function openQuestionsPreview(videoId) {
+      await openProtectedAction(videoId, () => showQuestionsModal(videoId));
+    }
+
+    document.getElementById('questionsPreviewModal').addEventListener('hidden.bs.modal', () => {
+      document.getElementById('questionsPreviewContainer').innerHTML = '';
+      questionsPreviewParts = [];
+      questionsPreviewIndex = 0;
+    });
 
     function openHomeworkCard(url, title) {
       const cleanedUrl = (url || '').trim();

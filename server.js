@@ -478,6 +478,26 @@ async function ensureSessionHomeworkFields() {
   }
 }
 
+async function ensureVideoQuestionsDisplayColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('videos');
+    if (!tableInfo.questions_display) {
+      await queryInterface.addColumn('videos', 'questions_display', {
+        type: sequelize.Sequelize.ENUM('inside', 'outside', 'both'),
+        allowNull: false,
+        defaultValue: 'inside',
+      });
+      console.log('✅ Added questions_display column to videos table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure videos.questions_display column:', error.message);
+  }
+}
+
 async function ensureStudentBookletCustomPriceColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -4715,6 +4735,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       order: [['createdAt', 'DESC']],
     });
 
+    const videoIdsWithQuestions = videos.length > 0
+      ? await VideoPart.findAll({
+          where: { VideoId: videos.map(video => video.id), category: 'questions' },
+          attributes: ['VideoId'],
+        })
+      : [];
+    const questionsVideoIdSet = new Set(videoIdsWithQuestions.map(part => part.VideoId));
+
     const linkedSessionIdsByVideoId = new Map();
     const allLinkedSessionIds = new Set();
     videos.forEach(video => {
@@ -4905,6 +4933,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         homeworkItems,
         examUrl: linkedExamSession?.exam_url || examLinksByLesson.get(session.lesson_number)?.examUrl || null,
         examVideoUrl: linkedExamSession?.exam_video_url || examLinksByLesson.get(session.lesson_number)?.examVideoUrl || null,
+        hasQuestions: questionsVideoIdSet.has(v.id),
+        questionsDisplay: v.questions_display,
       };
     }).filter(Boolean);
 
@@ -5181,7 +5211,7 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
 
     const availableCategories = Object.keys(grouped).filter(category => grouped[category].length > 0);
 
-    res.json({ success: true, title: video.title, parts: grouped, availableCategories });
+    res.json({ success: true, title: video.title, parts: grouped, availableCategories, questionsDisplay: video.questions_display });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
@@ -5402,6 +5432,22 @@ app.get('/admin/videos/:id', requirePermissionOrAdmin('admin_videos'), async (re
   });
 
   res.render('manage-video-parts', { video, videoParts, videoSessions, studentAccesses, allSessions });
+});
+
+app.post('/admin/videos/:id/questions-display', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const { questions_display } = req.body;
+    if (!['inside', 'outside', 'both'].includes(questions_display)) {
+      return res.status(400).send('❌ قيمة غير صحيحة');
+    }
+    const video = await Video.findByPk(req.params.id);
+    if (!video) return res.status(404).send('❌ الفيديو غير موجود');
+    await video.update({ questions_display });
+    res.redirect('/admin/videos/' + req.params.id);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
 });
 
 app.post('/admin/videos/:id/add-part', requirePermissionOrAdmin('admin_videos'), videoUpload.single('video_file'), async (req, res) => {
@@ -9152,6 +9198,7 @@ async function startServer() {
     await ensureSessionWeekNumberColumn();
     await ensureSessionHomeworkFields();
     await ensureStudentBookletCustomPriceColumn();
+    await ensureVideoQuestionsDisplayColumn();
     await ensureBalanceTransactionSessionColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
     await ensureHomeworkAssignmentLinkColumns();
@@ -9211,6 +9258,7 @@ async function startServer() {
           await ensureSessionWeekNumberColumn();
           await ensureSessionHomeworkFields();
           await ensureStudentBookletCustomPriceColumn();
+          await ensureVideoQuestionsDisplayColumn();
           await ensureUserProfilePhotoColumn();
           await ensureBookletReservationSchema(sequelize);
           await ensureLessonAccessSchema(sequelize);
