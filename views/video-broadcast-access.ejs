@@ -2,22 +2,22 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h3 class="mb-1">🔑 صلاحيات الوصول: <%= broadcast.title %></h3>
-    <p class="text-muted mb-0">الطلاب اللي فتحوا هذا الفيديو المدفوع (بالدفع أو بمنح يدوي من الأدمن).</p>
+    <h3 class="mb-1">🔑 <span class="ar-only">صلاحيات الوصول:</span><span class="en-only" style="display:none;">Access Permission:</span> <%= broadcast.title %></h3>
+    <p class="text-muted mb-0"><span class="ar-only">الطلاب اللي فتحوا هذا الفيديو المدفوع (بالدفع أو بمنح يدوي من الأدمن).</span><span class="en-only" style="display:none;">Students who opened this paid video (by payment or a manual grant from the admin).</span></p>
   </div>
-  <a href="/admin/video-broadcasts" class="btn btn-outline-secondary">رجوع للقائمة</a>
+  <a href="/admin/video-broadcasts" class="btn btn-outline-secondary"><span class="ar-only">رجوع للقائمة</span><span class="en-only" style="display:none;">Back to List</span></a>
 </div>
 
 <div class="card mb-4">
   <div class="card-body">
-    <h5 class="fw-bold mb-3">منح وصول مجاني لطالب</h5>
+    <h5 class="fw-bold mb-3"><span class="ar-only">منح وصول مجاني لطالب</span><span class="en-only" style="display:none;">Grant Free Access to a Student</span></h5>
     <form action="/admin/video-broadcasts/<%= broadcast.id %>/grant" method="POST" class="d-flex gap-2">
       <div class="position-relative flex-grow-1">
         <input type="text" id="studentSearchInput" class="form-control" placeholder="اكتب اسم الطالب أو كوده أو رقمه..." autocomplete="off">
         <div id="studentSearchResults" class="list-group position-absolute w-100" style="z-index:10;display:none;max-height:220px;overflow-y:auto;"></div>
       </div>
       <input type="hidden" name="student_id" id="student_id" required>
-      <button type="submit" class="btn btn-success">منح الوصول</button>
+      <button type="submit" class="btn btn-success"><span class="ar-only">منح الوصول</span><span class="en-only" style="display:none;">Grant Access</span></button>
     </form>
     <small class="text-muted d-block mt-2" id="selectedStudentLabel"></small>
   </div>
@@ -29,16 +29,16 @@
     <table class="table mb-0">
       <thead>
         <tr>
-          <th>الطالب</th>
-          <th>الكود</th>
-          <th>طريقة الوصول</th>
-          <th>تاريخ المنح</th>
-          <th>إجراءات</th>
+          <th><span class="ar-only">الطالب</span><span class="en-only" style="display:none;">Student</span></th>
+          <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+          <th><span class="ar-only">طريقة الوصول</span><span class="en-only" style="display:none;">Access Method</span></th>
+          <th><span class="ar-only">تاريخ المنح</span><span class="en-only" style="display:none;">Grant Date</span></th>
+          <th><span class="ar-only">إجراءات</span><span class="en-only" style="display:none;">Actions</span></th>
         </tr>
       </thead>
       <tbody>
         <% if (!accessList.length) { %>
-          <tr><td colspan="5" class="text-center text-muted py-4">لا يوجد طلاب لديهم وصول بعد</td></tr>
+          <tr><td colspan="5" class="text-center text-muted py-4"><span class="ar-only">لا يوجد طلاب لديهم وصول بعد</span><span class="en-only" style="display:none;">No students have access yet</span></td></tr>
         <% } %>
         <% accessList.forEach(access => { %>
           <tr>
@@ -46,15 +46,15 @@
             <td><%= access.Student ? access.Student.student_code : '—' %></td>
             <td>
               <% if (access.method === 'paid') { %>
-                <span class="badge bg-warning text-dark">دفع من الرصيد</span>
+                <span class="badge bg-warning text-dark"><span class="ar-only">دفع من الرصيد</span><span class="en-only" style="display:none;">Paid from Balance</span></span>
               <% } else { %>
-                <span class="badge bg-info">منح يدوي</span>
+                <span class="badge bg-info"><span class="ar-only">منح يدوي</span><span class="en-only" style="display:none;">Manual Grant</span></span>
               <% } %>
             </td>
             <td><%= new Date(access.granted_at).toLocaleString('ar-EG') %></td>
             <td>
               <form action="/admin/video-broadcasts/<%= broadcast.id %>/access/<%= access.id %>/revoke" method="POST" onsubmit="return confirm('سحب صلاحية الوصول من هذا الطالب؟')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">سحب الوصول</button>
+                <button type="submit" class="btn btn-sm btn-outline-danger"><span class="ar-only">سحب الوصول</span><span class="en-only" style="display:none;">Revoke Access</span></button>
               </form>
             </td>
           </tr>

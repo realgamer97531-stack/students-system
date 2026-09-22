@@ -35,6 +35,19 @@
       --sf-input-border: #E2E4F3;
       --sf-table-header-bg: #EEF0FB;
       --sf-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+      /* Soft tinted panels/badges used across pages (ad-hoc inline colors, now centralized) */
+      --sf-success-soft-bg: #D1FAE5;
+      --sf-success-soft-text: #047857;
+      --sf-warning-soft-bg: #FEF3C7;
+      --sf-warning-soft-text: #92400E;
+      --sf-danger-soft-bg: #FEE2E2;
+      --sf-danger-soft-text: #B91C1C;
+      --sf-info-soft-bg: #E0F2FE;
+      --sf-info-soft-text: #0369A1;
+      --sf-neutral-soft-bg: #F3F4F6;
+      --sf-neutral-soft-text: #374151;
+      --sf-panel-bg: #F8F9FC;
     }
 
     /* Dark Mode Variables */
@@ -58,6 +71,19 @@
       --sf-card-bg: #1E293B;
       --sf-input-border: #334155;
       --sf-table-header-bg: #111827; /* Cleaned up to contrast beautifully with the cards */
+
+      /* Same soft tints, tuned for dark mode using the same wash-of-accent-color formula as the badges below */
+      --sf-success-soft-bg: rgba(16, 185, 129, 0.15);
+      --sf-success-soft-text: #34D399;
+      --sf-warning-soft-bg: rgba(245, 158, 11, 0.15);
+      --sf-warning-soft-text: #FBBF24;
+      --sf-danger-soft-bg: rgba(225, 29, 72, 0.15);
+      --sf-danger-soft-text: #FB7185;
+      --sf-info-soft-bg: rgba(14, 165, 233, 0.15);
+      --sf-info-soft-text: #38BDF8;
+      --sf-neutral-soft-bg: rgba(148, 163, 184, 0.12);
+      --sf-neutral-soft-text: #CBD5E1;
+      --sf-panel-bg: #17223A;
     }
 
     * { font-family: 'Cairo', sans-serif; box-sizing: border-box; }
@@ -364,6 +390,25 @@
     }
 
     .badge { font-weight: 600; padding: 0.42em 0.75em; border-radius: 8px; letter-spacing: 0.1px; }
+
+    /* Bootstrap utility classes used across pages as "just a light panel/box" - not theme-aware by
+       default, so in dark mode they used to stay hard-coded white/near-white. Map them onto the
+       theme instead. (.bg-dark / .text-white are intentionally left alone: those are meant to stay
+       dark regardless of theme, e.g. table-dark headers.) */
+    .bg-light { background-color: var(--sf-panel-bg) !important; }
+    .bg-white { background-color: var(--sf-card-bg) !important; }
+    .text-dark { color: var(--sf-text) !important; }
+    [data-theme="dark"] .badge.bg-light { color: var(--sf-text) !important; border-color: var(--sf-input-border) !important; }
+
+    /* Soft tinted panels/badges: many pages set these inline (background:#EEF0FB, #D1FAE5, #FEF3C7,
+       #FEE2E2, #F3F4F6...); these classes give the same pages a themed alternative. */
+    .soft-primary { background-color: var(--sf-primary-light) !important; color: var(--sf-primary) !important; }
+    .soft-success { background-color: var(--sf-success-soft-bg) !important; color: var(--sf-success-soft-text) !important; }
+    .soft-warning { background-color: var(--sf-warning-soft-bg) !important; color: var(--sf-warning-soft-text) !important; }
+    .soft-danger { background-color: var(--sf-danger-soft-bg) !important; color: var(--sf-danger-soft-text) !important; }
+    .soft-info { background-color: var(--sf-info-soft-bg) !important; color: var(--sf-info-soft-text) !important; }
+    .soft-neutral { background-color: var(--sf-neutral-soft-bg) !important; color: var(--sf-neutral-soft-text) !important; }
+    .soft-panel { background-color: var(--sf-panel-bg) !important; color: var(--sf-text) !important; }
 
     a { text-decoration: none; transition: opacity 0.15s var(--sf-ease); }
     a:hover { text-decoration: none; opacity: 0.8; }

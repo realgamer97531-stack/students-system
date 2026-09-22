@@ -1,12 +1,12 @@
 <%- include('partials/header') %>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h3>إدارة المستخدمين</h3>
+  <h3><span class="ar-only">إدارة المستخدمين</span><span class="en-only" style="display:none;">Manage Users</span></h3>
 </div>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h5 class="mb-3">إضافة مستخدم جديد</h5>
+    <h5 class="mb-3"><span class="ar-only">إضافة مستخدم جديد</span><span class="en-only" style="display:none;">Add New User</span></h5>
     <form action="/users" method="POST" class="row g-2">
       <div class="col-md-3">
         <input type="text" name="name" class="form-control" placeholder="الاسم بالكامل" required>
@@ -22,12 +22,12 @@
       </div>
       <div class="col-md-2">
         <select name="role" class="form-select">
-          <option value="assistant">أسيستانت</option>
-          <option value="admin">أدمن</option>
+          <option value="assistant"><span class="ar-only">أسيستانت</span><span class="en-only" style="display:none;">Assistant</span></option>
+          <option value="admin"><span class="ar-only">أدمن</span><span class="en-only" style="display:none;">Admin</span></option>
         </select>
       </div>
       <div class="col-md-1">
-        <button type="submit" class="btn btn-primary w-100">إضافة</button>
+        <button type="submit" class="btn btn-primary w-100"><span class="ar-only">إضافة</span><span class="en-only" style="display:none;">Add</span></button>
       </div>
     </form>
   </div>
@@ -37,11 +37,11 @@
   <table class="table table-hover align-middle">
     <thead class="table-light">
       <tr>
-        <th>الاسم</th>
-        <th>اليوزرنيم</th>
-        <th>الهاتف</th>
-        <th>الصلاحية</th>
-        <th>تاريخ الإنشاء</th>
+        <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+        <th><span class="ar-only">اليوزرنيم</span><span class="en-only" style="display:none;">Username</span></th>
+        <th><span class="ar-only">الهاتف</span><span class="en-only" style="display:none;">Phone</span></th>
+        <th><span class="ar-only">الصلاحية</span><span class="en-only" style="display:none;">Permission</span></th>
+        <th><span class="ar-only">تاريخ الإنشاء</span><span class="en-only" style="display:none;">Created Date</span></th>
         <th></th>
       </tr>
     </thead>
@@ -53,32 +53,32 @@
           <td><%= u.phone || '-' %></td>
           <td>
             <% if (u.role === 'admin') { %>
-              <span class="badge bg-danger">أدمن</span>
+              <span class="badge bg-danger"><span class="ar-only">أدمن</span><span class="en-only" style="display:none;">Admin</span></span>
             <% } else { %>
-              <span class="badge bg-primary">أسيستانت</span>
+              <span class="badge bg-primary"><span class="ar-only">أسيستانت</span><span class="en-only" style="display:none;">Assistant</span></span>
             <% } %>
           </td>
           <td><%= u.createdAt.toLocaleDateString('ar-EG') %></td>
           <td>
             <% if (u.id !== currentUserId) { %>
               <form action="/users/<%= u.id %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف هذا المستخدم؟')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                <button type="submit" class="btn btn-sm btn-outline-danger"><span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span></button>
               </form>
             <% } else { %>
-              <span class="text-muted small">(أنت)</span>
+              <span class="text-muted small">(<span class="ar-only">أنت</span><span class="en-only" style="display:none;">You</span>)</span>
             <% } %>
           </td>
           <td>
-  <a href="/users/<%= u.id %>/stats" class="btn btn-sm btn-outline-info">📊 إحصائيات</a>
+  <a href="/users/<%= u.id %>/stats" class="btn btn-sm btn-outline-info">📊 <span class="ar-only">إحصائيات</span><span class="en-only" style="display:none;">Statistics</span></a>
   <% if (u.role !== 'admin') { %>
-    <a href="/users/<%= u.id %>/permissions" class="btn btn-sm btn-outline-primary">الصلاحيات</a>
+    <a href="/users/<%= u.id %>/permissions" class="btn btn-sm btn-outline-primary"><span class="ar-only">الصلاحيات</span><span class="en-only" style="display:none;">Permissions</span></a>
   <% } %>
   <% if (u.id !== currentUserId) { %>
     <form action="/users/<%= u.id %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف هذا المستخدم؟')" class="d-inline">
-      <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+      <button type="submit" class="btn btn-sm btn-outline-danger"><span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span></button>
     </form>
   <% } else { %>
-    <span class="text-muted small">(أنت)</span>
+    <span class="text-muted small">(<span class="ar-only">أنت</span><span class="en-only" style="display:none;">You</span>)</span>
   <% } %>
 </td>
         </tr>

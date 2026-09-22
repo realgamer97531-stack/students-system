@@ -1,20 +1,20 @@
 <%- include('partials/header') %>
 
 <h3 class="mb-3">
-  تقرير حصة: <%= session.Subject.name %> - <%= session.Center.name %>
-  (سيريال <%= session.serial_number %> / رقم نسبي <%= session.lesson_number %>)
+  <span class="ar-only">تقرير حصة:</span><span class="en-only" style="display:none;">Session Report:</span> <%= session.Subject.name %> - <%= session.Center.name %>
+  (<span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <%= session.serial_number %> / <span class="ar-only">رقم نسبي</span><span class="en-only" style="display:none;">Relative No.</span> <%= session.lesson_number %>)
 </h3>
 
 <div class="mb-3">
   <a href="/sessions/<%= session.id %>/report/export-attendance" class="btn btn-outline-success">
-    📥 تصدير الحاضرين
+    📥 <span class="ar-only">تصدير الحاضرين</span><span class="en-only" style="display:none;">Export Present</span>
   </a>
   <a href="/sessions/<%= session.id %>/report/export-absent" class="btn btn-outline-danger">
-    📥 تصدير الغايبين
+    📥 <span class="ar-only">تصدير الغايبين</span><span class="en-only" style="display:none;">Export Absent</span>
   </a>
   <% if (callCenterIntegrationEnabled) { %>
-    <button type="button" class="btn btn-outline-success js-callcenter-report" data-url="/sessions/<%= session.id %>/report/send-present">☎️ إرسال الحاضرين للاتصال</button>
-    <button type="button" class="btn btn-outline-danger js-callcenter-report" data-url="/sessions/<%= session.id %>/report/send-absent">☎️ إرسال الغايبين للاتصال</button>
+    <button type="button" class="btn btn-outline-success js-callcenter-report" data-url="/sessions/<%= session.id %>/report/send-present">☎️ <span class="ar-only">إرسال الحاضرين للاتصال</span><span class="en-only" style="display:none;">Send Present to Call Center</span></button>
+    <button type="button" class="btn btn-outline-danger js-callcenter-report" data-url="/sessions/<%= session.id %>/report/send-absent">☎️ <span class="ar-only">إرسال الغايبين للاتصال</span><span class="en-only" style="display:none;">Send Absent to Call Center</span></button>
     <span id="callcenterReportStatus" class="small text-muted"></span>
   <% } %>
 </div>
@@ -22,57 +22,57 @@
 <% if (userRole === 'admin') { %>
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">💰 تقفيل السنتر (حساب التكلفة)</h6>
+    <h6 class="mb-3">💰 <span class="ar-only">تقفيل السنتر (حساب التكلفة)</span><span class="en-only" style="display:none;">Center Closing (Cost Calculation)</span></h6>
     <p class="small">
-      عادي: <%= closing.normalCount %> | مخفض: <%= closing.reducedCount %> | مجاني: <%= closing.freeCount %><br>
-      إجمالي إيراد الحصة (سعر كل طالب مجمّع): <strong><%= closing.totalRevenue %> ج</strong>
+      <span class="ar-only">عادي:</span><span class="en-only" style="display:none;">Normal:</span> <%= closing.normalCount %> | <span class="ar-only">مخفض:</span><span class="en-only" style="display:none;">Reduced:</span> <%= closing.reducedCount %> | <span class="ar-only">مجاني:</span><span class="en-only" style="display:none;">Free:</span> <%= closing.freeCount %><br>
+      <span class="ar-only">إجمالي إيراد الحصة (سعر كل طالب مجمّع):</span><span class="en-only" style="display:none;">Total Session Revenue (sum of each student's price):</span> <strong><%= closing.totalRevenue %> ج</strong>
     </p>
     <form action="/sessions/<%= session.id %>/closing" method="POST" class="row g-2 align-items-end">
       <div class="col-md-3">
-        <label class="form-label small">تكلفة الشخص العادي</label>
+        <label class="form-label small"><span class="ar-only">تكلفة الشخص العادي</span><span class="en-only" style="display:none;">Normal Person Cost</span></label>
         <input type="number" step="0.1" name="cost_per_normal" class="form-control" value="<%= session.cost_per_normal != null ? session.cost_per_normal : '' %>">
       </div>
       <div class="col-md-3">
-        <label class="form-label small">تكلفة الشخص المخفض</label>
+        <label class="form-label small"><span class="ar-only">تكلفة الشخص المخفض</span><span class="en-only" style="display:none;">Reduced Person Cost</span></label>
         <input type="number" step="0.1" name="cost_per_reduced" class="form-control" value="<%= session.cost_per_reduced != null ? session.cost_per_reduced : '' %>">
       </div>
-      <div class="col-md-3"><button class="btn btn-primary w-100">حفظ وحساب</button></div>
-      <div class="col-md-3"><strong>إجمالي التكلفة: <%= closing.totalCost %> ج</strong></div>
+      <div class="col-md-3"><button class="btn btn-primary w-100"><span class="ar-only">حفظ وحساب</span><span class="en-only" style="display:none;">Save & Calculate</span></button></div>
+      <div class="col-md-3"><strong><span class="ar-only">إجمالي التكلفة:</span><span class="en-only" style="display:none;">Total Cost:</span> <%= closing.totalCost %> ج</strong></div>
     </form>
   </div>
 </div>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">💵 تقفيل نقدية الحصة</h6>
-    <p class="small text-muted mb-1">إجمالي المبالغ النقدية المدفوعة فعليًا وقت تسجيل الحضور (بدون أي مبالغ مخصومة من رصيد سابق):</p>
+    <h6 class="mb-3">💵 <span class="ar-only">تقفيل نقدية الحصة</span><span class="en-only" style="display:none;">Session Cash Closing</span></h6>
+    <p class="small text-muted mb-1"><span class="ar-only">إجمالي المبالغ النقدية المدفوعة فعليًا وقت تسجيل الحضور (بدون أي مبالغ مخصومة من رصيد سابق):</span><span class="en-only" style="display:none;">Total cash amounts actually paid at attendance time (excluding amounts deducted from a previous balance):</span></p>
     <h4 class="text-success"><%= totalCashCollected %> ج</h4>
   </div>
 </div>
-<a href="/sessions/<%= session.id %>/financial-report" class="btn btn-sm btn-outline-success">💰 التقرير المالي</a>
+<a href="/sessions/<%= session.id %>/financial-report" class="btn btn-sm btn-outline-success">💰 <span class="ar-only">التقرير المالي</span><span class="en-only" style="display:none;">Financial Report</span></a>
 <% } %>
 
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item">
     <a class="nav-link active" data-bs-toggle="tab" href="#attendedTab">
-      الحاضرين (<%= attendedRows.length %>)
+      <span class="ar-only">الحاضرين</span><span class="en-only" style="display:none;">Present</span> (<%= attendedRows.length %>)
     </a>
   </li>
   <% if (onlineAttendees && onlineAttendees.length > 0) { %>
   <li class="nav-item">
     <a class="nav-link" data-bs-toggle="tab" href="#onlineTab">
-      حضور أونلاين (<%= onlineAttendees.length %>) 📹
+      <span class="ar-only">حضور أونلاين</span><span class="en-only" style="display:none;">Online Attendance</span> (<%= onlineAttendees.length %>) 📹
     </a>
   </li>
   <% } %>
   <li class="nav-item">
     <a class="nav-link" data-bs-toggle="tab" href="#absentTab">
-      الغايبين (<%= absentStudents.length %>)
+      <span class="ar-only">الغايبين</span><span class="en-only" style="display:none;">Absent</span> (<%= absentStudents.length %>)
     </a>
   </li>
   <li class="nav-item">
     <a class="nav-link" data-bs-toggle="tab" href="#assistantTab">
-      الأسيستانتس (<%= assistantAttendances ? assistantAttendances.length : 0 %>)
+      <span class="ar-only">الأسيستانتس</span><span class="en-only" style="display:none;">Assistants</span> (<%= assistantAttendances ? assistantAttendances.length : 0 %>)
     </a>
   </li>
 </ul>
@@ -82,7 +82,7 @@
   <div class="tab-pane fade show active" id="attendedTab">
     <div class="card shadow-sm mb-3">
       <div class="card-body py-3">
-        <label for="attendedStudentSearch" class="form-label small mb-1">البحث في الحاضرين</label>
+        <label for="attendedStudentSearch" class="form-label small mb-1"><span class="ar-only">البحث في الحاضرين</span><span class="en-only" style="display:none;">Search Present</span></label>
         <input type="search" id="attendedStudentSearch" class="form-control" placeholder="ابحث بالاسم أو الكود أو رقم الهاتف">
       </div>
     </div>
@@ -90,18 +90,18 @@
       <table id="attendedStudentsTable" class="table table-sm table-hover align-middle">
         <thead class="table-light">
           <tr>
-            <th>الكود</th>
-            <th>الاسم</th>
-            <th>تليفون الطالب</th>
-            <th>تليفون ولي الأمر</th>
-            <th>مكان الحضور</th>
-            <th>الواجب</th>
-            <th>الامتحان</th>
-            <% if (userRole === 'admin') { %><th>دفع وقت الحضور</th><% } %>
-            <th>كومنت</th>
-            <th>سجّل الحضور</th>
-            <th>صحّح الواجب</th>
-            <th>رصد الامتحان</th>
+            <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+            <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+            <th><span class="ar-only">تليفون الطالب</span><span class="en-only" style="display:none;">Student Phone</span></th>
+            <th><span class="ar-only">تليفون ولي الأمر</span><span class="en-only" style="display:none;">Parent Phone</span></th>
+            <th><span class="ar-only">مكان الحضور</span><span class="en-only" style="display:none;">Attendance Location</span></th>
+            <th><span class="ar-only">الواجب</span><span class="en-only" style="display:none;">Homework</span></th>
+            <th><span class="ar-only">الامتحان</span><span class="en-only" style="display:none;">Exam</span></th>
+            <% if (userRole === 'admin') { %><th><span class="ar-only">دفع وقت الحضور</span><span class="en-only" style="display:none;">Paid at Attendance</span></th><% } %>
+            <th><span class="ar-only">كومنت</span><span class="en-only" style="display:none;">Comment</span></th>
+            <th><span class="ar-only">سجّل الحضور</span><span class="en-only" style="display:none;">Attendance Recorded By</span></th>
+            <th><span class="ar-only">صحّح الواجب</span><span class="en-only" style="display:none;">Homework Corrected By</span></th>
+            <th><span class="ar-only">رصد الامتحان</span><span class="en-only" style="display:none;">Exam Recorded By</span></th>
             <th></th>
           </tr>
         </thead>
@@ -114,7 +114,7 @@
               <td><%= row.student.parent_phone %></td>
               <td>
                 <% if (row.location === 'أونلاين') { %>
-                  <span class="badge bg-info">أونلاين</span>
+                  <span class="badge bg-info"><span class="ar-only">أونلاين</span><span class="en-only" style="display:none;">Online</span></span>
                 <% } else { %>
                   <span class="badge bg-primary"><%= row.location %></span>
                 <% } %>
@@ -123,13 +123,13 @@
                 <% if (!row.homeworkStatus) { %>
                   <span class="text-muted small">-</span>
                 <% } else if (row.homeworkStatus === 'complete') { %>
-                  <span class="badge bg-success">كامل</span>
+                  <span class="badge bg-success"><span class="ar-only">كامل</span><span class="en-only" style="display:none;">Complete</span></span>
                 <% } else if (row.homeworkStatus === 'incomplete') { %>
-                  <span class="badge bg-warning text-dark">مش كامل</span>
+                  <span class="badge bg-warning text-dark"><span class="ar-only">مش كامل</span><span class="en-only" style="display:none;">Incomplete</span></span>
                 <% } else if (row.homeworkStatus === 'no_steps') { %>
-                  <span class="badge bg-secondary">من غير خطوات</span>
+                  <span class="badge bg-secondary"><span class="ar-only">من غير خطوات</span><span class="en-only" style="display:none;">No Steps</span></span>
                 <% } else { %>
-                  <span class="badge bg-danger">مش معمول</span>
+                  <span class="badge bg-danger"><span class="ar-only">مش معمول</span><span class="en-only" style="display:none;">Not Done</span></span>
                 <% } %>
               </td>
               <td>
@@ -165,7 +165,7 @@
               <td>
                 <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف الحضور؟ سيُسترجع المبلغ للطالب.')">
                   <input type="hidden" name="redirect_to" value="/sessions/<%= session.id %>/report">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span></button>
                 </form>
               </td>
             </tr>
@@ -177,18 +177,18 @@
 
   <div class="tab-pane fade" id="absentTab">
     <% if (session.status === 'cancelled') { %>
-      <div class="alert alert-secondary">هذه الحصة ملغية، فلا يوجد غياب محسوب.</div>
+      <div class="alert alert-secondary"><span class="ar-only">هذه الحصة ملغية، فلا يوجد غياب محسوب.</span><span class="en-only" style="display:none;">This session is cancelled, so no absence is calculated.</span></div>
     <% } %>
     <div class="table-responsive bg-white rounded shadow-sm p-3">
       <table class="table table-sm table-hover align-middle">
         <thead class="table-light">
           <tr>
-            <th>الكود</th>
-            <th>الاسم</th>
-            <th>تليفون الطالب</th>
-            <th>تليفون ولي الأمر</th>
-            <th>حضر في مكان آخر</th>
-            <th>الرصيد الحالي</th>
+            <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+            <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+            <th><span class="ar-only">تليفون الطالب</span><span class="en-only" style="display:none;">Student Phone</span></th>
+            <th><span class="ar-only">تليفون ولي الأمر</span><span class="en-only" style="display:none;">Parent Phone</span></th>
+            <th><span class="ar-only">حضر في مكان آخر</span><span class="en-only" style="display:none;">Attended Elsewhere</span></th>
+            <th><span class="ar-only">الرصيد الحالي</span><span class="en-only" style="display:none;">Current Balance</span></th>
           </tr>
         </thead>
         <tbody>
@@ -200,7 +200,7 @@
               <td><%= student.parent_phone %></td>
               <td>
                 <% if (student.elsewhereAttendanceLocation) { %>
-                  <span class="badge bg-info text-dark">حضر في <%= student.elsewhereAttendanceLocation %></span>
+                  <span class="badge bg-info text-dark"><span class="ar-only">حضر في</span><span class="en-only" style="display:none;">Attended at</span> <%= student.elsewhereAttendanceLocation %></span>
                 <% } else { %>
                   <span class="text-muted small">-</span>
                 <% } %>
@@ -216,18 +216,18 @@
   <% if (onlineAttendees && onlineAttendees.length > 0) { %>
   <div class="tab-pane fade" id="onlineTab">
     <div class="alert alert-info">
-      🎓 هؤلاء الطلاب حضروا الحصة أونلاين فقط (لم يحضروا في المركز). تم تسجيل حضورهم كمعوض.
+      🎓 <span class="ar-only">هؤلاء الطلاب حضروا الحصة أونلاين فقط (لم يحضروا في المركز). تم تسجيل حضورهم كمعوض.</span><span class="en-only" style="display:none;">These students attended the session online only (did not attend the center). Their attendance was recorded as compensated.</span>
     </div>
     <div class="table-responsive bg-white rounded shadow-sm p-3">
       <table class="table table-sm table-hover align-middle">
         <thead class="table-light">
           <tr>
-            <th>الكود</th>
-            <th>الاسم</th>
-            <th>تليفون الطالب</th>
-            <th>تليفون ولي الأمر</th>
-            <th>الملاحظة</th>
-            <th>الرصيد الحالي</th>
+            <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+            <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+            <th><span class="ar-only">تليفون الطالب</span><span class="en-only" style="display:none;">Student Phone</span></th>
+            <th><span class="ar-only">تليفون ولي الأمر</span><span class="en-only" style="display:none;">Parent Phone</span></th>
+            <th><span class="ar-only">الملاحظة</span><span class="en-only" style="display:none;">Note</span></th>
+            <th><span class="ar-only">الرصيد الحالي</span><span class="en-only" style="display:none;">Current Balance</span></th>
           </tr>
         </thead>
         <tbody>
@@ -237,7 +237,7 @@
               <td><a href="/students/<%= student.id %>"><%= student.name %></a></td>
               <td><%= student.phone %></td>
               <td><%= student.parent_phone %></td>
-              <td><span class="badge bg-info">حضر أونلاين (معوض)</span></td>
+              <td><span class="badge bg-info"><span class="ar-only">حضر أونلاين (معوض)</span><span class="en-only" style="display:none;">Attended Online (Compensated)</span></span></td>
               <td><%= student.balance %> ج</td>
             </tr>
           <% }) %>
@@ -252,14 +252,14 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h6 class="mb-0">👨‍💼 الأسيستانتس الحاضرين</h6>
+          <h6 class="mb-0">👨‍💼 <span class="ar-only">الأسيستانتس الحاضرين</span><span class="en-only" style="display:none;">Present Assistants</span></h6>
         </div>
 
         <% if (userRole === 'admin') { %>
         <form action="/sessions/<%= session.id %>/assistant-attendance/add" method="POST" class="row g-2 mb-3">
           <div class="col-md-3">
             <select name="user_id" class="form-select form-select-sm" required>
-              <option value="">-- اختر أسيستانت --</option>
+              <option value=""><span class="ar-only">-- اختر أسيستانت --</span><span class="en-only" style="display:none;">-- Choose Assistant --</span></option>
               <% allUsers.forEach(u => { %>
                 <option value="<%= u.id %>"><%= u.name %> (<%= u.role === 'admin' ? 'أدمن' : 'أسيستانت' %>)</option>
                 <option value="<%= u.id %>"><%= u.name %></option>
@@ -268,13 +268,13 @@
           </div>
           <div class="col-md-3">
             <input type="datetime-local" name="check_in" class="form-control form-control-sm">
-            <small class="text-muted">وقت الحضور (فاضي = دلوقتي)</small>
+            <small class="text-muted"><span class="ar-only">وقت الحضور (فاضي = دلوقتي)</span><span class="en-only" style="display:none;">Check-in time (empty = now)</span></small>
           </div>
           <div class="col-md-3">
             <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة (اختياري)">
           </div>
           <div class="col-md-3">
-            <button class="btn btn-sm btn-primary w-100">+ تسجيل حضور</button>
+            <button class="btn btn-sm btn-primary w-100">+ <span class="ar-only">تسجيل حضور</span><span class="en-only" style="display:none;">Record Attendance</span></button>
           </div>
         </form>
         <% } %>
@@ -283,12 +283,12 @@
           <table class="table table-sm align-middle">
             <thead class="table-light">
               <tr>
-                <th>الاسم</th>
-                <th>وقت الحضور</th>
-                <th>وقت الانصراف</th>
-                <th>ساعات العمل</th>
-                <th>الراتب المحسوب</th>
-                <th>الطريقة</th>
+                <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+                <th><span class="ar-only">وقت الحضور</span><span class="en-only" style="display:none;">Check-in Time</span></th>
+                <th><span class="ar-only">وقت الانصراف</span><span class="en-only" style="display:none;">Check-out Time</span></th>
+                <th><span class="ar-only">ساعات العمل</span><span class="en-only" style="display:none;">Working Hours</span></th>
+                <th><span class="ar-only">الراتب المحسوب</span><span class="en-only" style="display:none;">Calculated Salary</span></th>
+                <th><span class="ar-only">الطريقة</span><span class="en-only" style="display:none;">Method</span></th>
                 <th></th>
               </tr>
             </thead>
@@ -309,16 +309,16 @@
                         <% if (userRole === 'admin') { %>
                           <form action="/sessions/<%= session.id %>/assistant-attendance/<%= aa.id %>/checkout" method="POST" class="d-flex gap-1">
                             <input type="datetime-local" name="check_out" class="form-control form-control-sm" style="max-width:180px;">
-                            <button class="btn btn-sm btn-outline-success">تسجيل انصراف</button>
+                            <button class="btn btn-sm btn-outline-success"><span class="ar-only">تسجيل انصراف</span><span class="en-only" style="display:none;">Record Checkout</span></button>
                           </form>
                         <% } else { %>
-                          <span class="text-muted small">لم ينصرف بعد</span>
+                          <span class="text-muted small"><span class="ar-only">لم ينصرف بعد</span><span class="en-only" style="display:none;">Not checked out yet</span></span>
                         <% } %>
                       <% } %>
                     </td>
                     <td>
                       <% if (aa.working_minutes) { %>
-                        <span class="fw-bold"><%= Math.floor(aa.working_minutes / 60) %>س <%= aa.working_minutes % 60 %>د</span>
+                        <span class="fw-bold"><%= Math.floor(aa.working_minutes / 60) %><span class="ar-only">س</span><span class="en-only" style="display:none;">h</span> <%= aa.working_minutes % 60 %><span class="ar-only">د</span><span class="en-only" style="display:none;">m</span></span>
                       <% } else { %><span class="text-muted">-</span><% } %>
                     </td>
                     <td>
@@ -328,13 +328,13 @@
                       <% } else { %><span class="text-muted">-</span><% } %>
                     </td>
                     <td>
-                      <span class="badge" style="background:#EEF0FB;color:#4338CA;font-size:0.7rem;">
+                      <span class="badge" style="background:var(--sf-primary-light);color:var(--sf-primary);font-size:0.7rem;">
                         <%= aa.check_in_method === 'auto' ? '🤖 تلقائي' : '✋ يدوي' %>
                       </span>
                     </td>
                     <td>
                       <% if (userRole === 'admin') { %>
-                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editModal<%= aa.id %>">تعديل</button>
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editModal<%= aa.id %>"><span class="ar-only">تعديل</span><span class="en-only" style="display:none;">Edit</span></button>
                         <form action="/sessions/<%= session.id %>/assistant-attendance/<%= aa.id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('حذف؟')">
                           <button class="btn btn-sm btn-outline-danger">🗑</button>
                         </form>
@@ -343,42 +343,42 @@
                           <div class="modal-dialog">
                             <div class="modal-content">
                               <div class="modal-header">
-                                <h6 class="modal-title">تعديل حضور: <%= aa.User ? aa.User.name : '' %></h6>
+                                <h6 class="modal-title"><span class="ar-only">تعديل حضور:</span><span class="en-only" style="display:none;">Edit Attendance:</span> <%= aa.User ? aa.User.name : '' %></h6>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                               </div>
                               <form action="/sessions/<%= session.id %>/assistant-attendance/<%= aa.id %>/edit" method="POST">
                                 <div class="modal-body row g-2">
                                   <div class="col-6">
-                                    <label class="form-label small">وقت الحضور</label>
+                                    <label class="form-label small"><span class="ar-only">وقت الحضور</span><span class="en-only" style="display:none;">Check-in Time</span></label>
                                     <input type="datetime-local" name="check_in" class="form-control form-control-sm"
                                       value="<%= aa.check_in ? new Date(aa.check_in).toISOString().slice(0,16) : '' %>">
                                   </div>
                                   <div class="col-6">
-                                    <label class="form-label small">وقت الانصراف</label>
+                                    <label class="form-label small"><span class="ar-only">وقت الانصراف</span><span class="en-only" style="display:none;">Check-out Time</span></label>
                                     <input type="datetime-local" name="check_out" class="form-control form-control-sm"
                                       value="<%= aa.check_out ? new Date(aa.check_out).toISOString().slice(0,16) : '' %>">
                                   </div>
                                   <div class="col-6">
-                                    <label class="form-label small">طريقة الراتب</label>
+                                    <label class="form-label small"><span class="ar-only">طريقة الراتب</span><span class="en-only" style="display:none;">Salary Method</span></label>
                                     <select name="salary_type" class="form-select form-select-sm">
-                                      <option value="fixed" <%= aa.salary_type==='fixed'?'selected':'' %>>ثابت</option>
-                                      <option value="hourly" <%= aa.salary_type==='hourly'?'selected':'' %>>بالساعة</option>
-                                      <option value="per_session" <%= aa.salary_type==='per_session'?'selected':'' %>>بالحصة</option>
+                                      <option value="fixed" <%= aa.salary_type==='fixed'?'selected':'' %>><span class="ar-only">ثابت</span><span class="en-only" style="display:none;">Fixed</span></option>
+                                      <option value="hourly" <%= aa.salary_type==='hourly'?'selected':'' %>><span class="ar-only">بالساعة</span><span class="en-only" style="display:none;">Hourly</span></option>
+                                      <option value="per_session" <%= aa.salary_type==='per_session'?'selected':'' %>><span class="ar-only">بالحصة</span><span class="en-only" style="display:none;">Per Session</span></option>
                                     </select>
                                   </div>
                                   <div class="col-6">
-                                    <label class="form-label small">المبلغ</label>
+                                    <label class="form-label small"><span class="ar-only">المبلغ</span><span class="en-only" style="display:none;">Amount</span></label>
                                     <input type="number" name="salary_amount" class="form-control form-control-sm" step="0.5"
                                       value="<%= aa.salary_amount || 0 %>">
                                   </div>
                                   <div class="col-12">
-                                    <label class="form-label small">ملاحظات</label>
+                                    <label class="form-label small"><span class="ar-only">ملاحظات</span><span class="en-only" style="display:none;">Notes</span></label>
                                     <input type="text" name="notes" class="form-control form-control-sm" value="<%= aa.notes || '' %>">
                                   </div>
                                 </div>
                                 <div class="modal-footer">
-                                  <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
-                                  <button type="submit" class="btn btn-primary btn-sm">حفظ</button>
+                                  <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
+                                  <button type="submit" class="btn btn-primary btn-sm"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
                                 </div>
                               </form>
                             </div>
@@ -389,7 +389,7 @@
                   </tr>
                 <% }) %>
               <% } else { %>
-                <tr><td colspan="7" class="text-muted text-center small">لا يوجد أسيستانتس مسجلين في هذه الحصة</td></tr>
+                <tr><td colspan="7" class="text-muted text-center small"><span class="ar-only">لا يوجد أسيستانتس مسجلين في هذه الحصة</span><span class="en-only" style="display:none;">No assistants registered for this session</span></td></tr>
               <% } %>
             </tbody>
           </table>

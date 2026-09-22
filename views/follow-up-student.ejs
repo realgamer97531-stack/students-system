@@ -2,7 +2,7 @@
 
 <div class="d-flex justify-content-between mb-4">
   <div>
-    <a href="/follow-up-dashboard" class="btn btn-sm btn-outline-secondary mb-2">⬅ رجوع</a>
+    <a href="/follow-up-dashboard" class="btn btn-sm btn-outline-secondary mb-2">⬅ <span class="ar-only">رجوع</span><span class="en-only" style="display:none;">Back</span></a>
     <h3 class="mb-1"><%= student.name %></h3>
     <p class="text-muted small mb-0"><%= student.student_code %> | <%= student.Subject?.name %> | <%= student.Center?.name %></p>
   </div>
@@ -13,30 +13,30 @@
   <div class="card-body">
     <div class="row g-3">
       <div class="col-md-4">
-        <div class="small text-muted">رقم الطالب</div>
+        <div class="small text-muted"><span class="ar-only">رقم الطالب</span><span class="en-only" style="display:none;">Student Number</span></div>
         <div class="fw-bold"><%= student.phone || '-' %></div>
       </div>
       <div class="col-md-4">
-        <div class="small text-muted">رقم ولي الأمر</div>
+        <div class="small text-muted"><span class="ar-only">رقم ولي الأمر</span><span class="en-only" style="display:none;">Parent Number</span></div>
         <div class="fw-bold"><%= student.parent_phone || '-' %></div>
         <% if (student.parent_phone) { %>
           <a href="https://wa.me/2<%= student.parent_phone.replace(/^0/,'') %>" target="_blank"
             class="btn btn-sm mt-1" style="background:#25D366;color:#fff;font-size:0.7rem;padding:2px 8px;">
-            💬 واتساب
+            💬 <span class="ar-only">واتساب</span><span class="en-only" style="display:none;">WhatsApp</span>
           </a>
         <% } %>
       </div>
       <div class="col-md-4">
-        <div class="small text-muted">أسيستانت المتابعة</div>
+        <div class="small text-muted"><span class="ar-only">أسيستانت المتابعة</span><span class="en-only" style="display:none;">Follow-up Assistant</span></div>
         <div class="fw-bold"><%= assignment?.Assistant?.name || 'غير محدد' %></div>
       </div>
       <div class="col-md-4">
-        <div class="small text-muted">الرصيد</div>
+        <div class="small text-muted"><span class="ar-only">الرصيد</span><span class="en-only" style="display:none;">Balance</span></div>
         <div class="fw-bold text-success"><%= student.balance %> ج</div>
       </div>
       <div class="col-md-4">
-        <div class="small text-muted">النقاط</div>
-        <div class="fw-bold" style="color:#D97706;"><%= student.points || 0 %> ⭐</div>
+        <div class="small text-muted"><span class="ar-only">النقاط</span><span class="en-only" style="display:none;">Points</span></div>
+        <div class="fw-bold" style="color:var(--sf-warning-soft-text);"><%= student.points || 0 %> ⭐</div>
       </div>
     </div>
   </div>
@@ -52,26 +52,26 @@
         <thead class="table-light">
           <tr>
             <th>#</th>
-            <th>الحضور</th>
-            <th>الواجب</th>
-            <th>الامتحان</th>
-            <th>📖 شرح</th>
-            <th>❓ أسئلة</th>
-            <th>✅ واجب</th>
-            <th>كومنت</th>
+            <th><span class="ar-only">الحضور</span><span class="en-only" style="display:none;">Attendance</span></th>
+            <th><span class="ar-only">الواجب</span><span class="en-only" style="display:none;">Homework</span></th>
+            <th><span class="ar-only">الامتحان</span><span class="en-only" style="display:none;">Exam</span></th>
+            <th>📖 <span class="ar-only">شرح</span><span class="en-only" style="display:none;">Explanation</span></th>
+            <th>❓ <span class="ar-only">أسئلة</span><span class="en-only" style="display:none;">Questions</span></th>
+            <th>✅ <span class="ar-only">واجب</span><span class="en-only" style="display:none;">Homework</span></th>
+            <th><span class="ar-only">كومنت</span><span class="en-only" style="display:none;">Comment</span></th>
           </tr>
         </thead>
         <tbody>
           <% lessonData.forEach(row => { %>
-            <tr style="background:<%= !row.attended ? '#FFF8F8' : 'transparent' %>">
+            <tr style="background:<%= !row.attended ? 'var(--sf-danger-soft-bg)' : 'transparent' %>">
               <td class="fw-bold"><%= row.session.lesson_number %></td>
               <td>
                 <% if (row.attended) { %>
-                  <span class="badge" style="background:#D1FAE5;color:#047857;font-size:0.7rem;">✓ <%= row.attendedWhere %></span>
-                  <% if (row.attendanceTime) { %><br><span style="font-size:0.65rem;color:#6B7280;"><%= new Date(row.attendanceTime).toLocaleString('ar-EG',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) %></span><% } %>
-                  <% if (row.attendedBy) { %><br><span style="font-size:0.62rem;color:#9CA3AF;"><%= row.attendedBy %></span><% } %>
+                  <span class="badge" style="background:var(--sf-success-soft-bg);color:var(--sf-success-soft-text);font-size:0.7rem;">✓ <%= row.attendedWhere %></span>
+                  <% if (row.attendanceTime) { %><br><span style="font-size:0.65rem;color:var(--sf-muted);"><%= new Date(row.attendanceTime).toLocaleString('ar-EG',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) %></span><% } %>
+                  <% if (row.attendedBy) { %><br><span style="font-size:0.62rem;color:var(--sf-muted);"><%= row.attendedBy %></span><% } %>
                 <% } else { %>
-                  <span class="badge" style="background:#FEE2E2;color:#B91C1C;font-size:0.7rem;">غائب</span>
+                  <span class="badge" style="background:var(--sf-danger-soft-bg);color:var(--sf-danger-soft-text);font-size:0.7rem;"><span class="ar-only">غائب</span><span class="en-only" style="display:none;">Absent</span></span>
                 <% } %>
               </td>
               <td>
@@ -81,7 +81,7 @@
               </td>
               <td>
                 <% if (row.examScore !== null) { %>
-                  <span class="fw-bold" style="color:<%= (row.examScore/row.examMax*100)>=60?'#059669':'#DC2626' %>;">
+                  <span class="fw-bold" style="color:<%= (row.examScore/row.examMax*100)>=60?'var(--sf-success-soft-text)':'var(--sf-danger-soft-text)' %>;">
                     <%= row.examScore %>/<%= row.examMax %>
                   </span>
                 <% } else { %><span class="text-muted small">-</span><% } %>
@@ -91,14 +91,14 @@
                   <% const watched = Math.floor((row.videoWatch[cat]||0)/60); %>
                   <% const total = Math.floor((row.videoWatch[`${cat}Total`]||0)/60); %>
                   <% if (total > 0) { %>
-                    <div style="font-size:0.8rem;font-weight:600;color:<%= watched/total>=0.7?'#059669':watched/total>=0.4?'#D97706':'#DC2626' %>;">
+                    <div style="font-size:0.8rem;font-weight:600;color:<%= watched/total>=0.7?'var(--sf-success-soft-text)':watched/total>=0.4?'var(--sf-warning-soft-text)':'var(--sf-danger-soft-text)' %>;">
                       <%= watched %>/<%= total %>د
                     </div>
                     <% row.videoParts.filter(part => part.category === cat).forEach(part => { %>
                       <form action="/follow-up-dashboard/student/<%= student.id %>/video-time" method="POST" class="d-flex align-items-center gap-1 mt-1">
                         <input type="hidden" name="video_part_id" value="<%= part.id %>">
                         <input type="number" name="watched_seconds" class="form-control form-control-sm" style="width:78px;font-size:0.7rem;" value="<%= part.watchedSeconds %>" min="0" max="<%= part.durationSeconds %>" title="الثواني" required>
-                        <button type="submit" class="btn btn-sm" style="padding:2px 5px;background:#EEF0FB;color:#4338CA;font-size:0.7rem;" title="حفظ وقت المشاهدة">💾</button>
+                        <button type="submit" class="btn btn-sm" style="padding:2px 5px;background:var(--sf-primary-light);color:var(--sf-primary);font-size:0.7rem;" title="حفظ وقت المشاهدة">💾</button>
                       </form>
                     <% }) %>
                   <% } else { %><span class="text-muted small">-</span><% } %>
@@ -106,15 +106,15 @@
               <% }) %>
               <td style="min-width:150px;">
                 <% if (row.comment) { %>
-                  <div class="p-1 rounded mb-1" style="background:#EEF0FB;font-size:0.72rem;"><%= row.comment %></div>
-                  <div style="font-size:0.62rem;color:#9CA3AF;"><%= row.commentUser %></div>
+                  <div class="p-1 rounded mb-1" style="background:var(--sf-primary-light);font-size:0.72rem;"><%= row.comment %></div>
+                  <div style="font-size:0.62rem;color:var(--sf-muted);"><%= row.commentUser %></div>
                 <% } %>
                 <form action="/follow-up-dashboard/comment" method="POST" class="d-flex gap-1 mt-1">
                   <input type="hidden" name="student_id" value="<%= student.id %>">
                   <input type="hidden" name="session_id" value="<%= row.session.id %>">
                   <input type="hidden" name="redirect_to" value="/follow-up-dashboard/student/<%= student.id %>">
                   <input type="text" name="comment" class="form-control form-control-sm" style="font-size:0.72rem;" value="<%= row.comment || '' %>" placeholder="كومنت...">
-                  <button class="btn btn-sm" style="padding:2px 6px;background:#EEF0FB;color:#4338CA;font-size:0.7rem;white-space:nowrap;">💾</button>
+                  <button class="btn btn-sm" style="padding:2px 6px;background:var(--sf-primary-light);color:var(--sf-primary);font-size:0.7rem;white-space:nowrap;">💾</button>
                 </form>
               </td>
             </tr>

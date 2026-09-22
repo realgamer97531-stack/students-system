@@ -2,10 +2,10 @@
 
 <div class="d-flex justify-content-between mb-4">
   <div>
-    <h3 class="mb-1">💰 التقرير المالي المفصل</h3>
-    <p class="text-muted small"><%= session.Subject.name %> - <%= session.Center.name %> - حصة <%= session.lesson_number %></p>
+    <h3 class="mb-1">💰 <span class="ar-only">التقرير المالي المفصل</span><span class="en-only" style="display:none;">Detailed Financial Report</span></h3>
+    <p class="text-muted small"><%= session.Subject.name %> - <%= session.Center.name %> - <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= session.lesson_number %></p>
   </div>
-  <a href="/sessions/<%= session.id %>/report" class="btn btn-outline-secondary btn-sm">⬅ رجوع للتقرير</a>
+  <a href="/sessions/<%= session.id %>/report" class="btn btn-outline-secondary btn-sm">⬅ <span class="ar-only">رجوع للتقرير</span><span class="en-only" style="display:none;">Back to Report</span></a>
 </div>
 
 <!-- فلاتر -->
@@ -13,24 +13,24 @@
   <div class="card-body">
     <form method="GET" class="row g-2 align-items-end">
       <div class="col-md-3">
-        <label class="form-label small">الأسيستانت</label>
+        <label class="form-label small"><span class="ar-only">الأسيستانت</span><span class="en-only" style="display:none;">Assistant</span></label>
         <select name="filter_user" class="form-select form-select-sm">
-          <option value="">الكل</option>
+          <option value=""><span class="ar-only">الكل</span><span class="en-only" style="display:none;">All</span></option>
           <% allUsers.forEach(u => { %>
             <option value="<%= u.id %>" <%= filters.filter_user == u.id ? 'selected':'' %>><%= u.name %></option>
           <% }) %>
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label small">نوع المدفوعات</label>
+        <label class="form-label small"><span class="ar-only">نوع المدفوعات</span><span class="en-only" style="display:none;">Payment Type</span></label>
         <select name="filter_type" class="form-select form-select-sm">
-          <option value="all" <%= filters.filter_type === 'all' ? 'selected' : '' %>>الكل</option>
-          <option value="session" <%= filters.filter_type === 'session' ? 'selected' : '' %>>الحصة فقط</option>
-          <option value="booklet" <%= filters.filter_type === 'booklet' ? 'selected' : '' %>>البوكليتس فقط</option>
+          <option value="all" <%= filters.filter_type === 'all' ? 'selected' : '' %>><span class="ar-only">الكل</span><span class="en-only" style="display:none;">All</span></option>
+          <option value="session" <%= filters.filter_type === 'session' ? 'selected' : '' %>><span class="ar-only">الحصة فقط</span><span class="en-only" style="display:none;">Session Only</span></option>
+          <option value="booklet" <%= filters.filter_type === 'booklet' ? 'selected' : '' %>><span class="ar-only">البوكليتس فقط</span><span class="en-only" style="display:none;">Booklets Only</span></option>
         </select>
       </div>
       <div class="col-md-2">
-        <button class="btn btn-primary btn-sm w-100">تطبيق</button>
+        <button class="btn btn-primary btn-sm w-100"><span class="ar-only">تطبيق</span><span class="en-only" style="display:none;">Apply</span></button>
       </div>
     </form>
   </div>
@@ -38,7 +38,7 @@
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <label class="form-label small mb-2">🔎 البحث عن طالب في الحصص أو البوكليتس</label>
+    <label class="form-label small mb-2">🔎 <span class="ar-only">البحث عن طالب في الحصص أو البوكليتس</span><span class="en-only" style="display:none;">Search for a student in sessions or booklets</span></label>
     <input type="search" id="financialSearch" class="form-control form-control-sm" placeholder="اكتب اسم الطالب أو الكود أو اسم البوكليت...">
   </div>
 </div>
@@ -46,20 +46,20 @@
 <!-- ملخص -->
 <div class="row g-3 mb-4">
   <div class="col-md-4">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;">
-      <div class="small text-muted">إجمالي مدفوعات الحصة</div>
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid var(--sf-accent);">
+      <div class="small text-muted"><span class="ar-only">إجمالي مدفوعات الحصة</span><span class="en-only" style="display:none;">Total Session Payments</span></div>
       <h4 class="text-success"><%= totalSession.toLocaleString() %> ج</h4>
     </div>
   </div>
   <div class="col-md-4">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #4338CA;">
-      <div class="small text-muted">إجمالي مدفوعات البوكليتس</div>
-      <h4 style="color:#4338CA;"><%= totalBooklets.toLocaleString() %> ج</h4>
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid var(--sf-primary);">
+      <div class="small text-muted"><span class="ar-only">إجمالي مدفوعات البوكليتس</span><span class="en-only" style="display:none;">Total Booklet Payments</span></div>
+      <h4 style="color:var(--sf-primary);"><%= totalBooklets.toLocaleString() %> ج</h4>
     </div>
   </div>
   <div class="col-md-4">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #D97706;">
-      <div class="small text-muted">الإجمالي الكلي</div>
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid var(--sf-warning);">
+      <div class="small text-muted"><span class="ar-only">الإجمالي الكلي</span><span class="en-only" style="display:none;">Grand Total</span></div>
       <h4 class="text-warning"><%= totalAll.toLocaleString() %> ج</h4>
     </div>
   </div>
@@ -67,15 +67,15 @@
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">👨‍💼 حساب الأسيستانتس</h6>
+    <h6 class="mb-3">👨‍💼 <span class="ar-only">حساب الأسيستانتس</span><span class="en-only" style="display:none;">Assistants Account</span></h6>
     <div class="table-responsive">
       <table class="table table-sm align-middle">
         <thead class="table-light">
           <tr>
-            <th>الأسيستانت</th>
-            <th>الحصص</th>
-            <th>البوكليتس</th>
-            <th>الإجمالي</th>
+            <th><span class="ar-only">الأسيستانت</span><span class="en-only" style="display:none;">Assistant</span></th>
+            <th><span class="ar-only">الحصص</span><span class="en-only" style="display:none;">Sessions</span></th>
+            <th><span class="ar-only">البوكليتس</span><span class="en-only" style="display:none;">Booklets</span></th>
+            <th><span class="ar-only">الإجمالي</span><span class="en-only" style="display:none;">Total</span></th>
           </tr>
         </thead>
         <tbody>
@@ -83,7 +83,7 @@
             <tr>
               <td><%= a.assistantName %></td>
               <td class="text-success fw-bold"><%= a.sessionTotal.toLocaleString() %> ج</td>
-              <td style="color:#4338CA; font-weight:700;"><%= a.bookletTotal.toLocaleString() %> ج</td>
+              <td style="color:var(--sf-primary); font-weight:700;"><%= a.bookletTotal.toLocaleString() %> ج</td>
               <td class="fw-bold"><%= (a.sessionTotal + a.bookletTotal).toLocaleString() %> ج</td>
             </tr>
           <% }) %>
@@ -97,11 +97,11 @@
 <% if (filters.filter_type !== 'booklet') { %>
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">✅ مدفوعات الحصة</h6>
+    <h6 class="mb-3">✅ <span class="ar-only">مدفوعات الحصة</span><span class="en-only" style="display:none;">Session Payments</span></h6>
     <div class="table-responsive">
       <table class="table table-sm">
         <thead class="table-light">
-          <tr><th>الطالب</th><th>الكود</th><th>المبلغ</th><th>الوقت</th><th>الأسيستانت</th></tr>
+          <tr><th><span class="ar-only">الطالب</span><span class="en-only" style="display:none;">Student</span></th><th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th><th><span class="ar-only">المبلغ</span><span class="en-only" style="display:none;">Amount</span></th><th><span class="ar-only">الوقت</span><span class="en-only" style="display:none;">Time</span></th><th><span class="ar-only">الأسيستانت</span><span class="en-only" style="display:none;">Assistant</span></th></tr>
         </thead>
         <tbody>
           <% rows.filter(r => r.sessionPayment > 0).forEach(r => { %>
@@ -114,7 +114,7 @@
             </tr>
           <% }) %>
           <tr class="table-success fw-bold">
-            <td colspan="2">الإجمالي</td>
+            <td colspan="2"><span class="ar-only">الإجمالي</span><span class="en-only" style="display:none;">Total</span></td>
             <td><%= totalSession %> ج</td>
             <td colspan="2"></td>
           </tr>
@@ -129,24 +129,24 @@
 <% if (filters.filter_type !== 'session') { %>
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">📚 مدفوعات البوكليتس (في نفس يوم الحصة)</h6>
+    <h6 class="mb-3">📚 <span class="ar-only">مدفوعات البوكليتس (في نفس يوم الحصة)</span><span class="en-only" style="display:none;">Booklet Payments (Same Day as Session)</span></h6>
     <div class="table-responsive">
       <table class="table table-sm">
         <thead class="table-light">
-          <tr><th>الطالب</th><th>البوكليت</th><th>المبلغ</th><th>الوقت</th></tr>
+          <tr><th><span class="ar-only">الطالب</span><span class="en-only" style="display:none;">Student</span></th><th><span class="ar-only">البوكليت</span><span class="en-only" style="display:none;">Booklet</span></th><th><span class="ar-only">المبلغ</span><span class="en-only" style="display:none;">Amount</span></th><th><span class="ar-only">الوقت</span><span class="en-only" style="display:none;">Time</span></th></tr>
         </thead>
         <tbody>
           <% bookletTransactions.forEach(t => { %>
             <tr data-search="<%= ((t.Student?.name || '') + ' ' + (t.Student?.student_code || '') + ' ' + (t.reason || '')).toLowerCase() %>">
               <td><%= t.Student?.name || '-' %></td>
               <td class="small"><%= t.reason.replace('دفع بوكليت: ','') %></td>
-              <td class="fw-bold" style="color:#4338CA;"><%= t.amount %> ج</td>
+              <td class="fw-bold" style="color:var(--sf-primary);"><%= t.amount %> ج</td>
               <td class="small text-muted"><%= new Date(t.createdAt).toLocaleString('ar-EG') %></td>
             </tr>
           <% }) %>
-          <tr class="fw-bold" style="background:#EEF0FB;">
-            <td colspan="2">الإجمالي</td>
-            <td style="color:#4338CA;"><%= totalBooklets %> ج</td>
+          <tr class="fw-bold" style="background:var(--sf-primary-light);">
+            <td colspan="2"><span class="ar-only">الإجمالي</span><span class="en-only" style="display:none;">Total</span></td>
+            <td style="color:var(--sf-primary);"><%= totalBooklets %> ج</td>
             <td></td>
           </tr>
         </tbody>

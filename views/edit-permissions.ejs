@@ -1,6 +1,6 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-4">🔐 صلاحيات: <%= targetUser.name %></h3>
+<h3 class="mb-4">🔐 <span class="ar-only">صلاحيات:</span><span class="en-only" style="display:none;">Permissions:</span> <%= targetUser.name %></h3>
 
 <form action="/users/<%= targetUser.id %>/permissions" method="POST">
   <div class="card shadow-sm p-3">
@@ -12,8 +12,8 @@
       </div>
     <% }) %>
   </div>
-  <button type="submit" class="btn btn-primary mt-3">حفظ الصلاحيات</button>
-  <a href="/users" class="btn btn-outline-secondary mt-3">رجوع</a>
+  <button type="submit" class="btn btn-primary mt-3"><span class="ar-only">حفظ الصلاحيات</span><span class="en-only" style="display:none;">Save Permissions</span></button>
+  <a href="/users" class="btn btn-outline-secondary mt-3"><span class="ar-only">رجوع</span><span class="en-only" style="display:none;">Back</span></a>
 </form>
 
 <%- include('partials/footer') %>

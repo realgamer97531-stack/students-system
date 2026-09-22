@@ -1,6 +1,6 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-4">🎯 إدارة توزيع المتابعة</h3>
+<h3 class="mb-4">🎯 <span class="ar-only">إدارة توزيع المتابعة</span><span class="en-only" style="display:none;">Follow-up Distribution Management</span></h3>
 
 <!-- الأسيستانتس وإحصائياتهم -->
 <div class="row g-3 mb-4">
@@ -10,19 +10,19 @@
         <div class="card-body">
           <div class="d-flex justify-content-between mb-2">
             <strong><%= stat.user.name %></strong>
-            <span class="badge" style="background:#EEF0FB;color:#4338CA;"><%= stat.count %> طالب</span>
+            <span class="badge" style="background:var(--sf-primary-light);color:var(--sf-primary);"><%= stat.count %> <span class="ar-only">طالب</span><span class="en-only" style="display:none;">Students</span></span>
           </div>
           <form action="/admin/follow-up-management/settings" method="POST" class="d-flex gap-1 mb-2">
             <input type="number" name="max_<%= stat.user.id %>" class="form-control form-control-sm"
               value="<%= settings['max_' + stat.user.id] || 50 %>" placeholder="الحد الأقصى">
-            <button class="btn btn-sm btn-outline-primary">حفظ</button>
+            <button class="btn btn-sm btn-outline-primary"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
           </form>
           <div style="max-height:150px;overflow-y:auto;">
             <% stat.students.forEach(s => { %>
               <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
                 <span style="font-size:0.78rem;"><%= s?.name %></span>
                 <form action="/admin/follow-up-management/unassign/<%= s?.id %>" method="POST">
-                  <button class="btn btn-sm" style="padding:1px 6px;background:#FEE2E2;font-size:0.65rem;">إلغاء</button>
+                  <button class="btn btn-sm" style="padding:1px 6px;background:var(--sf-danger-soft-bg);color:var(--sf-danger-soft-text);font-size:0.65rem;"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
                 </form>
               </div>
             <% }) %>
@@ -36,11 +36,11 @@
 <!-- تعيين يدوي -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">تعيين طالب يدوياً</h6>
+    <h6 class="mb-3"><span class="ar-only">تعيين طالب يدوياً</span><span class="en-only" style="display:none;">Manually Assign Student</span></h6>
     <form action="/admin/follow-up-management/assign" method="POST" class="row g-2">
       <div class="col-md-4">
         <select name="student_id" class="form-select form-select-sm" required>
-          <option value="">-- اختر الطالب --</option>
+          <option value=""><span class="ar-only">-- اختر الطالب --</span><span class="en-only" style="display:none;">-- Select Student --</span></option>
           <% unassignedStudents.forEach(s => { %>
             <option value="<%= s.id %>"><%= s.name %> - <%= s.student_code %></option>
           <% }) %>
@@ -48,14 +48,14 @@
       </div>
       <div class="col-md-4">
         <select name="assistant_id" class="form-select form-select-sm" required>
-          <option value="">-- اختر الأسيستانت --</option>
+          <option value=""><span class="ar-only">-- اختر الأسيستانت --</span><span class="en-only" style="display:none;">-- Select Assistant --</span></option>
           <% followUpEligible.forEach(u => { %>
             <option value="<%= u.id %>"><%= u.name %></option>
           <% }) %>
         </select>
       </div>
       <div class="col-md-4">
-        <button class="btn btn-primary btn-sm w-100">تعيين</button>
+        <button class="btn btn-primary btn-sm w-100"><span class="ar-only">تعيين</span><span class="en-only" style="display:none;">Assign</span></button>
       </div>
     </form>
   </div>
@@ -65,11 +65,11 @@
 <div class="card shadow-sm mb-4">
   <div class="card-body d-flex justify-content-between align-items-center">
     <div>
-      <h6 class="mb-1">توزيع تلقائي (Round-Robin)</h6>
-      <p class="small text-muted mb-0">سيوزع <%= unassignedStudents.length %> طالب غير مُعيَّن على الأسيستانتس المتاحين</p>
+      <h6 class="mb-1"><span class="ar-only">توزيع تلقائي</span><span class="en-only" style="display:none;">Auto Distribution</span> (Round-Robin)</h6>
+      <p class="small text-muted mb-0"><span class="ar-only">سيوزع</span><span class="en-only" style="display:none;">Will distribute</span> <%= unassignedStudents.length %> <span class="ar-only">طالب غير مُعيَّن على الأسيستانتس المتاحين</span><span class="en-only" style="display:none;">unassigned students to the available assistants</span></p>
     </div>
     <form action="/admin/follow-up-management/auto-assign" method="POST">
-      <button class="btn btn-success" onclick="return confirm('سيتم التوزيع التلقائي. متأكد؟')">⚡ توزيع تلقائي</button>
+      <button class="btn btn-success" onclick="return confirm('سيتم التوزيع التلقائي. متأكد؟')">⚡ <span class="ar-only">توزيع تلقائي</span><span class="en-only" style="display:none;">Auto Distribution</span></button>
     </form>
   </div>
 </div>
@@ -77,38 +77,38 @@
 <!-- كل الطلاب -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">👥 كل الطلاب</h6>
+    <h6 class="mb-3">👥 <span class="ar-only">كل الطلاب</span><span class="en-only" style="display:none;">All Students</span></h6>
 
     <form action="/admin/follow-up-management/bulk-assign" method="POST" id="bulkForm">
-      <div class="d-flex gap-2 mb-3 align-items-center flex-wrap p-2 rounded" style="background:#EEF0FB;">
+      <div class="d-flex gap-2 mb-3 align-items-center flex-wrap p-2 rounded" style="background:var(--sf-primary-light);">
         <div class="form-check mb-0">
           <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleAll(this)">
-          <label class="form-check-label small fw-bold" for="selectAll">تحديد الكل</label>
+          <label class="form-check-label small fw-bold" for="selectAll"><span class="ar-only">تحديد الكل</span><span class="en-only" style="display:none;">Select All</span></label>
         </div>
         <div class="d-flex gap-2 flex-wrap align-items-center">
           <select id="filterSubject" name="subject_id" class="form-select form-select-sm" style="width:180px;">
-            <option value="">-- تصفية بالمادة --</option>
+            <option value=""><span class="ar-only">-- تصفية بالمادة --</span><span class="en-only" style="display:none;">-- Filter by Subject --</span></option>
             <% subjects.forEach(sub => { %>
               <option value="<%= sub.id %>" <%= selectedSubjectId == sub.id ? 'selected' : '' %>><%= sub.name %></option>
             <% }) %>
           </select>
           <select id="filterCenter" name="center_id" class="form-select form-select-sm" style="width:180px;">
-            <option value="">-- تصفية بالسنتر --</option>
+            <option value=""><span class="ar-only">-- تصفية بالسنتر --</span><span class="en-only" style="display:none;">-- Filter by Center --</span></option>
             <% centers.forEach(center => { %>
               <option value="<%= center.id %>" <%= selectedCenterId == center.id ? 'selected' : '' %>><%= center.name %></option>
             <% }) %>
           </select>
-          <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyFollowUpFilters()">تطبيق التصفية</button>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyFollowUpFilters()"><span class="ar-only">تطبيق التصفية</span><span class="en-only" style="display:none;">Apply Filter</span></button>
         </div>
         <select name="assistant_id" class="form-select form-select-sm" style="width:180px;">
-          <option value="">-- اختر أسيستانت --</option>
+          <option value=""><span class="ar-only">-- اختر أسيستانت --</span><span class="en-only" style="display:none;">-- Select Assistant --</span></option>
           <% followUpEligible.forEach(u => { %>
             <option value="<%= u.id %>"><%= u.name %></option>
           <% }) %>
         </select>
-        <button type="submit" name="action" value="assign" class="btn btn-sm btn-primary">تعيين للمختارين</button>
+        <button type="submit" name="action" value="assign" class="btn btn-sm btn-primary"><span class="ar-only">تعيين للمختارين</span><span class="en-only" style="display:none;">Assign Selected</span></button>
         <button type="submit" name="action" value="unassign" class="btn btn-sm btn-outline-danger"
-          onclick="return confirm('إلغاء تعيين كل المحددين؟')">إلغاء تعيين المختارين</button>
+          onclick="return confirm('إلغاء تعيين كل المحددين؟')"><span class="ar-only">إلغاء تعيين المختارين</span><span class="en-only" style="display:none;">Unassign Selected</span></button>
         <span class="small text-muted ms-auto" id="selectedCount">0 محدد</span>
       </div>
 
@@ -119,10 +119,10 @@
           <thead class="table-light" style="position:sticky;top:0;">
             <tr>
               <th style="width:40px;"></th>
-              <th>الطالب</th>
-              <th>المادة</th>
-              <th>السنتر</th>
-              <th>الأسيستانت الحالي</th>
+              <th><span class="ar-only">الطالب</span><span class="en-only" style="display:none;">Student</span></th>
+              <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
+              <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
+              <th><span class="ar-only">الأسيستانت الحالي</span><span class="en-only" style="display:none;">Current Assistant</span></th>
             </tr>
           </thead>
           <tbody>
@@ -145,9 +145,9 @@
                 <td>
                   <% const currentAss = assignedMap[s.id]; %>
                   <% if (currentAss) { %>
-                    <span class="badge" style="background:#EEF0FB;color:#4338CA;font-size:0.7rem;"><%= currentAss.name %></span>
+                    <span class="badge" style="background:var(--sf-primary-light);color:var(--sf-primary);font-size:0.7rem;"><%= currentAss.name %></span>
                   <% } else { %>
-                    <span class="badge bg-secondary" style="font-size:0.65rem;">غير محدد</span>
+                    <span class="badge bg-secondary" style="font-size:0.65rem;"><span class="ar-only">غير محدد</span><span class="en-only" style="display:none;">Unassigned</span></span>
                   <% } %>
                 </td>
               </tr>

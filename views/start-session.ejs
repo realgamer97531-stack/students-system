@@ -2,13 +2,13 @@
   <div class="container py-5">
     <div class="card shadow-sm mx-auto" style="max-width: 600px;">
       <div class="card-body p-4">
-        <h3 class="mb-4 text-center">بدء حصة</h3>
+        <h3 class="mb-4 text-center"><span class="ar-only">بدء حصة</span><span class="en-only" style="display:none;">Start Session</span></h3>
 
         <form action="/sessions" method="POST">
           <div class="mb-3">
-            <label class="form-label">المادة</label>
+            <label class="form-label"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
             <select name="subject_id" class="form-select" required>
-              <option value="">-- اختر المادة --</option>
+              <option value=""><span class="ar-only">-- اختر المادة --</span><span class="en-only" style="display:none;">-- Choose Subject --</span></option>
               <% subjects.forEach(subj => { %>
                 <option value="<%= subj.id %>"><%= subj.name %></option>
               <% }) %>
@@ -16,9 +16,9 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">السنتر</label>
+            <label class="form-label"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
             <select name="center_id" class="form-select" required>
-              <option value="">-- اختر السنتر --</option>
+              <option value=""><span class="ar-only">-- اختر السنتر --</span><span class="en-only" style="display:none;">-- Choose Center --</span></option>
               <% centers.forEach(center => { %>
                 <option value="<%= center.id %>"><%= center.name %></option>
               <% }) %>
@@ -26,44 +26,46 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">نوع الحصة</label>
+            <label class="form-label"><span class="ar-only">نوع الحصة</span><span class="en-only" style="display:none;">Session Type</span></label>
             <div class="form-check">
               <input class="form-check-input" type="radio" name="mode" id="modeNew" value="new" checked>
               <label class="form-check-label" for="modeNew">
-                حصة جديدة (النظام يحسب رقمها تلقائي)
+                <span class="ar-only">حصة جديدة (النظام يحسب رقمها تلقائي)</span>
+                <span class="en-only" style="display:none;">New Session (system calculates its number automatically)</span>
               </label>
             </div>
             <div class="form-check">
               <input class="form-check-input" type="radio" name="mode" id="modeRepeat" value="repeat">
               <label class="form-check-label" for="modeRepeat">
-                تكرار حصة سابقة في سنتر تاني (أنا أحدد رقمها)
+                <span class="ar-only">تكرار حصة سابقة في سنتر تاني (أنا أحدد رقمها)</span>
+                <span class="en-only" style="display:none;">Repeat a previous session in another center (I specify its number)</span>
               </label>
             </div>
           </div>
 
           <div class="mb-3">
-            <label class="form-label">رقم الأسبوع</label>
+            <label class="form-label"><span class="ar-only">رقم الأسبوع</span><span class="en-only" style="display:none;">Week Number</span></label>
             <select name="week_number" class="form-select">
-              <option value="">-- اختر الأسبوع (اختياري) --</option>
-              <option value="1">الأسبوع 1</option>
-              <option value="2">الأسبوع 2</option>
-              <option value="3">الأسبوع 3</option>
-              <option value="4">الأسبوع 4</option>
-              <option value="5">الأسبوع 5</option>
-              <option value="6">الأسبوع 6</option>
-              <option value="7">الأسبوع 7</option>
-              <option value="8">الأسبوع 8</option>
-              <option value="9">الأسبوع 9</option>
-              <option value="10">الأسبوع 10</option>
+              <option value=""><span class="ar-only">-- اختر الأسبوع (اختياري) --</span><span class="en-only" style="display:none;">-- Choose Week (optional) --</span></option>
+              <option value="1"><span class="ar-only">الأسبوع 1</span><span class="en-only" style="display:none;">Week 1</span></option>
+              <option value="2"><span class="ar-only">الأسبوع 2</span><span class="en-only" style="display:none;">Week 2</span></option>
+              <option value="3"><span class="ar-only">الأسبوع 3</span><span class="en-only" style="display:none;">Week 3</span></option>
+              <option value="4"><span class="ar-only">الأسبوع 4</span><span class="en-only" style="display:none;">Week 4</span></option>
+              <option value="5"><span class="ar-only">الأسبوع 5</span><span class="en-only" style="display:none;">Week 5</span></option>
+              <option value="6"><span class="ar-only">الأسبوع 6</span><span class="en-only" style="display:none;">Week 6</span></option>
+              <option value="7"><span class="ar-only">الأسبوع 7</span><span class="en-only" style="display:none;">Week 7</span></option>
+              <option value="8"><span class="ar-only">الأسبوع 8</span><span class="en-only" style="display:none;">Week 8</span></option>
+              <option value="9"><span class="ar-only">الأسبوع 9</span><span class="en-only" style="display:none;">Week 9</span></option>
+              <option value="10"><span class="ar-only">الأسبوع 10</span><span class="en-only" style="display:none;">Week 10</span></option>
             </select>
           </div>
 
           <div class="mb-3" id="lessonNumberBox" style="display: none;">
-            <label class="form-label">رقم الحصة النسبي (مثلاً 3)</label>
+            <label class="form-label"><span class="ar-only">رقم الحصة النسبي (مثلاً 3)</span><span class="en-only" style="display:none;">Relative Session Number (e.g. 3)</span></label>
             <input type="number" name="lesson_number" class="form-control" min="1">
           </div>
 
-          <button type="submit" class="btn btn-success w-100">بدء الحصة</button>
+          <button type="submit" class="btn btn-success w-100"><span class="ar-only">بدء الحصة</span><span class="en-only" style="display:none;">Start Session</span></button>
         </form>
       </div>
     </div>

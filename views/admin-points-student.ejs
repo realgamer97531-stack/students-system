@@ -2,45 +2,45 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h3 class="mb-1">⭐ تفاصيل نقاط الطالب</h3>
+    <h3 class="mb-1">⭐ <span class="ar-only">تفاصيل نقاط الطالب</span><span class="en-only" style="display:none;">Student Points Details</span></h3>
     <p class="text-muted small mb-0"><%= student.name %> | <%= student.student_code || '-' %></p>
   </div>
-  <a href="/admin/points" class="btn btn-outline-secondary">العودة للقائمة</a>
+  <a href="/admin/points" class="btn btn-outline-secondary"><span class="ar-only">العودة للقائمة</span><span class="en-only" style="display:none;">Back to List</span></a>
 </div>
 
 <div class="row g-3 mb-4">
   <div class="col-md-4">
     <div class="card p-3 h-100">
-      <div class="text-muted small">إجمالي النقاط</div>
+      <div class="text-muted small"><span class="ar-only">إجمالي النقاط</span><span class="en-only" style="display:none;">Total Points</span></div>
       <div class="display-6 fw-bold text-warning"><%= currentPoints %></div>
     </div>
   </div>
   <div class="col-md-4">
     <div class="card p-3 h-100">
-      <div class="text-muted small">المادة</div>
+      <div class="text-muted small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></div>
       <div class="fw-bold"><%= student.Subject ? student.Subject.name : '-' %></div>
     </div>
   </div>
   <div class="col-md-4">
     <div class="card p-3 h-100">
-      <div class="text-muted small">السنتر</div>
+      <div class="text-muted small"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></div>
       <div class="fw-bold"><%= student.Center ? student.Center.name : '-' %></div>
     </div>
   </div>
 </div>
 
 <div class="card p-3">
-  <h5 class="mb-3">سجل أسباب النقاط</h5>
+  <h5 class="mb-3"><span class="ar-only">سجل أسباب النقاط</span><span class="en-only" style="display:none;">Points Reason Log</span></h5>
   <% if (pointHistory.length === 0) { %>
-    <p class="text-muted mb-0">لا يوجد سجل أسباب محفوظ لهذا الطالب حتى الآن.</p>
+    <p class="text-muted mb-0"><span class="ar-only">لا يوجد سجل أسباب محفوظ لهذا الطالب حتى الآن.</span><span class="en-only" style="display:none;">No reason log saved for this student yet.</span></p>
   <% } else { %>
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead>
           <tr>
-            <th>السبب</th>
-            <th class="text-center">النقاط</th>
-            <th>التاريخ</th>
+            <th><span class="ar-only">السبب</span><span class="en-only" style="display:none;">Reason</span></th>
+            <th class="text-center"><span class="ar-only">النقاط</span><span class="en-only" style="display:none;">Points</span></th>
+            <th><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
           </tr>
         </thead>
         <tbody>
@@ -49,7 +49,7 @@
               <td>
                 <%= entry.reason.replace(/^نقاط:\s*/, '') %>
                 <% if (entry.isReconciliation) { %>
-                  <span class="badge bg-secondary ms-1">تسوية عرض فقط</span>
+                  <span class="badge bg-secondary ms-1"><span class="ar-only">تسوية عرض فقط</span><span class="en-only" style="display:none;">Display-only Reconciliation</span></span>
                 <% } %>
               </td>
               <td class="text-center fw-bold <%= Number(entry.amount) >= 0 ? 'text-success' : 'text-danger' %>">
@@ -65,7 +65,7 @@
 </div>
 
 <div class="alert alert-info mt-3 mb-0">
-  الحضور +2، الواجب الكامل +3، الواجب غير الكامل +1، الواجب غير المحلول -2، ودرجة الامتحان تضاف كنقاط.
+  <span class="ar-only">الحضور +2، الواجب الكامل +3، الواجب غير الكامل +1، الواجب غير المحلول -2، ودرجة الامتحان تضاف كنقاط.</span><span class="en-only" style="display:none;">Attendance +2, complete homework +3, incomplete homework +1, unsolved homework -2, and exam score is added as points.</span>
 </div>
 
 <%- include('partials/footer') %>

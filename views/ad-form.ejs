@@ -8,7 +8,7 @@
   const formAction = isEdit ? ('/admin/ads/' + ad.id) : '/admin/ads';
 %>
 
-<h3 class="mb-4"><%= isEdit ? '✏️ تعديل إعلان' : '➕ إعلان جديد' %></h3>
+<h3 class="mb-4"><%- isEdit ? '✏️ <span class="ar-only">تعديل إعلان</span><span class="en-only" style="display:none;">Edit Ad</span>' : '➕ <span class="ar-only">إعلان جديد</span><span class="en-only" style="display:none;">New Ad</span>' %></h3>
 
 <form action="<%= formAction %>" method="POST" enctype="multipart/form-data" id="adForm">
   <div class="row g-4">
@@ -16,25 +16,25 @@
 
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">معلومات أساسية</h5>
+          <h5 class="fw-bold mb-3"><span class="ar-only">معلومات أساسية</span><span class="en-only" style="display:none;">Basic Information</span></h5>
           <div class="row g-3">
             <div class="col-md-8">
-              <label class="form-label">الاسم الداخلي (للأدمن فقط، الطالب لا يراه)</label>
+              <label class="form-label"><span class="ar-only">الاسم الداخلي (للأدمن فقط، الطالب لا يراه)</span><span class="en-only" style="display:none;">Internal Name (admin only, not visible to students)</span></label>
               <input type="text" name="title" class="form-control" required value="<%= isEdit ? ad.title : '' %>">
             </div>
             <div class="col-md-2">
-              <label class="form-label">الأولوية</label>
+              <label class="form-label"><span class="ar-only">الأولوية</span><span class="en-only" style="display:none;">Priority</span></label>
               <input type="number" name="priority" class="form-control" value="<%= isEdit ? ad.priority : 0 %>">
-              <small class="text-muted">الأصغر يظهر أولاً</small>
+              <small class="text-muted"><span class="ar-only">الأصغر يظهر أولاً</span><span class="en-only" style="display:none;">Smaller shows first</span></small>
             </div>
             <div class="col-md-2 d-flex align-items-end">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="is_active" id="is_active" <%= (!isEdit || ad.is_active) ? 'checked' : '' %>>
-                <label class="form-check-label" for="is_active">فعّال</label>
+                <label class="form-check-label" for="is_active"><span class="ar-only">فعّال</span><span class="en-only" style="display:none;">Active</span></label>
               </div>
             </div>
             <div class="col-md-12">
-              <label class="form-label">رابط عند الضغط على الإعلان (اختياري)</label>
+              <label class="form-label"><span class="ar-only">رابط عند الضغط على الإعلان (اختياري)</span><span class="en-only" style="display:none;">Link when tapping the ad (optional)</span></label>
               <input type="url" name="link_url" class="form-control" placeholder="https://..." value="<%= isEdit && ad.link_url ? ad.link_url : '' %>">
             </div>
           </div>
@@ -43,55 +43,55 @@
 
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">محتوى الإعلان</h5>
+          <h5 class="fw-bold mb-3"><span class="ar-only">محتوى الإعلان</span><span class="en-only" style="display:none;">Ad Content</span></h5>
           <div class="btn-group mb-3" role="group">
             <input type="radio" class="btn-check" name="ad_type" id="ad_type_image" value="image" <%= (!isEdit || ad.ad_type === 'image') ? 'checked' : '' %>>
-            <label class="btn btn-outline-primary" for="ad_type_image">🖼️ رفع صورة جاهزة</label>
+            <label class="btn btn-outline-primary" for="ad_type_image">🖼️ <span class="ar-only">رفع صورة جاهزة</span><span class="en-only" style="display:none;">Upload Ready Image</span></label>
             <input type="radio" class="btn-check" name="ad_type" id="ad_type_design" value="design" <%= (isEdit && ad.ad_type === 'design') ? 'checked' : '' %>>
-            <label class="btn btn-outline-primary" for="ad_type_design">🎨 تصميم إعلان</label>
+            <label class="btn btn-outline-primary" for="ad_type_design">🎨 <span class="ar-only">تصميم إعلان</span><span class="en-only" style="display:none;">Design Ad</span></label>
           </div>
 
           <div id="imagePanel">
-            <label class="form-label">صورة الإعلان</label>
+            <label class="form-label"><span class="ar-only">صورة الإعلان</span><span class="en-only" style="display:none;">Ad Image</span></label>
             <input type="file" name="image" id="imageFile" accept="image/*" class="form-control">
             <% if (isEdit && ad.image_url) { %>
-              <small class="text-muted d-block mt-1">اتركه فارغًا للاحتفاظ بالصورة الحالية</small>
+              <small class="text-muted d-block mt-1"><span class="ar-only">اتركه فارغًا للاحتفاظ بالصورة الحالية</span><span class="en-only" style="display:none;">Leave it empty to keep the current image</span></small>
             <% } %>
           </div>
 
           <div id="designPanel" style="display:none;">
 
-            <h6 class="fw-bold mt-2">الخلفية</h6>
+            <h6 class="fw-bold mt-2"><span class="ar-only">الخلفية</span><span class="en-only" style="display:none;">Background</span></h6>
             <div class="row g-3 align-items-end mb-2">
               <div class="col-auto">
-                <label class="form-label small">لون الخلفية</label>
+                <label class="form-label small"><span class="ar-only">لون الخلفية</span><span class="en-only" style="display:none;">Background Color</span></label>
                 <input type="color" name="design_backgroundColor" class="form-control form-control-color" value="<%= d.backgroundColor || '#4338CA' %>">
               </div>
               <div class="col-auto">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" name="design_useGradient" id="design_useGradient" <%= d.backgroundGradientTo ? 'checked' : '' %>>
-                  <label class="form-check-label small" for="design_useGradient">تدرج لوني</label>
+                  <label class="form-check-label small" for="design_useGradient"><span class="ar-only">تدرج لوني</span><span class="en-only" style="display:none;">Gradient</span></label>
                 </div>
               </div>
               <div class="col-auto" id="gradientColorWrap" style="display:<%= d.backgroundGradientTo ? 'block' : 'none' %>;">
-                <label class="form-label small">اللون الثاني</label>
+                <label class="form-label small"><span class="ar-only">اللون الثاني</span><span class="en-only" style="display:none;">Second Color</span></label>
                 <input type="color" name="design_backgroundGradientTo" class="form-control form-control-color" value="<%= d.backgroundGradientTo || '#14B8A6' %>">
               </div>
               <div class="col-md-4">
-                <label class="form-label small">صورة خلفية (اختياري، تلغي اللون)</label>
+                <label class="form-label small"><span class="ar-only">صورة خلفية (اختياري، تلغي اللون)</span><span class="en-only" style="display:none;">Background Image (optional, overrides color)</span></label>
                 <input type="file" name="design_background_image" id="designBgFile" accept="image/*" class="form-control form-control-sm">
               </div>
               <% if (d.backgroundImageUrl) { %>
                 <div class="col-auto">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="design_backgroundImageUrl_clear" value="1" id="clearBg">
-                    <label class="form-check-label small" for="clearBg">حذف صورة الخلفية الحالية</label>
+                    <label class="form-check-label small" for="clearBg"><span class="ar-only">حذف صورة الخلفية الحالية</span><span class="en-only" style="display:none;">Delete Current Background Image</span></label>
                   </div>
                 </div>
               <% } %>
             </div>
 
-            <h6 class="fw-bold mt-3">الشارة العلوية (Badge)</h6>
+            <h6 class="fw-bold mt-3"><span class="ar-only">الشارة العلوية (Badge)</span><span class="en-only" style="display:none;">Top Badge</span></h6>
             <div class="row g-3 mb-2">
               <div class="col-md-8">
                 <input type="text" name="design_badgeText" class="form-control" placeholder="مثال: عرض محدود" value="<%= d.badgeText || '' %>">
@@ -101,75 +101,75 @@
               </div>
             </div>
 
-            <h6 class="fw-bold mt-3">العنوان</h6>
+            <h6 class="fw-bold mt-3"><span class="ar-only">العنوان</span><span class="en-only" style="display:none;">Heading</span></h6>
             <div class="row g-3 mb-2">
               <div class="col-md-6">
                 <input type="text" name="design_heading" class="form-control" placeholder="العنوان الرئيسي" value="<%= d.heading || '' %>">
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">اللون</label>
+                <label class="form-label small mb-0"><span class="ar-only">اللون</span><span class="en-only" style="display:none;">Color</span></label>
                 <input type="color" name="design_headingColor" class="form-control form-control-color" value="<%= d.headingColor || '#ffffff' %>">
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">حجم الخط</label>
+                <label class="form-label small mb-0"><span class="ar-only">حجم الخط</span><span class="en-only" style="display:none;">Font Size</span></label>
                 <input type="number" name="design_headingSize" class="form-control" style="width:90px" value="<%= d.headingSize || 22 %>">
               </div>
             </div>
 
-            <h6 class="fw-bold mt-3">النص</h6>
+            <h6 class="fw-bold mt-3"><span class="ar-only">النص</span><span class="en-only" style="display:none;">Text</span></h6>
             <div class="row g-3 mb-2">
               <div class="col-md-6">
                 <textarea name="design_body" class="form-control" rows="3" placeholder="تفاصيل الإعلان"><%= d.body || '' %></textarea>
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">اللون</label>
+                <label class="form-label small mb-0"><span class="ar-only">اللون</span><span class="en-only" style="display:none;">Color</span></label>
                 <input type="color" name="design_bodyColor" class="form-control form-control-color" value="<%= d.bodyColor || '#ffffff' %>">
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">حجم الخط</label>
+                <label class="form-label small mb-0"><span class="ar-only">حجم الخط</span><span class="en-only" style="display:none;">Font Size</span></label>
                 <input type="number" name="design_bodySize" class="form-control" style="width:90px" value="<%= d.bodySize || 15 %>">
               </div>
             </div>
 
-            <h6 class="fw-bold mt-3">صورة داخل التصميم (اختياري)</h6>
+            <h6 class="fw-bold mt-3"><span class="ar-only">صورة داخل التصميم (اختياري)</span><span class="en-only" style="display:none;">Image Inside Design (optional)</span></h6>
             <div class="row g-3 mb-2 align-items-end">
               <div class="col-md-5">
                 <input type="file" name="design_image" id="designImgFile" accept="image/*" class="form-control form-control-sm">
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">مكانها</label>
+                <label class="form-label small mb-0"><span class="ar-only">مكانها</span><span class="en-only" style="display:none;">Position</span></label>
                 <select name="design_imagePosition" class="form-select form-select-sm">
-                  <option value="top" <%= d.imagePosition !== 'bottom' ? 'selected' : '' %>>أعلى</option>
-                  <option value="bottom" <%= d.imagePosition === 'bottom' ? 'selected' : '' %>>أسفل</option>
+                  <option value="top" <%= d.imagePosition !== 'bottom' ? 'selected' : '' %>><span class="ar-only">أعلى</span><span class="en-only" style="display:none;">Top</span></option>
+                  <option value="bottom" <%= d.imagePosition === 'bottom' ? 'selected' : '' %>><span class="ar-only">أسفل</span><span class="en-only" style="display:none;">Bottom</span></option>
                 </select>
               </div>
               <% if (d.imageUrl) { %>
                 <div class="col-auto">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="design_imageUrl_clear" value="1" id="clearImg">
-                    <label class="form-check-label small" for="clearImg">حذف الصورة الحالية</label>
+                    <label class="form-check-label small" for="clearImg"><span class="ar-only">حذف الصورة الحالية</span><span class="en-only" style="display:none;">Delete Current Image</span></label>
                   </div>
                 </div>
               <% } %>
             </div>
 
-            <h6 class="fw-bold mt-3">الزر</h6>
+            <h6 class="fw-bold mt-3"><span class="ar-only">الزر</span><span class="en-only" style="display:none;">Button</span></h6>
             <div class="row g-3 mb-2 align-items-end">
               <div class="col-auto">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" name="design_buttonEnabled" id="design_buttonEnabled" <%= d.buttonEnabled ? 'checked' : '' %>>
-                  <label class="form-check-label small" for="design_buttonEnabled">إظهار زر</label>
+                  <label class="form-check-label small" for="design_buttonEnabled"><span class="ar-only">إظهار زر</span><span class="en-only" style="display:none;">Show Button</span></label>
                 </div>
               </div>
               <div class="col-md-3">
                 <input type="text" name="design_buttonText" class="form-control" placeholder="نص الزر" value="<%= d.buttonText || '' %>">
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">لون الزر</label>
+                <label class="form-label small mb-0"><span class="ar-only">لون الزر</span><span class="en-only" style="display:none;">Button Color</span></label>
                 <input type="color" name="design_buttonColor" class="form-control form-control-color" value="<%= d.buttonColor || '#14B8A6' %>">
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">لون النص</label>
+                <label class="form-label small mb-0"><span class="ar-only">لون النص</span><span class="en-only" style="display:none;">Text Color</span></label>
                 <input type="color" name="design_buttonTextColor" class="form-control form-control-color" value="<%= d.buttonTextColor || '#ffffff' %>">
               </div>
               <div class="col-md-3">
@@ -177,22 +177,22 @@
               </div>
             </div>
 
-            <h6 class="fw-bold mt-3">التخطيط</h6>
+            <h6 class="fw-bold mt-3"><span class="ar-only">التخطيط</span><span class="en-only" style="display:none;">Layout</span></h6>
             <div class="row g-3 mb-2">
               <div class="col-auto">
-                <label class="form-label small mb-0">محاذاة النص</label>
+                <label class="form-label small mb-0"><span class="ar-only">محاذاة النص</span><span class="en-only" style="display:none;">Text Alignment</span></label>
                 <select name="design_textAlign" class="form-select form-select-sm">
-                  <option value="right" <%= d.textAlign === 'right' ? 'selected' : '' %>>يمين</option>
-                  <option value="center" <%= (!d.textAlign || d.textAlign === 'center') ? 'selected' : '' %>>وسط</option>
-                  <option value="left" <%= d.textAlign === 'left' ? 'selected' : '' %>>يسار</option>
+                  <option value="right" <%= d.textAlign === 'right' ? 'selected' : '' %>><span class="ar-only">يمين</span><span class="en-only" style="display:none;">Right</span></option>
+                  <option value="center" <%= (!d.textAlign || d.textAlign === 'center') ? 'selected' : '' %>><span class="ar-only">وسط</span><span class="en-only" style="display:none;">Center</span></option>
+                  <option value="left" <%= d.textAlign === 'left' ? 'selected' : '' %>><span class="ar-only">يسار</span><span class="en-only" style="display:none;">Left</span></option>
                 </select>
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">استدارة الحواف (px)</label>
+                <label class="form-label small mb-0"><span class="ar-only">استدارة الحواف (px)</span><span class="en-only" style="display:none;">Corner Radius (px)</span></label>
                 <input type="number" name="design_borderRadius" class="form-control form-control-sm" style="width:100px" value="<%= d.borderRadius != null ? d.borderRadius : 18 %>">
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">أقصى عرض (px)</label>
+                <label class="form-label small mb-0"><span class="ar-only">أقصى عرض (px)</span><span class="en-only" style="display:none;">Max Width (px)</span></label>
                 <input type="number" name="design_maxWidth" class="form-control form-control-sm" style="width:100px" value="<%= d.maxWidth || 420 %>">
               </div>
             </div>
@@ -202,8 +202,8 @@
 
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">أماكن الظهور</h5>
-          <p class="text-muted small">اختر الصفحات اللي يظهر فيها الإعلان (اتركها بدون اختيار = يظهر في كل الصفحات).</p>
+          <h5 class="fw-bold mb-3"><span class="ar-only">أماكن الظهور</span><span class="en-only" style="display:none;">Display Locations</span></h5>
+          <p class="text-muted small"><span class="ar-only">اختر الصفحات اللي يظهر فيها الإعلان (اتركها بدون اختيار = يظهر في كل الصفحات).</span><span class="en-only" style="display:none;">Choose the pages where the ad appears (leave unselected = appears on all pages).</span></p>
           <div class="mb-2">
             <% pages.forEach(p => { %>
               <div class="form-check form-check-inline">
@@ -217,19 +217,19 @@
 
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">الفئة المستهدفة</h5>
+          <h5 class="fw-bold mb-3"><span class="ar-only">الفئة المستهدفة</span><span class="en-only" style="display:none;">Target Audience</span></h5>
 
           <div class="btn-group mb-3" role="group">
             <input type="radio" class="btn-check" name="target_mode" id="target_mode_all" value="all" <%= (isEdit && ad.target_mode === 'all') ? 'checked' : '' %>>
-            <label class="btn btn-outline-secondary" for="target_mode_all">كل الطلاب</label>
+            <label class="btn btn-outline-secondary" for="target_mode_all"><span class="ar-only">كل الطلاب</span><span class="en-only" style="display:none;">All Students</span></label>
             <input type="radio" class="btn-check" name="target_mode" id="target_mode_filtered" value="filtered" <%= (!isEdit || ad.target_mode === 'filtered') ? 'checked' : '' %>>
-            <label class="btn btn-outline-secondary" for="target_mode_filtered">فئة محددة</label>
+            <label class="btn btn-outline-secondary" for="target_mode_filtered"><span class="ar-only">فئة محددة</span><span class="en-only" style="display:none;">Specific Group</span></label>
           </div>
 
           <div id="filteredPanel">
-            <p class="text-muted small">الطالب يظهر له الإعلان لو حقق <strong>كل</strong> الشروط المفعّلة تحت، أو لو كان ضمن قائمة "طلاب محددين بالاسم".</p>
+            <p class="text-muted small"><span class="ar-only">الطالب يظهر له الإعلان لو حقق <strong>كل</strong> الشروط المفعّلة تحت، أو لو كان ضمن قائمة "طلاب محددين بالاسم".</span><span class="en-only" style="display:none;">The ad appears to the student if they meet <strong>all</strong> the enabled conditions below, or if they are in the "students selected by name" list.</span></p>
 
-            <label class="form-label small fw-bold">السناتر (اتركها بدون اختيار = كل السناتر)</label>
+            <label class="form-label small fw-bold"><span class="ar-only">السناتر (اتركها بدون اختيار = كل السناتر)</span><span class="en-only" style="display:none;">Centers (leave unselected = all centers)</span></label>
             <div class="mb-3">
               <% centers.forEach(c => { %>
                 <div class="form-check form-check-inline">
@@ -239,7 +239,7 @@
               <% }) %>
             </div>
 
-            <label class="form-label small fw-bold">المواد (اتركها بدون اختيار = كل المواد)</label>
+            <label class="form-label small fw-bold"><span class="ar-only">المواد (اتركها بدون اختيار = كل المواد)</span><span class="en-only" style="display:none;">Subjects (leave unselected = all subjects)</span></label>
             <div class="mb-3">
               <% subjects.forEach(s => { %>
                 <div class="form-check form-check-inline">
@@ -253,20 +253,20 @@
               <div class="col-md-6">
                 <div class="form-check mb-1">
                   <input class="form-check-input" type="checkbox" name="balance_filter_enabled" id="balance_filter_enabled" <%= (isEdit && ad.balance_filter_enabled) ? 'checked' : '' %>>
-                  <label class="form-check-label" for="balance_filter_enabled">فقط لو رصيد الطالب أقل من</label>
+                  <label class="form-check-label" for="balance_filter_enabled"><span class="ar-only">فقط لو رصيد الطالب أقل من</span><span class="en-only" style="display:none;">Only if student balance is less than</span></label>
                 </div>
                 <input type="number" step="0.01" name="balance_max" class="form-control" value="<%= isEdit && ad.balance_max != null ? ad.balance_max : '' %>">
               </div>
               <div class="col-md-6">
                 <div class="form-check mb-1">
                   <input class="form-check-input" type="checkbox" name="booklet_filter_enabled" id="booklet_filter_enabled" <%= (isEdit && ad.booklet_filter_enabled) ? 'checked' : '' %>>
-                  <label class="form-check-label" for="booklet_filter_enabled">فقط لو مدفوع البوكليت أقل من</label>
+                  <label class="form-check-label" for="booklet_filter_enabled"><span class="ar-only">فقط لو مدفوع البوكليت أقل من</span><span class="en-only" style="display:none;">Only if booklet paid is less than</span></label>
                 </div>
                 <input type="number" step="0.01" name="booklet_paid_max" class="form-control" value="<%= isEdit && ad.booklet_paid_max != null ? ad.booklet_paid_max : '' %>">
               </div>
             </div>
 
-            <label class="form-label small fw-bold">طلاب محددين بالاسم (يظهر لهم الإعلان دائمًا)</label>
+            <label class="form-label small fw-bold"><span class="ar-only">طلاب محددين بالاسم (يظهر لهم الإعلان دائمًا)</span><span class="en-only" style="display:none;">Students Selected by Name (the ad always appears to them)</span></label>
             <div class="position-relative mb-2">
               <input type="text" id="studentSearchInput" class="form-control" placeholder="اكتب اسم الطالب أو كوده أو رقمه...">
               <div id="studentSearchResults" class="list-group position-absolute w-100" style="z-index:10;display:none;max-height:220px;overflow-y:auto;"></div>
@@ -277,14 +277,14 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-lg">💾 حفظ الإعلان</button>
-      <a href="/admin/ads" class="btn btn-outline-secondary btn-lg">إلغاء</a>
+      <button type="submit" class="btn btn-primary btn-lg">💾 <span class="ar-only">حفظ الإعلان</span><span class="en-only" style="display:none;">Save Ad</span></button>
+      <a href="/admin/ads" class="btn btn-outline-secondary btn-lg"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></a>
     </div>
 
     <div class="col-lg-5">
       <div class="card" style="position:sticky; top:20px;">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">👀 معاينة حية</h5>
+          <h5 class="fw-bold mb-3">👀 <span class="ar-only">معاينة حية</span><span class="en-only" style="display:none;">Live Preview</span></h5>
           <div style="background:#0f172a; border-radius:16px; padding:30px 16px; min-height:320px; display:flex; align-items:center; justify-content:center;">
             <div id="adPreviewContent" style="width:100%; display:flex; align-items:center; justify-content:center;"></div>
           </div>
@@ -371,7 +371,7 @@
   function updatePreview() {
     const previewEl = document.getElementById('adPreviewContent');
     const content = renderAdPopupContent(getFormAdObject());
-    previewEl.innerHTML = content || '<p class="text-muted text-center mb-0">املأ الحقول لمعاينة الإعلان</p>';
+    previewEl.innerHTML = content || '<p class="text-muted text-center mb-0"><span class="ar-only">املأ الحقول لمعاينة الإعلان</span><span class="en-only" style="display:none;">Fill in the fields to preview the ad</span></p>';
   }
 
   form.querySelectorAll('#designPanel input, #designPanel textarea, #designPanel select').forEach(el => {

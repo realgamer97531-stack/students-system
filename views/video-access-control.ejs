@@ -1,38 +1,38 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-4">🔐 التحكم في مشاهدات: <%= video.title %></h3>
+<h3 class="mb-4">🔐 <span class="ar-only">التحكم في مشاهدات:</span><span class="en-only" style="display:none;">Viewing Control:</span> <%= video.title %></h3>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">الإعدادات العامة (تخص كل الطلاب)</h6>
+    <h6 class="mb-3"><span class="ar-only">الإعدادات العامة (تخص كل الطلاب)</span><span class="en-only" style="display:none;">General Settings (apply to all students)</span></h6>
     <form action="/admin/videos/<%= video.id %>/session-settings" method="POST" class="row g-2 align-items-end">
       <div class="col-md-3 form-check ms-2">
         <input type="checkbox" class="form-check-input" name="is_free_for_all" id="freeCheck"
           <%= video.Session.is_free_for_all ? 'checked' : '' %>>
-        <label class="form-check-label" for="freeCheck">مفتوحة مجانًا للجميع</label>
+        <label class="form-check-label" for="freeCheck"><span class="ar-only">مفتوحة مجانًا للجميع</span><span class="en-only" style="display:none;">Free and Open to Everyone</span></label>
       </div>
       <div class="col-md-3">
-        <label class="form-label small">عدد المشاهدات (حضر بالسنتر)</label>
+        <label class="form-label small"><span class="ar-only">عدد المشاهدات (حضر بالسنتر)</span><span class="en-only" style="display:none;">Number of Views (attended at the center)</span></label>
         <input type="number" name="views_if_attended" class="form-control" value="<%= video.Session.views_if_attended %>">
       </div>
       <div class="col-md-3">
-        <label class="form-label small">عدد المشاهدات (دفع)</label>
+        <label class="form-label small"><span class="ar-only">عدد المشاهدات (دفع)</span><span class="en-only" style="display:none;">Number of Views (paid)</span></label>
         <input type="number" name="views_if_paid" class="form-control" value="<%= video.Session.views_if_paid %>">
       </div>
       <div class="col-md-3">
-        <label class="form-label small">مدة الإتاحة بالساعات لكل الطلاب</label>
+        <label class="form-label small"><span class="ar-only">مدة الإتاحة بالساعات لكل الطلاب</span><span class="en-only" style="display:none;">Access Duration in Hours for All Students</span></label>
         <input type="number" name="access_duration_hours" class="form-control" value="<%= video.Session.access_duration_hours || 72 %>" min="1" required>
       </div>
       <div class="col-md-3">
-        <label class="form-label small">رابط الامتحان</label>
+        <label class="form-label small"><span class="ar-only">رابط الامتحان</span><span class="en-only" style="display:none;">Exam Link</span></label>
         <input type="url" name="exam_url" class="form-control" value="<%= video.Session.exam_url || '' %>" placeholder="https://example.com/exam">
       </div>
       <div class="col-md-3">
-        <label class="form-label small">فيديو إجابة الاختبار (يُضاف لاحقًا)</label>
+        <label class="form-label small"><span class="ar-only">فيديو إجابة الاختبار (يُضاف لاحقًا)</span><span class="en-only" style="display:none;">Exam Answer Video (added later)</span></label>
         <input type="url" name="exam_video_url" class="form-control" value="<%= video.Session.exam_video_url || '' %>" placeholder="https://vimeo.com/...">
       </div>
       <div class="col-md-12">
-        <button type="submit" class="btn btn-primary w-100">حفظ</button>
+        <button type="submit" class="btn btn-primary w-100"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
       </div>
     </form>
     <div class="row g-2 mt-2">
@@ -40,7 +40,7 @@
         <div class="col-md-6">
           <form action="/admin/videos/<%= video.id %>/session-link/delete" method="POST" onsubmit="return confirm('حذف رابط الاختبار؟')">
             <input type="hidden" name="field" value="exam_url">
-            <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف رابط الاختبار</button>
+            <button type="submit" class="btn btn-sm btn-outline-danger w-100"><span class="ar-only">حذف رابط الاختبار</span><span class="en-only" style="display:none;">Delete Exam Link</span></button>
           </form>
         </div>
       <% } %>
@@ -48,7 +48,7 @@
         <div class="col-md-6">
           <form action="/admin/videos/<%= video.id %>/session-link/delete" method="POST" onsubmit="return confirm('حذف فيديو إجابة الاختبار؟')">
             <input type="hidden" name="field" value="exam_video_url">
-            <button type="submit" class="btn btn-sm btn-outline-danger w-100">حذف فيديو الإجابة</button>
+            <button type="submit" class="btn btn-sm btn-outline-danger w-100"><span class="ar-only">حذف فيديو الإجابة</span><span class="en-only" style="display:none;">Delete Answer Video</span></button>
           </form>
         </div>
       <% } %>
@@ -58,17 +58,17 @@
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">🏫 الحصص المسموح لها بمشاهدة هذا الفيديو</h6>
+    <h6 class="mb-3">🏫 <span class="ar-only">الحصص المسموح لها بمشاهدة هذا الفيديو</span><span class="en-only" style="display:none;">Sessions Allowed to Watch This Video</span></h6>
 
     <div class="d-flex flex-wrap gap-2 mb-3">
       <% if (videoSessions.length === 0) { %>
-        <span class="text-muted small">لا توجد حصص مرتبطة (الفيديو مرئي للجميع!)</span>
+        <span class="text-muted small"><span class="ar-only">لا توجد حصص مرتبطة (الفيديو مرئي للجميع!)</span><span class="en-only" style="display:none;">No linked sessions (the video is visible to everyone!)</span></span>
       <% } %>
       <% videoSessions.forEach(vs => { %>
-        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:#EEF0FB;font-size:0.8rem;">
-          <span><strong><%= vs.Session?.Subject?.name %></strong> - <%= vs.Session?.Center?.name %> (حصة <%= vs.Session?.lesson_number %>)</span>
+        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:var(--sf-primary-light);font-size:0.8rem;">
+          <span><strong><%= vs.Session?.Subject?.name %></strong> - <%= vs.Session?.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= vs.Session?.lesson_number %>)</span>
           <form action="/admin/videos/<%= video.id %>/remove-session/<%= vs.SessionId %>" method="POST">
-            <button class="btn btn-sm" style="padding:1px 6px;background:#FEE2E2;color:#B91C1C;font-size:0.65rem;">✕</button>
+            <button class="btn btn-sm" style="padding:1px 6px;background:var(--sf-danger-soft-bg);color:var(--sf-danger-soft-text);font-size:0.65rem;">✕</button>
           </form>
         </div>
       <% }) %>
@@ -76,41 +76,41 @@
 
     <form action="/admin/videos/<%= video.id %>/add-session" method="POST" class="d-flex gap-2">
       <select name="session_id" class="form-select session-select" placeholder="إضافة حصة جديدة" required>
-        <option value="">-- إضافة حصة جديدة --</option>
+        <option value=""><span class="ar-only">-- إضافة حصة جديدة --</span><span class="en-only" style="display:none;">-- Add New Session --</span></option>
         <% allSessions.forEach(s => { %>
           <% const alreadyAdded = videoSessions.some(vs => vs.SessionId === s.id); %>
           <% if (!alreadyAdded) { %>
-            <option value="<%= s.id %>"><%= s.Subject?.name %> - <%= s.Center?.name %> (حصة <%= s.lesson_number %> | سيريال <%= s.serial_number %>)</option>
+            <option value="<%= s.id %>"><%= s.Subject?.name %> - <%= s.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= s.lesson_number %> | <span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <%= s.serial_number %>)</option>
           <% } %>
         <% }) %>
       </select>
-      <button class="btn btn-sm btn-primary">+ إضافة</button>
+      <button class="btn btn-sm btn-primary">+ <span class="ar-only">إضافة</span><span class="en-only" style="display:none;">Add</span></button>
     </form>
   </div>
 </div>
 
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <h6 class="mb-3">👤 وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</h6>
+    <h6 class="mb-3">👤 <span class="ar-only">وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</span><span class="en-only" style="display:none;">Individual Access for Specific Students (Outside Allowed Groups)</span></h6>
 
     <div class="mb-3">
-      <input id="studentSearch" type="text" class="form-control" placeholder="🔍 بحث بالاسم أو الكود"> 
+      <input id="studentSearch" type="text" class="form-control" placeholder="🔍 بحث بالاسم أو الكود">
     </div>
 
     <% if (students.length === 0) { %>
-      <p class="text-muted small">لا يوجد طالب لديه وصول لهذا الفيديو حتى الآن.</p>
+      <p class="text-muted small"><span class="ar-only">لا يوجد طالب لديه وصول لهذا الفيديو حتى الآن.</span><span class="en-only" style="display:none;">No student has access to this video yet.</span></p>
     <% } else { %>
       <div class="table-responsive mb-3">
         <table class="table table-sm align-middle" id="studentsTable">
           <thead class="table-light">
             <tr>
-              <th>الكود</th>
-              <th>الاسم</th>
-              <th>الفرقة / السنتر</th>
-              <th>مصدر الوصول</th>
-              <th>المتبقي</th>
-              <th>تعديل</th>
-              <th>إلغاء</th>
+              <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+              <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+              <th><span class="ar-only">الفرقة / السنتر</span><span class="en-only" style="display:none;">Group / Center</span></th>
+              <th><span class="ar-only">مصدر الوصول</span><span class="en-only" style="display:none;">Access Source</span></th>
+              <th><span class="ar-only">المتبقي</span><span class="en-only" style="display:none;">Remaining</span></th>
+              <th><span class="ar-only">تعديل</span><span class="en-only" style="display:none;">Edit</span></th>
+              <th><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></th>
             </tr>
           </thead>
           <tbody>
@@ -134,16 +134,16 @@
                       <input type="number" name="access_duration_hours" class="form-control form-control-sm" style="width:110px;" value="<%= grant && grant.access_duration_hours ? grant.access_duration_hours : (video.Session.access_duration_hours || 72) %>" min="1" title="مدة الإتاحة بالساعات">
                     </div>
                     <div class="col-auto">
-                      <button type="button" class="btn btn-sm btn-outline-success add-24-hours" title="إضافة 24 ساعة">+24 ساعة</button>
+                      <button type="button" class="btn btn-sm btn-outline-success add-24-hours" title="إضافة 24 ساعة">+24 <span class="ar-only">ساعة</span><span class="en-only" style="display:none;">Hours</span></button>
                     </div>
                     <div class="col-auto">
-                      <button class="btn btn-sm btn-outline-primary">حفظ</button>
+                      <button class="btn btn-sm btn-outline-primary"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
                     </div>
                   </form>
                 </td>
                 <td>
                   <form action="/admin/videos/<%= video.id %>/remove-student-access/<%= student.id %>" method="POST">
-                    <button class="btn btn-sm btn-outline-danger">إلغاء</button>
+                    <button class="btn btn-sm btn-outline-danger"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
                   </form>
                 </td>
               </tr>
@@ -156,7 +156,7 @@
     <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex gap-2">
       <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:200px;"
         placeholder="كود الطالب (STU-XXXXX)" required>
-      <button class="btn btn-sm btn-success">+ إضافة طالب</button>
+      <button class="btn btn-sm btn-success">+ <span class="ar-only">إضافة طالب</span><span class="en-only" style="display:none;">Add Student</span></button>
     </form>
   </div>
 </div>

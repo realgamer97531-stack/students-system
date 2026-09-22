@@ -4,10 +4,13 @@
   <div class="alert alert-danger d-flex align-items-center gap-2 mb-4 shadow-sm border-0">
     <span style="font-size:1.5rem;">⛔</span>
     <div>
-      <strong>هذا الطالب محظور من النظام</strong> - وصل لـ 3 إنذارات
+      <strong><span class="ar-only">هذا الطالب محظور من النظام</span><span class="en-only" style="display:none;">This student is blocked from the system</span></strong>
+      <span class="ar-only">- وصل لـ 3 إنذارات</span><span class="en-only" style="display:none;">- reached 3 warnings</span>
       <% if (userRole === 'admin') { %>
         <form action="/students/<%= student.id %>/unblock" method="POST" class="d-inline ms-3">
-          <button class="btn btn-sm btn-success px-3">فك الحظر</button>
+          <button class="btn btn-sm btn-success px-3">
+            <span class="ar-only">فك الحظر</span><span class="en-only" style="display:none;">Unblock</span>
+          </button>
         </form>
       <% } %>
     </div>
@@ -18,34 +21,36 @@
   <div class="col-12">
     <div class="row g-4">
       <div class="col-lg-6">
-        <div class="card shadow-sm mb-4" style="border-right: 4px solid <%= warnings.length === 3 ? '#DC2626' : warnings.length === 2 ? '#F59E0B' : '#E2E4F3' %>;">
+        <div class="card shadow-sm mb-4" style="border-right: 4px solid <%= warnings.length === 3 ? 'var(--sf-danger)' : warnings.length === 2 ? 'var(--sf-warning)' : 'var(--sf-input-border)' %>;">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
-              <h6 class="mb-0 fw-bold">🚨 الإنذارات</h6>
-              <span class="badge" style="background: <%= warnings.length === 3 ? '#FEE2E2; color:#B91C1C' : warnings.length === 2 ? '#FEF3C7; color:#92400E' : '#EEF0FB; color:#4338CA' %>;">
+              <h6 class="mb-0 fw-bold">🚨 <span class="ar-only">الإنذارات</span><span class="en-only" style="display:none;">Warnings</span></h6>
+              <span class="badge <%= warnings.length === 3 ? 'soft-danger' : warnings.length === 2 ? 'soft-warning' : 'soft-primary' %>">
                 <%= warnings.length %> / 3
               </span>
             </div>
 
             <% if (warnings.length === 0) { %>
-              <p class="text-muted small mb-2">لا يوجد إنذارات</p>
+              <p class="text-muted small mb-2"><span class="ar-only">لا يوجد إنذارات</span><span class="en-only" style="display:none;">No warnings</span></p>
             <% } %>
 
             <ul class="list-group list-group-flush mb-3">
               <% warnings.forEach((w, i) => { %>
                 <li class="list-group-item d-flex justify-content-between align-items-center small px-0">
                   <span>
-                    <span class="badge bg-warning text-dark me-2">إنذار <%= i + 1 %></span>
-                    <%= w.reason || 'بدون سبب محدد' %><br>
+                    <span class="badge bg-warning text-dark me-2"><span class="ar-only">إنذار</span><span class="en-only" style="display:none;">Warning</span> <%= i + 1 %></span>
+                    <% if (w.reason) { %><%= w.reason %><% } else { %><span class="ar-only">بدون سبب محدد</span><span class="en-only" style="display:none;">No specific reason</span><% } %><br>
                     <span class="text-muted" style="font-size:0.7rem;">
-                      بواسطة: <%= w.User ? w.User.name : '-' %> - 
+                      <span class="ar-only">بواسطة:</span><span class="en-only" style="display:none;">By:</span> <%= w.User ? w.User.name : '-' %> -
                       <%= new Date(w.createdAt).toLocaleString('ar-EG') %>
                     </span>
                   </span>
                   <% if (userRole === 'admin') { %>
                     <form action="/students/<%= student.id %>/warning/remove/<%= w.id %>" method="POST"
                       onsubmit="return confirm('متأكد من إلغاء هذا الإنذار؟')">
-                      <button class="btn btn-sm btn-outline-secondary">إلغاء</button>
+                      <button class="btn btn-sm btn-outline-secondary">
+                        <span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span>
+                      </button>
                     </form>
                   <% } %>
                 </li>
@@ -55,7 +60,9 @@
             <% if (warnings.length < 3 && (userRole === 'admin' || userPermissions.includes('give_warning'))) { %>
               <form action="/students/<%= student.id %>/warning/add" method="POST" class="d-flex gap-2">
                 <input type="text" name="reason" class="form-control form-control-sm" placeholder="سبب الإنذار (اختياري)">
-                <button class="btn btn-sm btn-warning text-white" style="white-space:nowrap;">إضافة إنذار</button>
+                <button class="btn btn-sm btn-warning text-white" style="white-space:nowrap;">
+                  <span class="ar-only">إضافة إنذار</span><span class="en-only" style="display:none;">Add Warning</span>
+                </button>
               </form>
             <% } %>
           </div>
@@ -63,52 +70,54 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h5 class="card-title mb-3 border-bottom pb-2 text-primary">بيانات الطالب</h5>
+            <h5 class="card-title mb-3 border-bottom pb-2 text-primary">
+              <span class="ar-only">بيانات الطالب</span><span class="en-only" style="display:none;">Student Data</span>
+            </h5>
             <form action="/students/<%= student.id %>/edit" method="POST">
               <div class="text-center mb-3">
                 <% if (profilePhotoUrl) { %>
-                  <img src="<%= profilePhotoUrl %>" 
-                    style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #4338CA;">
+                  <img src="<%= profilePhotoUrl %>"
+                    style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--sf-primary);">
                 <% } else { %>
-                  <div style="width:80px;height:80px;border-radius:50%;background:#EEF0FB;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto;">
+                  <div style="width:80px;height:80px;border-radius:50%;background:var(--sf-primary-light);display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto;">
                     👤
                   </div>
                 <% } %>
               </div>
               <div class="mb-2">
-                <label class="form-label small">رقم الطالب</label>
+                <label class="form-label small"><span class="ar-only">رقم الطالب</span><span class="en-only" style="display:none;">Student ID</span></label>
                 <div class="form-control form-control-sm bg-light"><%= student.id %></div>
               </div>
               <div class="mb-2">
-                <label class="form-label small">الاسم</label>
+                <label class="form-label small"><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></label>
                 <input type="text" name="name" class="form-control form-control-sm" value="<%= student.name %>" required>
               </div>
               <div class="mb-2">
-                <label class="form-label small">تليفون الطالب</label>
+                <label class="form-label small"><span class="ar-only">تليفون الطالب</span><span class="en-only" style="display:none;">Student Phone</span></label>
                 <input type="text" name="phone" class="form-control form-control-sm" value="<%= student.phone %>" required>
               </div>
               <div class="mb-2">
-                <label class="form-label small">تليفون ولي الأمر</label>
+                <label class="form-label small"><span class="ar-only">تليفون ولي الأمر</span><span class="en-only" style="display:none;">Parent Phone</span></label>
                 <input type="text" name="parent_phone" class="form-control form-control-sm" value="<%= student.parent_phone %>" required>
               </div>
               <% if (typeof followUpAssistant !== 'undefined' && followUpAssistant) { %>
   <div class="mb-2">
-    <label class="form-label small">أسيستانت المتابعة</label>
-    <div class="p-2 rounded" style="background:#EEF0FB;">
+    <label class="form-label small"><span class="ar-only">أسيستانت المتابعة</span><span class="en-only" style="display:none;">Follow-up Assistant</span></label>
+    <div class="p-2 rounded" style="background:var(--sf-primary-light);">
       <strong><%= followUpAssistant.name %></strong>
       <% if (followUpAssistant.phone) { %>
         <br><span class="small text-muted"><%= followUpAssistant.phone %></span>
         <% const whatsappPhone = followUpAssistant.whatsappPhone || followUpAssistant.phone; %>
         <% if (whatsappPhone) { %>
           <a href="https://wa.me/<%= whatsappPhone %>" target="_blank"
-            class="btn btn-sm ms-2" style="background:#25D366;color:#fff;font-size:0.65rem;padding:2px 6px;">💬 واتساب</a>
+            class="btn btn-sm ms-2" style="background:#25D366;color:#fff;font-size:0.65rem;padding:2px 6px;">💬 <span class="ar-only">واتساب</span><span class="en-only" style="display:none;">WhatsApp</span></a>
         <% } %>
       <% } %>
     </div>
   </div>
 <% } %>
               <div class="mb-2">
-                <label class="form-label small">المادة</label>
+                <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
                 <select name="subject_id" class="form-select form-select-sm" required>
                   <% subjects.forEach(subj => { %>
                     <option value="<%= subj.id %>" <%= subj.id === student.SubjectId ? 'selected' : '' %>>
@@ -118,7 +127,7 @@
                 </select>
               </div>
               <div class="mb-2">
-                <label class="form-label small">السنتر</label>
+                <label class="form-label small"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
                 <select name="center_id" class="form-select form-select-sm" required>
                   <% centers.forEach(center => { %>
                     <option value="<%= center.id %>" <%= center.id === student.CenterId ? 'selected' : '' %>>
@@ -128,42 +137,52 @@
                 </select>
               </div>
               <div class="mb-2">
-                <label class="form-label small">سعر الحصة</label>
+                <label class="form-label small"><span class="ar-only">سعر الحصة</span><span class="en-only" style="display:none;">Session Price</span></label>
                 <input type="number" name="price_per_session" class="form-control form-control-sm" value="<%= student.price_per_session %>" required>
               </div>
               <div class="mb-2 form-check">
                 <input type="checkbox" name="booklet_status" class="form-check-input" id="bookletCheck" <%= student.booklet_status ? 'checked' : '' %>>
-                <label class="form-check-label small" for="bookletCheck">اشترى البوكليت</label>
+                <label class="form-check-label small" for="bookletCheck"><span class="ar-only">اشترى البوكليت</span><span class="en-only" style="display:none;">Purchased Booklet</span></label>
               </div>
               <div class="mb-3">
-                <label class="form-label small">ملاحظة دائمة (تظهر للأسيستانت وقت تسجيل الحضور)</label>
+                <label class="form-label small">
+                  <span class="ar-only">ملاحظة دائمة (تظهر للأسيستانت وقت تسجيل الحضور)</span>
+                  <span class="en-only" style="display:none;">Permanent note (shown to the assistant when recording attendance)</span>
+                </label>
                 <textarea name="admin_note" class="form-control form-control-sm" rows="2"><%= student.admin_note || '' %></textarea>
               </div>
-              <button type="submit" class="btn btn-primary btn-sm w-100">حفظ التعديلات</button>
+              <button type="submit" class="btn btn-primary btn-sm w-100">
+                <span class="ar-only">حفظ التعديلات</span><span class="en-only" style="display:none;">Save Changes</span>
+              </button>
             </form>
           </div>
         </div>
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h5 class="card-title mb-3 border-bottom pb-2">الرصيد الحالي: <span class="text-success"><%= student.balance %> ج</span></h5>
+            <h5 class="card-title mb-3 border-bottom pb-2">
+              <span class="ar-only">الرصيد الحالي:</span><span class="en-only" style="display:none;">Current Balance:</span>
+              <span class="text-success"><%= student.balance %> ج</span>
+            </h5>
             <form action="/students/<%= student.id %>/balance" method="POST">
               <div class="mb-2">
-                <label class="form-label small">المبلغ</label>
+                <label class="form-label small"><span class="ar-only">المبلغ</span><span class="en-only" style="display:none;">Amount</span></label>
                 <input type="number" name="amount" class="form-control form-control-sm" placeholder="مثال: 320" required>
               </div>
               <div class="mb-2">
-                <label class="form-label small">نوع العملية</label>
+                <label class="form-label small"><span class="ar-only">نوع العملية</span><span class="en-only" style="display:none;">Transaction Type</span></label>
                 <select name="type" class="form-select form-select-sm">
-                  <option value="add">إضافة رصيد</option>
-                  <option value="deduct">خصم رصيد</option>
+                  <option value="add"><span class="ar-only">إضافة رصيد</span></option>
+                  <option value="deduct"><span class="ar-only">خصم رصيد</span></option>
                 </select>
               </div>
               <div class="mb-2">
-                <label class="form-label small">السبب (اختياري)</label>
+                <label class="form-label small"><span class="ar-only">السبب (اختياري)</span><span class="en-only" style="display:none;">Reason (optional)</span></label>
                 <input type="text" name="reason" class="form-control form-control-sm" placeholder="مثال: تجديد شهري">
               </div>
-              <button type="submit" class="btn btn-success btn-sm w-100">تنفيذ العملية</button>
+              <button type="submit" class="btn btn-success btn-sm w-100">
+                <span class="ar-only">تنفيذ العملية</span><span class="en-only" style="display:none;">Execute Transaction</span>
+              </button>
             </form>
           </div>
         </div>
@@ -172,9 +191,13 @@
       <div class="col-lg-6">
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h6 class="mb-3 fw-bold">⭐ النقاط: <span class="text-warning"><%= student.points || 0 %> نقطة</span></h6>
+            <h6 class="mb-3 fw-bold">
+              ⭐ <span class="ar-only">النقاط:</span><span class="en-only" style="display:none;">Points:</span>
+              <span class="text-warning"><%= student.points || 0 %> <span class="ar-only">نقطة</span><span class="en-only" style="display:none;">points</span></span>
+            </h6>
             <p class="text-muted" style="font-size: 0.75rem; line-height: 1.4;">
-              نظام النقاط: حضور +2 | واجب كامل +3 | درجة امتحان = نفس عدد النقاط | مشاهدة فيديو +1
+              <span class="ar-only">نظام النقاط: حضور +2 | واجب كامل +3 | درجة امتحان = نفس عدد النقاط | مشاهدة فيديو +1</span>
+              <span class="en-only" style="display:none;">Points system: Attendance +2 | Full homework +3 | Exam score = same number of points | Watching a video +1</span>
             </p>
             <form action="/students/<%= student.id %>/points" method="POST" class="row g-2 mb-2">
               <div class="col-6">
@@ -182,19 +205,23 @@
               </div>
               <div class="col-6">
                 <select name="type" class="form-select form-select-sm">
-                  <option value="add">إضافة</option>
-                  <option value="deduct">خصم</option>
+                  <option value="add"><span class="ar-only">إضافة</span></option>
+                  <option value="deduct"><span class="ar-only">خصم</span></option>
                 </select>
               </div>
               <div class="col-8">
                 <input type="text" name="reason" class="form-control form-control-sm" placeholder="السبب (اختياري)">
               </div>
               <div class="col-4">
-                <button type="submit" class="btn btn-sm btn-warning w-100 text-white">تنفيذ</button>
+                <button type="submit" class="btn btn-sm btn-warning w-100 text-white">
+                  <span class="ar-only">تنفيذ</span><span class="en-only" style="display:none;">Execute</span>
+                </button>
               </div>
             </form>
             <hr class="my-2">
-            <p class="small text-muted mb-1 fw-bold">سجل النقاط (آخر 10):</p>
+            <p class="small text-muted mb-1 fw-bold">
+              <span class="ar-only">سجل النقاط (آخر 10):</span><span class="en-only" style="display:none;">Points History (last 10):</span>
+            </p>
             <ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
               <% transactions.filter(t => t.reason && t.reason.startsWith('نقاط:')).slice(0, 10).forEach(t => { %>
                 <li class="list-group-item d-flex justify-content-between small px-0 py-1" style="font-size:0.75rem;">
@@ -210,9 +237,9 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h6 class="mb-3 fw-bold">📚 البوكليتس</h6>
+            <h6 class="mb-3 fw-bold">📚 <span class="ar-only">البوكليتس</span><span class="en-only" style="display:none;">Booklets</span></h6>
             <% if (availableBooklets.length === 0) { %>
-              <p class="text-muted small">لا يوجد بوكليتس لهذه المادة</p>
+              <p class="text-muted small"><span class="ar-only">لا يوجد بوكليتس لهذه المادة</span><span class="en-only" style="display:none;">No booklets for this subject</span></p>
             <% } %>
             <% availableBooklets.forEach(b => { %>
               <% const sb = studentBooklets.find(s => s.BookletId === b.id); %>
@@ -223,13 +250,15 @@
                   <strong class="small"><%= b.name %></strong>
                   <div class="d-flex gap-1 align-items-center">
                     <% if (sb && sb.is_delivered) { %>
-                      <span class="badge bg-success" style="font-size:0.65rem;">✓ تم التسليم</span>
+                      <span class="badge bg-success" style="font-size:0.65rem;">✓ <span class="ar-only">تم التسليم</span><span class="en-only" style="display:none;">Delivered</span></span>
                     <% } else if (sb) { %>
                       <div class="d-flex align-items-center gap-1">
-                        <span class="badge bg-warning text-dark" style="font-size:0.65rem;">⚠️ غير مستلم</span>
+                        <span class="badge bg-warning text-dark" style="font-size:0.65rem;">⚠️ <span class="ar-only">غير مستلم</span><span class="en-only" style="display:none;">Not received</span></span>
                         <% if (userRole === 'admin') { %>
                           <form action="/students/<%= student.id %>/booklet-deliver/<%= sb.id %>" method="POST" class="d-inline">
-                            <button class="btn btn-sm btn-success" style="font-size:0.65rem;padding:1px 5px;">تسليم</button>
+                            <button class="btn btn-sm btn-success" style="font-size:0.65rem;padding:1px 5px;">
+                              <span class="ar-only">تسليم</span><span class="en-only" style="display:none;">Deliver</span>
+                            </button>
                           </form>
                         <% } %>
                       </div>
@@ -242,23 +271,25 @@
   const bookletRemaining = effectivePrice - paid;
 %>
 <div class="d-flex justify-content-between small text-muted mb-2">
-  <span>السعر: 
+  <span><span class="ar-only">السعر:</span><span class="en-only" style="display:none;">Price:</span>
     <% if (hasCustomPrice) { %>
       <span class="text-decoration-line-through text-muted"><%= b.sell_price %></span>
-      <strong class="text-warning"><%= sb.custom_price %> ج</strong> (مخصص)
+      <strong class="text-warning"><%= sb.custom_price %> ج</strong> (<span class="ar-only">مخصص</span><span class="en-only" style="display:none;">custom</span>)
     <% } else { %>
       <%= b.sell_price %> ج
     <% } %>
   </span>
-                  <span>مدفوع: <span class="text-success"><%= paid %> ج</span></span>
-                  <span>متبقي: <span class="<%= bookletRemaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= bookletRemaining %> ج</span></span>
+                  <span><span class="ar-only">مدفوع:</span><span class="en-only" style="display:none;">Paid:</span> <span class="text-success"><%= paid %> ج</span></span>
+                  <span><span class="ar-only">متبقي:</span><span class="en-only" style="display:none;">Remaining:</span> <span class="<%= bookletRemaining > 0 ? 'text-danger' : 'text-success' %> fw-bold"><%= bookletRemaining %> ج</span></span>
                 </div>
                 <% if (bookletRemaining > 0 && (userRole === 'admin' || userPermissions.includes('students_view'))) { %>
                   <form action="/students/<%= student.id %>/booklet-payment" method="POST" class="d-flex gap-1 mt-1">
                     <input type="hidden" name="booklet_id" value="<%= b.id %>">
                     <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="المبلغ" min="1" max="<%= bookletRemaining %>" required style="font-size: 0.75rem; padding: 2px 5px;">
                     <input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظة" style="font-size: 0.75rem; padding: 2px 5px;">
-                    <button class="btn btn-sm btn-primary" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">دفع</button>
+                    <button class="btn btn-sm btn-primary" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">
+                      <span class="ar-only">دفع</span><span class="en-only" style="display:none;">Pay</span>
+                    </button>
                   </form>
                 <% } %>
                 <% if (userRole === 'admin') { %>
@@ -266,14 +297,18 @@
                     <input type="hidden" name="booklet_id" value="<%= b.id %>">
                     <input type="number" name="paid_amount" class="form-control form-control-sm" placeholder="تعديل المبلغ المدفوع" value="<%= paid %>" step="0.01" required style="font-size: 0.75rem; padding: 2px 5px;">
                     <input type="text" name="notes" class="form-control form-control-sm" placeholder="سبب التعديل" style="font-size: 0.75rem; padding: 2px 5px;">
-                    <button class="btn btn-sm btn-info" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">تعديل المبلغ</button>
+                    <button class="btn btn-sm btn-info" style="white-space:nowrap; font-size: 0.75rem; padding: 2px 8px;">
+                      <span class="ar-only">تعديل المبلغ</span><span class="en-only" style="display:none;">Edit Amount</span>
+                    </button>
                   </form>
                 <% } %>
                 <% if (userRole === 'admin') { %>
                   <form action="/students/<%= student.id %>/booklet-custom-price" method="POST" class="d-flex gap-1 mt-1">
                     <input type="hidden" name="booklet_id" value="<%= b.id %>">
                     <input type="number" name="custom_price" class="form-control form-control-sm" placeholder="سعر مخصص لهذا الطالب" step="0.5">
-                    <button class="btn btn-sm btn-warning" style="white-space:nowrap;">تسعير خاص</button>
+                    <button class="btn btn-sm btn-warning" style="white-space:nowrap;">
+                      <span class="ar-only">تسعير خاص</span><span class="en-only" style="display:none;">Custom Pricing</span>
+                    </button>
                   </form>
                 <% } %>
               </div>
@@ -283,9 +318,9 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h6 class="mb-3 fw-bold">💳 سجل تعديلات الرصيد</h6>
+            <h6 class="mb-3 fw-bold">💳 <span class="ar-only">سجل تعديلات الرصيد</span><span class="en-only" style="display:none;">Balance Adjustment History</span></h6>
             <% if (transactions.length === 0) { %>
-              <p class="text-muted small">لا يوجد تعديلات سابقة</p>
+              <p class="text-muted small"><span class="ar-only">لا يوجد تعديلات سابقة</span><span class="en-only" style="display:none;">No previous adjustments</span></p>
             <% } %>
             <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
               <% transactions.forEach(t => { %>
@@ -307,9 +342,9 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h6 class="mb-3 fw-bold">📝 درجات الامتحانات</h6>
+            <h6 class="mb-3 fw-bold">📝 <span class="ar-only">درجات الامتحانات</span><span class="en-only" style="display:none;">Exam Scores</span></h6>
             <% if (examResults.length === 0) { %>
-              <p class="text-muted small">لا يوجد امتحانات مرصودة بعد</p>
+              <p class="text-muted small"><span class="ar-only">لا يوجد امتحانات مرصودة بعد</span><span class="en-only" style="display:none;">No exams recorded yet</span></p>
             <% } %>
             <ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
               <% examResults.forEach(r => { %>
@@ -317,7 +352,7 @@
                   <div>
                     <span class="fw-bold"><%= r.Exam.name %></span><br>
                     <span class="text-muted" style="font-size: 0.65rem;">
-                      رصده: <%= r.User ? r.User.name : '-' %><br>
+                      <span class="ar-only">رصده:</span><span class="en-only" style="display:none;">Recorded by:</span> <%= r.User ? r.User.name : '-' %><br>
                       <%= new Date(r.createdAt).toLocaleString('ar-EG') %>
                     </span>
                   </div>
@@ -330,9 +365,9 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h6 class="mb-3 fw-bold">🎬 مشاهدات الفيديو</h6>
+            <h6 class="mb-3 fw-bold">🎬 <span class="ar-only">مشاهدات الفيديو</span><span class="en-only" style="display:none;">Video Watch History</span></h6>
             <% if (videoWatchData.length === 0) { %>
-              <p class="text-muted small">لا يوجد فيديوهات لمادة هذا الطالب</p>
+              <p class="text-muted small"><span class="ar-only">لا يوجد فيديوهات لمادة هذا الطالب</span><span class="en-only" style="display:none;">No videos for this student's subject</span></p>
             <% } %>
             <div style="max-height: 300px; overflow-y: auto;">
               <% videoWatchData.forEach(v => { %>
@@ -340,15 +375,15 @@
                   <div class="d-flex justify-content-between align-items-center">
                     <strong class="small text-primary"><%= v.title %></strong>
                     <span class="badge bg-light text-dark border small" style="font-size: 0.65rem;">
-                      حصة <%= v.lessonNumber %><% if (v.centerName) { %> (<%= v.centerName %>)<% } %>
+                      <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= v.lessonNumber %><% if (v.centerName) { %> (<%= v.centerName %>)<% } %>
                     </span>
                   </div>
                   <% v.parts.forEach(p => { %>
                     <div class="d-flex justify-content-between text-muted mt-1" style="font-size:0.7rem;">
                       <span><%= p.category %><% if (p.orderIndex > 1) { %> #<%= p.orderIndex %><% } %></span>
                       <span>
-                        <%= Math.floor(p.watchedSeconds / 60) %>:<%= String(p.watchedSeconds % 60).padStart(2, '0') %> 
-                        من 
+                        <%= Math.floor(p.watchedSeconds / 60) %>:<%= String(p.watchedSeconds % 60).padStart(2, '0') %>
+                        <span class="ar-only">من</span><span class="en-only" style="display:none;">of</span>
                         <%= Math.floor(p.durationSeconds / 60) %>:<%= String(p.durationSeconds % 60).padStart(2, '0') %>
                       </span>
                     </div>
@@ -366,18 +401,19 @@
     <div class="card shadow-sm border-0">
       <div class="card-body">
         <h5 class="card-title mb-4 border-bottom pb-3 text-dark fw-bold">
-          📅 سجل الحضور والواجب والامتحانات (مادة: <%= student.Subject.name %>)
+          📅 <span class="ar-only">سجل الحضور والواجب والامتحانات (مادة: <%= student.Subject.name %>)</span>
+          <span class="en-only" style="display:none;">Attendance, Homework & Exam Record (Subject: <%= student.Subject.name %>)</span>
         </h5>
         <div class="table-responsive">
           <table class="table table-striped table-hover align-middle border text-center" style="min-width: 650px;">
             <thead class="table-dark">
               <tr>
-                <th style="width: 10%;">رقم الحصة</th>
-                <th style="width: 18%;">سيريال المجموعة</th>
-                <th style="width: 15%;">التاريخ</th>
-                <th style="width: 22%;">الحضور</th>
-                <th style="width: 18%;">الواجب</th>
-                <th style="width: 17%;">الامتحان المفاجئ</th>
+                <th style="width: 10%;"><span class="ar-only">رقم الحصة</span><span class="en-only" style="display:none;">Session No.</span></th>
+                <th style="width: 18%;"><span class="ar-only">سيريال المجموعة</span><span class="en-only" style="display:none;">Group Serial</span></th>
+                <th style="width: 15%;"><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
+                <th style="width: 22%;"><span class="ar-only">الحضور</span><span class="en-only" style="display:none;">Attendance</span></th>
+                <th style="width: 18%;"><span class="ar-only">الواجب</span><span class="en-only" style="display:none;">Homework</span></th>
+                <th style="width: 17%;"><span class="ar-only">الامتحان المفاجئ</span><span class="en-only" style="display:none;">Pop Quiz</span></th>
               </tr>
             </thead>
             <tbody>
@@ -388,32 +424,36 @@
                   <td class="small text-muted"><%= row.session.session_date %></td>
                   <td>
                     <% if (row.attendanceStatus === 'attended') { %>
-                      <span class="badge bg-success px-2 py-1 mb-1">حضر</span><br>
+                      <span class="badge bg-success px-2 py-1 mb-1"><span class="ar-only">حضر</span><span class="en-only" style="display:none;">Attended</span></span><br>
                       <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
-                        سجّله: <%= row.attendanceUser %><br>
+                        <span class="ar-only">سجّله:</span><span class="en-only" style="display:none;">Recorded by:</span> <%= row.attendanceUser %><br>
                         <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
                       </span>
                       <% if (userRole === 'admin' && row.attendanceId) { %>
                         <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟')">
-                          <button type="submit" class="btn btn-xs btn-outline-danger mt-1" style="font-size:0.65rem; padding: 2px 6px;">حذف الحضور</button>
+                          <button type="submit" class="btn btn-xs btn-outline-danger mt-1" style="font-size:0.65rem; padding: 2px 6px;">
+                            <span class="ar-only">حذف الحضور</span><span class="en-only" style="display:none;">Delete Attendance</span>
+                          </button>
                         </form>
                       <% } %>
                     <% } else if (row.attendanceStatus === 'attended_elsewhere') { %>
-                      <span class="badge bg-info text-dark px-2 py-1 mb-1">حضر في: <%= row.attendedElsewhere %></span><br>
+                      <span class="badge bg-info text-dark px-2 py-1 mb-1"><span class="ar-only">حضر في:</span><span class="en-only" style="display:none;">Attended at:</span> <%= row.attendedElsewhere %></span><br>
                       <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
-                        سجّله: <%= row.attendanceUser %><br>
+                        <span class="ar-only">سجّله:</span><span class="en-only" style="display:none;">Recorded by:</span> <%= row.attendanceUser %><br>
                         <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
                       </span>
                       <% if (userRole === 'admin' && row.attendanceId) { %>
                         <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟ سيتم استرجاع المبلغ للطالب.')">
                           <input type="hidden" name="redirect_to" value="/students/<%= student.id %>">
-                          <button type="submit" class="btn btn-xs btn-outline-danger mt-1" style="font-size:0.65rem; padding: 2px 6px;">حذف الحضور</button>
+                          <button type="submit" class="btn btn-xs btn-outline-danger mt-1" style="font-size:0.65rem; padding: 2px 6px;">
+                            <span class="ar-only">حذف الحضور</span><span class="en-only" style="display:none;">Delete Attendance</span>
+                          </button>
                         </form>
                       <% } %>
                     <% } else if (row.attendanceStatus === 'cancelled') { %>
-                      <span class="badge bg-secondary px-2 py-1">ملغية</span>
+                      <span class="badge bg-secondary px-2 py-1"><span class="ar-only">ملغية</span><span class="en-only" style="display:none;">Cancelled</span></span>
                     <% } else { %>
-                      <span class="badge bg-danger px-2 py-1">غاب</span>
+                      <span class="badge bg-danger px-2 py-1"><span class="ar-only">غاب</span><span class="en-only" style="display:none;">Absent</span></span>
                     <% } %>
                   </td>
                   <td>
@@ -421,17 +461,17 @@
                       <span class="text-muted small">-</span>
                     <% } else { %>
                       <% if (row.homeworkStatus === 'complete') { %>
-                        <span class="badge bg-success px-2 py-1 mb-1">كامل</span>
+                        <span class="badge bg-success px-2 py-1 mb-1"><span class="ar-only">كامل</span><span class="en-only" style="display:none;">Complete</span></span>
                       <% } else if (row.homeworkStatus === 'incomplete') { %>
-                        <span class="badge bg-warning text-dark px-2 py-1 mb-1">مش كامل</span>
+                        <span class="badge bg-warning text-dark px-2 py-1 mb-1"><span class="ar-only">مش كامل</span><span class="en-only" style="display:none;">Incomplete</span></span>
                       <% } else if (row.homeworkStatus === 'no_steps') { %>
-                        <span class="badge bg-secondary px-2 py-1 mb-1">من غير خطوات</span>
+                        <span class="badge bg-secondary px-2 py-1 mb-1"><span class="ar-only">من غير خطوات</span><span class="en-only" style="display:none;">No Steps</span></span>
                       <% } else { %>
-                        <span class="badge bg-danger px-2 py-1 mb-1">مش معمول</span>
+                        <span class="badge bg-danger px-2 py-1 mb-1"><span class="ar-only">مش معمول</span><span class="en-only" style="display:none;">Not Done</span></span>
                       <% } %>
                       <br>
                       <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
-                        صحّحه: <%= row.homeworkUser %><br>
+                        <span class="ar-only">صحّحه:</span><span class="en-only" style="display:none;">Corrected by:</span> <%= row.homeworkUser %><br>
                         <%= row.homeworkTime ? new Date(row.homeworkTime).toLocaleString('ar-EG') : '' %>
                       </span>
                     <% } %>
@@ -440,7 +480,7 @@
                     <% if (row.examInfo) { %>
                       <span class="fs-6 fw-bold text-dark"><%= row.examInfo.score %></span> / <span class="small text-muted"><%= row.examInfo.max_score %></span><br>
                       <span class="text-muted d-block" style="font-size: 0.65rem; line-height: 1.2;">
-                        رصده: <%= row.examInfo.recordedBy %><br>
+                        <span class="ar-only">رصده:</span><span class="en-only" style="display:none;">Recorded by:</span> <%= row.examInfo.recordedBy %><br>
                         <%= row.examInfo.recordedAt ? new Date(row.examInfo.recordedAt).toLocaleString('ar-EG') : '' %>
                       </span>
                     <% } else { %>

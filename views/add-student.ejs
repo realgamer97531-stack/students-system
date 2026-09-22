@@ -5,8 +5,8 @@
     <div class="col-lg-8">
       <div class="card shadow-sm border-0">
         <div class="card-body p-4">
-          <h3 class="text-primary mb-3">➕ تسجيل طالب جديد</h3>
-          <p class="text-muted mb-4">أدخل بيانات الطالب وسيتم حفظها في النظام.</p>
+          <h3 class="text-primary mb-3">➕ <span class="ar-only">تسجيل طالب جديد</span><span class="en-only" style="display:none;">Register New Student</span></h3>
+          <p class="text-muted mb-4"><span class="ar-only">أدخل بيانات الطالب وسيتم حفظها في النظام.</span><span class="en-only" style="display:none;">Enter the student's data and it will be saved in the system.</span></p>
 
           <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
             <div class="alert alert-danger"><%= errorMessage %></div>
@@ -15,32 +15,32 @@
           <form action="/students" method="POST" id="addStudentForm">
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label fw-semibold">اسم الطالب</label>
+                <label class="form-label fw-semibold"><span class="ar-only">اسم الطالب</span><span class="en-only" style="display:none;">Student Name</span></label>
                 <input type="text" name="name" class="form-control" required>
               </div>
 
               <div class="col-md-6">
-                <label class="form-label fw-semibold">تليفون الطالب</label>
+                <label class="form-label fw-semibold"><span class="ar-only">تليفون الطالب</span><span class="en-only" style="display:none;">Student Phone</span></label>
                 <input type="text" name="phone" class="form-control" required>
               </div>
 
               <div class="col-md-6">
-                <label class="form-label fw-semibold">تليفون ولي الأمر</label>
+                <label class="form-label fw-semibold"><span class="ar-only">تليفون ولي الأمر</span><span class="en-only" style="display:none;">Parent Phone</span></label>
                 <input type="text" name="parent_phone" class="form-control" required>
               </div>
 
               <div class="col-md-6">
-                <label class="form-label fw-semibold">سعر الحصة (ج)</label>
+                <label class="form-label fw-semibold"><span class="ar-only">سعر الحصة (ج)</span><span class="en-only" style="display:none;">Session Price (ج)</span></label>
                 <input type="number" name="price_per_session" id="priceInput" class="form-control" min="0" step="0.01" required>
               </div>
 
               <div class="col-md-6">
-                <label class="form-label fw-semibold">الرصيد الابتدائي</label>
+                <label class="form-label fw-semibold"><span class="ar-only">الرصيد الابتدائي</span><span class="en-only" style="display:none;">Initial Balance</span></label>
                 <input type="number" name="balance" class="form-control" min="0" step="0.01" value="0">
               </div>
 
               <div class="col-md-6">
-                <label class="form-label fw-semibold">المادة</label>
+                <label class="form-label fw-semibold"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
                 <select name="subject_id" id="subjectSelect" class="form-select" required>
                   <% (subjects || []).forEach(subj => { 
                        const nameStr = (subj.name || '').toString().trim().toLowerCase();
@@ -53,7 +53,7 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label fw-semibold">السنتر</label>
+                <label class="form-label fw-semibold"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
                 <select name="center_id" class="form-select" required>
                   <% (centers || []).forEach(center => { %>
                     <option value="<%= center.id %>"><%= center.name %></option>
@@ -62,12 +62,12 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label fw-semibold">مبلغ بوكليت مدفوع</label>
+                <label class="form-label fw-semibold"><span class="ar-only">مبلغ بوكليت مدفوع</span><span class="en-only" style="display:none;">Booklet Amount Paid</span></label>
                 <input type="number" name="booklet_paid_amount" class="form-control" min="0" step="0.01" value="0">
               </div>
 
               <div class="col-12">
-                <label class="form-label fw-semibold">💬 كومنت الحضور (اختياري)</label>
+                <label class="form-label fw-semibold">💬 <span class="ar-only">كومنت الحضور (اختياري)</span><span class="en-only" style="display:none;">Attendance Comment (optional)</span></label>
                 <input type="text" name="comment" class="form-control" placeholder="ملاحظة...">
               </div>
             </div>
@@ -76,7 +76,7 @@
               <div class="col-md-6">
                 <div class="form-check form-switch">
                   <input class="form-check-input" type="checkbox" name="booklet_status" value="on" id="bookletStatus">
-                  <label class="form-check-label fw-semibold" for="bookletStatus">يوجد بوكليت</label>
+                  <label class="form-check-label fw-semibold" for="bookletStatus"><span class="ar-only">يوجد بوكليت</span><span class="en-only" style="display:none;">Has Booklet</span></label>
                 </div>
               </div>
 
@@ -84,14 +84,14 @@
                 <div class="form-check form-switch">
                   <input type="hidden" name="register_attendance" value="on" id="registerAttendanceHidden">
                   <input class="form-check-input" type="checkbox" id="notAttendingCheck">
-                  <label class="form-check-label fw-semibold" for="notAttendingCheck">الطالب لم يحضر الحصة الحالية</label>
+                  <label class="form-check-label fw-semibold" for="notAttendingCheck"><span class="ar-only">الطالب لم يحضر الحصة الحالية</span><span class="en-only" style="display:none;">Student did not attend the current session</span></label>
                 </div>
               </div>
             </div>
 
             <div class="mt-4">
-              <button type="submit" class="btn btn-primary fw-bold px-4">💾 حفظ الطالب</button>
-              <a href="/students" class="btn btn-outline-secondary ms-2">إلغاء</a>
+              <button type="submit" class="btn btn-primary fw-bold px-4">💾 <span class="ar-only">حفظ الطالب</span><span class="en-only" style="display:none;">Save Student</span></button>
+              <a href="/students" class="btn btn-outline-secondary ms-2"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></a>
             </div>
           </form>
         </div>

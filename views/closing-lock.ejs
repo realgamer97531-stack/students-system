@@ -1,10 +1,10 @@
 <%- include('partials/header') %>
 <div class="card shadow-sm mx-auto p-4" style="max-width:400px;">
-  <h5 class="mb-3">🔐 تأكيد الهوية للدخول على التقفيل</h5>
+  <h5 class="mb-3">🔐 <span class="ar-only">تأكيد الهوية للدخول على التقفيل</span><span class="en-only" style="display:none;">Identity Confirmation to Access Closing</span></h5>
   <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
   <form action="/admin/closing/unlock" method="POST">
     <input type="password" name="password" class="form-control mb-2" placeholder="كلمة المرور" required>
-    <button class="btn btn-primary w-100">دخول</button>
+    <button class="btn btn-primary w-100"><span class="ar-only">دخول</span><span class="en-only" style="display:none;">Enter</span></button>
   </form>
 </div>
 <%- include('partials/footer') %>

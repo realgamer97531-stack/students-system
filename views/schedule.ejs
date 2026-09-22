@@ -1,6 +1,7 @@
 <%- include('partials/header') %>
 
 <% function canShow(key) { return userRole === 'admin' || (userPermissions && userPermissions.includes(key)); } %>
+<% const DAYS_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']; %>
 
 <style>
   /* Theme-aware layout adjustments for schedule cards */
@@ -42,11 +43,17 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h3 class="mb-1">📅 الجدول الأسبوعي</h3>
-    <p class="text-muted small mb-0">اليوم: <strong><%= ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][todayDay] %></strong></p>
+    <h3 class="mb-1">📅 <span class="ar-only">الجدول الأسبوعي</span><span class="en-only" style="display:none;">Weekly Schedule</span></h3>
+    <p class="text-muted small mb-0">
+      <span class="ar-only">اليوم:</span><span class="en-only" style="display:none;">Today:</span>
+      <strong>
+        <span class="ar-only"><%= ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][todayDay] %></span>
+        <span class="en-only" style="display:none;"><%= DAYS_EN[todayDay] %></span>
+      </strong>
+    </p>
   </div>
   <% if (userRole === 'admin') { %>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEntryModal">+ إضافة حصة للجدول</button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEntryModal">+ <span class="ar-only">إضافة حصة للجدول</span><span class="en-only" style="display:none;">Add Session to Schedule</span></button>
   <% } %>
 </div>
 
@@ -54,7 +61,7 @@
 <% if (todayEntries.length > 0) { %>
 <div class="card mb-4" style="border-right: 4px solid var(--sf-accent) !important;">
   <div class="card-body">
-    <h6 class="mb-3">🔴 حصص اليوم</h6>
+    <h6 class="mb-3">🔴 <span class="ar-only">حصص اليوم</span><span class="en-only" style="display:none;">Today's Sessions</span></h6>
     <div class="row g-2">
       <% todayEntries && todayEntries.forEach(entry => { %>
         <% if (entry && entry.Subject && entry.Center) { %>
@@ -64,7 +71,7 @@
               <strong class="small" style="color: var(--sf-text);"><%= entry.Subject.name %></strong>
               <span class="badge bg-primary"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></span>
             </div>
-            <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes || 'N/A' %> دقيقة</p>
+            <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes || 'N/A' %> <span class="ar-only">دقيقة</span><span class="en-only" style="display:none;">min</span></p>
           </div>
         </div>
         <% } %>
@@ -83,8 +90,8 @@
           <tr>
             <% DAYS.forEach((day, i) => { %>
               <th class="text-center small <%= i === todayDay ? 'table-primary-adaptive' : '' %>" style="min-width:120px;">
-                <%= day %>
-                <% if (i === todayDay) { %><br><span class="badge bg-light text-dark mt-1" style="font-size:0.65rem;">اليوم</span><% } %>
+                <span class="ar-only"><%= day %></span><span class="en-only" style="display:none;"><%= DAYS_EN[i] %></span>
+                <% if (i === todayDay) { %><br><span class="badge bg-light text-dark mt-1" style="font-size:0.65rem;"><span class="ar-only">اليوم</span><span class="en-only" style="display:none;">Today</span></span><% } %>
               </th>
             <% }) %>
           </tr>
@@ -101,7 +108,7 @@
                       <div class="small fw-semibold"><%= entry.Subject.name %></div>
                       <div class="small opacity-75"><%= entry.Center.name %></div>
                       <% if (entry.end_date && entry.end_date !== 'Invalid Date') { %>
-                        <div class="small opacity-75">حتى: <%= entry.end_date %></div>
+                        <div class="small opacity-75"><span class="ar-only">حتى:</span><span class="en-only" style="display:none;">Until:</span> <%= entry.end_date %></div>
                         <%
                           try {
                             const today = new Date();
@@ -112,7 +119,8 @@
                         %>
                               <% if (entry.expected_sessions_count) { %>
                                 <div class="small mt-1 fw-medium" style="color: var(--sf-primary);">
-                                  باقي ~<%= weeksLeft %> حصة | تم جدولة: <%= entry.expected_sessions_count %>
+                                  <span class="ar-only">باقي ~<%= weeksLeft %> حصة | تم جدولة: <%= entry.expected_sessions_count %></span>
+                                  <span class="en-only" style="display:none;">~<%= weeksLeft %> session(s) remaining | Scheduled: <%= entry.expected_sessions_count %></span>
                                 </div>
                               <% } %>
                         <%
@@ -154,61 +162,61 @@
   <div class="modal-dialog">
     <div class="modal-content card">
       <div class="modal-header border-bottom-0">
-        <h5 class="modal-title">إضافة حصة للجدول</h5>
+        <h5 class="modal-title"><span class="ar-only">إضافة حصة للجدول</span><span class="en-only" style="display:none;">Add Session to Schedule</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form action="/schedule/add" method="POST">
         <div class="modal-body row g-2">
           <div class="col-6">
-            <label class="form-label small">اليوم</label>
+            <label class="form-label small"><span class="ar-only">اليوم</span><span class="en-only" style="display:none;">Day</span></label>
             <select name="day_of_week" class="form-select" required>
-              <% DAYS.forEach((d, i) => { %><option value="<%= i %>"><%= d %></option><% }) %>
+              <% DAYS.forEach((d, i) => { %><option value="<%= i %>"><span class="ar-only"><%= d %></span><span class="en-only" style="display:none;"><%= DAYS_EN[i] %></span></option><% }) %>
             </select>
           </div>
           <div class="col-6">
-            <label class="form-label small">وقت البداية</label>
+            <label class="form-label small"><span class="ar-only">وقت البداية</span><span class="en-only" style="display:none;">Start Time</span></label>
             <input type="time" name="start_time" class="form-control" required>
           </div>
           <div class="col-6">
-            <label class="form-label small">المادة</label>
+            <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
             <select name="subject_id" class="form-select" required>
               <% if (subjects && subjects.length > 0) { %>
                 <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
               <% } else { %>
-                <option disabled>لا توجد مواد متاحة</option>
+                <option disabled><span class="ar-only">لا توجد مواد متاحة</span><span class="en-only" style="display:none;">No subjects available</span></option>
               <% } %>
             </select>
           </div>
           <div class="col-6">
-            <label class="form-label small">السنتر</label>
+            <label class="form-label small"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
             <select name="center_id" class="form-select" required>
               <% if (centers && centers.length > 0) { %>
                 <% centers.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
               <% } else { %>
-                <option disabled>لا توجد سنترات متاحة</option>
+                <option disabled><span class="ar-only">لا توجد سنترات متاحة</span><span class="en-only" style="display:none;">No centers available</span></option>
               <% } %>
             </select>
           </div>
           <div class="col-6">
-            <label class="form-label small">المدة (دقيقة)</label>
+            <label class="form-label small"><span class="ar-only">المدة (دقيقة)</span><span class="en-only" style="display:none;">Duration (minutes)</span></label>
             <input type="number" name="duration_minutes" class="form-control" value="90" min="30">
           </div>
           <div class="col-6">
-            <label class="form-label small">عدد الحصص المتوقعة</label>
+            <label class="form-label small"><span class="ar-only">عدد الحصص المتوقعة</span><span class="en-only" style="display:none;">Expected Sessions Count</span></label>
             <input type="number" name="expected_sessions_count" class="form-control" placeholder="مثال: 30">
           </div>
           <div class="col-6">
-            <label class="form-label small">تاريخ الانتهاء</label>
+            <label class="form-label small"><span class="ar-only">تاريخ الانتهاء</span><span class="en-only" style="display:none;">End Date</span></label>
             <input type="date" name="end_date" class="form-control">
           </div>
           <div class="col-12">
-            <label class="form-label small">ملاحظات</label>
+            <label class="form-label small"><span class="ar-only">ملاحظات</span><span class="en-only" style="display:none;">Notes</span></label>
             <input type="text" name="notes" class="form-control" placeholder="اختياري">
           </div>
         </div>
         <div class="modal-footer border-top-0">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-          <button type="submit" class="btn btn-primary">إضافة</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
+          <button type="submit" class="btn btn-primary"><span class="ar-only">إضافة</span><span class="en-only" style="display:none;">Add</span></button>
         </div>
       </form>
     </div>

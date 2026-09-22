@@ -1,26 +1,26 @@
 <%- include('partials/header') %>
-<h3 class="mb-4">📊 تقفيل دوري (أسبوعي/شهري)</h3>
+<h3 class="mb-4">📊 <span class="ar-only">تقفيل دوري (أسبوعي/شهري)</span><span class="en-only" style="display:none;">Periodic Closing (Weekly/Monthly)</span></h3>
 
 <form method="GET" class="row g-2 mb-4">
   <div class="col-md-3"><input type="date" name="start" class="form-control" value="<%= filters.start %>" required></div>
   <div class="col-md-3"><input type="date" name="end" class="form-control" value="<%= filters.end %>" required></div>
   <div class="col-md-3">
     <select name="center_id" class="form-select">
-      <option value="">-- كل السناتر --</option>
+      <option value=""><span class="ar-only">-- كل السناتر --</span><span class="en-only" style="display:none;">-- All Centers --</span></option>
       <% centers.forEach(c => { %><option value="<%= c.id %>" <%= String(filters.center_id)===String(c.id)?'selected':'' %>><%= c.name %></option><% }) %>
     </select>
   </div>
-  <div class="col-md-3"><button class="btn btn-primary w-100">احسب</button></div>
+  <div class="col-md-3"><button class="btn btn-primary w-100"><span class="ar-only">احسب</span><span class="en-only" style="display:none;">Calculate</span></button></div>
 </form>
 
 <% if (result) { %>
   <div class="row g-3">
-    <div class="col-md-6"><div class="card p-3 text-center"><small>عدد الحصص</small><h4><%= result.sessionsCount %></h4></div></div>
-    <div class="col-md-6"><div class="card p-3 text-center"><small>إجمالي النقدية المحصّلة</small><h4 class="text-success"><%= result.totalCash %> ج</h4></div></div>
+    <div class="col-md-6"><div class="card p-3 text-center"><small><span class="ar-only">عدد الحصص</span><span class="en-only" style="display:none;">Number of Sessions</span></small><h4><%= result.sessionsCount %></h4></div></div>
+    <div class="col-md-6"><div class="card p-3 text-center"><small><span class="ar-only">إجمالي النقدية المحصّلة</span><span class="en-only" style="display:none;">Total Cash Collected</span></small><h4 class="text-success"><%= result.totalCash %> ج</h4></div></div>
   </div>
 <% } %>
 
 <form action="/admin/closing/lock-again" method="POST" class="mt-4">
-  <button class="btn btn-outline-secondary">🔒 قفل صفحات التقفيل</button>
+  <button class="btn btn-outline-secondary">🔒 <span class="ar-only">قفل صفحات التقفيل</span><span class="en-only" style="display:none;">Lock Closing Pages</span></button>
 </form>
 <%- include('partials/footer') %>

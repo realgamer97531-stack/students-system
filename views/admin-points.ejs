@@ -2,8 +2,8 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h3 class="mb-1">⭐ متابعة نقاط الطلاب</h3>
-    <p class="text-muted small mb-0">قائمة الطلاب وإجمالي نقاطهم</p>
+    <h3 class="mb-1">⭐ <span class="ar-only">متابعة نقاط الطلاب</span><span class="en-only" style="display:none;">Student Points Tracking</span></h3>
+    <p class="text-muted small mb-0"><span class="ar-only">قائمة الطلاب وإجمالي نقاطهم</span><span class="en-only" style="display:none;">List of students and their total points</span></p>
   </div>
 </div>
 
@@ -12,11 +12,11 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>الطالب</th>
-        <th>الكود</th>
-        <th>المادة</th>
-        <th>السنتر</th>
-        <th class="text-center">النقاط</th>
+        <th><span class="ar-only">الطالب</span><span class="en-only" style="display:none;">Student</span></th>
+        <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+        <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
+        <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
+        <th class="text-center"><span class="ar-only">النقاط</span><span class="en-only" style="display:none;">Points</span></th>
         <th></th>
       </tr>
     </thead>
@@ -34,7 +34,7 @@
             </span>
           </td>
           <td class="text-end">
-            <a href="/admin/points/<%= student.id %>" class="btn btn-sm btn-outline-primary">التفاصيل</a>
+            <a href="/admin/points/<%= student.id %>" class="btn btn-sm btn-outline-primary"><span class="ar-only">التفاصيل</span><span class="en-only" style="display:none;">Details</span></a>
           </td>
         </tr>
       <% }) %>

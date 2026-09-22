@@ -1,32 +1,32 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-4">📊 نظرة عامة</h3>
+<h3 class="mb-4">📊 <span class="ar-only">نظرة عامة</span><span class="en-only" style="display:none;">Overview</span></h3>
 
 <!-- كروت الإحصائيات -->
 <div class="row g-3 mb-4">
   <div class="col-md-3">
     <div class="card shadow-sm border-0 text-center p-3">
-      <div class="text-muted small">إجمالي الطلاب</div>
+      <div class="text-muted small"><span class="ar-only">إجمالي الطلاب</span><span class="en-only" style="display:none;">Total Students</span></div>
       <div class="fs-3 fw-bold text-primary"><%= totalStudents %></div>
     </div>
   </div>
   <div class="col-md-3">
     <div class="card shadow-sm border-0 text-center p-3">
-      <div class="text-muted small">إجمالي أرصدة الطلاب</div>
+      <div class="text-muted small"><span class="ar-only">إجمالي أرصدة الطلاب</span><span class="en-only" style="display:none;">Total Students Balance</span></div>
       <div class="fs-3 fw-bold text-success"><%= totalBalance %> ج</div>
     </div>
   </div>
   <div class="col-md-3">
     <div class="card shadow-sm border-0 text-center p-3">
-      <div class="text-muted small">طلاب محتاجين تجديد</div>
+      <div class="text-muted small"><span class="ar-only">طلاب محتاجين تجديد</span><span class="en-only" style="display:none;">Students Needing Renewal</span></div>
       <div class="fs-3 fw-bold text-danger"><%= lowBalanceCount %></div>
     </div>
   </div>
   <div class="col-md-3">
     <div class="card shadow-sm border-0 text-center p-3">
-      <div class="text-muted small">حصص اليوم</div>
+      <div class="text-muted small"><span class="ar-only">حصص اليوم</span><span class="en-only" style="display:none;">Today's Sessions</span></div>
       <div class="fs-3 fw-bold text-info"><%= todaySessions %></div>
-      <div class="text-muted small mt-1">حضور اليوم: <%= todayAttendance %></div>
+      <div class="text-muted small mt-1"><span class="ar-only">حضور اليوم:</span><span class="en-only" style="display:none;">Today's Attendance:</span> <%= todayAttendance %></div>
     </div>
   </div>
 </div>
@@ -35,7 +35,7 @@
   <!-- جراف الحضور آخر 7 أيام -->
   <div class="col-md-7">
     <div class="card shadow-sm p-3">
-      <h6 class="mb-3">الحضور في آخر 7 أيام</h6>
+      <h6 class="mb-3"><span class="ar-only">الحضور في آخر 7 أيام</span><span class="en-only" style="display:none;">Attendance in the Last 7 Days</span></h6>
       <canvas id="attendanceChart" height="120"></canvas>
     </div>
   </div>
@@ -43,7 +43,7 @@
   <!-- توزيع الطلاب على السناتر -->
   <div class="col-md-5">
     <div class="card shadow-sm p-3">
-      <h6 class="mb-3">توزيع الطلاب على السناتر</h6>
+      <h6 class="mb-3"><span class="ar-only">توزيع الطلاب على السناتر</span><span class="en-only" style="display:none;">Students Distribution by Center</span></h6>
       <canvas id="centersChart" height="180"></canvas>
     </div>
   </div>
@@ -53,7 +53,7 @@
   <!-- توزيع الطلاب على المواد -->
   <div class="col-md-5">
     <div class="card shadow-sm p-3">
-      <h6 class="mb-3">توزيع الطلاب على المواد</h6>
+      <h6 class="mb-3"><span class="ar-only">توزيع الطلاب على المواد</span><span class="en-only" style="display:none;">Students Distribution by Subject</span></h6>
       <canvas id="subjectsChart" height="180"></canvas>
     </div>
   </div>
@@ -61,10 +61,10 @@
   <!-- آخر النشاطات -->
   <div class="col-md-7">
     <div class="card shadow-sm p-3">
-      <h6 class="mb-3">آخر النشاطات</h6>
+      <h6 class="mb-3"><span class="ar-only">آخر النشاطات</span><span class="en-only" style="display:none;">Recent Activities</span></h6>
       <ul class="list-group list-group-flush">
         <% if (activityFeed.length === 0) { %>
-          <li class="list-group-item text-muted small">لا يوجد نشاط حتى الآن</li>
+          <li class="list-group-item text-muted small"><span class="ar-only">لا يوجد نشاط حتى الآن</span><span class="en-only" style="display:none;">No activity yet</span></li>
         <% } %>
         <% activityFeed.forEach(item => { %>
           <li class="list-group-item small d-flex justify-content-between">
@@ -81,6 +81,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+  // Keep chart text/gridlines readable in dark mode too
+  (function themeChartDefaults() {
+    const styles = getComputedStyle(document.documentElement);
+    Chart.defaults.color = styles.getPropertyValue('--sf-muted').trim() || '#6B7280';
+    Chart.defaults.borderColor = styles.getPropertyValue('--sf-input-border').trim() || '#E2E4F3';
+  })();
+
   // جراف الحضور آخر 7 أيام
   const dayCounts = <%- JSON.stringify(dayCounts) %>;
   new Chart(document.getElementById('attendanceChart'), {

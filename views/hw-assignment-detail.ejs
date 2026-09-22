@@ -3,30 +3,30 @@
 <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
   <h3 class="mb-0">📝 <%= assignment.title %></h3>
   <a class="btn btn-outline-success btn-sm" href="/hw/assignments/<%= assignment.id %>/export?<%= new URLSearchParams({ student_search: student_search || '', show_all_students: show_all_students ? '1' : '', marked_filter: marked_filter || 'all' }).toString() %>">
-    📥 تصدير Excel
+    📥 <span class="ar-only">تصدير Excel</span><span class="en-only" style="display:none;">Export Excel</span>
   </a>
 </div>
-<p class="text-muted mb-2">واجب رقم <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
+<p class="text-muted mb-2"><span class="ar-only">واجب رقم</span><span class="en-only" style="display:none;">Homework #</span> <%= assignment.order_number %> | <%= assignment.start_date %> → <%= assignment.end_date %></p>
 <p class="text-muted mb-3">
   <% if (assignment.Subject) { %>📚 <%= assignment.Subject.name %><br><% } %>
-  <% if (assignment.Session && assignment.Session.Subject && assignment.Session.Center) { %>🔗 الحصة الرئيسية: <%= assignment.Session.Subject.name %> - <%= assignment.Session.Center.name %> - حصة <%= assignment.Session.lesson_number %><br><% } %>
+  <% if (assignment.Session && assignment.Session.Subject && assignment.Session.Center) { %>🔗 <span class="ar-only">الحصة الرئيسية:</span><span class="en-only" style="display:none;">Main Session:</span> <%= assignment.Session.Subject.name %> - <%= assignment.Session.Center.name %> - <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= assignment.Session.lesson_number %><br><% } %>
   <% const linkedSessions = (assignment.LinkedSessions || []).filter(s => String(s.id) !== String(assignment.SessionId)); %>
   <% if (linkedSessions.length) { %>
-    🔗 حصص مرتبطة: <%= linkedSessions.map(s => `${s.Subject?.name || 'غير معروف'} - ${s.Center?.name || 'غير معروف'} (حصة ${s.lesson_number})`).join('، ') %>
+    🔗 <span class="ar-only">حصص مرتبطة:</span><span class="en-only" style="display:none;">Linked Sessions:</span> <%= linkedSessions.map(s => `${s.Subject?.name || 'غير معروف'} - ${s.Center?.name || 'غير معروف'} (حصة ${s.lesson_number})`).join('، ') %>
   <% } %>
 </p>
 <% if (assignment.submission_type === 'link') { %>
   <div class="alert alert-info py-2">
-    🔗 ده واجب "رابط خارجي": الطالب بيتحول مباشرة للرابط <a href="<%= assignment.external_link %>" target="_blank" rel="noopener"><%= assignment.external_link %></a> بدل ما يرفع الواجب على المنصة، فمفيش تتبع للتسليم هنا.
+    🔗 <span class="ar-only">ده واجب "رابط خارجي": الطالب بيتحول مباشرة للرابط</span><span class="en-only" style="display:none;">This is an "External Link" homework: the student is redirected directly to the link</span> <a href="<%= assignment.external_link %>" target="_blank" rel="noopener"><%= assignment.external_link %></a> <span class="ar-only">بدل ما يرفع الواجب على المنصة، فمفيش تتبع للتسليم هنا.</span><span class="en-only" style="display:none;">instead of uploading the homework on the platform, so there is no submission tracking here.</span>
   </div>
 <% } %>
 <% if (assistantOnlyView) { %>
   <div class="alert alert-info py-2">
-    هذا العرض يعرض طلابك المتابعين فقط.
+    <span class="ar-only">هذا العرض يعرض طلابك المتابعين فقط.</span><span class="en-only" style="display:none;">This view shows only your assigned students.</span>
     <% if (assignedStudentCount === 0) { %>
-      لا يوجد طلاب مسندين لك لهذا الواجب.
+      <span class="ar-only">لا يوجد طلاب مسندين لك لهذا الواجب.</span><span class="en-only" style="display:none;">You have no students assigned to this homework.</span>
     <% } else { %>
-      عدد الطلاب المتاحين: <strong><%= assignedStudentCount %></strong>.
+      <span class="ar-only">عدد الطلاب المتاحين:</span><span class="en-only" style="display:none;">Available students:</span> <strong><%= assignedStudentCount %></strong>.
     <% } %>
   </div>
 <% } %>
@@ -35,36 +35,37 @@
   <div class="card-body">
     <form action="/hw/assignments/<%= assignment.id %>" method="GET" class="row g-2 align-items-end">
       <div class="col-md-3">
-        <label class="form-label small">بحث عن طالب</label>
+        <label class="form-label small"><span class="ar-only">بحث عن طالب</span><span class="en-only" style="display:none;">Search for Student</span></label>
         <input type="text" name="student_search" value="<%= student_search %>" class="form-control" placeholder="الاسم أو كود الطالب">
       </div>
       <div class="col-md-3">
-        <label class="form-label small">حالة التقييم</label>
+        <label class="form-label small"><span class="ar-only">حالة التقييم</span><span class="en-only" style="display:none;">Grading Status</span></label>
         <select name="marked_filter" class="form-select">
-          <option value="all" <%= marked_filter === 'all' ? 'selected' : '' %>>الكل</option>
-          <option value="marked" <%= marked_filter === 'marked' ? 'selected' : '' %>>المصحح</option>
-          <option value="not_marked" <%= marked_filter === 'not_marked' ? 'selected' : '' %>>غير مصحح</option>
+          <option value="all" <%= marked_filter === 'all' ? 'selected' : '' %>><span class="ar-only">الكل</span><span class="en-only" style="display:none;">All</span></option>
+          <option value="marked" <%= marked_filter === 'marked' ? 'selected' : '' %>><span class="ar-only">المصحح</span><span class="en-only" style="display:none;">Graded</span></option>
+          <option value="not_marked" <%= marked_filter === 'not_marked' ? 'selected' : '' %>><span class="ar-only">غير مصحح</span><span class="en-only" style="display:none;">Not Graded</span></option>
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label small">عرض جميع الطلاب</label>
+        <label class="form-label small"><span class="ar-only">عرض جميع الطلاب</span><span class="en-only" style="display:none;">Show All Students</span></label>
         <div class="form-check mt-1">
           <input class="form-check-input" type="checkbox" id="showAllStudents" name="show_all_students" value="1" <%= show_all_students ? 'checked' : '' %>>
-          <label class="form-check-label" for="showAllStudents">عرض جميع الطلاب</label>
+          <label class="form-check-label" for="showAllStudents"><span class="ar-only">عرض جميع الطلاب</span><span class="en-only" style="display:none;">Show All Students</span></label>
         </div>
       </div>
       <div class="col-md-2 d-flex align-items-end">
-        <button type="submit" class="btn btn-outline-primary w-100">بحث</button>
+        <button type="submit" class="btn btn-outline-primary w-100"><span class="ar-only">بحث</span><span class="en-only" style="display:none;">Search</span></button>
       </div>
     </form>
   </div>
 </div>
 
 <% const statusLabels = { submitted: 'تم التسليم', complete: 'كامل', incomplete: 'مش كامل', no_steps: 'من غير خطوات', not_done: 'مش معمول' }; %>
-<% const statusColors = { submitted: '#6B7280', complete: '#059669', incomplete: '#D97706', no_steps: '#6B7280', not_done: '#DC2626' }; %>
+<% const statusColors = { submitted: 'var(--sf-neutral-soft-text)', complete: 'var(--sf-success-soft-text)', incomplete: 'var(--sf-warning-soft-text)', no_steps: 'var(--sf-neutral-soft-text)', not_done: 'var(--sf-danger-soft-text)' }; %>
+<% const statusBgColors = { submitted: 'var(--sf-neutral-soft-bg)', complete: 'var(--sf-success-soft-bg)', incomplete: 'var(--sf-warning-soft-bg)', no_steps: 'var(--sf-neutral-soft-bg)', not_done: 'var(--sf-danger-soft-bg)' }; %>
 
 <!-- الطلاب اللي سلموا -->
-<h5 class="mb-3">✅ سلّموا الواجب (<%= submissions.length %>)</h5>
+<h5 class="mb-3">✅ <span class="ar-only">سلّموا الواجب</span><span class="en-only" style="display:none;">Submitted Homework</span> (<%= submissions.length %>)</h5>
 <div class="row g-3 mb-4">
   <% submissions.forEach(sub => { %>
     <div class="col-md-4">
@@ -75,11 +76,11 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <strong class="small"><%= sub.Student.name %></strong>
-            <span class="badge" style="background:<%= statusColors[sub.status] %>20;color:<%= statusColors[sub.status] %>;">
+            <span class="badge" style="background:<%= statusBgColors[sub.status] %>;color:<%= statusColors[sub.status] %>;">
               <%= statusLabels[sub.status] %>
             </span>
           </div>
-          <p class="small text-muted mb-0 mt-2"><%= submissionPaths.length %> ملف مرفق</p>
+          <p class="small text-muted mb-0 mt-2"><%= submissionPaths.length %> <span class="ar-only">ملف مرفق</span><span class="en-only" style="display:none;">attached file(s)</span></p>
         </div>
       </div>
     </div>
@@ -88,13 +89,13 @@
 
 <!-- الطلاب اللي مسلموش ومصححوش -->
 <% if (notSubmittedAndNotGraded.length > 0) { %>
-  <h5 class="mb-3">⚠️ لم يسلّموا ولم يصحَّح لهم (<%= notSubmittedAndNotGraded.length %>)</h5>
+  <h5 class="mb-3">⚠️ <span class="ar-only">لم يسلّموا ولم يصحَّح لهم</span><span class="en-only" style="display:none;">Not Submitted and Not Graded</span> (<%= notSubmittedAndNotGraded.length %>)</h5>
   <div class="card shadow-sm">
     <div class="card-body">
       <div class="table-responsive">
         <table class="table table-sm">
           <thead class="table-light">
-            <tr><th>الكود</th><th>الاسم</th><th>السنتر</th><th>تليفون ولي الأمر</th><th></th></tr>
+            <tr><th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th><th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th><th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th><th><span class="ar-only">تليفون ولي الأمر</span><span class="en-only" style="display:none;">Parent Phone</span></th><th></th></tr>
           </thead>
           <tbody>
             <% notSubmittedAndNotGraded.forEach(s => { %>
@@ -107,7 +108,7 @@
                   <% if (s.parent_phone) { %>
                     <a href="https://wa.me/2<%= s.parent_phone.replace(/^0/, '') %>?text=السلام+عليكم،+ابنك+<%= encodeURIComponent(s.name) %>+لم+يسلم+الواجب+بتاع+<%= encodeURIComponent(assignment.title) %>+حتى+الآن"
                       target="_blank" class="btn btn-sm btn-success">
-                      💬 واتساب
+                      💬 <span class="ar-only">واتساب</span><span class="en-only" style="display:none;">WhatsApp</span>
                     </a>
                   <% } %>
                 </td>
@@ -124,7 +125,7 @@
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="submissionModalTitle">تفاصيل التسليم</h5>
+        <h5 class="modal-title" id="submissionModalTitle"><span class="ar-only">تفاصيل التسليم</span><span class="en-only" style="display:none;">Submission Details</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="submissionModalBody"></div>
@@ -153,8 +154,13 @@ function openImg(src) {
 }
 
 let submissionModal;
-const statusLabels = { complete:'كامل', incomplete:'مش كامل', no_steps:'من غير خطوات', not_done:'مش معمول' };
-const statusColors = { complete:'#059669', incomplete:'#D97706', no_steps:'#6B7280', not_done:'#DC2626' };
+const statusLabels = {
+  complete: '<span class="ar-only">كامل</span><span class="en-only" style="display:none;">Complete</span>',
+  incomplete: '<span class="ar-only">مش كامل</span><span class="en-only" style="display:none;">Incomplete</span>',
+  no_steps: '<span class="ar-only">من غير خطوات</span><span class="en-only" style="display:none;">No Steps</span>',
+  not_done: '<span class="ar-only">مش معمول</span><span class="en-only" style="display:none;">Not Done</span>'
+};
+const statusColors = { complete:'var(--sf-success-soft-text)', incomplete:'var(--sf-warning-soft-text)', no_steps:'var(--sf-neutral-soft-text)', not_done:'var(--sf-danger-soft-text)' };
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, character => ({
@@ -164,7 +170,7 @@ function escapeHtml(value) {
 
 async function openSubmission(card) {
   const modalBody = document.getElementById('submissionModalBody');
-  modalBody.innerHTML = '<p class="text-center text-muted my-4">جاري تحميل تفاصيل التسليم...</p>';
+  modalBody.innerHTML = '<p class="text-center text-muted my-4"><span class="ar-only">جاري تحميل تفاصيل التسليم...</span><span class="en-only" style="display:none;">Loading submission details...</span></p>';
   submissionModal.show();
 
   try {
@@ -179,24 +185,24 @@ async function openSubmission(card) {
       const safeUrl = escapeHtml(displayUrl);
       const fileName = escapeHtml(filePath.split('/').pop());
       if (/\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(filePath)) {
-        return `<img src="${safeUrl}" alt="صورة الواجب" onclick="openImg(this.src)" style="width:90px;height:90px;object-fit:cover;border-radius:8px;cursor:pointer;background:#F3F4F6;">`;
+        return `<img src="${safeUrl}" alt="صورة الواجب" onclick="openImg(this.src)" style="width:90px;height:90px;object-fit:cover;border-radius:8px;cursor:pointer;background:var(--sf-neutral-soft-bg);">`;
       }
-      return `<a href="${safeUrl}" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center" style="width:90px;height:90px;background:#F8FAFC;color:#0F172A;text-decoration:none;font-size:0.78rem;">${/\.pdf(\?.*)?$/i.test(filePath) ? '📄' : '🔗'}<br><span style="font-size:0.65rem;line-height:1.1;">${fileName}</span></a>`;
+      return `<a href="${safeUrl}" target="_blank" class="d-flex align-items-center justify-content-center rounded border text-center" style="width:90px;height:90px;background:var(--sf-panel-bg);color:var(--sf-text);text-decoration:none;font-size:0.78rem;">${/\.pdf(\?.*)?$/i.test(filePath) ? '📄' : '🔗'}<br><span style="font-size:0.65rem;line-height:1.1;">${fileName}</span></a>`;
     }).join('');
     const gradingButtons = ['complete','incomplete','no_steps','not_done'].map(status =>
-      `<button onclick="gradeSubmission(${submission.id}, '${status}', ${submission.assignmentId})" class="btn btn-sm" style="font-size:0.72rem;padding:4px 8px;background:${submission.status === status ? statusColors[status] : '#F3F4F6'};color:${submission.status === status ? '#fff' : '#374151'};">${statusLabels[status]}</button>`
+      `<button onclick="gradeSubmission(${submission.id}, '${status}', ${submission.assignmentId})" class="btn btn-sm" style="font-size:0.72rem;padding:4px 8px;background:${submission.status === status ? statusColors[status] : 'var(--sf-neutral-soft-bg)'};color:${submission.status === status ? '#fff' : 'var(--sf-neutral-soft-text)'};">${statusLabels[status]}</button>`
     ).join('');
 
     modalBody.innerHTML = `
       <p class="small text-muted mb-1">🎓 ${escapeHtml(submission.subjectName)} | ${escapeHtml(submission.centerName)}<br>
         🔖 ${escapeHtml(submission.studentCode)}<br>
-        📁 ${submission.paths.length} ملف مرفق | 🕐 ${new Date(submission.createdAt).toLocaleString('ar-EG')}
+        📁 ${submission.paths.length} <span class="ar-only">ملف مرفق</span><span class="en-only" style="display:none;">attached file(s)</span> | 🕐 ${new Date(submission.createdAt).toLocaleString('ar-EG')}
       </p>
       ${submission.comment ? `<p class="small bg-light rounded p-2 mb-3">💬 ${escapeHtml(submission.comment)}</p>` : ''}
       <div class="d-flex flex-wrap gap-1 mb-3">${files}</div>
       <div class="d-flex gap-1 flex-wrap">${gradingButtons}</div>
       <form action="/hw/submissions/${submission.id}/delete" method="POST" class="mt-3" onsubmit="return confirm('سيتم حذف تسليم هذا الطالب وملفاته من الاستضافة نهائياً. هل أنت متأكد؟')">
-        <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ حذف التسليم والملفات</button>
+        <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ <span class="ar-only">حذف التسليم والملفات</span><span class="en-only" style="display:none;">Delete Submission and Files</span></button>
       </form>`;
   } catch (error) {
     modalBody.innerHTML = `<p class="text-danger">❌ ${escapeHtml(error.message)}</p>`;

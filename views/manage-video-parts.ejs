@@ -2,18 +2,18 @@
 
 <h3 class="mb-2">🎬 <%= video.title %></h3>
 <p class="text-muted mb-4">
-  <%= video.Session.Subject.name %> - <%= video.Session.Center.name %> - حصة رقم <%= video.Session.lesson_number %>
+  <%= video.Session.Subject.name %> - <%= video.Session.Center.name %> - <span class="ar-only">حصة رقم</span><span class="en-only" style="display:none;">Session #</span> <%= video.Session.lesson_number %>
 </p>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">إضافة فيديو جديد لهذا الدرس</h6>
+    <h6 class="mb-3"><span class="ar-only">إضافة فيديو جديد لهذا الدرس</span><span class="en-only" style="display:none;">Add New Video to This Lesson</span></h6>
     <form action="/admin/videos/<%= video.id %>/add-part" method="POST" enctype="multipart/form-data" class="row g-2" onsubmit="return combineDuration()">
       <div class="col-md-3">
         <select name="category" class="form-select" required>
-          <option value="explanation">فيديو الشرح</option>
-          <option value="questions">فيديو الأسئلة</option>
-          <option value="homework_solution">فيديو حل الواجب</option>
+          <option value="explanation"><span class="ar-only">فيديو الشرح</span><span class="en-only" style="display:none;">Explanation Video</span></option>
+          <option value="questions"><span class="ar-only">فيديو الأسئلة</span><span class="en-only" style="display:none;">Questions Video</span></option>
+          <option value="homework_solution"><span class="ar-only">فيديو حل الواجب</span><span class="en-only" style="display:none;">Homework Solution Video</span></option>
         </select>
       </div>
       <div class="col-md-2">
@@ -21,8 +21,8 @@
       </div>
       <div class="col-md-2">
         <select name="source_type" id="sourceType" class="form-select" onchange="toggleSource()">
-          <option value="link">لينك</option>
-          <option value="upload">رفع ملف</option>
+          <option value="link"><span class="ar-only">لينك</span><span class="en-only" style="display:none;">Link</span></option>
+          <option value="upload"><span class="ar-only">رفع ملف</span><span class="en-only" style="display:none;">Upload File</span></option>
         </select>
       </div>
       <div class="col-md-3" id="linkInputBox">
@@ -32,52 +32,53 @@
         <input type="file" name="video_file" class="form-control" accept="video/*">
       </div>
       <div class="col-md-3">
-        <label class="form-label small text-muted mb-1 d-block">مدة الفيديو</label>
+        <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">مدة الفيديو</span><span class="en-only" style="display:none;">Video Duration</span></label>
         <div class="d-flex gap-1">
           <div>
             <input type="number" id="durHours" class="form-control" placeholder="ساعة" min="0" value="0" style="width:75px;">
-            <span class="small text-muted d-block text-center">ساعة</span>
+            <span class="small text-muted d-block text-center"><span class="ar-only">ساعة</span><span class="en-only" style="display:none;">Hour</span></span>
           </div>
           <div>
             <input type="number" id="durMinutes" class="form-control" placeholder="دقيقة" min="0" max="59" value="0" style="width:75px;">
-            <span class="small text-muted d-block text-center">دقيقة</span>
+            <span class="small text-muted d-block text-center"><span class="ar-only">دقيقة</span><span class="en-only" style="display:none;">Minute</span></span>
           </div>
           <div>
             <input type="number" id="durSeconds" class="form-control" placeholder="ثانية" min="0" max="59" value="0" style="width:75px;">
-            <span class="small text-muted d-block text-center">ثانية</span>
+            <span class="small text-muted d-block text-center"><span class="ar-only">ثانية</span><span class="en-only" style="display:none;">Second</span></span>
           </div>
         </div>
         <input type="hidden" name="duration_seconds" id="durationSecondsHidden" required>
       </div>
       <div class="col-md-2">
-        <button type="submit" class="btn btn-success w-100">إضافة</button>
+        <button type="submit" class="btn btn-success w-100"><span class="ar-only">إضافة</span><span class="en-only" style="display:none;">Add</span></button>
       </div>
     </form>
-    <p class="text-muted small mt-2">💡 لو فيه أكتر من لينك لنفس النوع، ضيفهم بترتيب مختلف (1, 2, 3...).</p>
+    <p class="text-muted small mt-2">💡 <span class="ar-only">لو فيه أكتر من لينك لنفس النوع، ضيفهم بترتيب مختلف (1, 2, 3...).</span><span class="en-only" style="display:none;">If there's more than one link for the same type, add them with a different order (1, 2, 3...).</span></p>
   </div>
 </div>
 
 <% ['explanation', 'questions', 'homework_solution'].forEach(cat => { %>
   <% const labels = { explanation: '📖 فيديو الشرح', questions: '❓ فيديو الأسئلة', homework_solution: '✅ فيديو حل الواجب' }; %>
+  <% const labelsEn = { explanation: 'Explanation Video', questions: 'Questions Video', homework_solution: 'Homework Solution Video' }; %>
   <div class="card shadow-sm mb-3">
     <div class="card-body">
-      <h6 class="mb-3"><%= labels[cat] %></h6>
+      <h6 class="mb-3"><span class="ar-only"><%= labels[cat] %></span><span class="en-only" style="display:none;"><%= labelsEn[cat] %></span></h6>
       <% if (cat === 'questions') { %>
-        <div class="mb-3 p-2 rounded" style="background:#F8F9FC;">
-          <label class="form-label small text-muted mb-1 d-block">مكان ظهور فيديو الأسئلة (نفس صلاحية الوصول للحصة بتتطبق في الحالتين)</label>
+        <div class="mb-3 p-2 rounded" style="background:var(--sf-panel-bg);">
+          <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">مكان ظهور فيديو الأسئلة (نفس صلاحية الوصول للحصة بتتطبق في الحالتين)</span><span class="en-only" style="display:none;">Where the questions video appears (the same session access permission applies in both cases)</span></label>
           <form action="/admin/videos/<%= video.id %>/questions-display" method="POST" class="d-flex gap-2 align-items-center">
             <select name="questions_display" class="form-select form-select-sm" style="max-width:280px;">
-              <option value="inside" <%= video.questions_display === 'inside' ? 'selected' : '' %>>جوه صفحة الدرس بس</option>
-              <option value="outside" <%= video.questions_display === 'outside' ? 'selected' : '' %>>برا جنب الحصة بس (قبل الدخول)</option>
-              <option value="both" <%= video.questions_display === 'both' ? 'selected' : '' %>>الاتنين مع بعض</option>
+              <option value="inside" <%= video.questions_display === 'inside' ? 'selected' : '' %>><span class="ar-only">جوه صفحة الدرس بس</span><span class="en-only" style="display:none;">Inside the lesson page only</span></option>
+              <option value="outside" <%= video.questions_display === 'outside' ? 'selected' : '' %>><span class="ar-only">برا جنب الحصة بس (قبل الدخول)</span><span class="en-only" style="display:none;">Outside next to the session only (before entering)</span></option>
+              <option value="both" <%= video.questions_display === 'both' ? 'selected' : '' %>><span class="ar-only">الاتنين مع بعض</span><span class="en-only" style="display:none;">Both together</span></option>
             </select>
-            <button type="submit" class="btn btn-sm btn-primary">حفظ</button>
+            <button type="submit" class="btn btn-sm btn-primary"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
           </form>
         </div>
       <% } %>
       <% const parts = videoParts.filter(p => p.category === cat); %>
       <% if (parts.length === 0) { %>
-        <p class="text-muted small">لا يوجد فيديو من هذا النوع حتى الآن</p>
+        <p class="text-muted small"><span class="ar-only">لا يوجد فيديو من هذا النوع حتى الآن</span><span class="en-only" style="display:none;">No video of this type yet</span></p>
       <% } %>
       <% if (parts.length > 0) { %>
       <table class="table table-sm">
@@ -87,19 +88,19 @@
             <% const m = Math.floor((p.duration_seconds % 3600) / 60); %>
             <% const s = p.duration_seconds % 60; %>
             <tr>
-              <td>الجزء <%= p.order_index %></td>
+              <td><span class="ar-only">الجزء</span><span class="en-only" style="display:none;">Part</span> <%= p.order_index %></td>
               <td class="small">
                 <% if (p.source_type === 'link') { %>
-                  <a href="<%= p.video_url %>" target="_blank" class="text-decoration-none">🔗 لينك خارجي</a>
-                <% } else { %>📁 ملف مرفوع<% } %>
+                  <a href="<%= p.video_url %>" target="_blank" class="text-decoration-none">🔗 <span class="ar-only">لينك خارجي</span><span class="en-only" style="display:none;">External Link</span></a>
+                <% } else { %>📁 <span class="ar-only">ملف مرفوع</span><span class="en-only" style="display:none;">Uploaded File</span><% } %>
               </td>
               <td>
                 <%= h > 0 ? String(h).padStart(2, '0') + ':' : '' %><%= String(m).padStart(2, '0') %>:<%= String(s).padStart(2, '0') %>
               </td>
               <td class="d-flex gap-1">
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleEditRow('<%= p.id %>')">تعديل</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleEditRow('<%= p.id %>')"><span class="ar-only">تعديل</span><span class="en-only" style="display:none;">Edit</span></button>
                 <form action="/admin/videos/part/<%= p.id %>/delete" method="POST" onsubmit="return confirm('متأكد من الحذف؟')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span></button>
                 </form>
               </td>
             </tr>
@@ -108,27 +109,27 @@
                 <form action="/admin/videos/part/<%= p.id %>/update" method="POST" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return combineEditDuration('<%= p.id %>')">
                   <input type="hidden" name="category" value="<%= p.category %>">
                   <div class="col-md-2">
-                    <label class="form-label small text-muted mb-1 d-block">الترتيب</label>
+                    <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">الترتيب</span><span class="en-only" style="display:none;">Order</span></label>
                     <input type="number" name="order_index" class="form-control" value="<%= p.order_index %>" min="1" required>
                   </div>
                   <div class="col-md-2">
-                    <label class="form-label small text-muted mb-1 d-block">النوع</label>
+                    <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">النوع</span><span class="en-only" style="display:none;">Type</span></label>
                     <select name="source_type" id="editSourceType<%= p.id %>" class="form-select" onchange="toggleEditSource('<%= p.id %>')">
-                      <option value="link" <%= p.source_type === 'link' ? 'selected' : '' %>>لينك</option>
-                      <option value="upload" <%= p.source_type === 'upload' ? 'selected' : '' %>>رفع ملف</option>
+                      <option value="link" <%= p.source_type === 'link' ? 'selected' : '' %>><span class="ar-only">لينك</span><span class="en-only" style="display:none;">Link</span></option>
+                      <option value="upload" <%= p.source_type === 'upload' ? 'selected' : '' %>><span class="ar-only">رفع ملف</span><span class="en-only" style="display:none;">Upload File</span></option>
                     </select>
                   </div>
                   <div class="col-md-3" id="editLinkBox<%= p.id %>" style="<%= p.source_type === 'upload' ? 'display:none;' : '' %>">
-                    <label class="form-label small text-muted mb-1 d-block">لينك الفيديو</label>
+                    <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">لينك الفيديو</span><span class="en-only" style="display:none;">Video Link</span></label>
                     <input type="text" name="video_url" class="form-control" placeholder="لينك الفيديو" value="<%= p.source_type === 'link' ? p.video_url : '' %>">
                   </div>
                   <div class="col-md-3" id="editUploadBox<%= p.id %>" style="<%= p.source_type === 'upload' ? '' : 'display:none;' %>">
-                    <label class="form-label small text-muted mb-1 d-block">ملف جديد (اختياري)</label>
+                    <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">ملف جديد (اختياري)</span><span class="en-only" style="display:none;">New File (optional)</span></label>
                     <input type="file" name="video_file" class="form-control" accept="video/*">
-                    <% if (p.source_type === 'upload') { %><p class="small text-muted mb-0 mt-1">اترك فاضي للاحتفاظ بالملف الحالي</p><% } %>
+                    <% if (p.source_type === 'upload') { %><p class="small text-muted mb-0 mt-1"><span class="ar-only">اترك فاضي للاحتفاظ بالملف الحالي</span><span class="en-only" style="display:none;">Leave empty to keep the current file</span></p><% } %>
                   </div>
                   <div class="col-md-3">
-                    <label class="form-label small text-muted mb-1 d-block">مدة الفيديو</label>
+                    <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">مدة الفيديو</span><span class="en-only" style="display:none;">Video Duration</span></label>
                     <div class="d-flex gap-1">
                       <input type="number" id="editDurHours<%= p.id %>" class="form-control" placeholder="ساعة" min="0" value="<%= h %>" style="width:70px;">
                       <input type="number" id="editDurMinutes<%= p.id %>" class="form-control" placeholder="دقيقة" min="0" max="59" value="<%= m %>" style="width:70px;">
@@ -137,8 +138,8 @@
                     <input type="hidden" name="duration_seconds" id="editDurationSecondsHidden<%= p.id %>" required>
                   </div>
                   <div class="col-md-2 d-flex gap-1">
-                    <button type="submit" class="btn btn-sm btn-primary">حفظ</button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleEditRow('<%= p.id %>')">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleEditRow('<%= p.id %>')"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
                   </div>
                 </form>
               </td>
@@ -154,26 +155,26 @@
 <div class="card shadow-sm mb-3">
   <div class="card-body d-flex justify-content-between align-items-center">
     <div>
-      <h6 class="mb-1">🔐 إدارة وصول المشاهدة</h6>
-      <p class="text-muted small mb-0">نقل التحكم في الحصص والطلاب المسموح لهم إلى صفحة مخصصة.</p>
+      <h6 class="mb-1">🔐 <span class="ar-only">إدارة وصول المشاهدة</span><span class="en-only" style="display:none;">Manage Viewing Access</span></h6>
+      <p class="text-muted small mb-0"><span class="ar-only">نقل التحكم في الحصص والطلاب المسموح لهم إلى صفحة مخصصة.</span><span class="en-only" style="display:none;">Control over allowed sessions and students has been moved to a dedicated page.</span></p>
     </div>
-    <a href="/admin/videos/<%= video.id %>/access" class="btn btn-primary">الذهاب إلى صفحة الوصول</a>
+    <a href="/admin/videos/<%= video.id %>/access" class="btn btn-primary"><span class="ar-only">الذهاب إلى صفحة الوصول</span><span class="en-only" style="display:none;">Go to Access Page</span></a>
   </div>
 </div>
 
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <h6 class="mb-3">🏫 الحصص المسموح لها بمشاهدة هذا الفيديو</h6>
+    <h6 class="mb-3">🏫 <span class="ar-only">الحصص المسموح لها بمشاهدة هذا الفيديو</span><span class="en-only" style="display:none;">Sessions Allowed to Watch This Video</span></h6>
 
     <div class="d-flex flex-wrap gap-2 mb-3">
       <% if (videoSessions.length === 0) { %>
-        <span class="text-muted small">لا توجد حصص مرتبطة (الفيديو مرئي للجميع!)</span>
+        <span class="text-muted small"><span class="ar-only">لا توجد حصص مرتبطة (الفيديو مرئي للجميع!)</span><span class="en-only" style="display:none;">No linked sessions (the video is visible to everyone!)</span></span>
       <% } %>
       <% videoSessions.forEach(vs => { %>
-        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:#EEF0FB;font-size:0.8rem;">
-          <span><strong><%= vs.Session?.Subject?.name %></strong> - <%= vs.Session?.Center?.name %> (حصة <%= vs.Session?.lesson_number %>)</span>
+        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:var(--sf-primary-light);font-size:0.8rem;">
+          <span><strong><%= vs.Session?.Subject?.name %></strong> - <%= vs.Session?.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= vs.Session?.lesson_number %>)</span>
           <form action="/admin/videos/<%= video.id %>/remove-session/<%= vs.SessionId %>" method="POST">
-            <button class="btn btn-sm" style="padding:1px 6px;background:#FEE2E2;color:#B91C1C;font-size:0.65rem;">✕</button>
+            <button class="btn btn-sm" style="padding:1px 6px;background:var(--sf-danger-soft-bg);color:var(--sf-danger-soft-text);font-size:0.65rem;">✕</button>
           </form>
         </div>
       <% }) %>
@@ -181,34 +182,34 @@
 
     <form action="/admin/videos/<%= video.id %>/add-session" method="POST" class="d-flex gap-2">
       <select name="session_id" class="form-select session-select" placeholder="إضافة حصة جديدة" required>
-        <option value="">-- إضافة حصة جديدة --</option>
+        <option value=""><span class="ar-only">-- إضافة حصة جديدة --</span><span class="en-only" style="display:none;">-- Add New Session --</span></option>
         <% allSessions.forEach(s => { %>
           <% const alreadyAdded = videoSessions.some(vs => vs.SessionId === s.id); %>
           <% if (!alreadyAdded) { %>
-            <option value="<%= s.id %>"><%= s.Subject?.name %> - <%= s.Center?.name %> (حصة <%= s.lesson_number %> | سيريال <%= s.serial_number %>)</option>
+            <option value="<%= s.id %>"><%= s.Subject?.name %> - <%= s.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= s.lesson_number %> | <span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <%= s.serial_number %>)</option>
           <% } %>
         <% }) %>
       </select>
-      <button class="btn btn-sm btn-primary">+ إضافة</button>
+      <button class="btn btn-sm btn-primary">+ <span class="ar-only">إضافة</span><span class="en-only" style="display:none;">Add</span></button>
     </form>
   </div>
 </div>
 
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <h6 class="mb-3">👤 وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</h6>
+    <h6 class="mb-3">👤 <span class="ar-only">وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</span><span class="en-only" style="display:none;">Individual Access for Specific Students (Outside Allowed Groups)</span></h6>
 
     <% if (studentAccesses.length === 0) { %>
-      <p class="text-muted small mb-3">لا يوجد طلاب بوصول فردي</p>
+      <p class="text-muted small mb-3"><span class="ar-only">لا يوجد طلاب بوصول فردي</span><span class="en-only" style="display:none;">No students with individual access</span></p>
     <% } else { %>
       <div class="table-responsive mb-3">
         <table class="table table-sm align-middle">
           <thead class="table-light">
             <tr>
-              <th>الكود</th>
-              <th>الاسم</th>
-              <th>الفرقة / السنتر</th>
-              <th>إجراء</th>
+              <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+              <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+              <th><span class="ar-only">الفرقة / السنتر</span><span class="en-only" style="display:none;">Group / Center</span></th>
+              <th><span class="ar-only">إجراء</span><span class="en-only" style="display:none;">Action</span></th>
             </tr>
           </thead>
           <tbody>
@@ -219,7 +220,7 @@
                 <td class="small text-muted"><%= sa.Student?.Subject?.name %> - <%= sa.Student?.Center?.name %></td>
                 <td>
                   <form action="/admin/videos/<%= video.id %>/remove-student-access/<%= sa.id %>" method="POST">
-                    <button class="btn btn-sm btn-outline-danger">إلغاء الوصول</button>
+                    <button class="btn btn-sm btn-outline-danger"><span class="ar-only">إلغاء الوصول</span><span class="en-only" style="display:none;">Revoke Access</span></button>
                   </form>
                 </td>
               </tr>
@@ -232,7 +233,7 @@
     <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex gap-2">
       <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:200px;"
         placeholder="كود الطالب (STU-XXXXX)" required>
-      <button class="btn btn-sm btn-success">+ إضافة طالب</button>
+      <button class="btn btn-sm btn-success">+ <span class="ar-only">إضافة طالب</span><span class="en-only" style="display:none;">Add Student</span></button>
     </form>
   </div>
 </div>

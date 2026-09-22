@@ -1,17 +1,17 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-4">📊 نتيجة رفع الطلاب</h3>
+<h3 class="mb-4">📊 <span class="ar-only">نتيجة رفع الطلاب</span><span class="en-only" style="display:none;">Student Upload Results</span></h3>
 
 <div class="row g-3 mb-4">
   <div class="col-md-6">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #14B8A6;">
-      <div class="small text-muted">تم إضافتهم بنجاح</div>
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid var(--sf-accent);">
+      <div class="small text-muted"><span class="ar-only">تم إضافتهم بنجاح</span><span class="en-only" style="display:none;">Successfully Added</span></div>
       <h4 class="text-success"><%= results.success.length %></h4>
     </div>
   </div>
   <div class="col-md-6">
-    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid #DC2626;">
-      <div class="small text-muted">أخطاء</div>
+    <div class="card p-3 text-center shadow-sm" style="border-top:4px solid var(--sf-danger);">
+      <div class="small text-muted"><span class="ar-only">أخطاء</span><span class="en-only" style="display:none;">Errors</span></div>
       <h4 class="text-danger"><%= results.errors.length %></h4>
     </div>
   </div>
@@ -20,11 +20,11 @@
 <% if (results.success.length > 0) { %>
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <h6 class="text-success mb-3">✅ تمت إضافتهم</h6>
+    <h6 class="text-success mb-3">✅ <span class="ar-only">تمت إضافتهم</span><span class="en-only" style="display:none;">Added</span></h6>
     <ul class="list-unstyled mb-0">
       <% results.success.forEach(item => { %>
         <li class="small py-1 border-bottom">
-          <%= typeof item === 'string' ? item : `${item.text} (صف ${item.rowNumber})` %>
+          <span class="ar-only"><%= typeof item === 'string' ? item : `${item.text} (صف ${item.rowNumber})` %></span><span class="en-only" style="display:none;"><%= typeof item === 'string' ? item : `${item.text} (row ${item.rowNumber})` %></span>
         </li>
       <% }) %>
     </ul>
@@ -35,7 +35,7 @@
 <% if (results.errors.length > 0) { %>
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <h6 class="text-danger mb-3">❌ أخطاء</h6>
+    <h6 class="text-danger mb-3">❌ <span class="ar-only">أخطاء</span><span class="en-only" style="display:none;">Errors</span></h6>
     <ul class="list-unstyled mb-0">
       <% results.errors.forEach(err => { %><li class="small py-1 border-bottom text-danger"><%= err %></li><% }) %>
     </ul>
@@ -46,22 +46,22 @@
 <% if (results.duplicateRows && results.duplicateRows.length > 0) { %>
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <h6 class="text-warning mb-3">⚠️ تم اكتشاف صفوف مكررة</h6>
+    <h6 class="text-warning mb-3">⚠️ <span class="ar-only">تم اكتشاف صفوف مكررة</span><span class="en-only" style="display:none;">Duplicate Rows Detected</span></h6>
     <form method="POST" action="/students/bulk-upload/force-add">
       <div class="table-responsive">
         <table class="table table-bordered align-middle">
           <thead>
             <tr>
               <th class="text-center"><input type="checkbox" id="selectAllDuplicates"></th>
-              <th>صف</th>
-              <th>الاسم</th>
-              <th>التليفون</th>
-              <th>المادة</th>
-              <th>السنتر</th>
-              <th>السعر</th>
-              <th>الرصيد</th>
-              <th>البوكليت</th>
-              <th>دفع البوكليت</th>
+              <th><span class="ar-only">صف</span><span class="en-only" style="display:none;">Row</span></th>
+              <th><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></th>
+              <th><span class="ar-only">التليفون</span><span class="en-only" style="display:none;">Phone</span></th>
+              <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
+              <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
+              <th><span class="ar-only">السعر</span><span class="en-only" style="display:none;">Price</span></th>
+              <th><span class="ar-only">الرصيد</span><span class="en-only" style="display:none;">Balance</span></th>
+              <th><span class="ar-only">البوكليت</span><span class="en-only" style="display:none;">Booklet</span></th>
+              <th><span class="ar-only">دفع البوكليت</span><span class="en-only" style="display:none;">Booklet Payment</span></th>
             </tr>
           </thead>
           <tbody>
@@ -84,7 +84,7 @@
           </tbody>
         </table>
       </div>
-      <button type="submit" class="btn btn-success">إضافة الصفوف المختارة</button>
+      <button type="submit" class="btn btn-success"><span class="ar-only">إضافة الصفوف المختارة</span><span class="en-only" style="display:none;">Add Selected Rows</span></button>
     </form>
   </div>
 </div>
@@ -100,6 +100,6 @@
 </script>
 <% } %>
 
-<a href="/students" class="btn btn-primary">رجوع لقائمة الطلاب</a>
+<a href="/students" class="btn btn-primary"><span class="ar-only">رجوع لقائمة الطلاب</span><span class="en-only" style="display:none;">Back to Students List</span></a>
 
 <%- include('partials/footer') %>

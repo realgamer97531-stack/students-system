@@ -1,9 +1,9 @@
 <%- include('partials/header') %>
   <div class="container py-5 text-center">
     <div class="card shadow-sm mx-auto p-4" style="max-width: 450px;">
-      <h3 class="text-success mb-3">✅ تم تسجيل الطالب بنجاح</h3>
+      <h3 class="text-success mb-3">✅ <span class="ar-only">تم تسجيل الطالب بنجاح</span><span class="en-only" style="display:none;">Student Registered Successfully</span></h3>
       <h5 class="mb-3"><%= student.name %></h5>
-      <p class="text-muted">كود الطالب: <strong><%= student.student_code %></strong></p>
+      <p class="text-muted"><span class="ar-only">كود الطالب:</span><span class="en-only" style="display:none;">Student Code:</span> <strong><%= student.student_code %></strong></p>
       <% if (typeof attendanceNote !== 'undefined' && attendanceNote) { %>
         <div class="alert alert-info text-start">
           <%= attendanceNote %>
@@ -12,8 +12,8 @@
 
       <img src="<%= qrCodeImage %>" alt="QR Code" class="img-fluid mb-3" style="max-width: 250px; margin: auto;">
 
-      <a href="/students/new" class="btn btn-primary w-100">تسجيل طالب آخر</a>
-      <a href="/students" class="btn btn-outline-secondary w-100 mt-2">عرض كل الطلاب</a>
+      <a href="/students/new" class="btn btn-primary w-100"><span class="ar-only">تسجيل طالب آخر</span><span class="en-only" style="display:none;">Register Another Student</span></a>
+      <a href="/students" class="btn btn-outline-secondary w-100 mt-2"><span class="ar-only">عرض كل الطلاب</span><span class="en-only" style="display:none;">View All Students</span></a>
     </div>
   </div>
 <%- include('partials/footer') %>

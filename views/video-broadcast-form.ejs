@@ -6,7 +6,13 @@
   const targetPages = isEdit ? broadcast.target_pages : [];
 %>
 
-<h3 class="mb-4"><%= isEdit ? '✏️ تعديل فيديو' : '➕ فيديو جديد' %></h3>
+<h3 class="mb-4">
+  <% if (isEdit) { %>
+    ✏️ <span class="ar-only">تعديل فيديو</span><span class="en-only" style="display:none;">Edit Video</span>
+  <% } else { %>
+    ➕ <span class="ar-only">فيديو جديد</span><span class="en-only" style="display:none;">New Video</span>
+  <% } %>
+</h3>
 
 <form action="<%= formAction %>" method="POST" id="videoBroadcastForm">
   <div class="row g-4">
@@ -14,29 +20,29 @@
 
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">معلومات أساسية</h5>
+          <h5 class="fw-bold mb-3"><span class="ar-only">معلومات أساسية</span><span class="en-only" style="display:none;">Basic Information</span></h5>
           <div class="row g-3">
             <div class="col-md-9">
-              <label class="form-label">عنوان الفيديو</label>
+              <label class="form-label"><span class="ar-only">عنوان الفيديو</span><span class="en-only" style="display:none;">Video Title</span></label>
               <input type="text" name="title" class="form-control" required value="<%= isEdit ? broadcast.title : '' %>">
             </div>
             <div class="col-md-3">
-              <label class="form-label">الأولوية</label>
+              <label class="form-label"><span class="ar-only">الأولوية</span><span class="en-only" style="display:none;">Priority</span></label>
               <input type="number" name="priority" class="form-control" value="<%= isEdit ? broadcast.priority : 0 %>">
-              <small class="text-muted">الأصغر يظهر أولاً</small>
+              <small class="text-muted"><span class="ar-only">الأصغر يظهر أولاً</span><span class="en-only" style="display:none;">The smaller shows first</span></small>
             </div>
             <div class="col-md-12">
-              <label class="form-label">وصف مختصر (اختياري)</label>
+              <label class="form-label"><span class="ar-only">وصف مختصر (اختياري)</span><span class="en-only" style="display:none;">Short Description (optional)</span></label>
               <textarea name="description" class="form-control" rows="2"><%= isEdit && broadcast.description ? broadcast.description : '' %></textarea>
             </div>
             <div class="col-md-12">
-              <label class="form-label">رابط الفيديو (يوتيوب / فيميو / رابط ملف فيديو مباشر)</label>
+              <label class="form-label"><span class="ar-only">رابط الفيديو (يوتيوب / فيميو / رابط ملف فيديو مباشر)</span><span class="en-only" style="display:none;">Video Link (YouTube / Vimeo / direct video file link)</span></label>
               <input type="url" name="video_url" class="form-control" required placeholder="https://..." value="<%= isEdit ? broadcast.video_url : '' %>">
             </div>
             <div class="col-md-12 d-flex align-items-center gap-2">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="is_active" id="is_active" <%= (!isEdit || broadcast.is_active) ? 'checked' : '' %>>
-                <label class="form-check-label" for="is_active">فعّال</label>
+                <label class="form-check-label" for="is_active"><span class="ar-only">فعّال</span><span class="en-only" style="display:none;">Active</span></label>
               </div>
             </div>
           </div>
@@ -45,8 +51,8 @@
 
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">أماكن الظهور</h5>
-          <p class="text-muted small">اختر الصفحات اللي يظهر فيها الفيديو (اتركها بدون اختيار = يظهر في كل الصفحات).</p>
+          <h5 class="fw-bold mb-3"><span class="ar-only">أماكن الظهور</span><span class="en-only" style="display:none;">Display Locations</span></h5>
+          <p class="text-muted small"><span class="ar-only">اختر الصفحات اللي يظهر فيها الفيديو (اتركها بدون اختيار = يظهر في كل الصفحات).</span><span class="en-only" style="display:none;">Choose the pages where the video appears (leave unselected = shows on all pages).</span></p>
           <div class="mb-2">
             <% pages.forEach(p => { %>
               <div class="form-check form-check-inline">
@@ -60,31 +66,31 @@
 
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="fw-bold mb-3">الوصول: مجاني أم مدفوع</h5>
+          <h5 class="fw-bold mb-3"><span class="ar-only">الوصول: مجاني أم مدفوع</span><span class="en-only" style="display:none;">Access: Free or Paid</span></h5>
 
           <div class="btn-group mb-3" role="group">
             <input type="radio" class="btn-check" name="access_type" id="access_type_free" value="free" <%= (!isEdit || broadcast.access_type === 'free') ? 'checked' : '' %>>
-            <label class="btn btn-outline-success" for="access_type_free">🆓 مجاني للجميع</label>
+            <label class="btn btn-outline-success" for="access_type_free">🆓 <span class="ar-only">مجاني للجميع</span><span class="en-only" style="display:none;">Free for Everyone</span></label>
             <input type="radio" class="btn-check" name="access_type" id="access_type_paid" value="paid" <%= (isEdit && broadcast.access_type === 'paid') ? 'checked' : '' %>>
-            <label class="btn btn-outline-warning" for="access_type_paid">💰 مدفوع</label>
+            <label class="btn btn-outline-warning" for="access_type_paid">💰 <span class="ar-only">مدفوع</span><span class="en-only" style="display:none;">Paid</span></label>
           </div>
 
           <div id="paidPanel">
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label">الحصة المرتبطة</label>
+                <label class="form-label"><span class="ar-only">الحصة المرتبطة</span><span class="en-only" style="display:none;">Linked Session</span></label>
                 <select name="SessionId" class="form-select">
-                  <option value="">-- اختر الحصة --</option>
+                  <option value=""><span class="ar-only">-- اختر الحصة --</span><span class="en-only" style="display:none;">-- Choose Session --</span></option>
                   <% sessions.forEach(s => { %>
                     <option value="<%= s.id %>" <%= (isEdit && broadcast.SessionId === s.id) ? 'selected' : '' %>>
-                      <%= (s.Subject ? s.Subject.name : '') %> - حصة رقم <%= s.lesson_number %> - <%= s.session_date %> (<%= s.Center ? s.Center.name : '' %>)
+                      <%= (s.Subject ? s.Subject.name : '') %> - <span class="ar-only">حصة رقم</span><span class="en-only" style="display:none;">Session #</span> <%= s.lesson_number %> - <%= s.session_date %> (<%= s.Center ? s.Center.name : '' %>)
                     </option>
                   <% }) %>
                 </select>
-                <small class="text-muted">الطالب هيدفع سعر الفيديو من رصيده، ويُسجَّل ضمن كشف حساب هذه الحصة.</small>
+                <small class="text-muted"><span class="ar-only">الطالب هيدفع سعر الفيديو من رصيده، ويُسجَّل ضمن كشف حساب هذه الحصة.</span><span class="en-only" style="display:none;">The student will pay the video's price from their balance, and it will be recorded in this session's account statement.</span></small>
               </div>
               <div class="col-md-6">
-                <label class="form-label">السعر (جنيه)</label>
+                <label class="form-label"><span class="ar-only">السعر (جنيه)</span><span class="en-only" style="display:none;">Price (EGP)</span></label>
                 <input type="number" step="0.01" name="price" class="form-control" value="<%= isEdit && broadcast.price != null ? broadcast.price : '' %>">
               </div>
             </div>
@@ -92,8 +98,8 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-lg">💾 حفظ الفيديو</button>
-      <a href="/admin/video-broadcasts" class="btn btn-outline-secondary btn-lg">إلغاء</a>
+      <button type="submit" class="btn btn-primary btn-lg">💾 <span class="ar-only">حفظ الفيديو</span><span class="en-only" style="display:none;">Save Video</span></button>
+      <a href="/admin/video-broadcasts" class="btn btn-outline-secondary btn-lg"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></a>
     </div>
   </div>
 </form>

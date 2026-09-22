@@ -1,8 +1,8 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-3"><%= exam.name %> (<%= exam.Subject.name %> - من <%= exam.max_score %>)</h3>
+<h3 class="mb-3"><%= exam.name %> (<%= exam.Subject.name %> - <span class="ar-only">من</span><span class="en-only" style="display:none;">out of</span> <%= exam.max_score %>)</h3>
 <% if (exam.SessionId) { %>
-  <p class="text-muted small">⚠️ ظاهر هنا بس الطلاب اللي سجلوا حضورهم في حصة <%= exam.Session.lesson_number %> فعليًا.</p>
+  <p class="text-muted small">⚠️ <span class="ar-only">ظاهر هنا بس الطلاب اللي سجلوا حضورهم في حصة</span><span class="en-only" style="display:none;">Only students who actually attended session</span> <%= exam.Session.lesson_number %> <span class="ar-only">فعليًا.</span><span class="en-only" style="display:none;">are shown here.</span></p>
 <% } %>
 <input type="text" id="searchBox" class="form-control mb-3" placeholder="🔍 بحث بالاسم أو الكود...">
 
@@ -11,10 +11,10 @@
     <table class="table align-middle" id="studentsTable">
       <thead class="table-light">
         <tr>
-          <th>الكود</th>
-          <th>اسم الطالب</th>
-          <th>السنتر</th>
-          <th>الدرجة</th>
+          <th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th>
+          <th><span class="ar-only">اسم الطالب</span><span class="en-only" style="display:none;">Student Name</span></th>
+          <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
+          <th><span class="ar-only">الدرجة</span><span class="en-only" style="display:none;">Score</span></th>
         </tr>
       </thead>
       <tbody>
@@ -39,7 +39,7 @@
       </tbody>
     </table>
   </div>
-  <button type="submit" class="btn btn-success mt-3">حفظ كل الدرجات</button>
+  <button type="submit" class="btn btn-success mt-3"><span class="ar-only">حفظ كل الدرجات</span><span class="en-only" style="display:none;">Save All Scores</span></button>
 </form>
 
 <script>

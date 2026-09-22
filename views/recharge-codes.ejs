@@ -1,31 +1,31 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-4">🎫 أكواد الشحن</h3>
+<h3 class="mb-4">🎫 <span class="ar-only">أكواد الشحن</span><span class="en-only" style="display:none;">Recharge Codes</span></h3>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">توليد أكواد جديدة</h6>
+    <h6 class="mb-3"><span class="ar-only">توليد أكواد جديدة</span><span class="en-only" style="display:none;">Generate New Codes</span></h6>
     <form action="/admin/recharge-codes/generate" method="POST" class="row g-2 align-items-end">
       <div class="col-md-3">
-        <label class="form-label small">قيمة الكود (ج)</label>
+        <label class="form-label small"><span class="ar-only">قيمة الكود (ج)</span><span class="en-only" style="display:none;">Code Value (EGP)</span></label>
         <input type="number" name="amount" class="form-control" placeholder="مثال: 200" required min="1">
       </div>
       <div class="col-md-3">
-        <label class="form-label small">عدد الأكواد</label>
+        <label class="form-label small"><span class="ar-only">عدد الأكواد</span><span class="en-only" style="display:none;">Number of Codes</span></label>
         <input type="text" class="form-control" value="10 أكواد ثابتة" disabled>
       </div>
       <div class="col-md-3">
-        <button type="submit" class="btn btn-primary w-100">⚡ Generate + تحميل Excel</button>
+        <button type="submit" class="btn btn-primary w-100">⚡ <span class="ar-only">Generate + تحميل Excel</span><span class="en-only" style="display:none;">Generate + Download Excel</span></button>
       </div>
     </form>
-    <p class="text-muted small mt-2">⚠️ كل ضغطة تنشئ 10 أكواد بدون سنتر، ثم يمكنك ربط المجموعة بسنتر واحد.</p>
+    <p class="text-muted small mt-2">⚠️ <span class="ar-only">كل ضغطة تنشئ 10 أكواد بدون سنتر، ثم يمكنك ربط المجموعة بسنتر واحد.</span><span class="en-only" style="display:none;">Each click creates 10 codes with no center, then you can link the group to one center.</span></p>
     <form id="batch-generate-form" class="row g-2 align-items-end mt-3">
       <div class="col-md-3">
-        <label class="form-label small">عدد الملفات</label>
+        <label class="form-label small"><span class="ar-only">عدد الملفات</span><span class="en-only" style="display:none;">Number of Files</span></label>
         <input type="number" name="file_count" class="form-control" placeholder="مثال: 5" required min="1" max="50">
       </div>
       <div class="col-md-3">
-        <button type="submit" class="btn btn-outline-primary w-100">📁 توليد عدة ملفات</button>
+        <button type="submit" class="btn btn-outline-primary w-100">📁 <span class="ar-only">توليد عدة ملفات</span><span class="en-only" style="display:none;">Generate Multiple Files</span></button>
       </div>
     </form>
     <script>
@@ -67,29 +67,29 @@
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">إنشاء حساب سنتر</h6>
+    <h6 class="mb-3"><span class="ar-only">إنشاء حساب سنتر</span><span class="en-only" style="display:none;">Create Center Account</span></h6>
     <form action="/admin/recharge-codes/accounts" method="POST" class="row g-2 align-items-end">
-      <div class="col-md-3"><label class="form-label small">اسم السنتر الخارجي</label><input name="center_name" class="form-control" placeholder="اكتب اسم السنتر" required maxlength="150"></div>
-      <div class="col-md-3"><label class="form-label small">اسم المستخدم</label><input name="username" class="form-control" required></div>
-      <div class="col-md-3"><label class="form-label small">كلمة المرور</label><input name="password" type="password" class="form-control" required minlength="6"></div>
-      <div class="col-md-3"><button class="btn btn-outline-primary w-100">حفظ الحساب</button></div>
+      <div class="col-md-3"><label class="form-label small"><span class="ar-only">اسم السنتر الخارجي</span><span class="en-only" style="display:none;">External Center Name</span></label><input name="center_name" class="form-control" placeholder="اكتب اسم السنتر" required maxlength="150"></div>
+      <div class="col-md-3"><label class="form-label small"><span class="ar-only">اسم المستخدم</span><span class="en-only" style="display:none;">Username</span></label><input name="username" class="form-control" required></div>
+      <div class="col-md-3"><label class="form-label small"><span class="ar-only">كلمة المرور</span><span class="en-only" style="display:none;">Password</span></label><input name="password" type="password" class="form-control" required minlength="6"></div>
+      <div class="col-md-3"><button class="btn btn-outline-primary w-100"><span class="ar-only">حفظ الحساب</span><span class="en-only" style="display:none;">Save Account</span></button></div>
     </form>
   </div>
 </div>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">ملخص مبيعات الأكواد حسب سنتر التوزيع</h6>
-    <div class="table-responsive"><table class="table table-sm"><thead class="table-light"><tr><th>السنتر</th><th>المستلم</th><th>المستخدم</th><th>المتاح</th><th>قيمة المستخدم</th><th>الحساب</th></tr></thead><tbody>
+    <h6 class="mb-3"><span class="ar-only">ملخص مبيعات الأكواد حسب سنتر التوزيع</span><span class="en-only" style="display:none;">Code Sales Summary by Distribution Center</span></h6>
+    <div class="table-responsive"><table class="table table-sm"><thead class="table-light"><tr><th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th><th><span class="ar-only">المستلم</span><span class="en-only" style="display:none;">Received</span></th><th><span class="ar-only">المستخدم</span><span class="en-only" style="display:none;">Used</span></th><th><span class="ar-only">المتاح</span><span class="en-only" style="display:none;">Available</span></th><th><span class="ar-only">قيمة المستخدم</span><span class="en-only" style="display:none;">Used Value</span></th><th><span class="ar-only">الحساب</span><span class="en-only" style="display:none;">Account</span></th></tr></thead><tbody>
       <% centerStats.forEach(item => { %><tr><td><%= item.center.name %></td><td><%= item.stats.receivedCount %></td><td><%= item.stats.usedCount %></td><td><%= item.stats.availableCount %></td><td><%= item.stats.usedAmount %> ج</td><td><%= item.account ? item.account.username : 'غير منشأ' %></td></tr><% }) %>
     </tbody></table></div>
   </div>
 </div>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="mb-0">كل أكواد الشحن</h5>
+  <h5 class="mb-0"><span class="ar-only">كل أكواد الشحن</span><span class="en-only" style="display:none;">All Recharge Codes</span></h5>
   <form id="bulk-delete-form" action="/admin/recharge-codes/delete" method="POST" onsubmit="return prepareBulkDelete(event);">
-    <button type="submit" class="btn btn-outline-danger">🗑️ حذف المجموعات المحددة</button>
+    <button type="submit" class="btn btn-outline-danger">🗑️ <span class="ar-only">حذف المجموعات المحددة</span><span class="en-only" style="display:none;">Delete Selected Groups</span></button>
   </form>
 </div>
 <script>
@@ -118,36 +118,36 @@
   <details class="card shadow-sm mb-4">
     <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">
       <input type="checkbox" class="code-group-checkbox me-2" data-code-ids="<%= codeGroup.map(c => c.id).join(',') %>" aria-label="تحديد مجموعة الأكواد" onclick="event.stopPropagation()">
-      سنتر التوزيع: <%= group.center.name %> <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span>
+      <span class="ar-only">سنتر التوزيع:</span><span class="en-only" style="display:none;">Distribution Center:</span> <%= group.center.name %> <span class="text-muted small">(<span class="ar-only">مجموعة</span><span class="en-only" style="display:none;">Group</span> <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> <span class="ar-only">أكواد</span><span class="en-only" style="display:none;">codes</span></span>
     </summary>
     <div class="card-body">
       <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
         <div class="col-md-4">
-          <label class="form-label small">تغيير السنتر</label>
+          <label class="form-label small"><span class="ar-only">تغيير السنتر</span><span class="en-only" style="display:none;">Change Center</span></label>
           <select name="center_id" class="form-select">
-            <option value="">إزالة الربط</option>
+            <option value=""><span class="ar-only">إزالة الربط</span><span class="en-only" style="display:none;">Remove Link</span></option>
             <% accountCenters.forEach(center => { %><option value="<%= center.id %>" <%= String(center.id) === String(group.center.id) ? 'selected' : '' %>><%= center.name %></option><% }) %>
           </select>
         </div>
-        <div class="col-md-4"><label class="form-label small">كلمة مرور الأدمن للتغيير</label><input type="password" name="admin_password" class="form-control" required></div>
-        <div class="col-md-4"><button class="btn btn-outline-danger w-100">🔐 حفظ تغيير الربط</button></div>
+        <div class="col-md-4"><label class="form-label small"><span class="ar-only">كلمة مرور الأدمن للتغيير</span><span class="en-only" style="display:none;">Admin Password to Change</span></label><input type="password" name="admin_password" class="form-control" required></div>
+        <div class="col-md-4"><button class="btn btn-outline-danger w-100">🔐 <span class="ar-only">حفظ تغيير الربط</span><span class="en-only" style="display:none;">Save Link Change</span></button></div>
       </form>
       <form action="/admin/recharge-codes/delete" method="POST" class="mb-3" onsubmit="return confirm('هل أنت متأكد من حذف هذه المجموعة؟');">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
-        <button class="btn btn-outline-danger">🗑️ حذف المجموعة</button>
+        <button class="btn btn-outline-danger">🗑️ <span class="ar-only">حذف المجموعة</span><span class="en-only" style="display:none;">Delete Group</span></button>
       </form>
       <div class="table-responsive">
         <table class="table table-sm">
           <thead class="table-light">
-            <tr><th>الكود</th><th>القيمة</th><th>الحالة</th><th>تاريخ الإنشاء</th></tr>
+            <tr><th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th><th><span class="ar-only">القيمة</span><span class="en-only" style="display:none;">Value</span></th><th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th><th><span class="ar-only">تاريخ الإنشاء</span><span class="en-only" style="display:none;">Created Date</span></th></tr>
           </thead>
           <tbody>
             <% codeGroup.forEach(c => { %>
               <tr>
                 <td><code><%= c.code %></code></td>
                 <td><%= c.amount %> ج</td>
-                <td><span class="badge <%= c.is_used ? 'bg-secondary' : 'bg-success' %>"><%= c.is_used ? 'مستخدم' : 'متاح' %></span></td>
+                <td><span class="badge <%= c.is_used ? 'bg-secondary' : 'bg-success' %>"><% if (c.is_used) { %><span class="ar-only">مستخدم</span><span class="en-only" style="display:none;">Used</span><% } else { %><span class="ar-only">متاح</span><span class="en-only" style="display:none;">Available</span><% } %></span></td>
                 <td class="small text-muted"><%= new Date(c.createdAt).toLocaleString('ar-EG') %></td>
               </tr>
             <% }) %>
@@ -163,30 +163,30 @@
   <details class="card shadow-sm mb-4">
     <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">
       <input type="checkbox" class="code-group-checkbox me-2" data-code-ids="<%= codeGroup.map(c => c.id).join(',') %>" aria-label="تحديد مجموعة الأكواد" onclick="event.stopPropagation()">
-      أكواد بدون سنتر توزيع <span class="text-muted small">(مجموعة <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> أكواد</span>
+      <span class="ar-only">أكواد بدون سنتر توزيع</span><span class="en-only" style="display:none;">Codes with No Distribution Center</span> <span class="text-muted small">(<span class="ar-only">مجموعة</span><span class="en-only" style="display:none;">Group</span> <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> <span class="ar-only">أكواد</span><span class="en-only" style="display:none;">codes</span></span>
     </summary>
     <div class="card-body">
       <form action="/admin/recharge-codes/link" method="POST" class="row g-2 align-items-end mb-3">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
         <div class="col-md-8">
-          <label class="form-label small">اختر السنتر لربط الأكواد</label>
+          <label class="form-label small"><span class="ar-only">اختر السنتر لربط الأكواد</span><span class="en-only" style="display:none;">Choose the center to link the codes</span></label>
           <select name="center_id" class="form-select" required>
-            <option value="">اختر سنتر التوزيع</option>
+            <option value=""><span class="ar-only">اختر سنتر التوزيع</span><span class="en-only" style="display:none;">Choose the distribution center</span></option>
             <% accountCenters.forEach(center => { %><option value="<%= center.id %>"><%= center.name %></option><% }) %>
           </select>
         </div>
-        <div class="col-md-4"><button class="btn btn-success w-100">🔗 ربط المجموعة</button></div>
+        <div class="col-md-4"><button class="btn btn-success w-100">🔗 <span class="ar-only">ربط المجموعة</span><span class="en-only" style="display:none;">Link Group</span></button></div>
       </form>
       <form action="/admin/recharge-codes/delete" method="POST" class="mb-3" onsubmit="return confirm('هل أنت متأكد من حذف هذه المجموعة؟');">
         <% codeGroup.forEach(c => { %><input type="hidden" name="code_ids" value="<%= c.id %>"><% }) %>
-        <button class="btn btn-outline-danger">🗑️ حذف المجموعة</button>
+        <button class="btn btn-outline-danger">🗑️ <span class="ar-only">حذف المجموعة</span><span class="en-only" style="display:none;">Delete Group</span></button>
       </form>
       <div class="table-responsive">
         <table class="table table-sm">
-          <thead class="table-light"><tr><th>الكود</th><th>القيمة</th><th>الحالة</th><th>تاريخ الإنشاء</th></tr></thead>
+          <thead class="table-light"><tr><th><span class="ar-only">الكود</span><span class="en-only" style="display:none;">Code</span></th><th><span class="ar-only">القيمة</span><span class="en-only" style="display:none;">Value</span></th><th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th><th><span class="ar-only">تاريخ الإنشاء</span><span class="en-only" style="display:none;">Created Date</span></th></tr></thead>
           <tbody>
             <% codeGroup.forEach(c => { %>
-              <tr><td><code><%= c.code %></code></td><td><%= c.amount %> ج</td><td><span class="badge <%= c.is_used ? 'bg-secondary' : 'bg-success' %>"><%= c.is_used ? 'مستخدم' : 'متاح' %></span></td><td class="small text-muted"><%= new Date(c.createdAt).toLocaleString('ar-EG') %></td></tr>
+              <tr><td><code><%= c.code %></code></td><td><%= c.amount %> ج</td><td><span class="badge <%= c.is_used ? 'bg-secondary' : 'bg-success' %>"><% if (c.is_used) { %><span class="ar-only">مستخدم</span><span class="en-only" style="display:none;">Used</span><% } else { %><span class="ar-only">متاح</span><span class="en-only" style="display:none;">Available</span><% } %></span></td><td class="small text-muted"><%= new Date(c.createdAt).toLocaleString('ar-EG') %></td></tr>
             <% }) %>
           </tbody>
         </table>

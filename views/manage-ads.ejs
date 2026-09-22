@@ -2,10 +2,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h3 class="mb-1">📢 إدارة الإعلانات</h3>
-    <p class="text-muted mb-0">إعلانات تظهر كـ Popup للطلاب/أولياء الأمور عند فتح البوابة، حسب الفلاتر اللي تحددها.</p>
+    <h3 class="mb-1">📢 <span class="ar-only">إدارة الإعلانات</span><span class="en-only" style="display:none;">Manage Ads</span></h3>
+    <p class="text-muted mb-0"><span class="ar-only">إعلانات تظهر كـ Popup للطلاب/أولياء الأمور عند فتح البوابة، حسب الفلاتر اللي تحددها.</span><span class="en-only" style="display:none;">Ads that appear as a popup to students/parents when opening the portal, based on the filters you set.</span></p>
   </div>
-  <a href="/admin/ads/new" class="btn btn-primary">➕ إعلان جديد</a>
+  <a href="/admin/ads/new" class="btn btn-primary">➕ <span class="ar-only">إعلان جديد</span><span class="en-only" style="display:none;">New Ad</span></a>
 </div>
 
 <%
@@ -39,27 +39,27 @@
     <table class="table mb-0">
       <thead>
         <tr>
-          <th>الاسم الداخلي</th>
-          <th>النوع</th>
-          <th>يستهدف</th>
-          <th>الصفحات</th>
-          <th>الأولوية</th>
-          <th>الحالة</th>
-          <th>إجراءات</th>
+          <th><span class="ar-only">الاسم الداخلي</span><span class="en-only" style="display:none;">Internal Name</span></th>
+          <th><span class="ar-only">النوع</span><span class="en-only" style="display:none;">Type</span></th>
+          <th><span class="ar-only">يستهدف</span><span class="en-only" style="display:none;">Targets</span></th>
+          <th><span class="ar-only">الصفحات</span><span class="en-only" style="display:none;">Pages</span></th>
+          <th><span class="ar-only">الأولوية</span><span class="en-only" style="display:none;">Priority</span></th>
+          <th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th>
+          <th><span class="ar-only">إجراءات</span><span class="en-only" style="display:none;">Actions</span></th>
         </tr>
       </thead>
       <tbody>
         <% if (!ads.length) { %>
-          <tr><td colspan="7" class="text-center text-muted py-4">لا توجد إعلانات بعد</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-4"><span class="ar-only">لا توجد إعلانات بعد</span><span class="en-only" style="display:none;">No ads yet</span></td></tr>
         <% } %>
         <% ads.forEach(adRow => { %>
           <tr>
             <td><%= adRow.title %></td>
             <td>
               <% if (adRow.ad_type === 'image') { %>
-                <span class="badge bg-info">صورة</span>
+                <span class="badge bg-info"><span class="ar-only">صورة</span><span class="en-only" style="display:none;">Image</span></span>
               <% } else { %>
-                <span class="badge bg-primary">تصميم</span>
+                <span class="badge bg-primary"><span class="ar-only">تصميم</span><span class="en-only" style="display:none;">Design</span></span>
               <% } %>
             </td>
             <td class="small"><%= describeTargeting(adRow) %></td>
@@ -67,21 +67,21 @@
             <td><%= adRow.priority %></td>
             <td>
               <% if (adRow.is_active) { %>
-                <span class="badge bg-success">فعّال</span>
+                <span class="badge bg-success"><span class="ar-only">فعّال</span><span class="en-only" style="display:none;">Active</span></span>
               <% } else { %>
-                <span class="badge bg-secondary">متوقف</span>
+                <span class="badge bg-secondary"><span class="ar-only">متوقف</span><span class="en-only" style="display:none;">Inactive</span></span>
               <% } %>
             </td>
             <td>
               <div class="d-flex gap-2">
-                <a href="/admin/ads/<%= adRow.id %>/edit" class="btn btn-sm btn-outline-primary">تعديل</a>
+                <a href="/admin/ads/<%= adRow.id %>/edit" class="btn btn-sm btn-outline-primary"><span class="ar-only">تعديل</span><span class="en-only" style="display:none;">Edit</span></a>
                 <form action="/admin/ads/<%= adRow.id %>/toggle" method="POST">
                   <button type="submit" class="btn btn-sm btn-outline-secondary">
-                    <%= adRow.is_active ? 'إيقاف' : 'تفعيل' %>
+                    <%- adRow.is_active ? '<span class="ar-only">إيقاف</span><span class="en-only" style="display:none;">Deactivate</span>' : '<span class="ar-only">تفعيل</span><span class="en-only" style="display:none;">Activate</span>' %>
                   </button>
                 </form>
                 <form action="/admin/ads/<%= adRow.id %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف هذا الإعلان؟')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span></button>
                 </form>
               </div>
             </td>

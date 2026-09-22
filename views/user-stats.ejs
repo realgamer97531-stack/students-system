@@ -2,10 +2,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div>
-    <h3 class="mb-1">📊 ملف الأسيستانت: <%= targetUser.name %></h3>
-    <p class="text-muted small mb-0">تفاصيل الأداء والحضور والراتب</p>
+    <h3 class="mb-1">📊 <span class="ar-only">ملف الأسيستانت:</span><span class="en-only" style="display:none;">Assistant Profile:</span> <%= targetUser.name %></h3>
+    <p class="text-muted small mb-0"><span class="ar-only">تفاصيل الأداء والحضور والراتب</span><span class="en-only" style="display:none;">Performance, Attendance & Salary Details</span></p>
   </div>
-  <a href="/users" class="btn btn-sm btn-outline-secondary">⬅ رجوع</a>
+  <a href="/users" class="btn btn-sm btn-outline-secondary">⬅ <span class="ar-only">رجوع</span><span class="en-only" style="display:none;">Back</span></a>
 </div>
 
 <!-- فلتر التاريخ -->
@@ -13,18 +13,18 @@
   <div class="card-body">
     <form method="GET" class="row g-2 align-items-end">
       <div class="col-md-3">
-        <label class="form-label small">من</label>
+        <label class="form-label small"><span class="ar-only">من</span><span class="en-only" style="display:none;">From</span></label>
         <input type="date" name="from" class="form-control form-control-sm" value="<%= filters.from || '' %>">
       </div>
       <div class="col-md-3">
-        <label class="form-label small">إلى</label>
+        <label class="form-label small"><span class="ar-only">إلى</span><span class="en-only" style="display:none;">To</span></label>
         <input type="date" name="to" class="form-control form-control-sm" value="<%= filters.to || '' %>">
       </div>
       <div class="col-md-2">
-        <button class="btn btn-primary btn-sm w-100">تطبيق الفلتر</button>
+        <button class="btn btn-primary btn-sm w-100"><span class="ar-only">تطبيق الفلتر</span><span class="en-only" style="display:none;">Apply Filter</span></button>
       </div>
       <div class="col-md-2">
-        <a href="/users/<%= targetUser.id %>/stats" class="btn btn-outline-secondary btn-sm w-100">إعادة تعيين</a>
+        <a href="/users/<%= targetUser.id %>/stats" class="btn btn-outline-secondary btn-sm w-100"><span class="ar-only">إعادة تعيين</span><span class="en-only" style="display:none;">Reset</span></a>
       </div>
     </form>
   </div>
@@ -33,27 +33,27 @@
 <!-- بطاقات الملخص -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid #4338CA;">
-      <div class="small text-muted">حصص حضرها</div>
-      <h4 style="color:#4338CA;"><%= sessionsAttended %></h4>
+    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid var(--sf-primary);">
+      <div class="small text-muted"><span class="ar-only">حصص حضرها</span><span class="en-only" style="display:none;">Sessions Attended</span></div>
+      <h4 style="color:var(--sf-primary);"><%= sessionsAttended %></h4>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid #14B8A6;">
-      <div class="small text-muted">تسجيلات حضور طلاب</div>
-      <h4 style="color:#14B8A6;"><%= attendanceCount %></h4>
+    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid var(--sf-accent);">
+      <div class="small text-muted"><span class="ar-only">تسجيلات حضور طلاب</span><span class="en-only" style="display:none;">Student Attendance Records</span></div>
+      <h4 style="color:var(--sf-accent);"><%= attendanceCount %></h4>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid #D97706;">
-      <div class="small text-muted">تصحيحات واجب</div>
-      <h4 style="color:#D97706;"><%= homeworkCount %></h4>
+    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid var(--sf-warning);">
+      <div class="small text-muted"><span class="ar-only">تصحيحات واجب</span><span class="en-only" style="display:none;">Homework Corrections</span></div>
+      <h4 style="color:var(--sf-warning);"><%= homeworkCount %></h4>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid #059669;">
-      <div class="small text-muted">إجمالي ساعات العمل</div>
-      <h4 style="color:#059669;"><%= Math.floor(totalWorkingMinutes / 60) %>س <%= totalWorkingMinutes % 60 %>د</h4>
+    <div class="card shadow-sm p-3 text-center" style="border-top:3px solid var(--sf-success-soft-text);">
+      <div class="small text-muted"><span class="ar-only">إجمالي ساعات العمل</span><span class="en-only" style="display:none;">Total Working Hours</span></div>
+      <h4 style="color:var(--sf-success-soft-text);"><%= Math.floor(totalWorkingMinutes / 60) %>س <%= totalWorkingMinutes % 60 %>د</h4>
     </div>
   </div>
 </div>
@@ -63,7 +63,7 @@
   <div class="col-md-7">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h6 class="mb-3">📈 نشاط آخر 7 أيام (تسجيلات الحضور)</h6>
+        <h6 class="mb-3">📈 <span class="ar-only">نشاط آخر 7 أيام (تسجيلات الحضور)</span><span class="en-only" style="display:none;">Activity in Last 7 Days (Attendance Records)</span></h6>
         <canvas id="userChart" height="120"></canvas>
       </div>
     </div>
@@ -73,37 +73,37 @@
   <div class="col-md-5">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h6 class="mb-3">💰 إعداد الراتب</h6>
+        <h6 class="mb-3">💰 <span class="ar-only">إعداد الراتب</span><span class="en-only" style="display:none;">Salary Settings</span></h6>
         <form action="/users/<%= targetUser.id %>/salary-config" method="POST">
           <div class="mb-2">
-            <label class="form-label small">طريقة الحساب</label>
+            <label class="form-label small"><span class="ar-only">طريقة الحساب</span><span class="en-only" style="display:none;">Calculation Method</span></label>
             <select name="salary_type" class="form-select form-select-sm">
-              <option value="fixed" <%= salaryConfig?.salary_type==='fixed'?'selected':'' %>>ثابت شهري</option>
-              <option value="hourly" <%= salaryConfig?.salary_type==='hourly'?'selected':'' %>>بالساعة</option>
-              <option value="per_session" <%= salaryConfig?.salary_type==='per_session'?'selected':'' %>>بالحصة</option>
+              <option value="fixed" <%= salaryConfig?.salary_type==='fixed'?'selected':'' %>><span class="ar-only">ثابت شهري</span><span class="en-only" style="display:none;">Fixed Monthly</span></option>
+              <option value="hourly" <%= salaryConfig?.salary_type==='hourly'?'selected':'' %>><span class="ar-only">بالساعة</span><span class="en-only" style="display:none;">Hourly</span></option>
+              <option value="per_session" <%= salaryConfig?.salary_type==='per_session'?'selected':'' %>><span class="ar-only">بالحصة</span><span class="en-only" style="display:none;">Per Session</span></option>
             </select>
           </div>
           <div class="mb-2">
             <label class="form-label small">
-              المبلغ
-              <span class="text-muted">(ثابت = شهري | ساعة = لكل ساعة | حصة = لكل حصة)</span>
+              <span class="ar-only">المبلغ</span><span class="en-only" style="display:none;">Amount</span>
+              <span class="text-muted"><span class="ar-only">(ثابت = شهري | ساعة = لكل ساعة | حصة = لكل حصة)</span><span class="en-only" style="display:none;">(Fixed = monthly | Hourly = per hour | Per Session = per session)</span></span>
             </label>
             <input type="number" name="base_amount" class="form-control form-control-sm" step="0.5"
               value="<%= salaryConfig?.base_amount || 0 %>" required>
           </div>
           <div class="mb-2">
-            <label class="form-label small">ملاحظات</label>
+            <label class="form-label small"><span class="ar-only">ملاحظات</span><span class="en-only" style="display:none;">Notes</span></label>
             <input type="text" name="notes" class="form-control form-control-sm" value="<%= salaryConfig?.notes || '' %>">
           </div>
-          <button class="btn btn-primary btn-sm w-100">حفظ الإعداد</button>
+          <button class="btn btn-primary btn-sm w-100"><span class="ar-only">حفظ الإعداد</span><span class="en-only" style="display:none;">Save Settings</span></button>
         </form>
 
         <hr>
-        <div class="p-2 rounded" style="background:#EEF0FB;">
-          <div class="small text-muted mb-1">الراتب المحسوب (الفترة المختارة)</div>
-          <h5 style="color:#4338CA;" class="mb-0"><%= totalSalaryCalculated.toFixed(2) %> ج</h5>
+        <div class="p-2 rounded" style="background:var(--sf-primary-light);">
+          <div class="small text-muted mb-1"><span class="ar-only">الراتب المحسوب (الفترة المختارة)</span><span class="en-only" style="display:none;">Calculated Salary (Selected Period)</span></div>
+          <h5 style="color:var(--sf-primary);" class="mb-0"><%= totalSalaryCalculated.toFixed(2) %> ج</h5>
           <div class="small text-muted mt-1">
-            <%= sessionsAttended %> حصة |
+            <%= sessionsAttended %> <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session(s)</span> |
             <%= Math.floor(totalWorkingMinutes/60) %>س <%= totalWorkingMinutes%60 %>د
           </div>
         </div>
@@ -115,19 +115,19 @@
 <!-- سجل الحضور التفصيلي -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="mb-3">📋 سجل الحضور التفصيلي (<%= assistantAttendances.length %> حصة)</h6>
+    <h6 class="mb-3">📋 <span class="ar-only">سجل الحضور التفصيلي (<%= assistantAttendances.length %> حصة)</span><span class="en-only" style="display:none;">Detailed Attendance Record (<%= assistantAttendances.length %> Session(s))</span></h6>
     <div class="table-responsive">
       <table class="table table-sm table-hover">
         <thead class="table-light">
           <tr>
-            <th>الحصة</th><th>المادة</th><th>السنتر</th>
-            <th>حضور</th><th>انصراف</th><th>ساعات</th><th>راتب</th><th>طريقة</th>
+            <th><span class="ar-only">الحصة</span><span class="en-only" style="display:none;">Session</span></th><th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th><th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
+            <th><span class="ar-only">حضور</span><span class="en-only" style="display:none;">Check-in</span></th><th><span class="ar-only">انصراف</span><span class="en-only" style="display:none;">Check-out</span></th><th><span class="ar-only">ساعات</span><span class="en-only" style="display:none;">Hours</span></th><th><span class="ar-only">راتب</span><span class="en-only" style="display:none;">Salary</span></th><th><span class="ar-only">طريقة</span><span class="en-only" style="display:none;">Method</span></th>
           </tr>
         </thead>
         <tbody>
           <% assistantAttendances.forEach(aa => { %>
             <tr>
-              <td><%= aa.Session ? `حصة ${aa.Session.lesson_number}` : '-' %></td>
+              <td><span class="ar-only"><%= aa.Session ? `حصة ${aa.Session.lesson_number}` : '-' %></span><span class="en-only" style="display:none;"><%= aa.Session ? `Session ${aa.Session.lesson_number}` : '-' %></span></td>
               <td><small><%= aa.Session?.Subject?.name || '-' %></small></td>
               <td><small><%= aa.Session?.Center?.name || '-' %></small></td>
               <td>
@@ -138,7 +138,7 @@
               <td>
                 <% if (aa.check_out) { %>
                   <span class="small"><%= new Date(aa.check_out).toLocaleString('ar-EG', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) %></span>
-                <% } else { %><span class="badge bg-warning text-dark" style="font-size:0.65rem;">لم ينصرف</span><% } %>
+                <% } else { %><span class="badge bg-warning text-dark" style="font-size:0.65rem;"><span class="ar-only">لم ينصرف</span><span class="en-only" style="display:none;">Not checked out</span></span><% } %>
               </td>
               <td>
                 <% if (aa.working_minutes) { %>
@@ -151,14 +151,14 @@
                 <% } else { %><span class="text-muted">-</span><% } %>
               </td>
               <td>
-                <span class="badge" style="background:<%= aa.check_in_method==='auto'?'#EEF0FB':'#D1FAE5' %>;color:<%= aa.check_in_method==='auto'?'#4338CA':'#047857' %>;font-size:0.65rem;">
-                  <%= aa.check_in_method==='auto'?'🤖 تلقائي':'✋ يدوي' %>
+                <span class="badge" style="background:<%= aa.check_in_method==='auto'?'var(--sf-primary-light)':'var(--sf-success-soft-bg)' %>;color:<%= aa.check_in_method==='auto'?'var(--sf-primary)':'var(--sf-success-soft-text)' %>;font-size:0.65rem;">
+                  <span class="ar-only"><%= aa.check_in_method==='auto'?'🤖 تلقائي':'✋ يدوي' %></span><span class="en-only" style="display:none;"><%= aa.check_in_method==='auto'?'🤖 Automatic':'✋ Manual' %></span>
                 </span>
               </td>
             </tr>
           <% }) %>
           <% if (assistantAttendances.length === 0) { %>
-            <tr><td colspan="8" class="text-muted text-center">لا يوجد سجل حضور</td></tr>
+            <tr><td colspan="8" class="text-muted text-center"><span class="ar-only">لا يوجد سجل حضور</span><span class="en-only" style="display:none;">No attendance records</span></td></tr>
           <% } %>
         </tbody>
       </table>
@@ -168,6 +168,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+  // Keep chart text/gridlines readable in dark mode too
+  const chartStyles = getComputedStyle(document.documentElement);
+  Chart.defaults.color = chartStyles.getPropertyValue('--sf-muted').trim() || '#6B7280';
+  Chart.defaults.borderColor = chartStyles.getPropertyValue('--sf-input-border').trim() || '#E2E4F3';
+  const chartPrimary = chartStyles.getPropertyValue('--sf-primary').trim() || '#4338CA';
+
   const dayCounts = <%- JSON.stringify(dayCounts) %>;
   new Chart(document.getElementById('userChart'), {
     type: 'bar',
@@ -176,8 +182,8 @@
       datasets: [{
         label: 'تسجيلات الحضور',
         data: Object.values(dayCounts),
-        backgroundColor: '#4338CA50',
-        borderColor: '#4338CA',
+        backgroundColor: chartPrimary + '50',
+        borderColor: chartPrimary,
         borderWidth: 2,
         borderRadius: 6,
       }],

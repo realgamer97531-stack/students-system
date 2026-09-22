@@ -2,10 +2,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h3 class="mb-1">📺 التحكم في عرض الفيديوهات</h3>
-    <p class="text-muted mb-0">قسم منفصل تمامًا عن نظام إدارة الفيديوهات القديم — تحكم في مكان عرض كل فيديو، وهل هو مجاني للجميع أو مدفوع ومربوط بحصة معينة.</p>
+    <h3 class="mb-1">📺 <span class="ar-only">التحكم في عرض الفيديوهات</span><span class="en-only" style="display:none;">Video Broadcast Control</span></h3>
+    <p class="text-muted mb-0"><span class="ar-only">قسم منفصل تمامًا عن نظام إدارة الفيديوهات القديم — تحكم في مكان عرض كل فيديو، وهل هو مجاني للجميع أو مدفوع ومربوط بحصة معينة.</span><span class="en-only" style="display:none;">A section completely separate from the old video management system — control where each video is shown, and whether it is free for everyone or paid and linked to a specific session.</span></p>
   </div>
-  <a href="/admin/video-broadcasts/new" class="btn btn-primary">➕ فيديو جديد</a>
+  <a href="/admin/video-broadcasts/new" class="btn btn-primary">➕ <span class="ar-only">فيديو جديد</span><span class="en-only" style="display:none;">New Video</span></a>
 </div>
 
 <%
@@ -31,28 +31,28 @@
     <table class="table mb-0">
       <thead>
         <tr>
-          <th>العنوان</th>
-          <th>النوع</th>
-          <th>الحصة المرتبطة</th>
-          <th>السعر</th>
-          <th>الصفحات</th>
-          <th>الأولوية</th>
-          <th>الحالة</th>
-          <th>إجراءات</th>
+          <th><span class="ar-only">العنوان</span><span class="en-only" style="display:none;">Title</span></th>
+          <th><span class="ar-only">النوع</span><span class="en-only" style="display:none;">Type</span></th>
+          <th><span class="ar-only">الحصة المرتبطة</span><span class="en-only" style="display:none;">Linked Session</span></th>
+          <th><span class="ar-only">السعر</span><span class="en-only" style="display:none;">Price</span></th>
+          <th><span class="ar-only">الصفحات</span><span class="en-only" style="display:none;">Pages</span></th>
+          <th><span class="ar-only">الأولوية</span><span class="en-only" style="display:none;">Priority</span></th>
+          <th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th>
+          <th><span class="ar-only">إجراءات</span><span class="en-only" style="display:none;">Actions</span></th>
         </tr>
       </thead>
       <tbody>
         <% if (!broadcasts.length) { %>
-          <tr><td colspan="8" class="text-center text-muted py-4">لا توجد فيديوهات بعد</td></tr>
+          <tr><td colspan="8" class="text-center text-muted py-4"><span class="ar-only">لا توجد فيديوهات بعد</span><span class="en-only" style="display:none;">No videos yet</span></td></tr>
         <% } %>
         <% broadcasts.forEach(row => { %>
           <tr>
             <td><%= row.title %></td>
             <td>
               <% if (row.access_type === 'free') { %>
-                <span class="badge bg-success">مجاني للجميع</span>
+                <span class="badge bg-success"><span class="ar-only">مجاني للجميع</span><span class="en-only" style="display:none;">Free for Everyone</span></span>
               <% } else { %>
-                <span class="badge bg-warning text-dark">مدفوع</span>
+                <span class="badge bg-warning text-dark"><span class="ar-only">مدفوع</span><span class="en-only" style="display:none;">Paid</span></span>
               <% } %>
             </td>
             <td class="small"><%= describeBroadcastSession(row) %></td>
@@ -61,24 +61,28 @@
             <td><%= row.priority %></td>
             <td>
               <% if (row.is_active) { %>
-                <span class="badge bg-success">فعّال</span>
+                <span class="badge bg-success"><span class="ar-only">فعّال</span><span class="en-only" style="display:none;">Active</span></span>
               <% } else { %>
-                <span class="badge bg-secondary">متوقف</span>
+                <span class="badge bg-secondary"><span class="ar-only">متوقف</span><span class="en-only" style="display:none;">Stopped</span></span>
               <% } %>
             </td>
             <td>
               <div class="d-flex gap-2">
-                <a href="/admin/video-broadcasts/<%= row.id %>/edit" class="btn btn-sm btn-outline-primary">تعديل</a>
+                <a href="/admin/video-broadcasts/<%= row.id %>/edit" class="btn btn-sm btn-outline-primary"><span class="ar-only">تعديل</span><span class="en-only" style="display:none;">Edit</span></a>
                 <% if (row.access_type === 'paid') { %>
-                  <a href="/admin/video-broadcasts/<%= row.id %>/access" class="btn btn-sm btn-outline-info">الصلاحيات</a>
+                  <a href="/admin/video-broadcasts/<%= row.id %>/access" class="btn btn-sm btn-outline-info"><span class="ar-only">الصلاحيات</span><span class="en-only" style="display:none;">Permissions</span></a>
                 <% } %>
                 <form action="/admin/video-broadcasts/<%= row.id %>/toggle" method="POST">
                   <button type="submit" class="btn btn-sm btn-outline-secondary">
-                    <%= row.is_active ? 'إيقاف' : 'تفعيل' %>
+                    <% if (row.is_active) { %>
+                      <span class="ar-only">إيقاف</span><span class="en-only" style="display:none;">Stop</span>
+                    <% } else { %>
+                      <span class="ar-only">تفعيل</span><span class="en-only" style="display:none;">Activate</span>
+                    <% } %>
                   </button>
                 </form>
                 <form action="/admin/video-broadcasts/<%= row.id %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف هذا الفيديو؟')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span></button>
                 </form>
               </div>
             </td>
