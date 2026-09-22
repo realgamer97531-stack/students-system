@@ -367,6 +367,11 @@
         uploadSuccess: "تم بنجاح",
         alertConnError: "❌ حصلت مشكلة في الاتصال",
         maxImages: "لا يمكن رفع أكثر من 10 صور",
+        alertMinFile: "ارفع صورة أو ملف PDF واحد على الأقل",
+        alertMaxFileSize: "حجم كل ملف يجب أن يكون 10 ميجابايت أو أقل",
+        alertUploadingFiles: "⏳ جاري رفع الملفات على المنصة...",
+        alertUploadFailedPrefix: "❌ فشل رفع الصور: ",
+        alertSavingHomework: "⏳ جاري حفظ الواجب...",
         statusLabels: {
           submitted: 'تم التسليم ⏳',
           complete: 'كامل ✅',
@@ -408,6 +413,11 @@
         uploadSuccess: "Success",
         alertConnError: "❌ Connection error occurred",
         maxImages: "No more than 10 images can be uploaded",
+        alertMinFile: "Please upload at least one image or PDF file",
+        alertMaxFileSize: "Each file must be 10MB or less",
+        alertUploadingFiles: "⏳ Uploading files...",
+        alertUploadFailedPrefix: "❌ Failed to upload images: ",
+        alertSavingHomework: "⏳ Saving homework...",
         statusLabels: {
           submitted: 'Submitted ⏳',
           complete: 'Complete ✅',
@@ -614,17 +624,17 @@
       const maxFileSize = 10 * 1024 * 1024;
 
       if (selectedFiles.length === 0) {
-        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-warning small py-2">ارفع صورة أو ملف PDF واحد على الأقل</div>';
+        document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-warning small py-2">${translations[currentLang].alertMinFile}</div>`;
         return;
       }
 
       const oversizedFile = selectedFiles.find(file => file.size > maxFileSize);
       if (oversizedFile) {
-        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-warning small py-2">حجم كل ملف يجب أن يكون 10 ميجابايت أو أقل</div>';
+        document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-warning small py-2">${translations[currentLang].alertMaxFileSize}</div>`;
         return;
       }
 
-      document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-secondary small py-2">⏳ جاري رفع الملفات على المنصة...</div>';
+      document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-secondary small py-2">${translations[currentLang].alertUploadingFiles}</div>`;
 
       try {
         const formData = new FormData();
@@ -663,11 +673,11 @@
         }
 
         if (!uploadData.success) {
-          document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-danger small py-2">❌ فشل رفع الصور: ${uploadData.message}</div>`;
+          document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-danger small py-2">${translations[currentLang].alertUploadFailedPrefix}${uploadData.message}</div>`;
           return;
         }
 
-        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-secondary small py-2">⏳ جاري حفظ الواجب...</div>';
+        document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-secondary small py-2">${translations[currentLang].alertSavingHomework}</div>`;
 
         const res = await fetch(`${API_BASE_URL}/api/portal/homework/${currentAssignmentId}/submit`, {
           method: 'POST',
@@ -693,7 +703,7 @@
           document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-danger small py-2">${data.message}</div>`;
         }
       } catch (e) {
-        document.getElementById('uploadMsg').innerHTML = '<div class="alert alert-danger small py-2">❌ حصلت مشكلة في الاتصال</div>';
+        document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-danger small py-2">${translations[currentLang].alertConnError}</div>`;
         console.error(e);
       }
     }

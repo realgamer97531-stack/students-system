@@ -81,7 +81,7 @@
 
     /* شريط التحكم العائم (لغة / دارك مود) */
     .theme-controls {
-      position: absolute;
+      position: fixed;
       top: 20px;
       left: 20px;
       right: auto;
@@ -92,6 +92,11 @@
     html[dir="ltr"] .theme-controls {
       left: auto;
       right: 20px;
+    }
+    @media (max-width: 400px) {
+      .theme-controls { top: 12px; left: 12px; gap: 6px; }
+      html[dir="ltr"] .theme-controls { left: auto; right: 12px; }
+      .theme-controls .control-btn { padding: 6px 10px; font-size: 0.78rem; }
     }
     .control-btn {
       background: rgba(255, 255, 255, 0.9);

@@ -408,7 +408,9 @@
         confirmBtn: "تأكيد الحجز",
         vodaAlertMsg: "ارفع صورة التحويل الأول",
         aiProcessing: "🤖 جاري مراجعة الإيصال بالذكاء الاصطناعي... لحظات من فضلك.",
-        connError: "❌ حصلت مشكلة في الاتصال"
+        connError: "❌ حصلت مشكلة في الاتصال",
+        vodaOnlineUnavailable: "الدفع عبر الإنترنت غير متاح، الرجاء إتمام الدفع في السنتر.",
+        btnCenter: "🏫 في السنتر", btnVoda: "📱 فودافون كاش"
       },
       en: {
         pageTitle: "Booklets",
@@ -441,7 +443,9 @@
         confirmBtn: "Confirm Reservation",
         vodaAlertMsg: "Please upload the transfer image first",
         aiProcessing: "🤖 AI is reviewing the receipt... Please wait a moment.",
-        connError: "❌ Connection error occurred"
+        connError: "❌ Connection error occurred",
+        vodaOnlineUnavailable: "Online payment is not available, please complete the payment at the center.",
+        btnCenter: "🏫 At the Center", btnVoda: "📱 Vodafone Cash"
       }
     };
 
@@ -471,6 +475,8 @@
       document.getElementById('alert-voda-instructions').innerText = t.vodaInstructions;
       document.getElementById('btn-cancel').innerText = t.cancel;
       document.getElementById('confirmReserveBtn').innerText = t.confirmBtn;
+      document.getElementById('btnCenter').innerText = t.btnCenter;
+      document.getElementById('btnVoda').innerText = t.btnVoda;
 
       document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
       
@@ -607,7 +613,7 @@
       formData.append('payment_method', methodToSend);
       if (selectedMethod === 'vodafone') {
         // Ignore uploaded image; inform user that payments must be done at center.
-        document.getElementById('reserveMsg').innerHTML = `<div class="alert alert-info small py-2">${translations[currentLang].vodaInstructions} — الدفع عبر الإنترنت غير متاح، الرجاء إتمام الدفع في السنتر.</div>`;
+        document.getElementById('reserveMsg').innerHTML = `<div class="alert alert-info small py-2">${translations[currentLang].vodaInstructions} — ${translations[currentLang].vodaOnlineUnavailable}</div>`;
         // Delay to allow user to read message and then re-enable confirm button
         setTimeout(() => { document.getElementById('confirmReserveBtn').disabled = false; }, 1200);
         return;

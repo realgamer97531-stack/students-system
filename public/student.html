@@ -376,7 +376,7 @@
       <span id="welcomeText" class="text-white small fw-bold">أهلاً 👋</span>
       <div id="topProfileWrapper" class="d-flex flex-column align-items-center" style="cursor:pointer;" onclick="openPhotoModal()" title="اضغط لتغيير الصورة">
         <img id="topProfilePhoto" class="top-profile-photo rounded-circle" src="avatars/default.png" alt="صورة الطالب">
-        <span style="font-size:0.72rem; color:#F8FAFC; margin-top:4px;">اضغط لتغيير الصورة</span>
+        <span id="changePhotoHint" style="font-size:0.72rem; color:#F8FAFC; margin-top:4px;">اضغط لتغيير الصورة</span>
       </div>
       
       <!-- زر إظهار القائمة الجانبية للموبايل -->
@@ -421,7 +421,7 @@
             </div>
             <button id="qrLoadButton" class="btn btn-outline-primary btn-sm mt-2" type="button">عرض كود الطالب</button>
             <p class="small fw-bold mt-2 mb-0" id="qrCodeText" style="color: var(--sf-muted); letter-spacing: 1px;"></p>
-            <p class="small mt-1 mb-0" style="color: var(--sf-muted); font-size:0.72rem;">🔒 كود خاص بيك، حافظ عليه</p>
+            <p class="small mt-1 mb-0" id="qrPrivacyNote" style="color: var(--sf-muted); font-size:0.72rem;">🔒 كود خاص بيك، حافظ عليه</p>
           </div>
           
           <div class="col-md-9 text-center text-md-start border-md-right ps-md-4">
@@ -436,7 +436,7 @@
                 <div id="balanceText" class="fw-bold text-success" style="font-size:2rem;"></div>
               </div>
               <div class="col-12 col-sm-7">
-                <label for="rechargeCode" class="form-label small fw-bold" style="color: var(--sf-muted);">إضافة رصيد بكود الشحن</label>
+                <label for="rechargeCode" id="rechargeLabel" class="form-label small fw-bold" style="color: var(--sf-muted);">إضافة رصيد بكود الشحن</label>
                 <div class="input-group">
                   <input id="rechargeCode" class="form-control" placeholder="أدخل كود الشحن" maxlength="20">
                   <button id="rechargeButton" class="btn btn-primary" type="button">إضافة</button>
@@ -604,7 +604,13 @@
         bookletNotReceived: '<span class="badge bg-secondary px-3 py-2">لم يستلم بعد</span>',
         welcome: "أهلاً، ", pointsWord: "نقطة", rankWord: "من", studentsWord: "طالب", top3Title: "أفضل 3 في مادتك:", pointsHistoryTitle: "سجل نقاطي:",
         pointsRulesTitle: "كيف تحسب النقاط؟", pointsRulesBody: "✅ حضور حصة = +2 نقطة<br>📝 واجب كامل = +3 | مش كامل = +1 | مش معمول = -2<br>🎯 درجة امتحان = نفس عدد النقاط<br>🎬 مشاهدة فيديو جديد = +1 نقطة",
-        securityAlert: "🚨 تنبيه أمني: ", ofWord: "من", banMessage: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ حسابك محظور بالكامل، يرجى مراجعة إدارة السنتر فوراً للرفع</span>", noReason: "بدون سبب محدد"
+        securityAlert: "🚨 تنبيه أمني: ", ofWord: "من", banMessage: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ حسابك محظور بالكامل، يرجى مراجعة إدارة السنتر فوراً للرفع</span>", noReason: "بدون سبب محدد",
+        currency: "ج", warningLabel: "تحذير", emptyLabel: "فارغ",
+        followUpAssistantLabel: "🎯 أسيستانت المتابعة الخاص بك", followUpAssistantBadge: "مساعد أكاديمي", whatsappNow: "تواصل عبر واتساب الآن",
+        rechargeEnterCodeFirst: "أدخل كود الشحن أولاً.", rechargeAdding: "جاري إضافة الرصيد...", rechargeSuccessDefault: "تم إضافة الرصيد بنجاح.", rechargeFailedDefault: "تعذر إضافة الرصيد.",
+        noHistory: "لا يوجد سجل متاح",
+        changePhotoHint: "اضغط لتغيير الصورة", profilePhotoAlt: "صورة الطالب", qrImageAlt: "كود الطالب", qrPrivacyNote: "🔒 كود خاص بيك، حافظ عليه",
+        rechargeLabel: "إضافة رصيد بكود الشحن", rechargePlaceholder: "أدخل كود الشحن", rechargeBtnText: "إضافة"
       },
       en: {
         pageTitle: "Student Portal | Profile",
@@ -621,7 +627,13 @@
         bookletNotReceived: '<span class="badge bg-secondary px-3 py-2">Not Received</span>',
         welcome: "Welcome, ", pointsWord: "Points", rankWord: "of", studentsWord: "Students", top3Title: "Top 3 in your subject:", pointsHistoryTitle: "My Points History:",
         pointsRulesTitle: "How are points calculated?", pointsRulesBody: "✅ Session Attendance = +2 Pts<br>📝 Full Homework = +3 | Incomplete = +1 | Not Done = -2<br>🎯 Exam Grade = Same amount of points<br>🎬 Watch New Video = +1 Pt",
-        securityAlert: "🚨 Security Alert: ", ofWord: "of", banMessage: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ Your account is permanently suspended. Please contact the administration immediately.</span>", noReason: "No specific reason given"
+        securityAlert: "🚨 Security Alert: ", ofWord: "of", banMessage: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ Your account is permanently suspended. Please contact the administration immediately.</span>", noReason: "No specific reason given",
+        currency: "EGP", warningLabel: "Warning", emptyLabel: "Empty",
+        followUpAssistantLabel: "🎯 Your Follow-up Assistant", followUpAssistantBadge: "Academic Advisor", whatsappNow: "Message on WhatsApp now",
+        rechargeEnterCodeFirst: "Please enter the recharge code first.", rechargeAdding: "Adding balance...", rechargeSuccessDefault: "Balance added successfully.", rechargeFailedDefault: "Could not add balance.",
+        noHistory: "No history available",
+        changePhotoHint: "Click to change photo", profilePhotoAlt: "Student photo", qrImageAlt: "Student code", qrPrivacyNote: "🔒 Your private code, keep it safe",
+        rechargeLabel: "Add balance with recharge code", rechargePlaceholder: "Enter recharge code", rechargeBtnText: "Add"
       }
     };
 
@@ -663,6 +675,18 @@
         setTextIfExists('qrPlaceholder', isEn ? 'Click to show the student code' : 'اضغط لعرض كود الطالب');
         setTextIfExists('leaderboardLoadButton', isEn ? '🏆 Show ranking and points' : '🏆 عرض الترتيب والنقاط');
         setTextIfExists('transactionsLoadButton', isEn ? '💳 Show account statement' : '💳 عرض كشف الحساب');
+        setTextIfExists('changePhotoHint', t.changePhotoHint);
+        setTextIfExists('qrPrivacyNote', t.qrPrivacyNote);
+        setTextIfExists('rechargeLabel', t.rechargeLabel);
+        setTextIfExists('rechargeButton', t.rechargeBtnText);
+        const topProfileWrapperEl = document.getElementById('topProfileWrapper');
+        if (topProfileWrapperEl) topProfileWrapperEl.title = t.changePhotoHint;
+        const topProfilePhotoEl = document.getElementById('topProfilePhoto');
+        if (topProfilePhotoEl) topProfilePhotoEl.alt = t.profilePhotoAlt;
+        const qrImageEl = document.getElementById('qrImage');
+        if (qrImageEl) qrImageEl.alt = t.qrImageAlt;
+        const rechargeCodeEl = document.getElementById('rechargeCode');
+        if (rechargeCodeEl) rechargeCodeEl.placeholder = t.rechargePlaceholder;
 
         setTextIfExists('lang-toggle-btn', isEn ? 'العربية' : 'English');
       
@@ -718,7 +742,7 @@
       document.getElementById('welcomeText').textContent = `${t.welcome}${data.student.name.split(' ')[0]} 👋`;
       document.getElementById('subjectName').textContent = data.student.subjectName;
       document.getElementById('centerName').textContent = data.student.centerName;
-      document.getElementById('balanceText').textContent = `${data.student.balance} ج`;
+      document.getElementById('balanceText').textContent = `${data.student.balance} ${t.currency}`;
 
       // Handle booklet display safely: guard against missing DOM elements
       const bookletCol = document.getElementById('bookletCol');
@@ -769,8 +793,8 @@
                 </div>
                 <div class="flex-grow-1">
                   <div class="d-flex align-items-center justify-content-between">
-                    <span class="small fw-bold" style="color: var(--sf-muted); font-size: 0.78rem; letter-spacing: 0.5px;">🎯 أسيستانت المتابعة الخاص بك</span>
-                    <span class="badge" style="background-color: rgba(79, 70, 229, 0.1); color: var(--sf-primary); font-size: 0.7rem; padding: 4px 8px;">مساعد أكاديمي</span>
+                    <span class="small fw-bold" style="color: var(--sf-muted); font-size: 0.78rem; letter-spacing: 0.5px;">${t.followUpAssistantLabel}</span>
+                    <span class="badge" style="background-color: rgba(79, 70, 229, 0.1); color: var(--sf-primary); font-size: 0.7rem; padding: 4px 8px;">${t.followUpAssistantBadge}</span>
                   </div>
                   <h6 class="fw-bold mb-0 mt-1" style="color: var(--sf-text); font-size: 0.95rem;">${fa.name}</h6>
                   ${fa.phone ? `<p class="mb-0 small text-muted" style="font-size: 0.8rem; font-family: monospace;">${fa.phone}</p>` : ''}
@@ -786,7 +810,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-whatsapp" viewBox="0 0 16 16">
                       <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.949h.004c4.368 0 7.926-3.559 7.93-7.925a7.9 7.9 0 0 0-2.327-5.613l-.001-.002zM7.994 14.52a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c1.11-6.285 5.837-11.514 11.536-11.514a6.56 6.56 0 0 1 4.637 1.92 6.56 6.56 0 0 1 1.93 4.646c-.002 3.61-2.961 6.528-6.57 6.528"/>
                     </svg>
-                    تواصل عبر واتساب الآن
+                    ${t.whatsappNow}
                   </a>
                 </div>` : ''}
             </div>
@@ -808,11 +832,11 @@
           <div class="warning-item ${i <= warnLen ? 'active' : 'inactive'}">
             <div class="warning-icon">
               ${i <= warnLen
-                ? `<img src="warning.png" alt="تحذير ${i}">`
+                ? `<img src="warning.png" alt="${t.warningLabel} ${i}">`
                 : `<div style="width:44px;height:44px;border-radius:50%;background:#E5E7EB;"></div>`
               }
             </div>
-            <span>${i <= warnLen ? 'تحذير' : 'فارغ'}</span>
+            <span>${i <= warnLen ? t.warningLabel : t.emptyLabel}</span>
           </div>`).join('');
           
         box.innerHTML = `
@@ -841,7 +865,7 @@
               <span class="text-muted" style="font-size:0.75rem">${new Date(tr.time).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}</span>
             </span>
             <span class="${tr.amount >= 0 ? 'text-success' : 'text-danger'} fw-bold" style="font-size: 0.95rem;">
-              ${tr.amount >= 0 ? '+' : ''}${tr.amount} ج
+              ${tr.amount >= 0 ? '+' : ''}${tr.amount} ${t.currency}
             </span>
           </li>`).join('');
       }
@@ -850,7 +874,7 @@
       if (historyList) {
         const history = data.pointsHistory || [];
         if (history.length === 0) {
-          historyList.innerHTML = `<li class="list-group-item small text-muted">No history available</li>`;
+          historyList.innerHTML = `<li class="list-group-item small text-muted">${t.noHistory}</li>`;
         } else {
           historyList.innerHTML = history.map(h => `
             <li class="list-group-item d-flex justify-content-between small px-0">
@@ -1016,28 +1040,30 @@
     }
 
     document.getElementById('rechargeButton').addEventListener('click', async () => {
+      const lang = localStorage.getItem('portal_lang') || 'ar';
+      const t = translations[lang];
       const input = document.getElementById('rechargeCode');
       const message = document.getElementById('rechargeMessage');
       const button = document.getElementById('rechargeButton');
       const code = input.value.trim();
       if (!code) {
-        message.textContent = 'أدخل كود الشحن أولاً.';
+        message.textContent = t.rechargeEnterCodeFirst;
         message.className = 'small mt-2 text-danger';
         return;
       }
 
       button.disabled = true;
-      message.textContent = 'جاري إضافة الرصيد...';
+      message.textContent = t.rechargeAdding;
       message.className = 'small mt-2 text-muted';
       try {
         const result = await apiPost('/api/portal/recharge', { code });
         if (!result.success) throw new Error(result.message);
         input.value = '';
-        message.textContent = result.message || 'تم إضافة الرصيد بنجاح.';
+        message.textContent = result.message || t.rechargeSuccessDefault;
         message.className = 'small mt-2 text-success';
         await refreshDataOnly();
       } catch (error) {
-        message.textContent = error.message || 'تعذر إضافة الرصيد.';
+        message.textContent = error.message || t.rechargeFailedDefault;
         message.className = 'small mt-2 text-danger';
       } finally {
         button.disabled = false;

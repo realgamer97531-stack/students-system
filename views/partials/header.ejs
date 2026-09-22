@@ -471,6 +471,32 @@ span.text-muted {
     [lang="en"] .ar-only { display: none !important; }
     [lang="en"] .en-only { display: inline !important; }
 
+    /* Theme / language quick controls */
+    .theme-lang-controls { display: flex; gap: 8px; justify-content: center; margin: 0 18px 16px; }
+    .theme-lang-btn {
+      flex: 1;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 7px 10px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.78rem;
+      font-family: 'Cairo', sans-serif;
+      transition: background 0.15s var(--sf-ease);
+    }
+    .theme-lang-btn:hover { background: rgba(255,255,255,0.16); }
+    .theme-icon-dark { display: none; }
+    [data-theme="dark"] .theme-icon-light { display: none; }
+    [data-theme="dark"] .theme-icon-dark { display: inline; }
+
+    .mobile-topbar .theme-lang-controls { margin: 0; gap: 6px; }
+    .mobile-topbar .theme-lang-btn {
+      flex: none; width: auto; height: auto;
+      padding: 7px 9px; font-size: 0.78rem; line-height: 1.2;
+    }
+
     @media (max-width: 768px) {
       body { flex-direction: column; }
       .mobile-topbar {
@@ -556,7 +582,8 @@ span.text-muted {
         }
       });
     }
-
+  </script>
+  <style id="select2-styles">
     /* Select2 Custom Styling for Session Dropdowns */
     .select2-container--bootstrap-5 .select2-selection--single {
       height: calc(1.5em + 0.75rem + 2px) !important;
@@ -642,7 +669,6 @@ span.text-muted {
       color: #E2E8F0 !important;
     }
   </style>
-  <style id="select2-styles"></style>
 </head>
 <body onload="initializeTheme(); applyLanguageDisplay();">
   <script>
@@ -653,7 +679,17 @@ span.text-muted {
 
   <div class="mobile-topbar">
     <strong>Study<span style="color:#14B8A6">is</span>funny</strong>
-    <button onclick="toggleSidebar()">☰</button>
+    <div class="d-flex align-items-center gap-2">
+      <div class="theme-lang-controls">
+        <button class="theme-lang-btn" onclick="toggleLanguage()" title="تغيير اللغة / Change language">
+          <span class="ar-only">EN</span><span class="en-only">AR</span>
+        </button>
+        <button class="theme-lang-btn" onclick="toggleTheme()" title="تغيير المظهر / Toggle theme">
+          <span class="theme-icon-light">🌙</span><span class="theme-icon-dark">☀️</span>
+        </button>
+      </div>
+      <button onclick="toggleSidebar()">☰</button>
+    </div>
   </div>
 
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
@@ -662,6 +698,15 @@ span.text-muted {
     <div class="sf-logo">
       <div class="sf-logo-mark">S</div>
       <div class="sf-logo-text">Study<span>is</span>funny</div>
+    </div>
+    <div class="theme-lang-controls">
+      <button class="theme-lang-btn" onclick="toggleLanguage()">
+        <span class="ar-only">English</span><span class="en-only">العربية</span>
+      </button>
+      <button class="theme-lang-btn" onclick="toggleTheme()">
+        <span class="theme-icon-light">🌙 <span class="ar-only">داكن</span><span class="en-only">Dark</span></span>
+        <span class="theme-icon-dark">☀️ <span class="ar-only">فاتح</span><span class="en-only">Light</span></span>
+      </button>
     </div>
     <% if (typeof userProfilePhoto !== 'undefined' && userProfilePhoto) { %>
       <a href="/user/profile" style="text-decoration: none; display: block; text-align: center;">

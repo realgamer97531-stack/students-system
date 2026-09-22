@@ -386,7 +386,8 @@ html[dir="ltr"] .whatsapp-float {
           exhausted: '<span class="badge bg-secondary px-2 py-1">انتهت المشاهدات</span>',
           expired: '<span class="badge bg-secondary px-2 py-1">انتهت المدة</span>',
           locked: '<span class="badge bg-warning text-dark px-2 py-1">تحتاج فتح</span>',
-        }
+        },
+        whatsappSupportMessage: "مرحباً، لدي استفسار بخصوص منصة الدروس"
       },
       en: {
         pageTitle: "Videos",
@@ -417,7 +418,8 @@ html[dir="ltr"] .whatsapp-float {
           exhausted: '<span class="badge bg-secondary px-2 py-1">Views Expired</span>',
           expired: '<span class="badge bg-secondary px-2 py-1">Access Expired</span>',
           locked: '<span class="badge bg-warning text-dark px-2 py-1">Locked</span>',
-        }
+        },
+        whatsappSupportMessage: "Hello, I have a question about the lessons platform"
       }
     };
 
@@ -532,8 +534,20 @@ html[dir="ltr"] .whatsapp-float {
       document.getElementById('confirmPaymentBtn').innerText = translations[lang].btnModalConfirm;
 
       document.getElementById('lang-toggle-btn').innerText = isEn ? 'العربية' : 'English';
-      
+      updateWhatsappSupportLink(lang);
+
       loadLessons();
+    }
+
+    function updateWhatsappSupportLink(lang) {
+      const whatsappLink = document.getElementById('whatsapp-support');
+      const supportPhone = String(
+        window.CONFIG?.SUPPORT_PHONE ||
+        (typeof CONFIG !== 'undefined' ? CONFIG.SUPPORT_PHONE : '') ||
+        ''
+      ).replace(/\D/g, '');
+      if (!whatsappLink || !supportPhone) return;
+      whatsappLink.href = `https://wa.me/${supportPhone}?text=${encodeURIComponent(translations[lang].whatsappSupportMessage)}`;
     }
 
     function toggleLanguage() {
@@ -838,21 +852,5 @@ html[dir="ltr"] .whatsapp-float {
     <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.955-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.558 6.558 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.348.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.342-.116-.007-.249-.008-.382-.008-.133 0-.348.05-.53.248-.183.198-.7.683-.7 1.664 0 .98.718 1.925.818 2.059.1.133 1.41 2.154 3.415 3.018.477.206.85.33 1.141.424.481.153.921.132 1.268.08.388-.058 1.17-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.379-.232z"/>
   </svg>
 </a>
-<script>
-  (() => {
-    const whatsappLink = document.getElementById('whatsapp-support');
-    const supportPhone = String(
-      window.CONFIG?.SUPPORT_PHONE ||
-      (typeof CONFIG !== 'undefined' ? CONFIG.SUPPORT_PHONE : '') ||
-      ''
-    ).replace(/\D/g, '');
-
-    if (!whatsappLink || !supportPhone) return;
-
-    whatsappLink.href = `https://wa.me/${supportPhone}?text=${encodeURIComponent(
-      'مرحباً، لدي استفسار بخصوص منصة الدروس'
-    )}`;
-  })();
-</script>
 </body>
 </html>

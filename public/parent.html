@@ -176,6 +176,16 @@
       color: var(--dark-text);
     }
 
+    .followup-assistant-card { border-right: 3px solid #4338CA; }
+    html[dir="ltr"] .followup-assistant-card { border-right: none; border-left: 3px solid #4338CA; }
+    body.dark-theme .followup-assistant-card {
+      background-color: var(--dark-card) !important;
+      border-right-color: var(--dark-accent);
+    }
+    html[dir="ltr"] body.dark-theme .followup-assistant-card {
+      border-left-color: var(--dark-accent);
+    }
+
     /* شريط التحكم العائم (لغة / دارك مود) */
     .theme-controls {
       position: fixed;
@@ -389,7 +399,8 @@
         warningTitle: "🚨 تنبيه: {count} إنذارات من 3",
         warningTitleSingle: "🚨 تنبيه: إنذار واحد من 3",
         warningBlocked: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ الحساب محظور، تواصل مع الإدارة فورًا</span>",
-        noReason: "بدون سبب محدد"
+        noReason: "بدون سبب محدد",
+        followUpAssistantLabel: "🎯 أسيستانت متابعة ابنك/ابنتك", whatsappNow: "💬 تواصل معه على واتساب"
       },
       en: {
         pageTitle: "Parent Portal | Tracking",
@@ -430,7 +441,8 @@
         warningTitle: "🚨 Alert: {count} Warnings out of 3",
         warningTitleSingle: "🚨 Alert: 1 Warning out of 3",
         warningBlocked: "<br><span style='color:#DC2626; font-weight:bold;'>⛔ Account Blocked, contact management immediately</span>",
-        noReason: "No specific reason"
+        noReason: "No specific reason",
+        followUpAssistantLabel: "🎯 Your Child's Follow-up Assistant", whatsappNow: "💬 Message on WhatsApp"
       }
     };
 
@@ -634,14 +646,14 @@
       if (data.student.followUpAssistant) {
   const fa = data.student.followUpAssistant;
   const faHtml = `
-    <div class="card shadow-sm mt-3 mb-2 p-2" style="background:#EEF0FB;border-right:3px solid #4338CA;">
-      <div class="small text-muted mb-1">🎯 أسيستانت متابعة ابنك/ابنتك</div>
+    <div class="card followup-assistant-card shadow-sm mt-3 mb-2 p-2" style="background:#EEF0FB;">
+      <div class="small text-muted mb-1">${translations[lang].followUpAssistantLabel}</div>
       <div class="fw-bold">${fa.name}</div>
       ${fa.phone ? `
         <div class="small text-muted">${fa.phone}</div>
         <a href="https://wa.me/20${fa.phone.replace(/^0/,'')}" target="_blank"
           class="btn btn-sm mt-1" style="background:#25D366;color:#fff;font-size:0.72rem;padding:4px 10px;">
-          💬 تواصل معه على واتساب
+          ${translations[lang].whatsappNow}
         </a>` : ''}
     </div>`;
   document.getElementById('content').insertAdjacentHTML('afterbegin', faHtml);
