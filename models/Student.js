@@ -56,6 +56,11 @@ const Student = sequelize.define('Student', {
     type: DataTypes.STRING(500),
     allowNull: true,
   },
+  is_offer_subscribed: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false, // false = طالب عادي، true = مشترك في العرض
+  },
 }, {
   tableName: 'students',
   hooks: {

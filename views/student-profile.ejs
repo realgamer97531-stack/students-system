@@ -144,6 +144,10 @@
                 <input type="checkbox" name="booklet_status" class="form-check-input" id="bookletCheck" <%= student.booklet_status ? 'checked' : '' %>>
                 <label class="form-check-label small" for="bookletCheck"><span class="ar-only">اشترى البوكليت</span><span class="en-only" style="display:none;">Purchased Booklet</span></label>
               </div>
+              <div class="mb-2 form-check">
+                <input type="checkbox" name="is_offer_subscribed" class="form-check-input" id="offerCheck" <%= student.is_offer_subscribed ? 'checked' : '' %>>
+                <label class="form-check-label small" for="offerCheck"><span class="ar-only">مشترك في العرض</span><span class="en-only" style="display:none;">Subscribed to the offer</span></label>
+              </div>
               <div class="mb-3">
                 <label class="form-label small">
                   <span class="ar-only">ملاحظة دائمة (تظهر للأسيستانت وقت تسجيل الحضور)</span>

@@ -213,6 +213,7 @@
         <th><span class="ar-only">السعر</span><span class="en-only" style="display:none;">Price</span></th>
         <th><span class="ar-only">المدفوع للبوكليت</span><span class="en-only" style="display:none;">Paid Booklet</span></th>
         <th><span class="ar-only">الرصيد</span><span class="en-only" style="display:none;">Balance</span></th>
+        <th><span class="ar-only">العرض</span><span class="en-only" style="display:none;">Offer</span></th>
         <th><span class="ar-only">البوكليت</span><span class="en-only" style="display:none;">Booklet</span></th>
       </tr>
     </thead>
@@ -235,6 +236,19 @@
           <td><%= student.price_per_session %> ج</td>
           <td><%= typeof bookletPaidTotals !== 'undefined' ? (bookletPaidTotals[student.id] || 0) + ' ج' : '0 ج' %></td>
           <td><%= student.balance %> ج</td>
+          <td>
+            <% if (student.is_offer_subscribed) { %>
+              <span class="badge bg-success">
+                <span class="ar-only">مشترك في العرض</span>
+                <span class="en-only" style="display:none;">Offer</span>
+              </span>
+            <% } else { %>
+              <span class="badge bg-secondary">
+                <span class="ar-only">طالب عادي</span>
+                <span class="en-only" style="display:none;">Normal</span>
+              </span>
+            <% } %>
+          </td>
           <td>
             <% if (student.booklet_status) { %>
               <span class="badge bg-success">

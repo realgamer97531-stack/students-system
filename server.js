@@ -641,6 +641,24 @@ async function ensureUserProfilePhotoColumn() {
   }
 }
 
+async function ensureStudentOfferColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('students');
+    if (!tableInfo.is_offer_subscribed) {
+      await queryInterface.addColumn('students', 'is_offer_subscribed', {
+        type: sequelize.Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      });
+      console.log('Added is_offer_subscribed column to students table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) return;
+    console.error('Failed to ensure students.is_offer_subscribed column:', error.message);
+  }
+}
+
 async function ensureRechargeCodeCenterColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -2823,7 +2841,7 @@ app.post('/sessions/:id/update-week', requireAdmin, async (req, res) => {
 
 app.post('/students/:id/edit', async (req, res) => {
   try {
-    const { name, phone, parent_phone, price_per_session, booklet_status, center_id, subject_id, admin_note } = req.body;
+    const { name, phone, parent_phone, price_per_session, booklet_status, is_offer_subscribed, center_id, subject_id, admin_note } = req.body;
 
     await Student.update({
       name,
@@ -2831,6 +2849,7 @@ app.post('/students/:id/edit', async (req, res) => {
       parent_phone,
       price_per_session,
       booklet_status: booklet_status === 'on',
+      is_offer_subscribed: is_offer_subscribed === 'on',
       CenterId: center_id,
       SubjectId: subject_id,
       admin_note,
@@ -9459,6 +9478,7 @@ async function startServer() {
     await ensureHomeworkAssignmentShowForAllColumn();
     await ensureHomeworkAssignmentLinkColumns();
     await ensureUserProfilePhotoColumn();
+    await ensureStudentOfferColumn();
     await ensureBookletReservationSchema(sequelize);
     await ensureLessonAccessSchema(sequelize);
     console.log('RechargeCode table is ready');
@@ -9516,6 +9536,7 @@ async function startServer() {
           await ensureStudentBookletCustomPriceColumn();
           await ensureVideoQuestionsDisplayColumn();
           await ensureUserProfilePhotoColumn();
+          await ensureStudentOfferColumn();
           await ensureBookletReservationSchema(sequelize);
           await ensureLessonAccessSchema(sequelize);
           console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
