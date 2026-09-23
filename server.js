@@ -4596,9 +4596,10 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
   }
 });
 
-// Brief, read-only student history for the call-center's live call screen:
-// attendance (incl. online), homework and exam grades. Kept light on purpose
-// (no videos/booklets/transactions) since it's just call-side context.
+// Full, read-only student history for the call-center's live call screen:
+// per-lesson attendance (incl. online)/homework/exam table, plus past
+// session comments. No videos/booklets/transactions — just what a caller
+// needs to see while on the phone.
 app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) => {
   const configuredToken = process.env.CALLCENTER_SERVICE_TOKEN;
   if (!configuredToken || req.headers['x-callcenter-service-token'] !== configuredToken) {
@@ -4689,41 +4690,79 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
       }
     });
     let hwComplete = 0, hwIncomplete = 0, hwNotDone = 0;
-    const homeworkTimeline = lessonNumbers
-      .filter(n => homeworkByLesson[n] != null)
-      .map(n => {
-        const status = homeworkByLesson[n];
-        if (status === 'complete') hwComplete++;
-        else if (status === 'incomplete') hwIncomplete++;
-        else hwNotDone++;
-        return { lesson: n, status };
-      });
+    lessonNumbers.forEach(n => {
+      const status = homeworkByLesson[n];
+      if (status === 'complete') hwComplete++;
+      else if (status === 'incomplete') hwIncomplete++;
+      else if (status === 'no_steps' || status === 'not_done') hwNotDone++;
+    });
 
+    // Exams, matched to a lesson number the same way attendance is — last
+    // write (by createdAt) wins so a retake replaces the earlier attempt.
     const examResults = await ExamResult.findAll({
       where: { StudentId: student.id },
-      include: [{ model: Exam, attributes: ['name', 'max_score', 'SubjectId'], where: { SubjectId: student.SubjectId }, required: true }],
-      order: [['createdAt', 'DESC']],
-      limit: 3,
+      include: [{ model: Exam, attributes: ['name', 'max_score', 'SubjectId', 'SessionId'], where: { SubjectId: student.SubjectId }, required: true, include: [{ model: Session, attributes: ['lesson_number'] }] }],
+      order: [['createdAt', 'ASC']],
     });
+    const examByLesson = {};
+    examResults.forEach(r => {
+      if (r.Exam.Session) {
+        examByLesson[Number(r.Exam.Session.lesson_number)] = { name: r.Exam.name, score: r.score, max: r.Exam.max_score };
+      }
+    });
+    let examTotal = 0, examMaxTotal = 0;
+    Object.values(examByLesson).forEach(e => { examTotal += Number(e.score) || 0; examMaxTotal += Number(e.max) || 0; });
+
+    // Full per-lesson table: what the student did, or didn't do, each lesson.
+    const rows = lessonNumbers.map(lessonNumber => {
+      const ownSession = ownSessionByLesson[lessonNumber];
+      const exam = examByLesson[lessonNumber] || null;
+      return {
+        lesson: lessonNumber,
+        date: ownSession?.session_date || null,
+        attendance: attendanceTimeline.find(t => t.lesson === lessonNumber)?.status || 'absent',
+        homework: homeworkByLesson[lessonNumber] || null,
+        examScore: exam ? exam.score : null,
+        examMax: exam ? exam.max : null,
+        examName: exam ? exam.name : null,
+      };
+    });
+
+    // Past comments left on this student across sessions (from the admin
+    // follow-up dashboard and previous call-center dispositions synced back).
+    const sessionComments = await SessionComment.findAll({
+      where: { StudentId: student.id },
+      include: [
+        { model: Session, attributes: ['lesson_number', 'session_date'] },
+        { model: User, attributes: ['name'] },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    const comments = sessionComments.map(c => ({
+      lesson: c.Session ? c.Session.lesson_number : null,
+      date: c.Session ? c.Session.session_date : c.createdAt,
+      by: c.User ? c.User.name : '-',
+      comment: c.comment,
+    }));
 
     res.json({
       success: true,
       summary: {
-        attendance: {
-          total: lessonNumbers.length,
+        totals: {
+          totalLessons: lessonNumbers.length,
           attended,
           absent,
           cancelled,
-          recent: attendanceTimeline.slice(-6),
+          online: onlineCount,
+          lastOnlineDate,
+          homeworkComplete: hwComplete,
+          homeworkIncomplete: hwIncomplete,
+          homeworkNotDone: hwNotDone,
+          examTotal,
+          examMaxTotal,
         },
-        homework: {
-          complete: hwComplete,
-          incomplete: hwIncomplete,
-          notDone: hwNotDone,
-          recent: homeworkTimeline.slice(-6),
-        },
-        exams: examResults.map(r => ({ name: r.Exam.name, score: r.score, max: r.Exam.max_score })),
-        online: { count: onlineCount, lastDate: lastOnlineDate },
+        rows,
+        comments,
       },
     });
   } catch (error) {

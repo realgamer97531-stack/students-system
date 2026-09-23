@@ -41,6 +41,21 @@ function isAttendanceSession(session) {
   return /type:\s*present/i.test(session?.name || '');
 }
 
+const ATTENDANCE_LABELS = {
+  attended: 'Attended',
+  attended_elsewhere: 'Elsewhere',
+  online: 'Online',
+  cancelled: 'Cancelled',
+  absent: 'Absent',
+};
+
+const HOMEWORK_LABELS = {
+  complete: 'Complete',
+  incomplete: 'Incomplete',
+  no_steps: 'No steps',
+  not_done: 'Not done',
+};
+
 function copyText(value) {
   const text = value || '';
   if (navigator.clipboard && window.isSecureContext) {
@@ -350,26 +365,75 @@ function CallCard({ session, onLeave }) {
             </div>
 
             {(summaryLoading || summary) && (
-              <div className="contact-line" style={{ display: 'block' }}>
-                <span className="label">Student history</span>
+              <div style={{ marginTop: 4, marginBottom: 4 }}>
+                <div className="label" style={{ marginBottom: 6 }}>Student history</div>
                 {summaryLoading ? (
                   <div className="value" style={{ fontSize: 12.5, fontWeight: 400 }}>Loading…</div>
                 ) : (
-                  <div className="value" style={{ fontSize: 13, fontWeight: 400, lineHeight: 1.7 }}>
-                    Attendance: {summary.attendance.attended}/{summary.attendance.total} attended
-                    {summary.attendance.absent > 0 ? `, ${summary.attendance.absent} absent` : ''}
-                    {summary.online.count > 0 ? `, ${summary.online.count} online` : ''}
-                    <br />
-                    Homework: {summary.homework.complete} done
-                    {summary.homework.incomplete > 0 ? `, ${summary.homework.incomplete} incomplete` : ''}
-                    {summary.homework.notDone > 0 ? `, ${summary.homework.notDone} not done` : ''}
-                    {summary.exams.length > 0 && (
-                      <>
-                        <br />
-                        Last exam: {summary.exams[0].score}/{summary.exams[0].max}
-                      </>
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.6 }}>
+                      {summary.totals.attended}/{summary.totals.totalLessons} attended
+                      {summary.totals.absent > 0 ? `, ${summary.totals.absent} absent` : ''}
+                      {summary.totals.cancelled > 0 ? `, ${summary.totals.cancelled} cancelled` : ''}
+                      {summary.totals.online > 0 ? `, ${summary.totals.online} online` : ''}
+                      {' · '}HW: {summary.totals.homeworkComplete} done
+                      {summary.totals.homeworkIncomplete > 0 ? `, ${summary.totals.homeworkIncomplete} incomplete` : ''}
+                      {summary.totals.homeworkNotDone > 0 ? `, ${summary.totals.homeworkNotDone} not done` : ''}
+                      {summary.totals.examMaxTotal > 0 ? ` · Exams: ${summary.totals.examTotal}/${summary.totals.examMaxTotal}` : ''}
+                    </div>
+
+                    {summary.rows.length > 0 && (
+                      <div style={{ overflowX: 'auto', marginBottom: 10, border: '1px solid var(--border, #e5e5e5)', borderRadius: 8 }}>
+                        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ textAlign: 'left', color: 'var(--muted)', background: 'var(--bg)' }}>
+                              <th style={{ padding: '5px 8px' }}>Lesson</th>
+                              <th style={{ padding: '5px 8px' }}>Date</th>
+                              <th style={{ padding: '5px 8px' }}>Attendance</th>
+                              <th style={{ padding: '5px 8px' }}>Homework</th>
+                              <th style={{ padding: '5px 8px' }}>Exam</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...summary.rows].reverse().map((r) => (
+                              <tr key={r.lesson} style={{ borderTop: '1px solid var(--border, #eee)' }}>
+                                <td style={{ padding: '5px 8px' }}>{r.lesson}</td>
+                                <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>{r.date || '—'}</td>
+                                <td style={{ padding: '5px 8px' }}>{ATTENDANCE_LABELS[r.attendance] || r.attendance}</td>
+                                <td style={{ padding: '5px 8px' }}>{HOMEWORK_LABELS[r.homework] || '—'}</td>
+                                <td style={{ padding: '5px 8px' }}>{r.examScore != null ? `${r.examScore}/${r.examMax}` : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
-                  </div>
+
+                    {summary.comments.length > 0 && (
+                      <div style={{ overflowX: 'auto', border: '1px solid var(--border, #e5e5e5)', borderRadius: 8 }}>
+                        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ textAlign: 'left', color: 'var(--muted)', background: 'var(--bg)' }}>
+                              <th style={{ padding: '5px 8px' }}>Lesson</th>
+                              <th style={{ padding: '5px 8px' }}>Date</th>
+                              <th style={{ padding: '5px 8px' }}>By</th>
+                              <th style={{ padding: '5px 8px' }}>Comment</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {summary.comments.map((c, i) => (
+                              <tr key={i} style={{ borderTop: '1px solid var(--border, #eee)' }}>
+                                <td style={{ padding: '5px 8px' }}>{c.lesson ?? '—'}</td>
+                                <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>{c.date || '—'}</td>
+                                <td style={{ padding: '5px 8px' }}>{c.by}</td>
+                                <td style={{ padding: '5px 8px', whiteSpace: 'pre-wrap' }}>{c.comment}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
