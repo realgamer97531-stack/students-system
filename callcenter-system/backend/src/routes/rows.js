@@ -141,6 +141,44 @@ router.post('/sessions/:id/next', requireAuth, async (req, res) => {
   }
 });
 
+// --- Brief, read-only student history for the current row's student ---
+// (attendance, homework, exam grades, online sessions) — pulled live from
+// the main student system so it stays accurate even if call_rows is stale.
+
+router.get('/rows/:id/student-summary', requireAuth, async (req, res) => {
+  try {
+    const [rowsRes] = await pool.query('SELECT * FROM call_rows WHERE id = ?', [req.params.id]);
+    const row = rowsRes[0];
+    if (!row) return res.status(404).json({ error: 'Row not found' });
+    if (!row.student_id) return res.status(404).json({ error: 'This row has no Student ID' });
+
+    const serviceToken = process.env.CALLCENTER_SERVICE_TOKEN;
+    if (!serviceToken) {
+      return res.status(503).json({ error: 'CALLCENTER_SERVICE_TOKEN is not configured on the call-center backend' });
+    }
+    const baseUrl = process.env.CALLCENTER_STUDENT_SUMMARY_URL
+      || 'https://students-system-production-6b89.up.railway.app/api/internal/callcenter/student-summary';
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(`${baseUrl}/${encodeURIComponent(row.student_id)}`, {
+        headers: { 'X-Callcenter-Service-Token': serviceToken },
+        signal: controller.signal,
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        return res.status(response.status === 404 ? 404 : 502).json({ error: result.message || 'Could not load student summary' });
+      }
+      res.json({ summary: result.summary });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Caller submits a disposition, finalizing their current row ---
 
 router.post('/rows/:id/disposition', requireAuth, async (req, res) => {

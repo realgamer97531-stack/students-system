@@ -26,6 +26,12 @@
         const id = u.pathname.split('/').filter(Boolean).pop();
         return `https://player.vimeo.com/video/${id}`;
       }
+      if (u.hostname.toLowerCase().includes('mediadelivery.net')) {
+        u.searchParams.set('autoplay', 'true');
+        u.searchParams.set('muted', 'false');
+        u.searchParams.set('responsive', 'true');
+        return u.toString();
+      }
     } catch (e) {
       // رابط غير صالح كـ URL كامل - هنتعامل معاه كملف فيديو مباشر
     }

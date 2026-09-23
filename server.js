@@ -1041,7 +1041,8 @@ app.get('/logout', (req, res) => {
 function requireLogin(req, res, next) {
   // مسارات API بتاعة بوابة الطالب/ولي الأمر مستقلة تمامًا، ومحمية بـ Token بدل الجلسة
   // The call-center bridge authenticates with its own server-to-server token.
-  if (req.path.startsWith('/api/portal') || req.path === '/api/internal/callcenter/session-comment') {
+  if (req.path.startsWith('/api/portal') || req.path === '/api/internal/callcenter/session-comment'
+    || req.path.startsWith('/api/internal/callcenter/student-summary/')) {
     return next();
   }
   if (!req.session.userId) {
@@ -4592,6 +4593,142 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
   } catch (error) {
     console.error('Call-center session comment bridge failed:', error.message);
     res.status(500).json({ success: false, message: 'Could not save session comment' });
+  }
+});
+
+// Brief, read-only student history for the call-center's live call screen:
+// attendance (incl. online), homework and exam grades. Kept light on purpose
+// (no videos/booklets/transactions) since it's just call-side context.
+app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) => {
+  const configuredToken = process.env.CALLCENTER_SERVICE_TOKEN;
+  if (!configuredToken || req.headers['x-callcenter-service-token'] !== configuredToken) {
+    return res.status(401).json({ success: false, message: 'Invalid service token' });
+  }
+
+  try {
+    const identity = String(req.params.studentId || '').trim();
+    const student = await Student.findOne({
+      where: {
+        [Op.or]: [
+          { student_code: identity },
+          ...( /^\d+$/.test(identity) ? [{ id: Number(identity) }] : []),
+        ],
+      },
+    });
+    if (!student) {
+      return res.status(404).json({ success: false, message: `Student not found for ID "${identity}"` });
+    }
+
+    const ownSessions = await Session.findAll({
+      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
+      attributes: ['id', 'lesson_number', 'status', 'session_date'],
+      order: [['lesson_number', 'ASC']],
+    });
+    const ownSessionByLesson = {};
+    ownSessions.forEach(s => { ownSessionByLesson[s.lesson_number] = s; });
+
+    const attendanceRecords = await Attendance.findAll({
+      where: { StudentId: student.id },
+      include: [{
+        model: Session,
+        attributes: ['id', 'lesson_number', 'CenterId', 'SubjectId'],
+        include: [{ model: Center, attributes: ['name'] }],
+      }],
+    });
+    const attendanceByLesson = {};
+    attendanceRecords.forEach(a => {
+      if (a.Session && a.Session.SubjectId === student.SubjectId) {
+        const key = Number(a.Session.lesson_number);
+        const current = attendanceByLesson[key];
+        const ownSession = ownSessionByLesson[key];
+        const isOwnCenter = ownSession && a.Session.CenterId === ownSession.CenterId;
+        const currentIsOwnCenter = current && ownSession && current.CenterId === ownSession.CenterId;
+        if (!current || (isOwnCenter && !currentIsOwnCenter)) {
+          attendanceByLesson[key] = a.Session;
+        }
+      }
+    });
+
+    const lessonNumbersSet = new Set(ownSessions.map(s => s.lesson_number));
+    Object.keys(attendanceByLesson).forEach(n => lessonNumbersSet.add(Number(n)));
+    const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
+
+    let attended = 0, absent = 0, cancelled = 0, onlineCount = 0, lastOnlineDate = null;
+    const attendanceTimeline = lessonNumbers.map(lessonNumber => {
+      const ownSession = ownSessionByLesson[lessonNumber];
+      const attendedSession = attendanceByLesson[lessonNumber];
+      let status;
+      if (attendedSession) {
+        const isOnline = attendedSession.Center && attendedSession.Center.name === 'أونلاين';
+        status = (ownSession && attendedSession.CenterId === ownSession.CenterId)
+          ? 'attended'
+          : (isOnline ? 'online' : 'attended_elsewhere');
+        attended++;
+        if (isOnline) {
+          onlineCount++;
+          lastOnlineDate = ownSession?.session_date || lastOnlineDate;
+        }
+      } else if (ownSession && ownSession.status === 'cancelled') {
+        status = 'cancelled';
+        cancelled++;
+      } else {
+        status = 'absent';
+        absent++;
+      }
+      return { lesson: lessonNumber, status };
+    });
+
+    const homeworkRecords = await HomeworkCheck.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Session, attributes: ['lesson_number', 'SubjectId'] }],
+    });
+    const homeworkByLesson = {};
+    homeworkRecords.forEach(h => {
+      if (h.Session && h.Session.SubjectId === student.SubjectId) {
+        homeworkByLesson[Number(h.Session.lesson_number)] = h.status;
+      }
+    });
+    let hwComplete = 0, hwIncomplete = 0, hwNotDone = 0;
+    const homeworkTimeline = lessonNumbers
+      .filter(n => homeworkByLesson[n] != null)
+      .map(n => {
+        const status = homeworkByLesson[n];
+        if (status === 'complete') hwComplete++;
+        else if (status === 'incomplete') hwIncomplete++;
+        else hwNotDone++;
+        return { lesson: n, status };
+      });
+
+    const examResults = await ExamResult.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Exam, attributes: ['name', 'max_score', 'SubjectId'], where: { SubjectId: student.SubjectId }, required: true }],
+      order: [['createdAt', 'DESC']],
+      limit: 3,
+    });
+
+    res.json({
+      success: true,
+      summary: {
+        attendance: {
+          total: lessonNumbers.length,
+          attended,
+          absent,
+          cancelled,
+          recent: attendanceTimeline.slice(-6),
+        },
+        homework: {
+          complete: hwComplete,
+          incomplete: hwIncomplete,
+          notDone: hwNotDone,
+          recent: homeworkTimeline.slice(-6),
+        },
+        exams: examResults.map(r => ({ name: r.Exam.name, score: r.score, max: r.Exam.max_score })),
+        online: { count: onlineCount, lastDate: lastOnlineDate },
+      },
+    });
+  } catch (error) {
+    console.error('Call-center student summary bridge failed:', error.message);
+    res.status(500).json({ success: false, message: 'Could not load student summary' });
   }
 });
 

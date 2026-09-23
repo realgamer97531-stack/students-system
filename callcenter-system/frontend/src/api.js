@@ -68,6 +68,7 @@ export const api = {
   exportSession: (id, onlyDone) => request(`/sessions/${id}/export${onlyDone ? '?onlyDone=true' : ''}`, { isBlob: true }),
 
   nextRow: (sessionId) => request(`/sessions/${sessionId}/next`, { method: 'POST' }),
+  studentSummary: (rowId) => request(`/rows/${rowId}/student-summary`),
   submitDisposition: (rowId, disposition, comment) =>
     request(`/rows/${rowId}/disposition`, { method: 'POST', body: { disposition, comment } }),
 };

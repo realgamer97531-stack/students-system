@@ -122,6 +122,10 @@ function CallCard({ session, onLeave }) {
   // comment, then clicks "Next" (or clicks the outcome button again to submit
   // immediately without a comment — same as before).
   const [pendingDisp,   setPendingDisp]  = useState(null);
+  // Brief read-only student history (attendance/homework/exams) for whoever
+  // is currently on the card — fetched live, never blocks the call flow.
+  const [summary,       setSummary]      = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   const fetching = useRef(false);
 
@@ -130,6 +134,19 @@ function CallCard({ session, onLeave }) {
   // clearing the comment — the user may have typed something before switching
   // apps. We don't clear the comment on resume, only on a genuine new row.
   useEffect(() => { initialFetch(); }, []); // eslint-disable-line
+
+  // Load the brief student history whenever we land on a new row. Purely
+  // informational for the caller, so a failure here is silent and never
+  // blocks the call.
+  useEffect(() => {
+    if (!row?.id) { setSummary(null); return; }
+    setSummary(null);
+    setSummaryLoading(true);
+    api.studentSummary(row.id)
+      .then((res) => setSummary(res.summary))
+      .catch(() => setSummary(null))
+      .finally(() => setSummaryLoading(false));
+  }, [row?.id]);
 
   const initialFetch = async () => {
     if (fetching.current) return;
@@ -331,6 +348,31 @@ function CallCard({ session, onLeave }) {
               {displayRow.student_id ? `ID ${displayRow.student_id} · ` : ''}
               {displayRow.center || displayRow.grade || '—'} · {displayRow.subject || '—'}
             </div>
+
+            {(summaryLoading || summary) && (
+              <div className="contact-line" style={{ display: 'block' }}>
+                <span className="label">Student history</span>
+                {summaryLoading ? (
+                  <div className="value" style={{ fontSize: 12.5, fontWeight: 400 }}>Loading…</div>
+                ) : (
+                  <div className="value" style={{ fontSize: 13, fontWeight: 400, lineHeight: 1.7 }}>
+                    Attendance: {summary.attendance.attended}/{summary.attendance.total} attended
+                    {summary.attendance.absent > 0 ? `, ${summary.attendance.absent} absent` : ''}
+                    {summary.online.count > 0 ? `, ${summary.online.count} online` : ''}
+                    <br />
+                    Homework: {summary.homework.complete} done
+                    {summary.homework.incomplete > 0 ? `, ${summary.homework.incomplete} incomplete` : ''}
+                    {summary.homework.notDone > 0 ? `, ${summary.homework.notDone} not done` : ''}
+                    {summary.exams.length > 0 && (
+                      <>
+                        <br />
+                        Last exam: {summary.exams[0].score}/{summary.exams[0].max}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {showAttendanceDetails && (displayRow.homework_status || displayRow.exam_score !== null && displayRow.exam_score !== undefined) && (
               <div className="contact-line" style={{ display: 'block' }}>
