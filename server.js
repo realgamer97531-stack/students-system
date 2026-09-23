@@ -24,6 +24,7 @@ const execFileAsync = promisify(execFile);
 // استدعاء الجداول
 const Center = require('./models/Center');
 const Subject = require('./models/Subject');
+const { findSurchargeRule, surchargeReason } = require('./utils/onlineSessionSurcharge');
 const Student = require('./models/Student');
 const QRCode = require('qrcode');
 const CenterSubjectSeries = require('./models/CenterSubjectSeries');
@@ -5100,6 +5101,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       }
     });
 
+    const subjectNameById = new Map((await Subject.findAll({ attributes: ['id', 'name'] })).map(s => [s.id, s.name]));
+
     const lessons = videos.map(v => {
       const linkedVideoSessions = (linkedSessionIdsByVideoId.get(v.id) || [])
         .map(sessionId => linkedSessionById.get(sessionId))
@@ -5163,7 +5166,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         accessExpiresAt,
         viewsUsed,
         maxViews,
-        price: student.price_per_session,
+        price: student.price_per_session + (findSurchargeRule(subjectNameById.get(session.SubjectId), session.lesson_number)?.extra || 0),
         homeworkVideoUrl,
         realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
         homeworkItems,
@@ -5283,22 +5286,28 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       return res.json({ success: true, viewsUsed: 1, maxViews: grant.max_views });
     }
 
+    // رسوم إضافية لحصص محددة (مثلاً ماث تالتة ثانوي حصة 5) - تنطبق على أي طالب من أي سنتر
+    const sessionSubject = await Subject.findByPk(session.SubjectId, { attributes: ['name'] });
+    const surchargeRule = findSurchargeRule(sessionSubject?.name, session.lesson_number);
+    const surchargeAmount = surchargeRule ? surchargeRule.extra : 0;
+    const totalPrice = student.price_per_session + surchargeAmount;
+
     // 4) لسه مدفوعش - لو ماأكدش الدفع، نرجع نطلب تأكيد
     if (!confirm_payment) {
       return res.json({
         success: false,
         requiresPayment: true,
-        price: student.price_per_session,
-        message: `لم تحضر هذه الحصة في السنتر. هل توافق على دفع ${student.price_per_session} ج من رصيدك لمشاهدتها؟`,
+        price: totalPrice,
+        message: `لم تحضر هذه الحصة في السنتر. هل توافق على دفع ${totalPrice} ج من رصيدك لمشاهدتها؟`,
       });
     }
 
     // 5) أكد الدفع - نتحقق من الرصيد وننفذ
-    if (student.balance < student.price_per_session) {
+    if (student.balance < totalPrice) {
       return res.json({ success: false, message: 'رصيدك غير كافٍ لدفع ثمن هذه الحصة' });
     }
 
-    student.balance -= student.price_per_session;
+    student.balance -= totalPrice;
     await student.save();
 
     await BalanceTransaction.create({
@@ -5306,6 +5315,14 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       amount: -student.price_per_session,
       reason: `دفع لمشاهدة حصة أونلاين (سيريال ${session.serial_number})`,
     });
+    if (surchargeAmount > 0) {
+      await BalanceTransaction.create({
+        StudentId: student.id,
+        SessionId: session.id,
+        amount: -surchargeAmount,
+        reason: surchargeReason(surchargeRule),
+      });
+    }
 
     grant = await VideoAccessGrant.create({
       StudentId: student.id,
