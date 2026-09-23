@@ -5182,7 +5182,13 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       video.Session,
       ...(video.VideoSessions || []).map(videoSession => videoSession.Session),
     ].filter(session => session && session.SubjectId === student.SubjectId && session.CenterId === student.CenterId);
-    const session = linkedSessions[0];
+    // وصول فردي: الطالب ممكن يكون من مجموعة (مادة/سنتر) مختلفة عن حصص الفيديو
+    const individualAccess = await VideoStudentAccess.findOne({
+      where: { VideoId: req.params.videoId, StudentId: student.id },
+    });
+    const session = linkedSessions[0] || (individualAccess
+      ? [video.Session, ...(video.VideoSessions || []).map(videoSession => videoSession.Session)].find(Boolean)
+      : undefined);
     if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
 
     if (allVideoAccess) {
@@ -5226,9 +5232,6 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     }
 
     // تحقق من الوصول الفردي (student-specific access)
-    const individualAccess = await VideoStudentAccess.findOne({
-      where: { VideoId: req.params.videoId, StudentId: student.id },
-    });
     if (individualAccess && !grant) {
       grant = await VideoAccessGrant.create({
         StudentId: student.id,
@@ -5377,7 +5380,13 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
       video.Session,
       ...(video.VideoSessions || []).map(videoSession => videoSession.Session),
     ].filter(session => session && session.SubjectId === student.SubjectId && session.CenterId === student.CenterId);
-    const session = linkedSessions[0];
+    // وصول فردي: نفس منطق الـ access endpoint (fallback لأول حصة مرتبطة)
+    const individualAccess = linkedSessions[0] || allVideoAccess ? null : await VideoStudentAccess.findOne({
+      where: { VideoId: video.id, StudentId: student.id },
+    });
+    const session = linkedSessions[0] || (individualAccess
+      ? [video.Session, ...(video.VideoSessions || []).map(videoSession => videoSession.Session)].find(Boolean)
+      : undefined);
     if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
 
     // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة، أو حضور فعلي حالي)
@@ -5611,6 +5620,12 @@ app.post('/admin/videos/:id/add-student-access', requirePermissionOrAdmin('admin
     console.error(e);
     res.status(500).send('❌ ' + e.message);
   }
+});
+
+// حذف وصول فردي بالطالب (صفحة التحكم في الوصول)
+app.post('/admin/videos/:videoId/remove-student-access-by-student/:studentId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  await VideoStudentAccess.destroy({ where: { VideoId: req.params.videoId, StudentId: req.params.studentId } });
+  res.redirect('/admin/videos/' + req.params.videoId + '/access');
 });
 
 // حذف وصول فردي
