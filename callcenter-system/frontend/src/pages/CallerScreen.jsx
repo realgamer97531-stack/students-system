@@ -56,6 +56,20 @@ const HOMEWORK_LABELS = {
   not_done: 'Not done',
 };
 
+function attendanceLabel(row) {
+  if (row.attendance === 'attended_elsewhere') return row.elsewhereCenter || 'Elsewhere';
+  return ATTENDANCE_LABELS[row.attendance] || row.attendance;
+}
+
+function formatWatchDuration(totalSeconds) {
+  const s = Math.max(0, Math.round(totalSeconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
 function copyText(value) {
   const text = value || '';
   if (navigator.clipboard && window.isSecureContext) {
@@ -123,6 +137,25 @@ function SessionPicker({ onPick }) {
   );
 }
 
+// Isolates the optional student-history panel: if it ever throws, it just
+// disappears instead of blanking the whole call card (the call itself must
+// never depend on this rendering correctly).
+class SummaryBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error) {
+    console.error('Student history panel crashed:', error);
+  }
+  render() {
+    return this.state.hasError ? null : this.props.children;
+  }
+}
+
 /* ── Main call card ───────────────────────────────────────────────── */
 
 function CallCard({ session, onLeave }) {
@@ -158,7 +191,15 @@ function CallCard({ session, onLeave }) {
     setSummary(null);
     setSummaryLoading(true);
     api.studentSummary(row.id)
-      .then((res) => setSummary(res.summary))
+      .then((res) => {
+        const s = res && res.summary;
+        // Guard against a stale/mismatched backend still on an older
+        // response shape — never let a shape surprise crash the call card.
+        const valid = s && s.totals && Array.isArray(s.rows) && Array.isArray(s.comments);
+        // `videos` is a newer, optional field — default it so an older
+        // backend response (missing it) still renders the rest fine.
+        setSummary(valid ? { ...s, videos: Array.isArray(s.videos) ? s.videos : [] } : null);
+      })
       .catch(() => setSummary(null))
       .finally(() => setSummaryLoading(false));
   }, [row?.id]);
@@ -365,6 +406,7 @@ function CallCard({ session, onLeave }) {
             </div>
 
             {(summaryLoading || summary) && (
+              <SummaryBoundary key={row?.id}>
               <div style={{ marginTop: 4, marginBottom: 4 }}>
                 <div className="label" style={{ marginBottom: 6 }}>Student history</div>
                 {summaryLoading ? (
@@ -399,7 +441,7 @@ function CallCard({ session, onLeave }) {
                               <tr key={r.lesson} style={{ borderTop: '1px solid var(--border, #eee)' }}>
                                 <td style={{ padding: '5px 8px' }}>{r.lesson}</td>
                                 <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>{r.date || '—'}</td>
-                                <td style={{ padding: '5px 8px' }}>{ATTENDANCE_LABELS[r.attendance] || r.attendance}</td>
+                                <td style={{ padding: '5px 8px' }}>{attendanceLabel(r)}</td>
                                 <td style={{ padding: '5px 8px' }}>{HOMEWORK_LABELS[r.homework] || '—'}</td>
                                 <td style={{ padding: '5px 8px' }}>{r.examScore != null ? `${r.examScore}/${r.examMax}` : '—'}</td>
                               </tr>
@@ -433,9 +475,35 @@ function CallCard({ session, onLeave }) {
                         </table>
                       </div>
                     )}
+
+                    {summary.videos.length > 0 && (
+                      <div style={{ overflowX: 'auto', marginTop: 10, border: '1px solid var(--border, #e5e5e5)', borderRadius: 8 }}>
+                        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ textAlign: 'left', color: 'var(--muted)', background: 'var(--bg)' }}>
+                              <th style={{ padding: '5px 8px' }}>Lesson</th>
+                              <th style={{ padding: '5px 8px' }}>Video</th>
+                              <th style={{ padding: '5px 8px' }}>Watched</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {summary.videos.map((v, i) => (
+                              <tr key={i} style={{ borderTop: '1px solid var(--border, #eee)' }}>
+                                <td style={{ padding: '5px 8px' }}>{v.lesson ?? '—'}</td>
+                                <td style={{ padding: '5px 8px' }}>{v.title}</td>
+                                <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>
+                                  {formatWatchDuration(v.watchedSeconds)} / {formatWatchDuration(v.durationSeconds)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
+              </SummaryBoundary>
             )}
 
             {showAttendanceDetails && (displayRow.homework_status || displayRow.exam_score !== null && displayRow.exam_score !== undefined) && (

@@ -4659,11 +4659,13 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
       const ownSession = ownSessionByLesson[lessonNumber];
       const attendedSession = attendanceByLesson[lessonNumber];
       let status;
+      let elsewhereCenter = null;
       if (attendedSession) {
         const isOnline = attendedSession.Center && attendedSession.Center.name === 'أونلاين';
         status = (ownSession && attendedSession.CenterId === ownSession.CenterId)
           ? 'attended'
           : (isOnline ? 'online' : 'attended_elsewhere');
+        if (status === 'attended_elsewhere') elsewhereCenter = attendedSession.Center?.name || null;
         attended++;
         if (isOnline) {
           onlineCount++;
@@ -4676,7 +4678,7 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
         status = 'absent';
         absent++;
       }
-      return { lesson: lessonNumber, status };
+      return { lesson: lessonNumber, status, elsewhereCenter };
     });
 
     const homeworkRecords = await HomeworkCheck.findAll({
@@ -4717,16 +4719,54 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
     const rows = lessonNumbers.map(lessonNumber => {
       const ownSession = ownSessionByLesson[lessonNumber];
       const exam = examByLesson[lessonNumber] || null;
+      const timelineEntry = attendanceTimeline.find(t => t.lesson === lessonNumber);
       return {
         lesson: lessonNumber,
         date: ownSession?.session_date || null,
-        attendance: attendanceTimeline.find(t => t.lesson === lessonNumber)?.status || 'absent',
+        attendance: timelineEntry?.status || 'absent',
+        elsewhereCenter: timelineEntry?.elsewhereCenter || null,
         homework: homeworkByLesson[lessonNumber] || null,
         examScore: exam ? exam.score : null,
         examMax: exam ? exam.max : null,
         examName: exam ? exam.name : null,
       };
     });
+
+    // Video-watch time, same accessible-videos logic as the profile page but
+    // rolled up to one watched/duration total per video (no per-part detail).
+    const studentSessionIds = ownSessions.map(s => s.id);
+    const groupVideoSessions = studentSessionIds.length > 0 ? await VideoSession.findAll({
+      where: { SessionId: studentSessionIds },
+      attributes: ['VideoId'],
+    }) : [];
+    const groupVideoIds = [...new Set(groupVideoSessions.map(vs => vs.VideoId))];
+    const individualAccesses = await VideoStudentAccess.findAll({
+      where: { StudentId: student.id },
+      attributes: ['VideoId'],
+    });
+    const accessibleVideoIds = [...new Set([...groupVideoIds, ...individualAccesses.map(a => a.VideoId)])];
+    const studentVideos = accessibleVideoIds.length > 0 ? await Video.findAll({
+      where: { id: accessibleVideoIds },
+      include: [{ model: Session, attributes: ['lesson_number'] }, VideoPart],
+    }) : [];
+    const watchRecords = accessibleVideoIds.length > 0 ? await WatchProgress.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: VideoPart, attributes: ['VideoId'], where: { VideoId: accessibleVideoIds } }],
+    }) : [];
+    const watchedSecondsByVideo = {};
+    watchRecords.forEach(w => {
+      const videoId = w.VideoPart?.VideoId;
+      if (videoId != null) watchedSecondsByVideo[videoId] = (watchedSecondsByVideo[videoId] || 0) + (w.watched_seconds || 0);
+    });
+    const videos = studentVideos.map(v => {
+      const durationSeconds = v.VideoParts.reduce((sum, p) => sum + (p.duration_seconds || 0), 0);
+      return {
+        title: v.title,
+        lesson: v.Session ? v.Session.lesson_number : null,
+        watchedSeconds: Math.min(watchedSecondsByVideo[v.id] || 0, durationSeconds || Infinity),
+        durationSeconds,
+      };
+    }).sort((a, b) => (a.lesson || 0) - (b.lesson || 0));
 
     // Past comments left on this student across sessions (from the admin
     // follow-up dashboard and previous call-center dispositions synced back).
@@ -4763,6 +4803,7 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
         },
         rows,
         comments,
+        videos,
       },
     });
   } catch (error) {
