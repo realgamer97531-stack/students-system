@@ -21,7 +21,7 @@
         <% }) %>
       </select>
     </form>
-    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', show_only_attended: filters.show_only_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '' }).toString(); %>
+    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', show_only_attended: filters.show_only_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '', filter_missing_exam: filters.filter_missing_exam || '' }).toString(); %>
     <a href="/follow-up-dashboard/export?<%= exportQuery %>" class="btn btn-success btn-sm">📥 <span class="ar-only">تصدير</span><span class="en-only" style="display:none;">Export</span> Excel</a>
     <% if (callCenterIntegrationEnabled && selectedSession && sessionRows.length > 0) { %>
       <button type="button" id="sendFollowUpToCallcenter" class="btn btn-outline-primary btn-sm">☎️ <span class="ar-only">إرسال الظاهرين للاتصال</span><span class="en-only" style="display:none;">Send Visible to Call Center</span></button>
@@ -38,6 +38,7 @@
       filter_video_max: filters.filter_video_max || '',
       filter_hw_status: filters.filter_hw_status || '',
       filter_exam_max: filters.filter_exam_max || '',
+      filter_missing_exam: filters.filter_missing_exam || '',
       session_id: filters.session_id || selectedSession.id,
       show_all: filters.show_all || '',
       show_attended: filters.show_attended || '',
@@ -84,6 +85,15 @@
       <div class="col-md-2">
         <label class="form-label small fw-bold"><span class="ar-only">درجة الامتحان أقل من</span><span class="en-only" style="display:none;">Exam Score Less Than</span></label>
         <input type="number" name="filter_exam_max" class="form-control form-control-sm" value="<%= filters.filter_exam_max || '' %>" placeholder="مثال: 50">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold"><span class="ar-only">لم يمتحن (امتحان مستقل)</span><span class="en-only" style="display:none;">Missed Standalone Exam</span></label>
+        <select name="filter_missing_exam" class="form-select form-select-sm">
+          <option value=""><span class="ar-only">-- بدون --</span><span class="en-only" style="display:none;">-- None --</span></option>
+          <% (typeof unlinkedExams !== 'undefined' ? unlinkedExams : []).forEach(exam => { %>
+            <option value="<%= exam.id %>" <%= String(exam.id) === String(filters.filter_missing_exam) ? 'selected':'' %>><%= exam.name %><%= exam.exam_date ? ` (${exam.exam_date})` : '' %></option>
+          <% }) %>
+        </select>
       </div>
       <div class="col-md-2">
         <label class="form-label small fw-bold"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
@@ -140,7 +150,11 @@
 <% const _hasFilters = (typeof hasFilters !== 'undefined') ? hasFilters : false; %>
 
 <% if (_hasFilters) { %>
-  <div class="alert alert-info small mb-3">🔍 <span class="ar-only">يظهر</span><span class="en-only" style="display:none;">Showing</span> <%= sessionRows.length %> <span class="ar-only">طالب بعد تطبيق الفلاتر</span><span class="en-only" style="display:none;">student(s) after applying filters</span></div>
+  <div class="alert alert-info small mb-3">🔍 <span class="ar-only">يظهر</span><span class="en-only" style="display:none;">Showing</span> <%= sessionRows.length %> <span class="ar-only">طالب بعد تطبيق الفلاتر</span><span class="en-only" style="display:none;">student(s) after applying filters</span>
+    <% if (typeof missingExam !== 'undefined' && missingExam) { %>
+      <br>📝 <span class="ar-only">طلاب ملهمش درجة متسجلة في امتحان:</span><span class="en-only" style="display:none;">Students with no recorded score in exam:</span> <strong><%= missingExam.name %></strong>
+    <% } %>
+  </div>
 <% } %>
 
 <!-- جدول الطلاب -->

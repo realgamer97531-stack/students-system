@@ -8333,10 +8333,30 @@ function requireFollowUp(req, res, next) {
   res.status(403).send('⛔ غير مسموح');
 }
 
+// فلتر "لم يمتحن": امتحانات مستقلة (SessionId = null) لنفس مادة الحصة المختارة،
+// وبيرجع IDs الطلاب اللي ليهم درجة متسجلة في الامتحان المختار
+async function loadFollowUpMissingExamFilter(selectedSession, studentIds, examId) {
+  if (!selectedSession) return { unlinkedExams: [], missingExam: null, gradedStudentIds: new Set() };
+  const unlinkedExams = await Exam.findAll({
+    where: { SessionId: null, SubjectId: selectedSession.SubjectId },
+    order: [['exam_date', 'DESC'], ['id', 'DESC']],
+  });
+  const missingExam = examId ? unlinkedExams.find(exam => String(exam.id) === String(examId)) || null : null;
+  const gradedStudentIds = new Set();
+  if (missingExam && studentIds.length) {
+    const results = await ExamResult.findAll({
+      where: { ExamId: missingExam.id, StudentId: studentIds },
+      attributes: ['StudentId'],
+    });
+    results.forEach(result => gradedStudentIds.add(result.StudentId));
+  }
+  return { unlinkedExams, missingExam, gradedStudentIds };
+}
+
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
 app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
 
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
     const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
@@ -8408,7 +8428,7 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
     const equivalentAttendanceSessionIds = equivalentAttendanceSessions.map(session => session.id);
     const video = await Video.findOne({ where: { SessionId: equivalentAttendanceSessionIds }, include: [{ model: VideoPart, order: [['order_index', 'ASC']] }] });
 
-    const [attendanceRecords, hwRecords, examResults, sessionComments] = await Promise.all([
+    const [attendanceRecords, hwRecords, examResults, sessionComments, missingExamFilter] = await Promise.all([
       Attendance.findAll({
         where: { StudentId: studentIds, SessionId: equivalentAttendanceSessionIds },
         include: [User, { model: Session, include: [Center] }],
@@ -8423,7 +8443,9 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       SessionComment.findAll({
         where: { StudentId: studentIds, SessionId: selectedSession.id },
       }),
+      loadFollowUpMissingExamFilter(selectedSession, studentIds, filter_missing_exam),
     ]);
+    const { missingExam, gradedStudentIds } = missingExamFilter;
 
     const attendanceMap = {};
     attendanceRecords.forEach(att => { attendanceMap[att.StudentId] = att; });
@@ -8439,6 +8461,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
 
     const sessionRows = [];
     for (const student of students) {
+      if (missingExam && gradedStudentIds.has(student.id)) continue;
+
       const attendance = attendanceMap[student.id] || null;
       const hw = hwMap[student.id] || null;
       const examResult = examMap[student.id] || null;
@@ -8465,7 +8489,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
         sessionComment: sessionComment ? sessionComment.comment : null,
       };
 
-      if (!show_attended && !show_only_attended && row.attended) continue;
+      // فلتر "لم يمتحن" بيعرض الحاضر والغائب إلا لو اتحدد "الحضور فقط"
+      if (!show_attended && !show_only_attended && !missingExam && row.attended) continue;
       if (show_only_attended && !row.attended) continue;
 
       if (filter_video_type && filter_video_max) {
@@ -8586,7 +8611,7 @@ app.post('/follow-up-dashboard/send-to-callcenter', requireFollowUp, async (req,
 
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
 
     // load centers & subjects for filters
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
@@ -8641,8 +8666,10 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     if (students.length === 0) {
       return res.render('follow-up-dashboard', {
         students: [], sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
         absentStudents: [],
+        unlinkedExams: [],
+        missingExam: null,
         centers: centersList,
         subjects: subjectsList,
         hasFilters: false,
@@ -8656,8 +8683,10 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     if (!selectedSession) {
       return res.render('follow-up-dashboard', {
         students, sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
         absentStudents: [],
+        unlinkedExams: [],
+        missingExam: null,
         centers: centersList,
         subjects: subjectsList,
         hasFilters: false,
@@ -8689,7 +8718,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
     });
 
-    const [attendanceRecords, hwRecords, examResults, sessionComments] = await Promise.all([
+    const [attendanceRecords, hwRecords, examResults, sessionComments, missingExamFilter] = await Promise.all([
       Attendance.findAll({
         where: { StudentId: studentIds, SessionId: equivalentAttendanceSessionIds },
         include: [User, { model: Session, include: [Center] }],
@@ -8704,7 +8733,10 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       SessionComment.findAll({
         where: { StudentId: studentIds, SessionId: selectedSession.id },
       }),
+      loadFollowUpMissingExamFilter(selectedSession, studentIds, filter_missing_exam),
     ]);
+    const { unlinkedExams, missingExam, gradedStudentIds } = missingExamFilter;
+    const effectiveMissingExamId = missingExam ? String(missingExam.id) : '';
 
     const attendanceMap = {};
     attendanceRecords.forEach(att => { attendanceMap[att.StudentId] = att; });
@@ -8757,7 +8789,8 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     // تطبيق الفلاتر
     let filteredRows = [...sessionRows];
 
-    if (!show_attended && !show_only_attended) {
+    // فلتر "لم يمتحن" بيعرض الحاضر والغائب إلا لو اتحدد "الحضور فقط"
+    if (!show_attended && !show_only_attended && !missingExam) {
       filteredRows = filteredRows.filter(row => !row.attended);
     }
 
@@ -8781,11 +8814,17 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       filteredRows = filteredRows.filter(r => r.examScore !== null && r.examScore <= parseFloat(filter_exam_max));
     }
 
+    if (missingExam) {
+      filteredRows = filteredRows.filter(r => !gradedStudentIds.has(r.student.id));
+    }
+
     res.render('follow-up-dashboard', {
       students, sessionRows: filteredRows, sessions, selectedSession,
-      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: effectiveMissingExamId, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
       absentStudents: absentStudents,
-      hasFilters: !!(show_attended || show_only_attended || filter_video_type || filter_hw_status || filter_exam_max),
+      unlinkedExams,
+      missingExam,
+      hasFilters: !!(show_attended || show_only_attended || filter_video_type || filter_hw_status || filter_exam_max || missingExam),
       centers: centersList,
       subjects: subjectsList,
       callCenterIntegrationEnabled: isCallCenterIntegrationEnabled(),
@@ -8796,6 +8835,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
           filter_video_max: filter_video_max || '',
           filter_hw_status: filter_hw_status || '',
           filter_exam_max: filter_exam_max || '',
+          filter_missing_exam: effectiveMissingExamId,
           session_id: session_id || selectedSession.id,
           show_all: show_all || '',
           show_attended: show_attended || '',
