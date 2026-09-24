@@ -67,6 +67,77 @@
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
+    <h6 class="mb-3">🔍 <span class="ar-only">البحث عن كود شحن</span><span class="en-only" style="display:none;">Search a Recharge Code</span></h6>
+    <form id="code-search-form" class="d-flex gap-2">
+      <input type="text" id="code-search-input" class="form-control" placeholder="اكتب الكود (أو جزء منه) لمعرفة حالته والطالب اللي استخدمه" autocomplete="off" style="text-transform:uppercase;">
+      <button type="submit" class="btn btn-primary text-nowrap">بحث</button>
+    </form>
+    <div id="code-search-results" class="mt-3"></div>
+  </div>
+</div>
+<script>
+  (function () {
+    const form = document.getElementById('code-search-form');
+    const input = document.getElementById('code-search-input');
+    const out = document.getElementById('code-search-results');
+    function row(label, value) {
+      const r = document.createElement('div');
+      r.className = 'd-flex justify-content-between border-bottom py-1 small';
+      const l = document.createElement('span'); l.className = 'text-muted'; l.textContent = label;
+      const v = document.createElement('span'); v.className = 'fw-semibold text-end'; v.textContent = value;
+      r.appendChild(l); r.appendChild(v);
+      return r;
+    }
+    const fmt = (d) => (d ? new Date(d).toLocaleString('ar-EG') : '—');
+    function card(item) {
+      const box = document.createElement('div');
+      box.className = 'border rounded p-3 mb-3';
+      const head = document.createElement('div');
+      head.className = 'd-flex justify-content-between align-items-center mb-2';
+      const code = document.createElement('code'); code.className = 'fs-5'; code.textContent = item.code;
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + (item.isUsed ? 'bg-secondary' : 'bg-success');
+      badge.textContent = item.isUsed ? 'مستخدم' : 'متاح (لسه ماتستخدمش)';
+      head.appendChild(code); head.appendChild(badge);
+      box.appendChild(head);
+      box.appendChild(row('القيمة', item.amount + ' ج'));
+      box.appendChild(row('تاريخ الإنشاء', fmt(item.createdAt)));
+      box.appendChild(row('سنتر التوزيع', item.center ? item.center.name + (item.center.hasAccount ? ' (حساب: ' + item.center.username + ')' : ' (بدون حساب)') : 'غير مربوط بسنتر'));
+      if (item.isUsed) {
+        const u = item.usage || {};
+        box.appendChild(row('طريقة الاستخدام', u.kind === 'registration' ? 'تسجيل طالب جديد بالكود' : u.kind === 'recharge' ? 'شحن رصيد من بوابة الطالب' : 'غير معروفة (مفيش حركة رصيد مسجلة)'));
+        box.appendChild(row('وقت الاستخدام', fmt(u.at || item.updatedAt)));
+        if (u.student) {
+          const r = row('استخدمه الطالب', '');
+          const link = document.createElement('a');
+          link.href = '/students/' + u.student.id; link.textContent = u.student.name + ' (' + u.student.code + ')';
+          r.lastChild.appendChild(link); box.appendChild(r);
+          box.appendChild(row('تليفون الطالب', u.student.phone || '—'));
+          box.appendChild(row('تليفون ولي الأمر', u.student.parentPhone || '—'));
+          box.appendChild(row('رصيد الطالب الحالي', u.student.balance + ' ج'));
+        } else {
+          box.appendChild(row('الطالب', 'غير معروف'));
+        }
+      }
+      return box;
+    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      out.textContent = 'جاري البحث...';
+      try {
+        const res = await fetch('/admin/recharge-codes/search?q=' + encodeURIComponent(input.value));
+        const data = await res.json();
+        out.textContent = '';
+        if (!data.success) { out.textContent = data.message || 'حصلت مشكلة'; return; }
+        if (!data.results.length) { out.textContent = data.message || 'مفيش كود بالشكل ده.'; return; }
+        data.results.forEach((item) => out.appendChild(card(item)));
+      } catch (err) { out.textContent = 'حصلت مشكلة أثناء البحث'; }
+    });
+  })();
+</script>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
     <h6 class="mb-3"><span class="ar-only">إنشاء حساب سنتر</span><span class="en-only" style="display:none;">Create Center Account</span></h6>
     <form action="/admin/recharge-codes/accounts" method="POST" class="row g-2 align-items-end">
       <div class="col-md-3"><label class="form-label small"><span class="ar-only">اسم السنتر الخارجي</span><span class="en-only" style="display:none;">External Center Name</span></label><input name="center_name" class="form-control" placeholder="اكتب اسم السنتر" required maxlength="150"></div>

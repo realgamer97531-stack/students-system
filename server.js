@@ -6671,6 +6671,46 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
   }
 });
 
+// بحث عن كود شحن ومعرفة كل حاجة عنه (قراءة فقط)
+app.get('/admin/recharge-codes/search', requireAdmin, async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (q.length < 3) return res.json({ success: true, results: [], message: 'اكتب 3 حروف على الأقل من الكود' });
+    const escaped = q.replace(/[\\%_]/g, (ch) => '\\' + ch);
+    const codes = await RechargeCode.findAll({ where: { code: { [Op.like]: `%${escaped}%` } }, order: [['createdAt', 'DESC']], limit: 20 });
+    const results = [];
+    for (const c of codes) {
+      const center = c.recharge_center_id ? await RechargeCenter.findByPk(c.recharge_center_id, { attributes: ['id', 'name'] }) : null;
+      const account = center ? await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id }, attributes: ['username'] }) : null;
+      let usage = null;
+      if (c.is_used) {
+        // الاستخدام بيتسجل في حركات الرصيد بنص فيه الكود بين قوسين (تسجيل جديد أو شحن رصيد)
+        const tx = await BalanceTransaction.findOne({
+          where: { reason: { [Op.like]: `%(${c.code})%` } },
+          include: [{ model: Student, attributes: ['id', 'name', 'student_code', 'phone', 'parent_phone', 'balance'] }],
+          order: [['createdAt', 'ASC']],
+        });
+        usage = tx
+          ? {
+              at: tx.createdAt,
+              kind: /^رصيد التسجيل/.test(tx.reason || '') ? 'registration' : 'recharge',
+              student: tx.Student ? { id: tx.Student.id, name: tx.Student.name, code: tx.Student.student_code, phone: tx.Student.phone, parentPhone: tx.Student.parent_phone, balance: tx.Student.balance } : null,
+            }
+          : { at: null, kind: 'unknown', student: null };
+      }
+      results.push({
+        code: c.code, amount: c.amount, isUsed: !!c.is_used, createdAt: c.createdAt, updatedAt: c.updatedAt,
+        center: center ? { id: center.id, name: center.name, hasAccount: !!account, username: account ? account.username : null } : null,
+        usage,
+      });
+    }
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Recharge code search failed:', error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة أثناء البحث' });
+  }
+});
+
 // توليد أكواد جديدة
 app.post('/admin/recharge-codes/generate', requireAdmin, async (req, res) => {
   try {
