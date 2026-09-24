@@ -17,6 +17,10 @@ const PopupQuestion = sequelize.define('PopupQuestion', {
   choice_b: { type: DataTypes.TEXT, allowNull: true },
   choice_c: { type: DataTypes.TEXT, allowNull: true },
   choice_d: { type: DataTypes.TEXT, allowNull: true },
+  choice_a_image: { type: DataTypes.STRING(500), allowNull: true },
+  choice_b_image: { type: DataTypes.STRING(500), allowNull: true },
+  choice_c_image: { type: DataTypes.STRING(500), allowNull: true },
+  choice_d_image: { type: DataTypes.STRING(500), allowNull: true },
   correct_choice: { type: DataTypes.STRING(1), allowNull: true }, // a | b | c | d (مقالي = null)
   solution_video_url: { type: DataTypes.STRING(1000), allowNull: true },
   solution_start_seconds: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },

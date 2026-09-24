@@ -8,6 +8,7 @@ const PopupQuestion = require('../models/PopupQuestion');
 const PopupQuestionAnswer = require('../models/PopupQuestionAnswer');
 
 const CHOICES = ['a', 'b', 'c', 'd'];
+const IMAGE_FIELDS = [{ name: 'question_image', maxCount: 1 }, ...['a', 'b', 'c', 'd'].map((c) => ({ name: `choice_${c}_image`, maxCount: 1 }))];
 
 const DEFAULT_DESIGN = {
   bgColor: '#ffffff',
@@ -113,25 +114,42 @@ module.exports = function registerPopupQuestionRoutes(app, deps) {
       })),
     };
     if (type === 'mcq') {
-      CHOICES.forEach((c) => { fields[`choice_${c}`] = String(body[`choice_${c}`] || '').trim(); });
+      CHOICES.forEach((c) => { fields[`choice_${c}`] = String(body[`choice_${c}`] || '').trim() || null; });
       fields.correct_choice = CHOICES.includes(body.correct_choice) ? body.correct_choice : null;
     } else {
       CHOICES.forEach((c) => { fields[`choice_${c}`] = null; });
       fields.correct_choice = null;
+      CHOICES.forEach((c) => { fields[`choice_${c}_image`] = null; });
     }
     return fields;
   }
 
-  function validateQuestionFields(fields) {
+  // hasImage(c): فيه صورة للاختيار (مرفوعة دلوقتي أو موجودة قبل كده ومش متعلّم عليها حذف)
+  function validateQuestionFields(fields, hasImage) {
     if (!fields.question_text) return 'اكتب نص السؤال';
     if (fields.question_type === 'mcq') {
-      if (CHOICES.some((c) => !fields[`choice_${c}`])) return 'لازم تكتب الاختيارات الأربعة';
+      if (CHOICES.some((c) => !fields[`choice_${c}`] && !hasImage(c))) return 'كل اختيار لازم يكون له نص أو صورة (الاختيارات الأربعة)';
       if (!fields.correct_choice) return 'اختار الإجابة الصحيحة';
     }
     if (fields.solution_end_seconds && fields.solution_end_seconds <= fields.solution_start_seconds) {
       return 'وقت نهاية فيديو الحل لازم يكون بعد وقت البداية';
     }
     return null;
+  }
+
+  const uploadedFile = (req, name) => (req.files && req.files[name] && req.files[name][0]) || null;
+
+  // بيرفع صور السؤال/الاختيارات المتاحة في الطلب ويرجّع الحقول اللي اتغيرت
+  async function collectImageFields(req, existing) {
+    const out = {};
+    const targets = ['question_image', ...CHOICES.map((c) => `choice_${c}_image`)];
+    for (const name of targets) {
+      const column = name === 'question_image' ? 'question_image_url' : name;
+      const file = uploadedFile(req, name);
+      if (file) out[column] = (await uploadBufferToCloudinary(file.buffer, 'studyisfunny/popup-questions')).secure_url;
+      else if (existing && req.body['remove_' + name] === '1') out[column] = null;
+    }
+    return out;
   }
 
   async function renderForm(res, video, question, error) {
@@ -175,15 +193,15 @@ module.exports = function registerPopupQuestionRoutes(app, deps) {
     await renderForm(res, video, null);
   });
 
-  app.post('/admin/popup-questions/video/:videoId', adminGuard, adImageUpload.single('question_image'), async (req, res) => {
+  app.post('/admin/popup-questions/video/:videoId', adminGuard, adImageUpload.fields(IMAGE_FIELDS), async (req, res) => {
     try {
       const video = await Video.findByPk(req.params.videoId);
       if (!video) return res.status(404).send('❌ غير موجود');
       const fields = readQuestionBody(req.body);
       const part = await VideoPart.findOne({ where: { id: Number.parseInt(req.body.VideoPartId, 10) || 0, VideoId: video.id } });
-      const error = !part ? 'اختار الفيديو اللي السؤال هيظهر فيه' : validateQuestionFields(fields);
+      const error = !part ? 'اختار الفيديو اللي السؤال هيظهر فيه' : validateQuestionFields(fields, (c) => !!uploadedFile(req, `choice_${c}_image`));
       if (error) return renderForm(res, video, { ...fields, id: null }, error);
-      if (req.file) fields.question_image_url = (await uploadBufferToCloudinary(req.file.buffer, 'studyisfunny/popup-questions')).secure_url;
+      Object.assign(fields, await collectImageFields(req, false));
       await PopupQuestion.create({ ...fields, VideoId: video.id, VideoPartId: part.id });
       res.redirect('/admin/popup-questions/video/' + video.id);
     } catch (error) {
@@ -199,17 +217,17 @@ module.exports = function registerPopupQuestionRoutes(app, deps) {
     await renderForm(res, video, question);
   });
 
-  app.post('/admin/popup-questions/:id/update', adminGuard, adImageUpload.single('question_image'), async (req, res) => {
+  app.post('/admin/popup-questions/:id/update', adminGuard, adImageUpload.fields(IMAGE_FIELDS), async (req, res) => {
     try {
       const question = await PopupQuestion.findByPk(req.params.id);
       if (!question) return res.status(404).send('❌ غير موجود');
       const video = await Video.findByPk(question.VideoId);
       const fields = readQuestionBody(req.body);
       const part = await VideoPart.findOne({ where: { id: Number.parseInt(req.body.VideoPartId, 10) || 0, VideoId: question.VideoId } });
-      const error = !part ? 'اختار الفيديو اللي السؤال هيظهر فيه' : validateQuestionFields(fields);
+      const hasImage = (c) => !!uploadedFile(req, `choice_${c}_image`) || (!!question[`choice_${c}_image`] && req.body[`remove_choice_${c}_image`] !== '1');
+      const error = !part ? 'اختار الفيديو اللي السؤال هيظهر فيه' : validateQuestionFields(fields, hasImage);
       if (error) return renderForm(res, video, Object.assign(question, fields), error);
-      if (req.file) fields.question_image_url = (await uploadBufferToCloudinary(req.file.buffer, 'studyisfunny/popup-questions')).secure_url;
-      else if (req.body.remove_image === '1') fields.question_image_url = null;
+      Object.assign(fields, await collectImageFields(req, true));
       await question.update({ ...fields, VideoPartId: part.id });
       res.redirect('/admin/popup-questions/video/' + question.VideoId);
     } catch (error) {
@@ -334,6 +352,7 @@ module.exports = function registerPopupQuestionRoutes(app, deps) {
       text: q.question_text,
       imageUrl: q.question_image_url,
       choices: q.question_type === 'mcq' ? { a: q.choice_a, b: q.choice_b, c: q.choice_c, d: q.choice_d } : null,
+      choiceImages: q.question_type === 'mcq' ? { a: q.choice_a_image, b: q.choice_b_image, c: q.choice_c_image, d: q.choice_d_image } : null,
       bonusPoints: q.bonus_points,
       design: parseDesign(q.design),
       answered: !!answer,

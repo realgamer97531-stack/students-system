@@ -40,7 +40,8 @@
       .pq-choice:hover:not(:disabled){transform:translateY(-1px);border-color:var(--pq-accent)}
       .pq-choice:disabled{cursor:default}
       .pq-choice .pq-key{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--pq-accent);color:#fff;font-weight:800;text-transform:uppercase}
-      .pq-choice .pq-txt{white-space:pre-wrap;word-break:break-word}
+      .pq-choice .pq-txt{white-space:pre-wrap;word-break:break-word;display:flex;flex-direction:column;gap:8px}
+      .pq-choice-img{max-width:100%;max-height:200px;border-radius:10px;object-fit:contain;align-self:flex-start}
       .pq-choice.pq-ok{border-color:var(--pq-correct);background:color-mix(in srgb,var(--pq-correct) 18%,var(--pq-choice))}
       .pq-choice.pq-bad{border-color:var(--pq-wrong);background:color-mix(in srgb,var(--pq-wrong) 18%,var(--pq-choice))}
       .pq-hint{font-size:.9em;opacity:.75;margin-bottom:10px}
@@ -263,7 +264,12 @@
         b.type = 'button';
         b.dataset.key = key;
         b.appendChild(el('span', 'pq-key', key));
-        b.appendChild(el('span', 'pq-txt', (q.choices && q.choices[key]) || ''));
+        const choiceImg = q.choiceImages && q.choiceImages[key];
+        const choiceText = (q.choices && q.choices[key]) || '';
+        const content = el('span', 'pq-txt');
+        if (choiceImg) { const im = el('img', 'pq-choice-img'); im.src = choiceImg; im.alt = ''; content.appendChild(im); }
+        if (choiceText) content.appendChild(el('span', '', choiceText));
+        b.appendChild(content);
         b.onclick = async () => {
           interactive.querySelectorAll('button').forEach((x) => { x.disabled = true; });
           try {

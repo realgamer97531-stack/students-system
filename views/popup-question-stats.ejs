@@ -15,7 +15,7 @@
     <% if (question.question_type === 'mcq') { %>
       <ul class="list-unstyled mt-3 mb-0">
         <% ['a','b','c','d'].forEach(k => { %>
-          <li class="<%= question.correct_choice === k ? 'fw-bold text-success' : '' %>"><span class="text-uppercase"><%= k %></span>) <%= question['choice_' + k] %> <%= question.correct_choice === k ? '✅' : '' %></li>
+          <li class="<%= question.correct_choice === k ? 'fw-bold text-success' : '' %>"><span class="text-uppercase"><%= k %></span>) <%= question['choice_' + k] || '' %> <% if (question['choice_' + k + '_image']) { %><img src="<%= question['choice_' + k + '_image'] %>" style="max-height:60px;" class="rounded border align-middle"><% } %> <%= question.correct_choice === k ? '✅' : '' %></li>
         <% }) %>
       </ul>
     <% } %>

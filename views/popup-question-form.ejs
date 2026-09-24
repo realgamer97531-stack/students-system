@@ -90,16 +90,24 @@
       <input type="file" name="question_image" id="qImage" class="form-control" accept="image/*">
       <% if (v('question_image_url', null)) { %>
         <div class="mt-2"><img src="<%= v('question_image_url', '') %>" style="max-height:80px;" class="rounded border">
-        <label class="ms-2 small"><input type="checkbox" name="remove_image" value="1"> حذف الصورة الحالية</label></div>
+        <label class="ms-2 small"><input type="checkbox" name="remove_question_image" value="1"> حذف الصورة الحالية</label></div>
       <% } %>
     </div>
     <div class="col-12" id="mcqBox">
-      <label class="form-label">الاختيارات الأربعة — اكتب كل اختيار، وعلّم على الإجابة الصحيحة بالدايرة على اليمين <span class="text-danger">*</span></label>
+      <label class="form-label">الاختيارات الأربعة — لكل اختيار اكتب نص و/أو ارفع صورة، وعلّم على الإجابة الصحيحة <span class="text-danger">*</span></label>
       <% ['a','b','c','d'].forEach(k => { %>
         <div class="input-group mb-2">
           <span class="input-group-text text-uppercase" style="width:48px;"><%= k %></span>
-          <input type="text" name="choice_<%= k %>" class="form-control" value="<%= v('choice_' + k, '') %>">
+          <input type="text" name="choice_<%= k %>" class="form-control" placeholder="نص الاختيار (أو ارفع صورة)" value="<%= v('choice_' + k, '') %>">
           <span class="input-group-text"><input type="radio" name="correct_choice" value="<%= k %>" class="form-check-input mt-0" <%= v('correct_choice', '') === k ? 'checked' : '' %>>&nbsp;صحيحة</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-3 ps-1">
+          <label class="small text-muted mb-0">🖼 صورة الاختيار <span class="text-uppercase"><%= k %></span> (اختياري):</label>
+          <input type="file" name="choice_<%= k %>_image" id="choiceImg_<%= k %>" class="form-control form-control-sm" style="max-width:280px;" accept="image/*">
+          <% if (v('choice_' + k + '_image', null)) { %>
+            <img src="<%= v('choice_' + k + '_image', '') %>" style="max-height:50px;" class="rounded border">
+            <label class="small"><input type="checkbox" name="remove_choice_<%= k %>_image" value="1"> حذف الصورة</label>
+          <% } %>
         </div>
       <% }) %>
     </div>
@@ -188,6 +196,15 @@
       id: 0, type: isMcq ? 'mcq' : 'essay', text: f.question_text.value || '(نص السؤال)',
       imageUrl: file ? URL.createObjectURL(file) : <%- JSON.stringify(v('question_image_url', null)).replace(/</g, '\\u003c') %>,
       choices: { a: f.choice_a.value, b: f.choice_b.value, c: f.choice_c.value, d: f.choice_d.value },
+      choiceImages: (() => {
+        const existing = <%- JSON.stringify({ a: v('choice_a_image', null), b: v('choice_b_image', null), c: v('choice_c_image', null), d: v('choice_d_image', null) }).split('<').join('\\u003c') %>;
+        const out = {};
+        ['a', 'b', 'c', 'd'].forEach((k) => {
+          const picked = document.getElementById('choiceImg_' + k).files[0];
+          out[k] = picked ? URL.createObjectURL(picked) : (f['remove_choice_' + k + '_image'] && f['remove_choice_' + k + '_image'].checked ? null : existing[k]);
+        });
+        return out;
+      })(),
       bonusPoints: bonus, design: readDesign(),
     };
     PopupQuestionUI.mount(q, {
