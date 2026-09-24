@@ -6634,7 +6634,7 @@ if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
 // صفحة إدارة الأكواد (أدمن بس)
 app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
   try {
-    const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC']] });
+    const codes = await RechargeCode.findAll({ order: [['createdAt', 'DESC'], ['id', 'DESC']] });
     const centers = await RechargeCenter.findAll({ order: [['name', 'ASC']] });
     const accounts = await RechargeCenterAccount.findAll({ attributes: ['recharge_center_id'] });
     const accountCenterIds = new Set(accounts.map(account => String(account.recharge_center_id)));
@@ -6674,16 +6674,25 @@ app.get('/admin/recharge-codes', requireAdmin, async (req, res) => {
 // بحث عن كود شحن ومعرفة كل حاجة عنه (قراءة فقط)
 app.get('/admin/recharge-codes/search', requireAdmin, async (req, res) => {
   try {
-    const q = String(req.query.q || '').trim().toUpperCase().replace(/\s+/g, '');
+    // بنشيل أي مسافات/شرطات/رموز (لو الكود اتنسخ من إكسل أو متقسم) ونسيب الحروف والأرقام بس
+    const q = String(req.query.q || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (q.length < 3) return res.json({ success: true, results: [], message: 'اكتب 3 حروف على الأقل من الكود' });
-    const escaped = q.replace(/[\\%_]/g, (ch) => '\\' + ch);
-    const codes = await RechargeCode.findAll({ where: { code: { [Op.like]: `%${escaped}%` } }, order: [['createdAt', 'DESC']], limit: 20 });
+    const codes = await RechargeCode.findAll({ where: { code: { [Op.like]: `%${q}%` } }, order: [['createdAt', 'DESC']], limit: 20 });
+    // نفس تقسيم الصفحة: كل سنتر (أو "بدون سنتر") بيتقسم مجموعات من 10 أكواد بالترتيب من الأحدث
+    const allCodes = await RechargeCode.findAll({ attributes: ['id', 'recharge_center_id'], order: [['createdAt', 'DESC'], ['id', 'DESC']] });
+    const groupOf = (c) => {
+      const sameCenter = allCodes.filter((x) => String(x.recharge_center_id || '') === String(c.recharge_center_id || ''));
+      const index = sameCenter.findIndex((x) => x.id === c.id);
+      const number = Math.floor(index / 10) + 1;
+      const size = Math.min(10, sameCenter.length - (number - 1) * 10);
+      return { key: (c.recharge_center_id ? 'c' + c.recharge_center_id : 'u') + '-' + number, number, size };
+    };
     const results = [];
     for (const c of codes) {
       const center = c.recharge_center_id ? await RechargeCenter.findByPk(c.recharge_center_id, { attributes: ['id', 'name'] }) : null;
       const account = center ? await RechargeCenterAccount.findOne({ where: { recharge_center_id: center.id }, attributes: ['username'] }) : null;
       let usage = null;
-      if (c.is_used) {
+      if (c.is_used) try {
         // الاستخدام بيتسجل في حركات الرصيد بنص فيه الكود بين قوسين (تسجيل جديد أو شحن رصيد)
         const tx = await BalanceTransaction.findOne({
           where: { reason: { [Op.like]: `%(${c.code})%` } },
@@ -6697,9 +6706,13 @@ app.get('/admin/recharge-codes/search', requireAdmin, async (req, res) => {
               student: tx.Student ? { id: tx.Student.id, name: tx.Student.name, code: tx.Student.student_code, phone: tx.Student.phone, parentPhone: tx.Student.parent_phone, balance: tx.Student.balance } : null,
             }
           : { at: null, kind: 'unknown', student: null };
+      } catch (usageError) {
+        console.error('Recharge code usage lookup failed:', usageError.message);
+        usage = { at: null, kind: 'unknown', student: null };
       }
       results.push({
         code: c.code, amount: c.amount, isUsed: !!c.is_used, createdAt: c.createdAt, updatedAt: c.updatedAt,
+        group: groupOf(c),
         center: center ? { id: center.id, name: center.name, hasAccount: !!account, username: account ? account.username : null } : null,
         usage,
       });
@@ -6707,7 +6720,7 @@ app.get('/admin/recharge-codes/search', requireAdmin, async (req, res) => {
     res.json({ success: true, results });
   } catch (error) {
     console.error('Recharge code search failed:', error);
-    res.status(500).json({ success: false, message: 'حصلت مشكلة أثناء البحث' });
+    res.status(500).json({ success: false, message: 'حصلت مشكلة أثناء البحث: ' + error.message });
   }
 });
 

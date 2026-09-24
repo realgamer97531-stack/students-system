@@ -102,6 +102,23 @@
       box.appendChild(head);
       box.appendChild(row('القيمة', item.amount + ' ج'));
       box.appendChild(row('تاريخ الإنشاء', fmt(item.createdAt)));
+      if (item.group) {
+        const g = row('المجموعة', (item.center ? item.center.name : 'بدون سنتر') + ' — مجموعة ' + item.group.number + ' (' + item.group.size + ' أكواد) ');
+        const go = document.createElement('button');
+        go.type = 'button'; go.className = 'btn btn-sm btn-outline-primary ms-2';
+        go.textContent = '➡ اذهب للمجموعة';
+        go.onclick = () => {
+          const target = document.getElementById('grp-' + item.group.key);
+          if (!target) { alert('المجموعة مش ظاهرة في الصفحة'); return; }
+          target.open = true;
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          target.style.transition = 'box-shadow .3s';
+          target.style.boxShadow = '0 0 0 4px #0d6efd';
+          setTimeout(() => { target.style.boxShadow = ''; }, 2500);
+        };
+        g.lastChild.appendChild(go);
+        box.appendChild(g);
+      }
       box.appendChild(row('سنتر التوزيع', item.center ? item.center.name + (item.center.hasAccount ? ' (حساب: ' + item.center.username + ')' : ' (بدون حساب)') : 'غير مربوط بسنتر'));
       if (item.isUsed) {
         const u = item.usage || {};
@@ -129,9 +146,9 @@
         const data = await res.json();
         out.textContent = '';
         if (!data.success) { out.textContent = data.message || 'حصلت مشكلة'; return; }
-        if (!data.results.length) { out.textContent = data.message || 'مفيش كود بالشكل ده.'; return; }
+        if (!data.results.length) { out.textContent = data.message || ('مفيش أي كود فيه "' + input.value.trim() + '" في قاعدة البيانات.'); return; }
         data.results.forEach((item) => out.appendChild(card(item)));
-      } catch (err) { out.textContent = 'حصلت مشكلة أثناء البحث'; }
+      } catch (err) { out.textContent = 'حصلت مشكلة أثناء البحث (' + err.message + ') — جرب تحدّث الصفحة.'; }
     });
   })();
 </script>
@@ -186,7 +203,7 @@
   }
 </script>
 <% codesByCenter.forEach(group => { group.codes.forEach((codeGroup, groupIndex) => { %>
-  <details class="card shadow-sm mb-4">
+  <details class="card shadow-sm mb-4" id="grp-c<%= group.center.id %>-<%= groupIndex + 1 %>">
     <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">
       <input type="checkbox" class="code-group-checkbox me-2" data-code-ids="<%= codeGroup.map(c => c.id).join(',') %>" aria-label="تحديد مجموعة الأكواد" onclick="event.stopPropagation()">
       <span class="ar-only">سنتر التوزيع:</span><span class="en-only" style="display:none;">Distribution Center:</span> <%= group.center.name %> <span class="text-muted small">(<span class="ar-only">مجموعة</span><span class="en-only" style="display:none;">Group</span> <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> <span class="ar-only">أكواد</span><span class="en-only" style="display:none;">codes</span></span>
@@ -231,7 +248,7 @@
 
 <% if (unassignedGroups.length) { %>
   <% unassignedGroups.forEach((codeGroup, groupIndex) => { %>
-  <details class="card shadow-sm mb-4">
+  <details class="card shadow-sm mb-4" id="grp-u-<%= groupIndex + 1 %>">
     <summary class="px-3 py-2 fw-semibold" style="cursor:pointer;">
       <input type="checkbox" class="code-group-checkbox me-2" data-code-ids="<%= codeGroup.map(c => c.id).join(',') %>" aria-label="تحديد مجموعة الأكواد" onclick="event.stopPropagation()">
       <span class="ar-only">أكواد بدون سنتر توزيع</span><span class="en-only" style="display:none;">Codes with No Distribution Center</span> <span class="text-muted small">(<span class="ar-only">مجموعة</span><span class="en-only" style="display:none;">Group</span> <%= groupIndex + 1 %>)</span> <span class="text-muted small">- <%= codeGroup.length %> <span class="ar-only">أكواد</span><span class="en-only" style="display:none;">codes</span></span>
