@@ -25,19 +25,21 @@
 
 <form action="<%= action %>" method="POST" enctype="multipart/form-data" id="pqForm" onsubmit="return prepareSubmit()">
   <div class="card shadow-sm mb-3"><div class="card-body row g-3">
-    <h6 class="mb-0">الإعدادات الأساسية</h6>
+    <h5 class="mb-0">① الإعدادات الأساسية <span class="fs-6 text-muted fw-normal">— السؤال يظهر إمتى وفين؟</span></h5>
     <div class="col-md-6">
-      <label class="form-label">اسم داخلي (اختياري، للأدمن بس)</label>
-      <input type="text" name="title" class="form-control" value="<%= v('title', '') %>" maxlength="200">
+      <label class="form-label">اسم للسؤال (اختياري)</label>
+      <input type="text" name="title" class="form-control" placeholder="مثال: سؤال قانون نيوتن الثاني" value="<%= v('title', '') %>" maxlength="200">
+      <div class="form-text">للتنظيم بس، بيظهر لك في القائمة والنتائج. الطالب مبيشوفوش.</div>
     </div>
     <div class="col-md-6">
-      <label class="form-label">يظهر في أنهي فيديو؟</label>
+      <label class="form-label">يظهر جوه أنهي فيديو؟ <span class="text-danger">*</span></label>
       <select name="VideoPartId" class="form-select" required>
         <option value="">— اختار —</option>
         <% parts.forEach(p => { %>
           <option value="<%= p.id %>" <%= Number(v('VideoPartId', 0)) === p.id ? 'selected' : '' %>><%= catLabel[p.category] || p.category %> - جزء <%= p.order_index %></option>
         <% }) %>
       </select>
+      <div class="form-text">اختار الفيديو (الشرح / الأسئلة / حل الواجب) اللي الطالب هيشوفه ويظهر له السؤال أثناءه.</div>
     </div>
     <div class="col-md-4">
       <label class="form-label">نوع السؤال</label>
@@ -45,6 +47,7 @@
         <option value="mcq" <%= type === 'mcq' ? 'selected' : '' %>>🔘 اختيار من 4</option>
         <option value="essay" <%= type === 'essay' ? 'selected' : '' %>>✍️ مقالي (الطالب يرفع صورة)</option>
       </select>
+      <div class="form-text">الاختياري بيتصحح تلقائي. المقالي بيتصحح يدوي من صفحة النتائج.</div>
     </div>
     <div class="col-md-4">
       <label class="form-label">متى يظهر؟</label>
@@ -52,35 +55,38 @@
         <option value="end" <%= v('trigger_type', 'end') === 'end' ? 'selected' : '' %>>بعد انتهاء الفيديو</option>
         <option value="time" <%= v('trigger_type', 'end') === 'time' ? 'selected' : '' %>>في وقت محدد من الفيديو</option>
       </select>
+      <div class="form-text">لو الطالب قدّم الفيديو للآخر السؤال بيظهر برضه.</div>
     </div>
     <div class="col-md-4" id="trigTimeBox">
-      <label class="form-label">الوقت (دقيقة : ثانية)</label>
+      <label class="form-label">يظهر عند الدقيقة : الثانية</label>
       <div class="d-flex gap-1 align-items-center">
         <input type="number" id="trigM" class="form-control" min="0" value="<%= trig.m %>"> :
         <input type="number" id="trigS" class="form-control" min="0" max="59" value="<%= trig.s %>">
       </div>
       <input type="hidden" name="trigger_seconds" id="trigSeconds">
+      <div class="form-text">مثال: 5 : 30 يعني السؤال يظهر لما الفيديو يوصل 5 دقايق و30 ثانية.</div>
     </div>
     <div class="col-md-4">
-      <label class="form-label">نقاط المكافأة عند الإجابة الصح</label>
+      <label class="form-label">نقاط المكافأة للإجابة الصح</label>
       <input type="number" name="bonus_points" class="form-control" min="0" value="<%= v('bonus_points', 5) %>">
+      <div class="form-text">بتتضاف لنقاط الطالب. المقالي بتتضاف بعد ما تصححه صح.</div>
     </div>
     <div class="col-md-4 d-flex align-items-end">
       <div class="form-check">
         <input type="checkbox" name="is_active" id="isActive" class="form-check-input" <%= v('is_active', true) ? 'checked' : '' %>>
-        <label class="form-check-label" for="isActive">السؤال شغال</label>
+        <label class="form-check-label" for="isActive">السؤال شغال (يظهر للطلبة)</label>
       </div>
     </div>
   </div></div>
 
   <div class="card shadow-sm mb-3"><div class="card-body row g-3">
-    <h6 class="mb-0">السؤال</h6>
+    <h5 class="mb-0">② السؤال والاختيارات</h5>
     <div class="col-12">
-      <label class="form-label">نص السؤال</label>
-      <textarea name="question_text" id="qText" class="form-control" rows="3" required><%= v('question_text', '') %></textarea>
+      <label class="form-label">نص السؤال اللي هيظهر للطالب <span class="text-danger">*</span></label>
+      <textarea name="question_text" id="qText" class="form-control" rows="3" placeholder="اكتب السؤال هنا..." required><%= v('question_text', '') %></textarea>
     </div>
     <div class="col-md-6">
-      <label class="form-label">صورة للسؤال (اختياري)</label>
+      <label class="form-label">صورة مع السؤال (اختياري)</label>
       <input type="file" name="question_image" id="qImage" class="form-control" accept="image/*">
       <% if (v('question_image_url', null)) { %>
         <div class="mt-2"><img src="<%= v('question_image_url', '') %>" style="max-height:80px;" class="rounded border">
@@ -88,7 +94,7 @@
       <% } %>
     </div>
     <div class="col-12" id="mcqBox">
-      <label class="form-label">الاختيارات (اختار الإجابة الصحيحة بالدايرة)</label>
+      <label class="form-label">الاختيارات الأربعة — اكتب كل اختيار، وعلّم على الإجابة الصحيحة بالدايرة على اليمين <span class="text-danger">*</span></label>
       <% ['a','b','c','d'].forEach(k => { %>
         <div class="input-group mb-2">
           <span class="input-group-text text-uppercase" style="width:48px;"><%= k %></span>
@@ -100,23 +106,23 @@
   </div></div>
 
   <div class="card shadow-sm mb-3"><div class="card-body row g-3">
-    <h6 class="mb-0">فيديو الحل (بيظهر بعد ما الطالب يجاوب ومينفعش يقفل السؤال قبل ما يخلصه)</h6>
+    <h5 class="mb-0">③ فيديو الحل <span class="fs-6 text-muted fw-normal">— بيظهر بعد ما الطالب يجاوب، ومينفعش يقفل السؤال قبل ما يخلصه</span></h5>
     <div class="col-12">
-      <label class="form-label">لينك فيديو الحل (YouTube / Vimeo / Drive / لينك مباشر) — اتركه فاضي لو مفيش</label>
-      <input type="text" name="solution_video_url" id="solUrl" class="form-control" value="<%= v('solution_video_url', '') %>">
+      <label class="form-label">لينك فيديو الحل (اختياري)</label>
+      <input type="text" name="solution_video_url" id="solUrl" class="form-control" placeholder="الصق لينك YouTube أو Vimeo أو Drive هنا" value="<%= v('solution_video_url', '') %>">
     </div>
     <div class="col-md-4">
-      <label class="form-label">يبدأ من (دقيقة : ثانية)</label>
+      <label class="form-label">الحل يبدأ من الدقيقة : الثانية</label>
       <div class="d-flex gap-1 align-items-center"><input type="number" id="solStartM" class="form-control" min="0" value="<%= solStart.m %>"> : <input type="number" id="solStartS" class="form-control" min="0" max="59" value="<%= solStart.s %>"></div>
       <input type="hidden" name="solution_start_seconds" id="solStartSeconds">
     </div>
     <div class="col-md-4">
-      <label class="form-label">ينتهي عند (0:00 = لآخر الفيديو)</label>
+      <label class="form-label">الحل ينتهي عند (0 : 0 = لآخر الفيديو)</label>
       <div class="d-flex gap-1 align-items-center"><input type="number" id="solEndM" class="form-control" min="0" value="<%= solEnd.m %>"> : <input type="number" id="solEndS" class="form-control" min="0" max="59" value="<%= solEnd.s %>"></div>
       <input type="hidden" name="solution_end_seconds" id="solEndSeconds">
     </div>
     <div class="col-md-4">
-      <label class="form-label">أقل وقت قبل ما يقدر يقفل (دقيقة : ثانية)</label>
+      <label class="form-label">أقل مدة قبل ما الطالب يقدر يقفل</label>
       <div class="d-flex gap-1 align-items-center"><input type="number" id="solMinM" class="form-control" min="0" value="<%= solMin.m %>"> : <input type="number" id="solMinS" class="form-control" min="0" max="59" value="<%= solMin.s %>"></div>
       <input type="hidden" name="solution_min_seconds" id="solMinSeconds">
     </div>
@@ -124,7 +130,7 @@
   </div></div>
 
   <div class="card shadow-sm mb-3"><div class="card-body row g-3">
-    <h6 class="mb-0">🎨 التصميم</h6>
+    <h5 class="mb-0">④ 🎨 التصميم <span class="fs-6 text-muted fw-normal">— شكل السؤال عند الطالب (كله اختياري)</span></h5>
     <% const colors = [['d_bgColor','لون الخلفية','bgColor'],['d_textColor','لون الكتابة','textColor'],['d_accentColor','لون التمييز (الهيدر والأزرار)','accentColor'],['d_choiceBgColor','لون خلفية الاختيارات','choiceBgColor'],['d_correctColor','لون الإجابة الصح','correctColor'],['d_wrongColor','لون الإجابة الغلط','wrongColor']]; %>
     <% colors.forEach(([name, label, key]) => { %>
       <div class="col-6 col-md-2"><label class="form-label small"><%= label %></label><input type="color" name="<%= name %>" data-d="<%= key %>" class="form-control form-control-color w-100" value="<%= design[key] %>"></div>

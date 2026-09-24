@@ -6,6 +6,27 @@
 </p>
 <div class="mb-4"><a href="/admin/popup-questions/video/<%= video.id %>" class="btn btn-outline-primary">❓ الأسئلة المنبثقة للدرس (Popup)</a></div>
 
+<div class="card shadow-sm mb-4" id="questionsPlacement">
+  <div class="card-body">
+    <h6 class="mb-1">📍 مكان ظهور فيديو الأسئلة للطالب</h6>
+    <p class="text-muted small mb-3">بتحدد هنا الطالب هيشوف فيديو "الأسئلة" (اللي بتضيفه تحت في كارت ❓ فيديو الأسئلة) فين. نفس صلاحية الوصول للحصة بتتطبق في كل الحالات.</p>
+    <form action="/admin/videos/<%= video.id %>/questions-display" method="POST">
+      <% const placementOptions = [
+        ['inside', 'جوه صفحة الدرس بس', 'تبويب "❓ الأسئلة" جوه صفحة مشاهدة الدرس. مفيش كارت منفصل في صفحة الدروس.'],
+        ['outside', 'برا جنب الحصة بس', 'كارت "❓ الأسئلة" منفصل في صفحة الدروس جنب كارت الحصة، ومفيش تبويب جوه الدرس.'],
+        ['both', 'الاتنين مع بعض', 'الكارت المنفصل في صفحة الدروس + التبويب جوه صفحة الدرس.']
+      ]; %>
+      <% placementOptions.forEach(([value, title, desc]) => { %>
+        <label class="d-flex gap-2 align-items-start p-2 mb-2 rounded border" style="cursor:pointer;">
+          <input type="radio" name="questions_display" value="<%= value %>" class="form-check-input mt-1" <%= (video.questions_display || 'inside') === value ? 'checked' : '' %>>
+          <span><strong><%= title %></strong><br><span class="small text-muted"><%= desc %></span></span>
+        </label>
+      <% }) %>
+      <button type="submit" class="btn btn-primary btn-sm">💾 حفظ مكان الظهور</button>
+    </form>
+  </div>
+</div>
+
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h6 class="mb-3"><span class="ar-only">إضافة فيديو جديد لهذا الدرس</span><span class="en-only" style="display:none;">Add New Video to This Lesson</span></h6>
@@ -64,19 +85,6 @@
   <div class="card shadow-sm mb-3">
     <div class="card-body">
       <h6 class="mb-3"><span class="ar-only"><%= labels[cat] %></span><span class="en-only" style="display:none;"><%= labelsEn[cat] %></span></h6>
-      <% if (cat === 'questions') { %>
-        <div class="mb-3 p-2 rounded" style="background:var(--sf-panel-bg);">
-          <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">مكان ظهور فيديو الأسئلة (نفس صلاحية الوصول للحصة بتتطبق في الحالتين)</span><span class="en-only" style="display:none;">Where the questions video appears (the same session access permission applies in both cases)</span></label>
-          <form action="/admin/videos/<%= video.id %>/questions-display" method="POST" class="d-flex gap-2 align-items-center">
-            <select name="questions_display" class="form-select form-select-sm" style="max-width:280px;">
-              <option value="inside" <%= video.questions_display === 'inside' ? 'selected' : '' %>><span class="ar-only">جوه صفحة الدرس بس</span><span class="en-only" style="display:none;">Inside the lesson page only</span></option>
-              <option value="outside" <%= video.questions_display === 'outside' ? 'selected' : '' %>><span class="ar-only">برا جنب الحصة بس (قبل الدخول)</span><span class="en-only" style="display:none;">Outside next to the session only (before entering)</span></option>
-              <option value="both" <%= video.questions_display === 'both' ? 'selected' : '' %>><span class="ar-only">الاتنين مع بعض</span><span class="en-only" style="display:none;">Both together</span></option>
-            </select>
-            <button type="submit" class="btn btn-sm btn-primary"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
-          </form>
-        </div>
-      <% } %>
       <% const parts = videoParts.filter(p => p.category === cat); %>
       <% if (parts.length === 0) { %>
         <p class="text-muted small"><span class="ar-only">لا يوجد فيديو من هذا النوع حتى الآن</span><span class="en-only" style="display:none;">No video of this type yet</span></p>

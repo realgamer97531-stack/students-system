@@ -318,6 +318,37 @@
     let popupActive = false;
     let popupPollInterval = null;
     let popupControls = { pause() {}, resume() {} };
+    let playerMsgHandler = null;
+    let gotPlayerEvents = false; // لو الـ iframe (Vimeo/Bunny) بعت أحداث حقيقية بنعتمد عليها بدل الوقت التقديري
+
+    // Vimeo (native API) و Bunny mediadelivery (player.js): بنسمع لـ timeupdate/ended عشان نعرف لو الطالب قدّم للآخر
+    function listenToEmbeddedPlayer(iframe) {
+      const post = (payload) => { try { iframe.contentWindow.postMessage(JSON.stringify(payload), '*'); } catch (_) {} };
+      const subscribe = () => {
+        ['timeupdate', 'ended'].forEach(ev => post({ context: 'player.js', version: '0.0.10', method: 'addEventListener', value: ev }));
+        ['playProgress', 'finish'].forEach(ev => post({ method: 'addEventListener', value: ev }));
+      };
+      let lastSeconds = 0;
+      playerMsgHandler = (e) => {
+        if (e.source !== iframe.contentWindow) return;
+        let d = e.data;
+        if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
+        if (!d || typeof d !== 'object') return;
+        if (d.event === 'ready') { subscribe(); return; }
+        const info = d.event === 'timeupdate' ? d.value : d.event === 'playProgress' ? d.data : null;
+        if (info && typeof info.seconds === 'number') {
+          gotPlayerEvents = true;
+          lastSeconds = info.seconds;
+          firePopups('time', info.seconds);
+          if (info.duration && info.seconds >= info.duration - 0.5) firePopups('end', info.seconds);
+        } else if (d.event === 'ended' || d.event === 'finish') {
+          gotPlayerEvents = true;
+          firePopups('end', lastSeconds);
+        }
+      };
+      window.addEventListener('message', playerMsgHandler);
+      iframe.addEventListener('load', subscribe);
+    }
 
     async function loadPopupQuestions() {
       try {
@@ -376,12 +407,14 @@
         if (popupActive) return;
         const pos = getPosition();
         firePopups('time', pos);
-        if (detectEnd && durationSeconds > 0 && pos >= durationSeconds) firePopups('end', pos);
+        if (detectEnd && !gotPlayerEvents && durationSeconds > 0 && pos >= durationSeconds) firePopups('end', pos);
       }, 1000);
     }
 
     function clearPlayer() {
       stopPopupPoll();
+      if (playerMsgHandler) { window.removeEventListener('message', playerMsgHandler); playerMsgHandler = null; }
+      gotPlayerEvents = false;
       popupControls = { pause() {}, resume() {} };
       if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
       if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
@@ -609,6 +642,7 @@
         iframe.setAttribute('webkitallowfullscreen', 'true');
         iframe.setAttribute('mozallowfullscreen', 'true');
         iframe.title = 'Video player';
+        if (source.type === 'vimeo' || source.type === 'mediadelivery') listenToEmbeddedPlayer(iframe);
         playerFrame.appendChild(iframe);
 
         iframeWatchPartId = part.id;
