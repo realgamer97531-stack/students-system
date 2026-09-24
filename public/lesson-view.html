@@ -592,7 +592,7 @@
         video.ontimeupdate = () => {
           const current = Math.floor(video.currentTime);
           if (current - lastSent >= 5) { lastSent = current; sendProgress(part.id, current); }
-          firePopups('time', video.currentTime);
+          if (!video.paused) firePopups('time', video.currentTime); // بس أثناء التشغيل الفعلي
         };
         video.onended = () => firePopups('end', video.currentTime);
         video.onpause = () => sendProgress(part.id, Math.floor(video.currentTime));
@@ -607,14 +607,16 @@
               onReady: (e) => {
                 if (part.watchedSeconds) e.target.seekTo(part.watchedSeconds, true);
                 popupControls = { pause: () => { try { ytPlayer.pauseVideo(); } catch (_) {} }, resume: () => { try { ytPlayer.playVideo(); } catch (_) {} } };
-                startPopupPoll(() => { try { return ytPlayer.getCurrentTime(); } catch (_) { return 0; } }, 0, false);
               },
               onStateChange: (e) => {
                 if (e.data === YT.PlayerState.ENDED) firePopups('end', 0);
                 if (e.data === YT.PlayerState.PLAYING) {
+                  // العد بيبدأ من لحظة التشغيل الفعلي (مش من تحميل الصفحة)
+                  startPopupPoll(() => { try { return ytPlayer.getCurrentTime(); } catch (_) { return 0; } }, 0, false);
                   if (ytInterval) clearInterval(ytInterval);
                   ytInterval = setInterval(() => sendProgress(part.id, Math.floor(ytPlayer.getCurrentTime())), 5000);
                 } else {
+                  stopPopupPoll();
                   if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
                   if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
                     sendProgress(part.id, Math.floor(ytPlayer.getCurrentTime()));
@@ -666,8 +668,11 @@
         }
         updateIframeProgress();
         iframeWatchInterval = setInterval(updateIframeProgress, 5000);
-        // مفيش events من الـ iframe: الوقت بيتقدّر من وقت المشاهدة الفعلي (تقريبي)
-        startPopupPoll(() => iframeWatchBase + Math.floor((Date.now() - iframeWatchStart) / 1000), part.durationSeconds || 0, true);
+        // Vimeo/Bunny: بنعتمد على أحداث المشغل الحقيقية بس (listenToEmbeddedPlayer). باقي الـ iframes (Drive...) مفيهاش أحداث،
+        // فبنقدّر من وقت الفتح (الفيديو بيبدأ من الصفر جوه الـ iframe، فمش بنضيف وقت المشاهدة القديم)
+        if (source.type !== 'vimeo' && source.type !== 'mediadelivery') {
+          startPopupPoll(() => Math.floor((Date.now() - iframeWatchStart) / 1000), part.durationSeconds || 0, true);
+        }
 
         const note = document.createElement('p');
         note.className = 'text-muted small mt-2';
