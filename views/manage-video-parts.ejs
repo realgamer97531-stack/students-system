@@ -4,6 +4,7 @@
 <p class="text-muted mb-4">
   <%= video.Session.Subject.name %> - <%= video.Session.Center.name %> - <span class="ar-only">حصة رقم</span><span class="en-only" style="display:none;">Session #</span> <%= video.Session.lesson_number %>
 </p>
+<div class="mb-4"><a href="/admin/popup-questions/video/<%= video.id %>" class="btn btn-outline-primary">❓ الأسئلة المنبثقة للدرس (Popup)</a></div>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">

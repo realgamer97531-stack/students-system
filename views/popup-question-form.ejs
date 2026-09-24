@@ -1,0 +1,196 @@
+<%- include('partials/header') %>
+<%
+  const q = question || {};
+  const v = (k, def) => (q[k] !== undefined && q[k] !== null ? q[k] : def);
+  const isEdit = !!q.id;
+  const action = isEdit ? '/admin/popup-questions/' + q.id + '/update' : '/admin/popup-questions/video/' + video.id;
+  const ms = (sec) => ({ m: Math.floor((Number(sec) || 0) / 60), s: (Number(sec) || 0) % 60 });
+  const trig = ms(v('trigger_seconds', 0));
+  const solStart = ms(v('solution_start_seconds', 0));
+  const solEnd = ms(v('solution_end_seconds', 0));
+  const solMin = ms(v('solution_min_seconds', 0));
+  const catLabel = { explanation: 'شرح', questions: 'أسئلة', homework_solution: 'حل واجب' };
+  const type = v('question_type', 'mcq');
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-1"><%= isEdit ? '✏️ تعديل سؤال منبثق' : '➕ سؤال منبثق جديد' %></h3>
+    <p class="text-muted mb-0">🎬 <%= video.title %></p>
+  </div>
+  <a href="/admin/popup-questions/video/<%= video.id %>" class="btn btn-outline-secondary">⬅ رجوع</a>
+</div>
+
+<% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+<form action="<%= action %>" method="POST" enctype="multipart/form-data" id="pqForm" onsubmit="return prepareSubmit()">
+  <div class="card shadow-sm mb-3"><div class="card-body row g-3">
+    <h6 class="mb-0">الإعدادات الأساسية</h6>
+    <div class="col-md-6">
+      <label class="form-label">اسم داخلي (اختياري، للأدمن بس)</label>
+      <input type="text" name="title" class="form-control" value="<%= v('title', '') %>" maxlength="200">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">يظهر في أنهي فيديو؟</label>
+      <select name="VideoPartId" class="form-select" required>
+        <option value="">— اختار —</option>
+        <% parts.forEach(p => { %>
+          <option value="<%= p.id %>" <%= Number(v('VideoPartId', 0)) === p.id ? 'selected' : '' %>><%= catLabel[p.category] || p.category %> - جزء <%= p.order_index %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">نوع السؤال</label>
+      <select name="question_type" id="qType" class="form-select" onchange="syncType()">
+        <option value="mcq" <%= type === 'mcq' ? 'selected' : '' %>>🔘 اختيار من 4</option>
+        <option value="essay" <%= type === 'essay' ? 'selected' : '' %>>✍️ مقالي (الطالب يرفع صورة)</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">متى يظهر؟</label>
+      <select name="trigger_type" id="trigType" class="form-select" onchange="syncType()">
+        <option value="end" <%= v('trigger_type', 'end') === 'end' ? 'selected' : '' %>>بعد انتهاء الفيديو</option>
+        <option value="time" <%= v('trigger_type', 'end') === 'time' ? 'selected' : '' %>>في وقت محدد من الفيديو</option>
+      </select>
+    </div>
+    <div class="col-md-4" id="trigTimeBox">
+      <label class="form-label">الوقت (دقيقة : ثانية)</label>
+      <div class="d-flex gap-1 align-items-center">
+        <input type="number" id="trigM" class="form-control" min="0" value="<%= trig.m %>"> :
+        <input type="number" id="trigS" class="form-control" min="0" max="59" value="<%= trig.s %>">
+      </div>
+      <input type="hidden" name="trigger_seconds" id="trigSeconds">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">نقاط المكافأة عند الإجابة الصح</label>
+      <input type="number" name="bonus_points" class="form-control" min="0" value="<%= v('bonus_points', 5) %>">
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+      <div class="form-check">
+        <input type="checkbox" name="is_active" id="isActive" class="form-check-input" <%= v('is_active', true) ? 'checked' : '' %>>
+        <label class="form-check-label" for="isActive">السؤال شغال</label>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="card shadow-sm mb-3"><div class="card-body row g-3">
+    <h6 class="mb-0">السؤال</h6>
+    <div class="col-12">
+      <label class="form-label">نص السؤال</label>
+      <textarea name="question_text" id="qText" class="form-control" rows="3" required><%= v('question_text', '') %></textarea>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">صورة للسؤال (اختياري)</label>
+      <input type="file" name="question_image" id="qImage" class="form-control" accept="image/*">
+      <% if (v('question_image_url', null)) { %>
+        <div class="mt-2"><img src="<%= v('question_image_url', '') %>" style="max-height:80px;" class="rounded border">
+        <label class="ms-2 small"><input type="checkbox" name="remove_image" value="1"> حذف الصورة الحالية</label></div>
+      <% } %>
+    </div>
+    <div class="col-12" id="mcqBox">
+      <label class="form-label">الاختيارات (اختار الإجابة الصحيحة بالدايرة)</label>
+      <% ['a','b','c','d'].forEach(k => { %>
+        <div class="input-group mb-2">
+          <span class="input-group-text text-uppercase" style="width:48px;"><%= k %></span>
+          <input type="text" name="choice_<%= k %>" class="form-control" value="<%= v('choice_' + k, '') %>">
+          <span class="input-group-text"><input type="radio" name="correct_choice" value="<%= k %>" class="form-check-input mt-0" <%= v('correct_choice', '') === k ? 'checked' : '' %>>&nbsp;صحيحة</span>
+        </div>
+      <% }) %>
+    </div>
+  </div></div>
+
+  <div class="card shadow-sm mb-3"><div class="card-body row g-3">
+    <h6 class="mb-0">فيديو الحل (بيظهر بعد ما الطالب يجاوب ومينفعش يقفل السؤال قبل ما يخلصه)</h6>
+    <div class="col-12">
+      <label class="form-label">لينك فيديو الحل (YouTube / Vimeo / Drive / لينك مباشر) — اتركه فاضي لو مفيش</label>
+      <input type="text" name="solution_video_url" id="solUrl" class="form-control" value="<%= v('solution_video_url', '') %>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">يبدأ من (دقيقة : ثانية)</label>
+      <div class="d-flex gap-1 align-items-center"><input type="number" id="solStartM" class="form-control" min="0" value="<%= solStart.m %>"> : <input type="number" id="solStartS" class="form-control" min="0" max="59" value="<%= solStart.s %>"></div>
+      <input type="hidden" name="solution_start_seconds" id="solStartSeconds">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">ينتهي عند (0:00 = لآخر الفيديو)</label>
+      <div class="d-flex gap-1 align-items-center"><input type="number" id="solEndM" class="form-control" min="0" value="<%= solEnd.m %>"> : <input type="number" id="solEndS" class="form-control" min="0" max="59" value="<%= solEnd.s %>"></div>
+      <input type="hidden" name="solution_end_seconds" id="solEndSeconds">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">أقل وقت قبل ما يقدر يقفل (دقيقة : ثانية)</label>
+      <div class="d-flex gap-1 align-items-center"><input type="number" id="solMinM" class="form-control" min="0" value="<%= solMin.m %>"> : <input type="number" id="solMinS" class="form-control" min="0" max="59" value="<%= solMin.s %>"></div>
+      <input type="hidden" name="solution_min_seconds" id="solMinSeconds">
+    </div>
+    <div class="col-12 small text-muted">في فيديوهات YouTube والملفات المباشرة الإغلاق بيتفتح لما الفيديو يخلص. لباقي المنصات (Vimeo / Drive...) مفيش طريقة نعرف منها إنه خلص، فالإغلاق بيتفتح بعد مدة الحل (أو 30 ثانية لو مش محددة).</div>
+  </div></div>
+
+  <div class="card shadow-sm mb-3"><div class="card-body row g-3">
+    <h6 class="mb-0">🎨 التصميم</h6>
+    <% const colors = [['d_bgColor','لون الخلفية','bgColor'],['d_textColor','لون الكتابة','textColor'],['d_accentColor','لون التمييز (الهيدر والأزرار)','accentColor'],['d_choiceBgColor','لون خلفية الاختيارات','choiceBgColor'],['d_correctColor','لون الإجابة الصح','correctColor'],['d_wrongColor','لون الإجابة الغلط','wrongColor']]; %>
+    <% colors.forEach(([name, label, key]) => { %>
+      <div class="col-6 col-md-2"><label class="form-label small"><%= label %></label><input type="color" name="<%= name %>" data-d="<%= key %>" class="form-control form-control-color w-100" value="<%= design[key] %>"></div>
+    <% }) %>
+    <div class="col-md-3"><label class="form-label small">حجم الخط (<span id="fsVal"><%= design.fontSize %></span>px)</label><input type="range" name="d_fontSize" data-d="fontSize" min="14" max="40" class="form-range" value="<%= design.fontSize %>"></div>
+    <div class="col-md-3"><label class="form-label small">استدارة الحواف (<span id="brVal"><%= design.borderRadius %></span>px)</label><input type="range" name="d_borderRadius" data-d="borderRadius" min="0" max="40" class="form-range" value="<%= design.borderRadius %>"></div>
+    <div class="col-md-3"><label class="form-label small">عتامة الخلفية خلف السؤال (<span id="ovVal"><%= design.overlayOpacity %></span>%)</label><input type="range" name="d_overlayOpacity" data-d="overlayOpacity" min="0" max="95" class="form-range" value="<%= design.overlayOpacity %>"></div>
+    <div class="col-md-3"><label class="form-label small">الخط</label>
+      <select name="d_fontFamily" data-d="fontFamily" class="form-select">
+        <% fontFamilies.forEach(f => { %><option value="<%= f %>" <%= design.fontFamily === f ? 'selected' : '' %>><%= f.split(',')[0] %></option><% }) %>
+      </select>
+    </div>
+    <div class="col-md-6"><label class="form-label small">عنوان الهيدر (اختياري، الافتراضي "❓ سؤال")</label><input type="text" name="d_headerText" data-d="headerText" class="form-control" maxlength="80" value="<%= design.headerText %>"></div>
+    <div class="col-12"><button type="button" class="btn btn-outline-primary" onclick="previewPopup()">👁 معاينة السؤال كأنك طالب</button> <span class="small text-muted">(المعاينة مبتحفظش أي إجابة ولا نقاط)</span></div>
+  </div></div>
+
+  <button type="submit" class="btn btn-success btn-lg">💾 حفظ</button>
+</form>
+
+<script src="/video-embed.js?v=1"></script>
+<script src="/popup-question.js?v=1"></script>
+<script>
+  const num = (id) => parseInt(document.getElementById(id).value, 10) || 0;
+  function syncType() {
+    document.getElementById('mcqBox').style.display = document.getElementById('qType').value === 'mcq' ? '' : 'none';
+    document.getElementById('trigTimeBox').style.display = document.getElementById('trigType').value === 'time' ? '' : 'none';
+  }
+  function prepareSubmit() {
+    document.getElementById('trigSeconds').value = num('trigM') * 60 + num('trigS');
+    document.getElementById('solStartSeconds').value = num('solStartM') * 60 + num('solStartS');
+    document.getElementById('solEndSeconds').value = num('solEndM') * 60 + num('solEndS');
+    document.getElementById('solMinSeconds').value = num('solMinM') * 60 + num('solMinS');
+    return true;
+  }
+  document.querySelectorAll('[data-d]').forEach((input) => input.addEventListener('input', () => {
+    const map = { fontSize: 'fsVal', borderRadius: 'brVal', overlayOpacity: 'ovVal' };
+    const el = document.getElementById(map[input.dataset.d] || '');
+    if (el) el.textContent = input.value;
+  }));
+  function readDesign() {
+    const d = {};
+    document.querySelectorAll('[data-d]').forEach((i) => { d[i.dataset.d] = i.type === 'range' ? Number(i.value) : i.value; });
+    return d;
+  }
+  function previewPopup() {
+    prepareSubmit();
+    const f = document.getElementById('pqForm');
+    const isMcq = f.question_type.value === 'mcq';
+    const file = document.getElementById('qImage').files[0];
+    const correct = (f.querySelector('input[name="correct_choice"]:checked') || {}).value || null;
+    const solUrl = document.getElementById('solUrl').value.trim();
+    const solution = solUrl ? { url: solUrl, start: num('solStartM') * 60 + num('solStartS'), end: num('solEndM') * 60 + num('solEndS'), minSeconds: num('solMinM') * 60 + num('solMinS') } : null;
+    const bonus = parseInt(f.bonus_points.value, 10) || 0;
+    const q = {
+      id: 0, type: isMcq ? 'mcq' : 'essay', text: f.question_text.value || '(نص السؤال)',
+      imageUrl: file ? URL.createObjectURL(file) : <%- JSON.stringify(v('question_image_url', null)).replace(/</g, '\\u003c') %>,
+      choices: { a: f.choice_a.value, b: f.choice_b.value, c: f.choice_c.value, d: f.choice_d.value },
+      bonusPoints: bonus, design: readDesign(),
+    };
+    PopupQuestionUI.mount(q, {
+      lang: 'ar',
+      onChoice: async (choice) => ({ status: 'answered', selected: choice, isCorrect: choice === correct, pointsAwarded: choice === correct ? bonus : 0, correctChoice: correct, solution }),
+      onEssay: async () => ({ status: 'pending', selected: null, isCorrect: null, pointsAwarded: 0, correctChoice: null, solution }),
+    });
+  }
+  syncType();
+</script>
+
+<%- include('partials/footer') %>

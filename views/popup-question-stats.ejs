@@ -1,0 +1,83 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-1">📊 نتائج السؤال</h3>
+    <p class="text-muted mb-0">🎬 <%= video.title %> — <%= question.title || question.question_text.slice(0, 60) %></p>
+  </div>
+  <a href="/admin/popup-questions/video/<%= video.id %>" class="btn btn-outline-secondary">⬅ رجوع</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div style="white-space:pre-wrap;"><%= question.question_text %></div>
+    <% if (question.question_image_url) { %><img src="<%= question.question_image_url %>" style="max-width:300px;" class="mt-2 rounded d-block"><% } %>
+    <% if (question.question_type === 'mcq') { %>
+      <ul class="list-unstyled mt-3 mb-0">
+        <% ['a','b','c','d'].forEach(k => { %>
+          <li class="<%= question.correct_choice === k ? 'fw-bold text-success' : '' %>"><span class="text-uppercase"><%= k %></span>) <%= question['choice_' + k] %> <%= question.correct_choice === k ? '✅' : '' %></li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</div>
+
+<div class="row g-3 mb-2">
+  <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-3"><div class="text-muted small">إجمالي الإجابات</div><div class="fs-3 fw-bold"><%= summary.total %></div></div></div>
+  <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-3"><div class="text-muted small">✅ صح</div><div class="fs-3 fw-bold text-success"><%= summary.correct %> <small>(<%= summary.correctPct %>%)</small></div></div></div>
+  <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-3"><div class="text-muted small">❌ غلط</div><div class="fs-3 fw-bold text-danger"><%= summary.wrong %> <small>(<%= summary.wrongPct %>%)</small></div></div></div>
+  <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-3"><div class="text-muted small">⏳ مستني تصحيح</div><div class="fs-3 fw-bold text-warning"><%= summary.pending %></div></div></div>
+</div>
+<p class="text-muted small mb-4">نسبة الصح والغلط محسوبة من الإجابات اللي اتصححت بس (الاختياري بيتصحح تلقائي، والمقالي بعد تصحيح المساعد).</p>
+
+<% if (question.question_type === 'mcq') { %>
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">توزيع الاختيارات</h6>
+    <% summary.choices.forEach(c => { %>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div style="width:28px;" class="fw-bold text-uppercase"><%= c.key %></div>
+        <div class="progress flex-grow-1" style="height:22px;">
+          <div class="progress-bar <%= question.correct_choice === c.key ? 'bg-success' : 'bg-secondary' %>" style="width: <%= c.pct %>%;"><%= c.pct > 8 ? c.pct + '%' : '' %></div>
+        </div>
+        <div style="width:120px;" class="small"><%= c.count %> طالب (<%= c.pct %>%)</div>
+      </div>
+    <% }) %>
+  </div>
+</div>
+<% } %>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>الطالب</th><th><%= question.question_type === 'mcq' ? 'اختار' : 'إجابة الطالب' %></th><th>النتيجة</th><th>نقاط</th><th>وقت الإجابة</th><% if (question.question_type === 'essay') { %><th>تصحيح</th><% } %></tr></thead>
+      <tbody>
+        <% if (rows.length === 0) { %><tr><td colspan="6" class="text-center text-muted py-4">لا توجد إجابات لسه</td></tr><% } %>
+        <% rows.forEach(r => { %>
+          <tr>
+            <td><%= r.student ? r.student.name : '—' %> <span class="small text-muted"><%= r.student ? r.student.student_code : '' %></span></td>
+            <td>
+              <% if (question.question_type === 'mcq') { %><span class="fw-bold text-uppercase"><%= r.selected %></span>
+              <% } else if (r.essayImage) { %><a href="<%= r.essayImage %>" target="_blank"><img src="<%= r.essayImage %>" style="height:70px;" class="rounded border"></a><% } %>
+            </td>
+            <td>
+              <% if (r.isCorrect === true) { %><span class="badge bg-success">صح</span>
+              <% } else if (r.isCorrect === false) { %><span class="badge bg-danger">غلط</span>
+              <% } else { %><span class="badge bg-warning text-dark">مستني التصحيح</span><% } %>
+            </td>
+            <td><%= r.points %></td>
+            <td class="small"><%= new Date(r.at).toLocaleString('ar-EG') %></td>
+            <% if (question.question_type === 'essay') { %>
+              <td class="text-nowrap">
+                <form action="/admin/popup-questions/answers/<%= r.id %>/grade" method="POST" class="d-inline"><input type="hidden" name="result" value="correct"><button class="btn btn-sm <%= r.isCorrect === true ? 'btn-success' : 'btn-outline-success' %>">✅ صح</button></form>
+                <form action="/admin/popup-questions/answers/<%= r.id %>/grade" method="POST" class="d-inline"><input type="hidden" name="result" value="wrong"><button class="btn btn-sm <%= r.isCorrect === false ? 'btn-danger' : 'btn-outline-danger' %>">❌ غلط</button></form>
+              </td>
+            <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -681,6 +681,36 @@ html[dir="ltr"] .whatsapp-float {
       onSuccess();
     }
 
+    // نتائج الأسئلة المنبثقة (مقالي/اختياري) على كارت الدرس
+    let popupResultsPromise = null;
+    function applyPopupResults() {
+      if (!popupResultsPromise) {
+        popupResultsPromise = apiGet('/api/portal/student/popup-results')
+          .then(r => (r && r.success ? r.results || {} : {}))
+          .catch(() => ({}));
+      }
+      popupResultsPromise.then(results => {
+        const isEn = (localStorage.getItem('portal_lang') || 'ar') === 'en';
+        document.querySelectorAll('[data-popup-result-slot]').forEach(slot => {
+          const list = results[slot.getAttribute('data-popup-result-slot')];
+          if (!Array.isArray(list) || list.length === 0) { slot.innerHTML = ''; return; }
+          const pill = (bg, fg, text) => `<div class="small fw-semibold mt-2 px-2 py-1 rounded" style="background:${bg};color:${fg};">${text}</div>`;
+          const mcq = list.filter(x => x.type === 'mcq');
+          let html = '';
+          if (mcq.length) {
+            const ok = mcq.filter(x => x.isCorrect === true).length;
+            html += pill('rgba(79,70,229,0.1)', '#4338CA', isEn ? `🎯 Popup questions: ${ok} / ${mcq.length} correct` : `🎯 الأسئلة المنبثقة: ${ok} صح من ${mcq.length}`);
+          }
+          list.filter(x => x.type === 'essay').forEach(x => {
+            if (x.isCorrect === true) html += pill('rgba(22,163,74,0.12)', '#15803d', isEn ? '✅ Essay question: correct' : '✅ السؤال المقالي: إجابتك صحيحة');
+            else if (x.isCorrect === false) html += pill('rgba(220,38,38,0.12)', '#b91c1c', isEn ? '❌ Essay question: incorrect' : '❌ السؤال المقالي: إجابتك خاطئة');
+            else html += pill('rgba(245,158,11,0.15)', '#b45309', isEn ? '⏳ Essay question: waiting for grading' : '⏳ السؤال المقالي: في انتظار التصحيح');
+          });
+          slot.innerHTML = html;
+        });
+      });
+    }
+
     async function loadLessons() {
       const currentLang = localStorage.getItem('portal_lang') || 'ar';
       const result = await apiGet('/api/portal/student/lessons');
@@ -746,6 +776,7 @@ html[dir="ltr"] .whatsapp-float {
                   <p class="small mb-2" style="color: var(--sf-muted);">📅 ${lesson.date}</p>
                   ${accessText}
                   ${viewsText}
+                  <div data-popup-result-slot="${lesson.videoId}"></div>
                 </div>
               </div>
             </div>`;
@@ -828,6 +859,7 @@ html[dir="ltr"] .whatsapp-float {
           container.innerHTML += lessonCardHtml + questionsCardHtml + examCardHtml + examVideoCardHtml + homeworkCards;
         });
         updateAccessCountdowns();
+        applyPopupResults();
         return;
       }
 

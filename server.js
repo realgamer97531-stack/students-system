@@ -51,6 +51,8 @@ const BookletReservation = require('./models/BookletReservation');
 const PaymentVerification = require('./models/PaymentVerification');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
 const ensureLessonAccessSchema = require('./utils/ensureLessonAccessSchema');
+const ensurePopupQuestionSchema = require('./utils/ensurePopupQuestionSchema');
+const registerPopupQuestionRoutes = require('./routes/popupQuestions');
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
@@ -9471,6 +9473,11 @@ app.post('/user/profile-photo', requireLogin, profilePhotoUpload.single('photo')
   }
 });
 
+registerPopupQuestionRoutes(app, {
+  requirePermissionOrAdmin, verifyPortalToken, hasAllVideoAccess, addPoints, uploadBufferToCloudinary,
+  adImageUpload, Student, Video, VideoPart, Session, VideoSession, VideoStudentAccess,
+});
+
 async function startServer() {
   // Attempt initial DB connection; if it fails, still start the HTTP server
   try {
@@ -9498,6 +9505,7 @@ async function startServer() {
     await ensureStudentOfferColumn();
     await ensureBookletReservationSchema(sequelize);
     await ensureLessonAccessSchema(sequelize);
+    await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
   } catch (error) {
@@ -9556,6 +9564,7 @@ async function startServer() {
           await ensureStudentOfferColumn();
           await ensureBookletReservationSchema(sequelize);
           await ensureLessonAccessSchema(sequelize);
+          await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
           console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
           break;
         } catch (e) {

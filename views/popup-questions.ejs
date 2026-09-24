@@ -1,0 +1,58 @@
+<%- include('partials/header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-1">❓ الأسئلة المنبثقة</h3>
+    <p class="text-muted mb-0">🎬 <%= video.title %> — الأسئلة دي بتظهر للطالب جوه صفحة الدرس (بعد الفيديو أو في وقت محدد) ولازم يجاوب ويشوف فيديو الحل قبل ما يقفلها.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/admin/videos/<%= video.id %>" class="btn btn-outline-secondary">⬅ رجوع للفيديوهات</a>
+    <a href="/admin/popup-questions/video/<%= video.id %>/new" class="btn btn-primary">➕ سؤال جديد</a>
+  </div>
+</div>
+
+<% if (questions.length === 0) { %>
+  <div class="alert alert-secondary">مفيش أسئلة منبثقة للدرس ده لسه.</div>
+<% } else { %>
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr><th>#</th><th>السؤال</th><th>النوع</th><th>الفيديو</th><th>وقت الظهور</th><th>الإجابات</th><th>الحالة</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% const catLabel = { explanation: 'شرح', questions: 'أسئلة', homework_solution: 'حل واجب' }; %>
+        <% questions.forEach((q, i) => { %>
+          <% const part = partById.get(q.VideoPartId); const c = counts[q.id] || { total: 0, pending: 0 }; %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td style="max-width:320px;"><strong><%= q.title || '' %></strong><div class="small text-muted text-truncate"><%= q.question_text %></div></td>
+            <td><%= q.question_type === 'essay' ? '✍️ مقالي' : '🔘 اختيار من 4' %></td>
+            <td class="small"><%= part ? (catLabel[part.category] || part.category) + ' - جزء ' + part.order_index : '—' %></td>
+            <td class="small">
+              <% if (q.trigger_type === 'end') { %>بعد انتهاء الفيديو<% } else { %>عند <%= Math.floor(q.trigger_seconds / 60) %>:<%= String(q.trigger_seconds % 60).padStart(2, '0') %><% } %>
+            </td>
+            <td class="small">
+              <%= c.total %>
+              <% if (c.pending > 0) { %><span class="badge bg-warning text-dark">⏳ <%= c.pending %> مستني تصحيح</span><% } %>
+            </td>
+            <td><span class="badge <%= q.is_active ? 'bg-success' : 'bg-secondary' %>"><%= q.is_active ? 'شغال' : 'متوقف' %></span></td>
+            <td class="text-nowrap">
+              <a href="/admin/popup-questions/<%= q.id %>/stats" class="btn btn-sm btn-outline-info">📊 النتائج</a>
+              <a href="/admin/popup-questions/<%= q.id %>/edit" class="btn btn-sm btn-outline-primary">✏️ تعديل</a>
+              <form action="/admin/popup-questions/<%= q.id %>/toggle" method="POST" class="d-inline">
+                <button class="btn btn-sm btn-outline-secondary"><%= q.is_active ? 'إيقاف' : 'تشغيل' %></button>
+              </form>
+              <form action="/admin/popup-questions/<%= q.id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('هيتمسح السؤال وكل إجابات الطلاب عليه. متأكد؟')">
+                <button class="btn btn-sm btn-outline-danger">🗑</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<%- include('partials/footer') %>

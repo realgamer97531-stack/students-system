@@ -34,6 +34,158 @@
       .d-flex.justify-content-between .btn { flex: 1 1 0; white-space: nowrap; }
       .d-flex.justify-content-between #partIndicator { flex: 0 0 auto; }
     }
+
+    /* ===== Modern senior-student theme (visual only) ===== */
+    :root {
+      --lv-bg: #f4f5fb;
+      --lv-surface: #ffffff;
+      --lv-text: #0f172a;
+      --lv-muted: #64748b;
+      --lv-border: #e3e6f3;
+      --lv-accent: #6366f1;
+      --lv-accent-2: #8b5cf6;
+      --lv-glow: rgba(99, 102, 241, 0.35);
+      --lv-radius: 18px;
+    }
+    body.dark-theme {
+      --lv-bg: #070a14;
+      --lv-surface: #10162a;
+      --lv-text: #f1f5f9;
+      --lv-muted: #94a3b8;
+      --lv-border: #1f293d;
+      --lv-glow: rgba(129, 140, 248, 0.3);
+    }
+    body {
+      font-family: "Segoe UI", "Cairo", Tahoma, system-ui, -apple-system, sans-serif;
+      background-color: var(--lv-bg) !important;
+      background-image:
+        radial-gradient(900px 420px at 85% -10%, rgba(99, 102, 241, 0.16), transparent 60%),
+        radial-gradient(700px 380px at 0% 0%, rgba(139, 92, 246, 0.12), transparent 60%);
+      background-repeat: no-repeat;
+      color: var(--lv-text);
+      min-height: 100vh;
+      transition: background-color .3s ease, color .3s ease;
+    }
+
+    /* Navbar */
+    .navbar {
+      position: sticky; top: 0; z-index: 1030;
+      padding: 12px 20px !important;
+      background: rgba(15, 23, 42, 0.78) !important;
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 6px 24px rgba(2, 6, 23, 0.18);
+    }
+    body.dark-theme .navbar { background: rgba(7, 10, 20, 0.8) !important; }
+    .navbar-brand { font-weight: 700; font-size: 1.05rem; letter-spacing: .2px; margin: 0; }
+    .navbar-brand .badge {
+      background: linear-gradient(135deg, var(--lv-accent), var(--lv-accent-2)) !important;
+      border-radius: 10px; padding: 6px 9px; box-shadow: 0 4px 14px var(--lv-glow);
+    }
+    .navbar .btn-outline-light {
+      border-radius: 999px; padding: 6px 16px; font-weight: 600;
+      border-color: rgba(255, 255, 255, 0.25); backdrop-filter: blur(6px);
+      transition: all .2s ease;
+    }
+    .navbar .btn-outline-light:hover { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.5); color: #fff; transform: translateY(-1px); }
+
+    /* Layout */
+    .container { max-width: 1080px; }
+
+    /* Category tabs -> segmented pill control */
+    .btn-group.w-100 {
+      background: var(--lv-surface);
+      border: 1px solid var(--lv-border);
+      border-radius: 16px;
+      padding: 6px;
+      gap: 6px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+    .btn-group.w-100 > .btn,
+    .btn-group.w-100 > .btn:not(:last-child),
+    .btn-group.w-100 > .btn:not(:first-child),
+    .btn-group.w-100 > .btn-group:not(:last-child) > .btn {
+      flex: 1 1 0;
+      border: 0 !important;
+      border-radius: 12px !important;
+      margin: 0 !important;
+      padding: 11px 14px;
+      font-weight: 700;
+      font-size: .95rem;
+      color: var(--lv-muted);
+      background: transparent;
+      transition: all .25s ease;
+    }
+    .btn-group.w-100 > .btn:hover { color: var(--lv-text); background: rgba(99, 102, 241, 0.09); }
+    .btn-group.w-100 > .btn.active,
+    .btn-group.w-100 > .btn:active {
+      color: #fff !important;
+      background: linear-gradient(135deg, var(--lv-accent), var(--lv-accent-2)) !important;
+      box-shadow: 0 8px 20px var(--lv-glow);
+    }
+
+    /* Player card */
+    .card {
+      background: var(--lv-surface);
+      border: 1px solid var(--lv-border);
+      border-radius: var(--lv-radius);
+      box-shadow: 0 20px 50px -20px rgba(15, 23, 42, 0.25) !important;
+      overflow: hidden;
+    }
+    body.dark-theme .card { background: var(--lv-surface); border-color: var(--lv-border); box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.7) !important; }
+    .card-body { padding: 20px; }
+    .player-frame {
+      border-radius: 14px;
+      background: #000;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 18px 40px -12px rgba(0, 0, 0, 0.55);
+    }
+    .player-frame iframe, .player-frame video { border-radius: 14px; }
+
+    /* Part navigation */
+    .card-body .btn-outline-secondary {
+      border-radius: 999px; padding: 9px 20px; font-weight: 600;
+      color: var(--lv-text); background: transparent;
+      border: 1px solid var(--lv-border);
+      transition: all .2s ease;
+    }
+    .card-body .btn-outline-secondary:hover {
+      color: #fff; border-color: transparent;
+      background: linear-gradient(135deg, var(--lv-accent), var(--lv-accent-2));
+      box-shadow: 0 8px 18px var(--lv-glow); transform: translateY(-1px);
+    }
+    #partIndicator {
+      font-weight: 700; font-size: .9rem; color: var(--lv-muted) !important;
+      background: rgba(99, 102, 241, 0.1); padding: 6px 14px; border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+    #partIndicator:empty { display: none; }
+    .text-muted { color: var(--lv-muted) !important; }
+
+    /* Empty-state alert */
+    .alert-secondary {
+      background: var(--lv-surface); color: var(--lv-muted);
+      border: 1px dashed var(--lv-border); border-radius: var(--lv-radius);
+      text-align: center; padding: 28px 16px; font-weight: 600;
+    }
+
+    /* Floating controls */
+    .control-btn {
+      background: rgba(255, 255, 255, 0.8); color: var(--lv-text);
+      border: 1px solid var(--lv-border);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.15);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .control-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px var(--lv-glow); }
+    body.dark-theme .control-btn { background: rgba(16, 22, 42, 0.85); }
+
+    @media (max-width: 576px) {
+      .navbar { padding: 10px 12px !important; }
+      .card-body { padding: 12px; }
+      .btn-group.w-100 > .btn { padding: 10px 6px; font-size: .85rem; }
+      .card { border-radius: 14px; }
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -74,6 +226,7 @@
   <script src="ads-popup.js"></script>
   <script src="video-broadcasts.js"></script>
   <script src="video-embed.js?v=1"></script>
+  <script src="popup-question.js?v=1"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const videoId = urlParams.get('videoId');
@@ -159,7 +312,77 @@
       applyTheme(newTheme);
     }
 
+    // ===== الأسئلة المنبثقة =====
+    let popupQuestions = [];
+    let partPopups = [];
+    let popupActive = false;
+    let popupPollInterval = null;
+    let popupControls = { pause() {}, resume() {} };
+
+    async function loadPopupQuestions() {
+      try {
+        const res = await apiGet(`/api/portal/student/lessons/${videoId}/popups`);
+        popupQuestions = res && res.success && Array.isArray(res.questions) ? res.questions : [];
+      } catch (_) { popupQuestions = []; }
+    }
+
+    async function submitPopupEssay(questionId, file) {
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch(`${API_BASE_URL}/api/portal/student/popup-questions/${questionId}/essay`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
+      });
+      return res.json();
+    }
+
+    // kind: 'time' (مع الموضع الحالي بالثواني) أو 'end' (الفيديو خلص). الأسئلة بتظهر واحد ورا التاني.
+    function firePopups(kind, position) {
+      if (popupActive) return;
+      const q = partPopups.find(p => !p.answered && !p.shown && (
+        kind === 'end' || (p.triggerType === 'time' && position >= p.triggerSeconds)
+      ));
+      if (!q) return;
+      q.shown = true;
+      popupActive = true;
+      popupControls.pause();
+      const lang = localStorage.getItem('portal_lang') || 'ar';
+      const handle = (res) => {
+        if (!res || !res.success) throw new Error((res && res.message) || 'failed');
+        q.answered = true;
+        return res.result;
+      };
+      PopupQuestionUI.mount(q, {
+        lang,
+        onChoice: async (choice) => handle(await apiPost(`/api/portal/student/popup-questions/${q.id}/answer`, { choice })),
+        onEssay: async (file) => handle(await submitPopupEssay(q.id, file)),
+        onClosed: () => {
+          popupActive = false;
+          q.answered = true;
+          if (kind === 'time') popupControls.resume();
+          firePopups(kind, position);
+        },
+      });
+    }
+
+    function stopPopupPoll() {
+      if (popupPollInterval) { clearInterval(popupPollInterval); popupPollInterval = null; }
+    }
+
+    // للمشغلات اللي مفيهاش events (iframe): بنقدّر الموضع من الوقت الفعلي
+    function startPopupPoll(getPosition, durationSeconds, detectEnd) {
+      stopPopupPoll();
+      if (partPopups.length === 0) return;
+      popupPollInterval = setInterval(() => {
+        if (popupActive) return;
+        const pos = getPosition();
+        firePopups('time', pos);
+        if (detectEnd && durationSeconds > 0 && pos >= durationSeconds) firePopups('end', pos);
+      }, 1000);
+    }
+
     function clearPlayer() {
+      stopPopupPoll();
+      popupControls = { pause() {}, resume() {} };
       if (ytInterval) { clearInterval(ytInterval); ytInterval = null; }
       if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
       if (iframeWatchInterval) {
@@ -265,6 +488,7 @@
       const showQuestionsTab = currentParts.questions.length > 0 && questionsDisplayMode !== 'outside';
       document.getElementById('catQuestions').style.display = showQuestionsTab ? 'inline-block' : 'none';
 
+      await loadPopupQuestions();
       switchCategory('explanation');
     }
 
@@ -310,6 +534,8 @@
       iframeWatchPartId = null;
       iframeWatchStart = 0;
       iframeWatchBase = 0;
+      partPopups = popupQuestions.filter(p => p.videoPartId === part.id && !p.answered);
+      partPopups.forEach(p => { p.shown = false; });
       document.getElementById('partIndicator').textContent = parts.length > 1 ? `${currentIndex + 1} / ${parts.length}` : '';
       document.getElementById('prevPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
       document.getElementById('nextPartBtn').style.display = parts.length > 1 ? 'inline-block' : 'none';
@@ -329,10 +555,13 @@
         playerFrame.appendChild(video);
         video.currentTime = part.watchedSeconds || 0;
         let lastSent = 0;
+        popupControls = { pause: () => video.pause(), resume: () => { video.play().catch(() => {}); } };
         video.ontimeupdate = () => {
           const current = Math.floor(video.currentTime);
           if (current - lastSent >= 5) { lastSent = current; sendProgress(part.id, current); }
+          firePopups('time', video.currentTime);
         };
+        video.onended = () => firePopups('end', video.currentTime);
         video.onpause = () => sendProgress(part.id, Math.floor(video.currentTime));
       } else if (source.type === 'youtube') {
         const div = document.createElement('div');
@@ -342,8 +571,13 @@
           ytPlayer = new YT.Player('ytPlayerDiv', {
             height: '600', width: '100%', videoId: source.id,
             events: {
-              onReady: (e) => { if (part.watchedSeconds) e.target.seekTo(part.watchedSeconds, true); },
+              onReady: (e) => {
+                if (part.watchedSeconds) e.target.seekTo(part.watchedSeconds, true);
+                popupControls = { pause: () => { try { ytPlayer.pauseVideo(); } catch (_) {} }, resume: () => { try { ytPlayer.playVideo(); } catch (_) {} } };
+                startPopupPoll(() => { try { return ytPlayer.getCurrentTime(); } catch (_) { return 0; } }, 0, false);
+              },
               onStateChange: (e) => {
+                if (e.data === YT.PlayerState.ENDED) firePopups('end', 0);
                 if (e.data === YT.PlayerState.PLAYING) {
                   if (ytInterval) clearInterval(ytInterval);
                   ytInterval = setInterval(() => sendProgress(part.id, Math.floor(ytPlayer.getCurrentTime())), 5000);
@@ -398,6 +632,8 @@
         }
         updateIframeProgress();
         iframeWatchInterval = setInterval(updateIframeProgress, 5000);
+        // مفيش events من الـ iframe: الوقت بيتقدّر من وقت المشاهدة الفعلي (تقريبي)
+        startPopupPoll(() => iframeWatchBase + Math.floor((Date.now() - iframeWatchStart) / 1000), part.durationSeconds || 0, true);
 
         const note = document.createElement('p');
         note.className = 'text-muted small mt-2';
