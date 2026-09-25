@@ -20,7 +20,9 @@ const sequelize = new Sequelize(
     },
     logging: false,
     pool: {
-      max: 3,       // Keep the connection footprint within hosted database limits
+      // قاعدة البيانات على سيرفر بعيد، فكل query بتاخد وقت شبكة؛ 3 اتصالات بس كانت بتخلي الطلبات تستنى في طابور.
+      // ممكن تتغير من غير تعديل كود عن طريق DB_POOL_MAX في الـ environment.
+      max: Number.parseInt(process.env.DB_POOL_MAX, 10) || 10,
       min: 0,
       acquire: 30000,
       idle: 60000,

@@ -1,6 +1,12 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
+// بيشيل أي مسافات (وكمان علامات الاتجاه المخفية اللي بتيجي مع النسخ) من أرقام التليفون
+function stripPhoneSpaces(value) {
+  if (value === null || value === undefined) return value;
+  return String(value).replace(/[\s\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '');
+}
+
 const Student = sequelize.define('Student', {
   id: {
     type: DataTypes.INTEGER,
@@ -19,10 +25,16 @@ const Student = sequelize.define('Student', {
   phone: {
     type: DataTypes.STRING,
     allowNull: false,
+    set(value) {
+      this.setDataValue('phone', stripPhoneSpaces(value));
+    },
   },
   parent_phone: {
     type: DataTypes.STRING,
     allowNull: false,
+    set(value) {
+      this.setDataValue('parent_phone', stripPhoneSpaces(value));
+    },
   },
   price_per_session: {
     type: DataTypes.FLOAT,
@@ -74,3 +86,4 @@ const Student = sequelize.define('Student', {
 });
 
 module.exports = Student;
+module.exports.stripPhoneSpaces = stripPhoneSpaces;

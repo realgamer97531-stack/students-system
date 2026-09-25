@@ -52,6 +52,7 @@ const PaymentVerification = require('./models/PaymentVerification');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
 const ensureLessonAccessSchema = require('./utils/ensureLessonAccessSchema');
 const ensurePopupQuestionSchema = require('./utils/ensurePopupQuestionSchema');
+const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
@@ -756,6 +757,33 @@ async function ensureStudentBookletPlaceholder(student, booklets = null) {
   }
 }
 
+// بيجيب سجلات البوكليت والحجوزات لكل البوكليتس في استعلامين بس (بدل 2 استعلام لكل بوكليت).
+// لو فيه أكتر من سجل لنفس البوكليت بياخد الأقدم (زي findOne بالظبط).
+async function loadStudentBookletRecords(studentId, bookletIds) {
+  if (!bookletIds || bookletIds.length === 0) {
+    return { studentBookletByBookletId: new Map(), reservationByBookletId: new Map() };
+  }
+  const [studentBooklets, reservations] = await Promise.all([
+    StudentBooklet.findAll({
+      where: { StudentId: studentId, BookletId: bookletIds },
+      order: [['id', 'ASC']],
+    }),
+    BookletReservation.findAll({
+      where: { StudentId: studentId, BookletId: bookletIds, status: { [Op.ne]: 'rejected' } },
+      order: [['id', 'ASC']],
+    }),
+  ]);
+  const studentBookletByBookletId = new Map();
+  studentBooklets.forEach(sb => {
+    if (!studentBookletByBookletId.has(sb.BookletId)) studentBookletByBookletId.set(sb.BookletId, sb);
+  });
+  const reservationByBookletId = new Map();
+  reservations.forEach(r => {
+    if (!reservationByBookletId.has(r.BookletId)) reservationByBookletId.set(r.BookletId, r);
+  });
+  return { studentBookletByBookletId, reservationByBookletId };
+}
+
 async function markDefaultBookletDelivered(student) {
   if (!student) return null;
   const booklets = await Booklet.findAll({ where: { SubjectId: student.SubjectId, is_active: true }, order: [['order_index', 'ASC']] });
@@ -816,6 +844,19 @@ function getActualSessionPayment(attendance) {
   return parseFloat(attendance?.payment_collected || 0);
 }
 
+// تسجيل الطلبات البطيئة في اللوج (عشان نعرف أي صفحة محتاجة تحسين)
+const SLOW_REQUEST_MS = Number.parseInt(process.env.SLOW_REQUEST_MS, 10) || 2000;
+app.use((req, res, next) => {
+  const startedAt = process.hrtime.bigint();
+  res.on('finish', () => {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    if (elapsedMs >= SLOW_REQUEST_MS) {
+      console.warn(`🐢 Slow request: ${req.method} ${req.originalUrl.split('?')[0]} took ${Math.round(elapsedMs)}ms (status ${res.statusCode})`);
+    }
+  });
+  next();
+});
+
 app.use(cors()); // يسمح لأي موقع يتواصل مع الـ API بتاعنا
 app.use(compression());
 app.use(cors({
@@ -832,6 +873,8 @@ app.use(cors({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// الملفات المرفوعة أسماؤها فيها وقت الرفع فمش بتتغير أبدًا، فالمتصفح يقدر يحتفظ بيها بدل ما يحملها كل مرة
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), { maxAge: '7d' }));
 // عشان نقدر نستخدم ملفات CSS / JS / صور من فولدر public
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -1074,21 +1117,46 @@ function requireLogin(req, res, next) {
 
 app.use(requireLogin);
 
+// كاش صغير لبيانات المستخدم (الصورة + الصلاحيات) بدل ما نسأل قاعدة البيانات مرتين في كل طلب.
+// بيتمسح فورًا لما الصلاحيات أو الصورة تتغير، وكمان بينتهي لوحده بعد 30 ثانية.
+const USER_CONTEXT_TTL_MS = 30 * 1000;
+const userContextCache = new Map();
+
+function invalidateUserContext(userId) {
+  userContextCache.delete(String(userId));
+}
+
+async function getUserContext(userId) {
+  const key = String(userId);
+  const cached = userContextCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const user = await User.findByPk(userId, { attributes: ['id', 'profile_photo_url', 'permissions'] });
+  let permissions = [];
+  if (user && user.permissions) {
+    try { permissions = JSON.parse(user.permissions) || []; } catch (e) { permissions = []; }
+  }
+  const value = { exists: !!user, profilePhotoUrl: user ? user.profile_photo_url || null : null, permissions };
+  userContextCache.set(key, { value, expiresAt: Date.now() + USER_CONTEXT_TTL_MS });
+  return value;
+}
+
 // إتاحة بيانات المستخدم تلقائيًا في كل صفحة EJS
 app.use(async (req, res, next) => {
   res.locals.userName = req.session.userName || null;
   res.locals.userRole = req.session.userRole || null;
   res.locals.userProfilePhoto = null;
 
-  // Fetch user profile photo if logged in
   if (req.session.userId) {
     try {
-      const user = await User.findByPk(req.session.userId);
-      if (user && user.profile_photo_url) {
-        res.locals.userProfilePhoto = user.profile_photo_url;
+      const context = await getUserContext(req.session.userId);
+      res.locals.userProfilePhoto = context.profilePhotoUrl;
+      // تحميل صلاحيات الأسيستانت في الجلسة عند كل طلب (يضمن التحديث الفوري لو الأدمن غيّرها)
+      if (req.session.userRole === 'assistant') {
+        req.session.userPermissions = context.permissions;
       }
     } catch (e) {
-      console.error('Error fetching user profile photo:', e);
+      console.error('Error loading user context:', e);
     }
   }
 
@@ -1122,15 +1190,6 @@ app.post('/admin/closing/unlock', requireAdmin, async (req, res) => {
 app.post('/admin/closing/lock-again', requireAdmin, (req, res) => {
   req.session.closingUnlocked = false;
   res.redirect('/dashboard');
-});
-
-// تحميل صلاحيات المستخدم في الجلسة عند كل طلب (يضمن التحديث الفوري لو الأدمن غيّرها)
-app.use(async (req, res, next) => {
-  if (req.session.userId && req.session.userRole === 'assistant') {
-    const user = await User.findByPk(req.session.userId);
-    req.session.userPermissions = user.permissions ? JSON.parse(user.permissions) : [];
-  }
-  next();
 });
 
 function requirePermission(key) {
@@ -1470,11 +1529,34 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
   if (center_id) where.CenterId = center_id;
   if (subject_id) where.SubjectId = subject_id;
 
-  let students = await Student.findAll({
-    where,
-    include: [Center, Subject],
-    order: [['createdAt', 'DESC']],
-  });
+  // بنجيب الأعمدة اللي الصفحة بتعرضها بس، وبيانات خام (أسرع بكتير مع آلاف الطلاب)،
+  // ومعاها السناتر والمواد وإجمالي مدفوعات البوكليت في نفس الوقت
+  const [studentRows, centers, subjects, bookletPaidRows] = await Promise.all([
+    Student.findAll({
+      where,
+      attributes: ['id', 'profile_photo_url', 'student_code', 'name', 'phone', 'parent_phone', 'price_per_session',
+        'balance', 'is_offer_subscribed', 'booklet_status', 'CenterId', 'SubjectId', 'createdAt'],
+      include: [
+        { model: Center, attributes: ['id', 'name'] },
+        { model: Subject, attributes: ['id', 'name'] },
+      ],
+      order: [['createdAt', 'DESC']],
+      raw: true,
+      nest: true,
+    }),
+    Center.findAll(),
+    Subject.findAll(),
+    StudentBooklet.findAll({
+      attributes: ['StudentId', [sequelize.fn('SUM', sequelize.col('paid_amount')), 'total_paid']],
+      group: ['StudentId'],
+      raw: true,
+    }),
+  ]);
+  let students = studentRows.map((student) => ({
+    ...student,
+    Center: student.Center && student.Center.id !== null ? student.Center : null,
+    Subject: student.Subject && student.Subject.id !== null ? student.Subject : null,
+  }));
 
   const normalizedSearch = String(search || '').trim().toLowerCase();
   const normalizedDigits = normalizedSearch.replace(/\D/g, '');
@@ -1509,17 +1591,10 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
     students = students.filter((student) => Number(student.balance || 0) <= 90);
   }
 
-  const centers = await Center.findAll();
-  const subjects = await Subject.findAll();
-
   // Compute total paid amounts for booklets per student so the list view can show "Paid Price for the Current Booklet"
-  const studentBooklets = await StudentBooklet.findAll({
-    where: { StudentId: students.map(student => student.id) },
-  });
-
   const bookletPaidTotals = {};
-  studentBooklets.forEach(studentBooklet => {
-    bookletPaidTotals[studentBooklet.StudentId] = (bookletPaidTotals[studentBooklet.StudentId] || 0) + Number(studentBooklet.paid_amount || 0);
+  bookletPaidRows.forEach(row => {
+    bookletPaidTotals[row.StudentId] = Number(row.total_paid || 0);
   });
 
   res.render('students-list', {
@@ -1682,17 +1757,92 @@ app.get('/students/:id', async (req, res) => {
       include: [Center, Subject],
     });
     if (!student) return res.status(404).send('❌ الطالب غير موجود');
-    const centers = await Center.findAll();
-    const subjects = await Subject.findAll();
-    const ownSessions = await Session.findAll({
-      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
-      include: [Center, Subject],
-      order: [['lesson_number', 'ASC']],
-    });
-    const attendanceRecords = await Attendance.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session, include: [Center] }, User],
-    });
+
+    // كل بيانات الصفحة مستقلة عن بعض، فبتتجاب في نفس الوقت بدل ما كل استعلام يستنى اللي قبله
+    const [
+      centers,
+      subjects,
+      ownSessions,
+      attendanceRecords,
+      homeworkRecords,
+      examResults,
+      transactions,
+      warnings,
+      studentVideos,
+      watchRecords,
+      studentBooklets,
+      availableBooklets,
+      followUpAssistant,
+    ] = await Promise.all([
+      Center.findAll(),
+      Subject.findAll(),
+      Session.findAll({
+        where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
+        include: [Center, Subject],
+        order: [['lesson_number', 'ASC']],
+      }),
+      Attendance.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Session, include: [Center] }, User],
+      }),
+      // سجلات الواجب
+      HomeworkCheck.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Session, include: [Center] }, User],
+      }),
+      // سجلات الامتحانات
+      ExamResult.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Exam, include: [Session] }, User],
+        order: [['createdAt', 'DESC']],
+      }),
+      BalanceTransaction.findAll({
+        where: { StudentId: student.id },
+        order: [['createdAt', 'DESC']],
+      }),
+      Warning.findAll({
+        where: { StudentId: student.id },
+        include: [User],
+        order: [['createdAt', 'ASC']],
+      }),
+      // الفيديوهات المتاحة لهذا الطالب فقط (فيديوهات حصص مجموعته + الوصول الفردي)
+      (async () => {
+        const [groupVideoSessions, individualAccesses] = await Promise.all([
+          VideoSession.findAll({
+            attributes: ['VideoId'],
+            include: [{
+              model: Session,
+              attributes: [],
+              required: true,
+              where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
+            }],
+          }),
+          VideoStudentAccess.findAll({
+            where: { StudentId: student.id },
+            attributes: ['VideoId'],
+          }),
+        ]);
+        const accessibleVideoIds = [...new Set([
+          ...groupVideoSessions.map(vs => vs.VideoId),
+          ...individualAccesses.map(a => a.VideoId),
+        ])];
+        return accessibleVideoIds.length > 0 ? Video.findAll({
+          where: { id: accessibleVideoIds },
+          include: [{ model: Session, include: [Center] }, VideoPart],
+          order: [['createdAt', 'ASC']],
+        }) : [];
+      })(),
+      WatchProgress.findAll({ where: { StudentId: student.id }, attributes: ['VideoPartId', 'watched_seconds'] }),
+      StudentBooklet.findAll({
+        where: { StudentId: student.id },
+        include: [Booklet],
+      }),
+      Booklet.findAll({
+        where: { SubjectId: student.SubjectId, is_active: true },
+      }),
+      getFollowUpAssistantForStudent(student.id),
+      syncStudentBookletStatus(student),
+    ]);
     const ownSessionIds = new Set(ownSessions.map(s => s.id));
     const attendanceByLesson = {};
     const attendanceUserByLesson = {};
@@ -1713,11 +1863,6 @@ app.get('/students/:id', async (req, res) => {
       }
     });
 
-    // سجلات الواجب
-    const homeworkRecords = await HomeworkCheck.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session, include: [Center] }, User],
-    });
     const homeworkByLesson = {};
     const homeworkUserByLesson = {};
     const homeworkTimeByLesson = {};
@@ -1736,13 +1881,6 @@ app.get('/students/:id', async (req, res) => {
       }
     });
 
-    // ✅ سجلات الامتحانات - لازم تكون هنا، قبل استخدامها تحت
-    const examResults = await ExamResult.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Exam, include: [Session] }, User],
-      order: [['createdAt', 'DESC']],
-    });
-    
     const examScoreByLesson = {};
     examResults.forEach(r => {
       if (r && r.Exam && r.Exam.Session) {
@@ -1806,43 +1944,7 @@ app.get('/students/:id', async (req, res) => {
       };
     });
 
-    const transactions = await BalanceTransaction.findAll({
-      where: { StudentId: student.id },
-      order: [['createdAt', 'DESC']],
-    });
-
-    const warnings = await Warning.findAll({
-      where: { StudentId: student.id },
-      include: [User],
-      order: [['createdAt', 'ASC']],
-    });
-
     // بيانات مشاهدة الفيديوهات المتاحة لهذا الطالب فقط
-    const studentSessions = await Session.findAll({
-      where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
-    });
-    const studentSessionIds = studentSessions.map(s => s.id);
-
-    const groupVideoSessions = studentSessionIds.length > 0 ? await VideoSession.findAll({
-      where: { SessionId: studentSessionIds },
-      attributes: ['VideoId'],
-    }) : [];
-    const groupVideoIds = [...new Set(groupVideoSessions.map(vs => vs.VideoId))];
-
-    const individualAccesses = await VideoStudentAccess.findAll({
-      where: { StudentId: student.id },
-      attributes: ['VideoId'],
-    });
-    const individualVideoIds = individualAccesses.map(a => a.VideoId);
-
-    const accessibleVideoIds = [...new Set([...groupVideoIds, ...individualVideoIds])];
-    const studentVideos = accessibleVideoIds.length > 0 ? await Video.findAll({
-      where: { id: accessibleVideoIds },
-      include: [{ model: Session, include: [Center] }, VideoPart],
-      order: [['createdAt', 'ASC']],
-    }) : [];
-
-    const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
     const watchMap = {};
     watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
 
@@ -1860,21 +1962,11 @@ app.get('/students/:id', async (req, res) => {
       })),
     }));
 
-    const studentBooklets = await StudentBooklet.findAll({
-      where: { StudentId: student.id },
-      include: [Booklet],
-    });
-    await syncStudentBookletStatus(student);
     if (!student.booklet_status && studentBooklets.length > 0) {
       student.booklet_status = true;
       await student.save();
     }
 
-    const availableBooklets = await Booklet.findAll({
-      where: { SubjectId: student.SubjectId, is_active: true },
-    });
-
-    const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
     const profilePhotoUrl = student.profile_photo_url || null;
 
     res.render('student-profile', {
@@ -2913,17 +3005,19 @@ app.get('/attendance/scan', requirePermission('attendance_scan'), async (req, re
   if (!req.session.activeSessionId) {
     return res.send('⚠️ لازم تبدأ حصة الأول من <a href="/sessions/new">هنا</a>');
   }
-  const activeSession = await Session.findOne({
-    where: { id: req.session.activeSessionId },
-    include: [Center, Subject],
-  });
-  const recentSessions = await Session.findAll({
-    include: [Center, Subject],
-    order: [['createdAt', 'DESC']],
-    limit: 30,
-  });
-  const allSubjects = await Subject.findAll();
-  const allCenters = await Center.findAll();
+  const [activeSession, recentSessions, allSubjects, allCenters] = await Promise.all([
+    Session.findOne({
+      where: { id: req.session.activeSessionId },
+      include: [Center, Subject],
+    }),
+    Session.findAll({
+      include: [Center, Subject],
+      order: [['createdAt', 'DESC']],
+      limit: 30,
+    }),
+    Subject.findAll(),
+    Center.findAll(),
+  ]);
   res.render('scan-attendance', {
     activeSession,
     recentSessions,
@@ -3025,11 +3119,12 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     const { student_code } = req.body;
     const sessionId = req.session.activeSessionId;
 
-    const student = await Student.findOne({ where: { student_code }, include: [Center, Subject] });
+    const [student, activeSession] = await Promise.all([
+      Student.findOne({ where: { student_code }, include: [Center, Subject] }),
+      sessionId ? Session.findByPk(sessionId, { include: [Center] }) : null,
+    ]);
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
-    await syncStudentBookletStatus(student);
 
-    const activeSession = await Session.findByPk(sessionId, { include: [Center] });
     if (!activeSession) return res.json({ success: false, message: '⚠️ مفيش حصة شغالة' });
     if (activeSession.status === 'cancelled') {
       return res.json({ success: false, message: '⚠️ هذه الحصة ملغية' });
@@ -3042,31 +3137,53 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       });
     }
 
-    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
+    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId }, attributes: ['id'] });
     if (existing) return res.json({ success: false, message: `${student.name} مسجل حضوره من قبل` });
 
-    const independentExamResults = await ExamResult.findAll({
-      where: { StudentId: student.id },
-      attributes: ['ExamId', 'score'],
-      include: [{
-        model: Exam,
-        where: { SessionId: null },
-        attributes: ['name', 'max_score', 'exam_date'],
-        required: true,
-      }],
-      order: [[Exam, 'exam_date', 'DESC']],
-    });
+    // كل البيانات دي مستقلة عن بعض، فبتتجاب في نفس الوقت
+    const [
+      independentExamResults,
+      ownSessions,
+      attendanceRecords,
+      followUpAssistant,
+      videos,
+      watchRecords,
+      booklets,
+    ] = await Promise.all([
+      ExamResult.findAll({
+        where: { StudentId: student.id },
+        attributes: ['ExamId', 'score'],
+        include: [{
+          model: Exam,
+          where: { SessionId: null },
+          attributes: ['name', 'max_score', 'exam_date'],
+          required: true,
+        }],
+        order: [[Exam, 'exam_date', 'DESC']],
+      }),
+      // الحصص اللي بتاعت مجموعة الطالب الأصلية
+      Session.findAll({
+        where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
+        attributes: ['id', 'lesson_number'],
+        order: [['lesson_number', 'ASC']],
+      }),
+      Attendance.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Session, include: [Center] }],
+      }),
+      getFollowUpAssistantForStudent(student.id),
+      Video.findAll({
+        where: { SubjectId: student.SubjectId },
+        include: [VideoPart],
+      }),
+      WatchProgress.findAll({ where: { StudentId: student.id }, attributes: ['VideoPartId', 'watched_seconds'] }),
+      Booklet.findAll({
+        where: { SubjectId: student.SubjectId, is_active: true },
+        order: [['order_index', 'ASC']],
+      }),
+      syncStudentBookletStatus(student),
+    ]);
 
-    // الحصص اللي بتاعت مجموعة الطالب الأصلية
-    const ownSessions = await Session.findAll({
-      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
-      order: [['lesson_number', 'ASC']],
-    });
-
-    const attendanceRecords = await Attendance.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session, include: [Center] }],
-    });
     const attByLesson = {};
     attendanceRecords.forEach(a => {
       if (a.Session.SubjectId === student.SubjectId) attByLesson[a.Session.lesson_number] = a.Session;
@@ -3078,16 +3195,9 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     Object.keys(attByLesson).forEach(n => lessonNumbersSet.add(parseInt(n)));
     const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
 
-    const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
-
-    const videos = await Video.findAll({
-      where: { SubjectId: student.SubjectId },
-      include: [Session, VideoPart],
-    });
     const videoBySessionId = {};
     videos.forEach(v => { videoBySessionId[v.SessionId] = v; });
 
-    const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
     const watchMap = {};
     watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
 
@@ -3114,22 +3224,14 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       };
     });
 
-    const booklets = await Booklet.findAll({
-      where: { SubjectId: student.SubjectId, is_active: true },
-      order: [['order_index', 'ASC']],
-    });
-    await syncStudentBookletStatus(student);
     if (student.booklet_status) {
       await ensureStudentBookletPlaceholder(student, booklets);
     }
 
-    const bookletStatuses = await Promise.all(booklets.map(async (booklet) => {
-      const studentBooklet = await StudentBooklet.findOne({
-        where: { StudentId: student.id, BookletId: booklet.id },
-      });
-      const reservation = await BookletReservation.findOne({
-        where: { StudentId: student.id, BookletId: booklet.id, status: { [Op.ne]: 'rejected' } },
-      });
+    const { studentBookletByBookletId, reservationByBookletId } = await loadStudentBookletRecords(student.id, booklets.map(b => b.id));
+    const bookletStatuses = booklets.map((booklet) => {
+      const studentBooklet = studentBookletByBookletId.get(booklet.id) || null;
+      const reservation = reservationByBookletId.get(booklet.id) || null;
 
       const paidAmount = studentBooklet ? studentBooklet.paid_amount : 0;
       const effectivePrice = getEffectiveBookletPrice(booklet, studentBooklet);
@@ -3147,7 +3249,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
         reservationMethod: reservation ? reservation.payment_method : null,
         isFullyPaid: remaining <= 0,
       };
-    }));
+    });
 
     const resolvedBookletStatus = student.booklet_status || bookletStatuses.some(b => b.studentBookletId !== null);
 
@@ -3509,15 +3611,17 @@ app.get('/homework/scan', requirePermission('homework_scan'), async (req, res) =
   if (!req.session.activeSessionId) {
     return res.send('⚠️ لازم تبدأ حصة الأول من <a href="/sessions/new">هنا</a>');
   }
-  const activeSession = await Session.findOne({
-    where: { id: req.session.activeSessionId },
-    include: [Center, Subject],
-  });
-  const recentSessions = await Session.findAll({
-    include: [Center, Subject],
-    order: [['createdAt', 'DESC']],
-    limit: 30,
-  });
+  const [activeSession, recentSessions] = await Promise.all([
+    Session.findOne({
+      where: { id: req.session.activeSessionId },
+      include: [Center, Subject],
+    }),
+    Session.findAll({
+      include: [Center, Subject],
+      order: [['createdAt', 'DESC']],
+      limit: 30,
+    }),
+  ]);
   res.render('scan-homework', {
     activeSession,
     recentSessions,
@@ -3533,16 +3637,17 @@ app.post('/homework/scan/summary', async (req, res) => {
     const student = await Student.findOne({ where: { student_code } });
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
 
-    const attendanceRecords = await Attendance.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session, include: [Center] }],
-      order: [[Session, 'lesson_number', 'ASC']],
-    });
-
-    const homeworkRecords = await HomeworkCheck.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session, include: [Center] }],
-    });
+    const [attendanceRecords, homeworkRecords] = await Promise.all([
+      Attendance.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Session, include: [Center] }],
+        order: [[Session, 'lesson_number', 'ASC']],
+      }),
+      HomeworkCheck.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Session, attributes: ['id', 'lesson_number', 'SubjectId'] }],
+      }),
+    ]);
     const homeworkMap = {};
     homeworkRecords.forEach(h => {
       if (h.Session && h.Session.SubjectId === student.SubjectId) {
@@ -3651,15 +3756,15 @@ app.post('/door/scan', async (req, res) => {
     const { student_code } = req.body;
     const sessionId = req.session.activeSessionId;
 
-    const student = await Student.findOne({ where: { student_code } });
+    const [student, currentSession] = await Promise.all([
+      Student.findOne({ where: { student_code }, attributes: ['id', 'name'] }),
+      sessionId ? Session.findByPk(sessionId, { attributes: ['lesson_number', 'CenterId', 'SubjectId'] }) : null,
+    ]);
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     }
 
-    const currentSession = await Session.findByPk(sessionId, {
-      attributes: ['lesson_number', 'CenterId', 'SubjectId'],
-    });
-    let attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
+    let attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId }, attributes: ['id'] });
     if (!attendance && currentSession) {
       const equivalentSessions = await Session.findAll({
         attributes: ['id'],
@@ -3752,6 +3857,7 @@ app.post('/users/:id/delete', requireAdmin, async (req, res) => {
 
     await FollowUpAssignment.destroy({ where: { AssistantId: targetUserId } });
     await User.destroy({ where: { id: targetUserId } });
+    invalidateUserContext(targetUserId);
 
     res.redirect('/users');
   } catch (error) {
@@ -3771,6 +3877,7 @@ app.post('/users/:id/permissions', requireAdmin, async (req, res) => {
   let selected = req.body.permissions || [];
   if (!Array.isArray(selected)) selected = [selected]; // لو اختار صلاحية واحدة بس
   await User.update({ permissions: JSON.stringify(selected) }, { where: { id: req.params.id } });
+  invalidateUserContext(req.params.id);
   res.redirect('/users');
 });
 
@@ -3940,12 +4047,24 @@ app.get('/follow-up', requirePermission('students_view'), async (req, res) => {
   }
 });
 
+// بيدور على الطالب بالكود + الرقم من غير ما يفرق معاه المسافات
+// (لو في رقم قديم لسه متسجل بمسافات قبل ما يتنضف)
+async function findStudentByCodeAndPhone(studentCode, phoneField, phone) {
+  if (!studentCode || !phone) return null;
+  const student = await Student.findOne({ where: { student_code: studentCode, [phoneField]: phone } });
+  if (student) return student;
+  const candidate = await Student.findOne({ where: { student_code: studentCode } });
+  if (candidate && Student.stripPhoneSpaces(String(candidate[phoneField] || '')) === phone) return candidate;
+  return null;
+}
+
 // دخول الطالب: برقم تليفونه + كود الطالب
 app.post('/api/portal/student-login', async (req, res) => {
   try {
-    const { phone, student_code } = req.body;
+    const phone = Student.stripPhoneSpaces(String(req.body.phone || ''));
+    const student_code = String(req.body.student_code || '').trim();
 
-    const student = await Student.findOne({ where: { phone, student_code } });
+    const student = await findStudentByCodeAndPhone(student_code, 'phone', phone);
     if (!student) {
       return res.status(401).json({ success: false, message: 'رقم التليفون أو الكود غير صحيح' });
     }
@@ -3969,9 +4088,10 @@ app.post('/api/portal/student-login', async (req, res) => {
 // دخول ولي الأمر: بكود الطالب + رقم ولي الأمر
 app.post('/api/portal/parent-login', async (req, res) => {
   try {
-    const { student_code, parent_phone } = req.body;
+    const parent_phone = Student.stripPhoneSpaces(String(req.body.parent_phone || ''));
+    const student_code = String(req.body.student_code || '').trim();
 
-    const student = await Student.findOne({ where: { student_code, parent_phone } });
+    const student = await findStudentByCodeAndPhone(student_code, 'parent_phone', parent_phone);
     if (!student) {
       return res.status(401).json({ success: false, message: 'كود الطالب أو رقم ولي الأمر غير صحيح' });
     }
@@ -4066,30 +4186,59 @@ async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
   const grants = await VideoAccessGrant.findAll({ where });
   const staleGrantIds = [];
 
-  for (const grant of grants) {
-    if (grant.method !== 'attended') continue;
+  // نفس المنطق القديم بالظبط، بس بنجيب الحصص والحضور مرة واحدة لكل الـ grants بدل 3 queries لكل grant
+  const attendedGrants = grants.filter(grant => grant.method === 'attended');
+  attendedGrants.filter(grant => !grant.SessionId).forEach(grant => staleGrantIds.push(grant.id));
+  const grantsToCheck = attendedGrants.filter(grant => grant.SessionId);
 
-    if (!grant.SessionId) {
-      staleGrantIds.push(grant.id);
-      continue;
-    }
-
-    const grantSession = await Session.findByPk(grant.SessionId, {
+  if (grantsToCheck.length > 0) {
+    const grantSessionIds = [...new Set(grantsToCheck.map(grant => grant.SessionId))];
+    const grantSessions = await Session.findAll({
+      where: { id: grantSessionIds },
       attributes: ['id', 'SubjectId', 'lesson_number'],
     });
-    const equivalentSessionIds = grantSession
-      ? (await Session.findAll({
-          where: { SubjectId: grantSession.SubjectId, lesson_number: grantSession.lesson_number },
-          attributes: ['id'],
-        })).map(session => session.id)
-      : [grant.SessionId];
-    const hasValidAttendance = await Attendance.findOne({
-      where: { StudentId: studentId, SessionId: equivalentSessionIds },
+    const grantSessionById = new Map(grantSessions.map(session => [session.id, session]));
+
+    const lessonKey = (subjectId, lessonNumber) => `${subjectId}|${lessonNumber}`;
+    const lessonPairs = new Map();
+    grantSessions.forEach(session => {
+      lessonPairs.set(lessonKey(session.SubjectId, session.lesson_number), {
+        SubjectId: session.SubjectId,
+        lesson_number: session.lesson_number,
+      });
+    });
+    const equivalentSessions = lessonPairs.size > 0
+      ? await Session.findAll({
+          where: { [Op.or]: [...lessonPairs.values()] },
+          attributes: ['id', 'SubjectId', 'lesson_number'],
+        })
+      : [];
+    const equivalentIdsByLesson = new Map();
+    equivalentSessions.forEach(session => {
+      const key = lessonKey(session.SubjectId, session.lesson_number);
+      if (!equivalentIdsByLesson.has(key)) equivalentIdsByLesson.set(key, []);
+      equivalentIdsByLesson.get(key).push(session.id);
     });
 
-    if (!hasValidAttendance) {
-      staleGrantIds.push(grant.id);
-    }
+    const equivalentIdsForGrant = (grant) => {
+      const grantSession = grantSessionById.get(grant.SessionId);
+      return grantSession
+        ? (equivalentIdsByLesson.get(lessonKey(grantSession.SubjectId, grantSession.lesson_number)) || [])
+        : [grant.SessionId];
+    };
+
+    const allCandidateSessionIds = [...new Set(grantsToCheck.flatMap(equivalentIdsForGrant))];
+    const attendedSessionIds = new Set(allCandidateSessionIds.length > 0
+      ? (await Attendance.findAll({
+          where: { StudentId: studentId, SessionId: allCandidateSessionIds },
+          attributes: ['SessionId'],
+        })).map(attendance => attendance.SessionId)
+      : []);
+
+    grantsToCheck.forEach(grant => {
+      const hasValidAttendance = equivalentIdsForGrant(grant).some(sessionId => attendedSessionIds.has(sessionId));
+      if (!hasValidAttendance) staleGrantIds.push(grant.id);
+    });
   }
 
   if (staleGrantIds.length > 0) {
@@ -4160,18 +4309,62 @@ async function buildStudentData(studentId) {
   });
   if (!student) return null;
 
-  const ownSessions = await Session.findAll({
-    where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
-    include: [Center, Subject],
-    order: [['lesson_number', 'ASC']],
-  });
+  // كل الاستعلامات دي مستقلة عن بعض، فبنشغلها مع بعض بدل ما كل واحدة تستنى اللي قبلها
+  const [
+    ownSessions,
+    attendanceRecords,
+    homeworkRecords,
+    examResults,
+    sessionComments,
+    transactions,
+    videos,
+    watchRecords,
+    warnings,
+    followUpAssistant,
+    shamelExams,
+  ] = await Promise.all([
+    Session.findAll({
+      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
+      include: [Center, Subject],
+      order: [['lesson_number', 'ASC']],
+    }),
+    Attendance.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Session, include: [Center] }, User],
+    }),
+    HomeworkCheck.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Session, include: [Center] }, User],
+    }),
+    ExamResult.findAll({
+      where: { StudentId: student.id },
+      include: [{ model: Exam, include: [Session] }, User],
+    }),
+    SessionComment.findAll({
+      where: { StudentId: student.id },
+      include: [Session],
+    }),
+    BalanceTransaction.findAll({
+      where: { StudentId: student.id },
+      order: [['createdAt', 'DESC']],
+      limit: 30,
+    }),
+    Video.findAll({
+      where: { SubjectId: student.SubjectId },
+      include: [VideoPart],
+      order: [['createdAt', 'ASC']],
+    }),
+    WatchProgress.findAll({ where: { StudentId: student.id } }),
+    Warning.findAll({
+      where: { StudentId: student.id },
+      order: [['createdAt', 'ASC']],
+    }),
+    getFollowUpAssistantForStudent(student.id),
+    getShamelExams(student.id),
+  ]);
 
   const ownSessionIds = new Set(ownSessions.map(s => s.id));
 
-  const attendanceRecords = await Attendance.findAll({
-    where: { StudentId: student.id },
-    include: [{ model: Session, include: [Center] }, User],
-  });
   const attendanceByLesson = {};
   attendanceRecords.forEach(a => {
     if (a.Session && a.Session.SubjectId === student.SubjectId) {
@@ -4180,10 +4373,6 @@ async function buildStudentData(studentId) {
     }
   });
 
-  const homeworkRecords = await HomeworkCheck.findAll({
-    where: { StudentId: student.id },
-    include: [{ model: Session, include: [Center] }, User],
-  });
   const homeworkByLesson = {};
   homeworkRecords.forEach(h => {
     if (h.Session && h.Session.SubjectId === student.SubjectId) {
@@ -4192,10 +4381,6 @@ async function buildStudentData(studentId) {
     }
   });
 
-  const examResults = await ExamResult.findAll({
-    where: { StudentId: student.id },
-    include: [{ model: Exam, include: [Session] }, User],
-  });
   const examByLesson = {};
   examResults.forEach(r => {
     if (r.Exam.Session) {
@@ -4204,10 +4389,6 @@ async function buildStudentData(studentId) {
     }
   });
 
-  const sessionComments = await SessionComment.findAll({
-    where: { StudentId: student.id },
-    include: [Session],
-  });
   const commentBySessionId = {};
   sessionComments.forEach(c => {
     const sessionId = c.SessionId || (c.Session && c.Session.id);
@@ -4221,11 +4402,6 @@ async function buildStudentData(studentId) {
 
   const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
 
-  const transactions = await BalanceTransaction.findAll({
-    where: { StudentId: student.id },
-    order: [['createdAt', 'DESC']],
-    limit: 30,
-  });
   const pointsHistory = transactions
     .filter(t => t.reason && t.reason.startsWith('نقاط:'))
     .slice(0, 20)
@@ -4317,12 +4493,6 @@ async function buildStudentData(studentId) {
     };
   });
 
-  const videos = await Video.findAll({
-    where: { SubjectId: student.SubjectId },
-    include: [VideoPart],
-    order: [['createdAt', 'ASC']],
-  });
-  const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
   const watchMap = {};
   watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
 
@@ -4337,10 +4507,6 @@ async function buildStudentData(studentId) {
     })),
   }));
 
-  const warnings = await Warning.findAll({
-    where: { StudentId: student.id },
-    order: [['createdAt', 'ASC']],
-  });
 
   return {
     student: {
@@ -4354,12 +4520,12 @@ async function buildStudentData(studentId) {
       isBlocked: student.is_blocked,
       points: student.points,
       warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
-      followUpAssistant: await getFollowUpAssistantForStudent(student.id),
+      followUpAssistant,
     },
     sessions,
     videos: videosData,
     warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
-    shamelExams: await getShamelExams(student.id),
+    shamelExams,
     transactions: transactions.map(t => ({
       amount: t.amount,
       reason: t.reason,
@@ -4377,10 +4543,14 @@ async function buildStudentProfileSummary(studentId) {
   });
   if (!student) return null;
 
-  const warnings = await Warning.findAll({
-    where: { StudentId: student.id },
-    order: [['createdAt', 'ASC']],
-  });
+  const [warnings, followUpAssistant, shamelExams] = await Promise.all([
+    Warning.findAll({
+      where: { StudentId: student.id },
+      order: [['createdAt', 'ASC']],
+    }),
+    getFollowUpAssistantForStudent(student.id),
+    getShamelExams(student.id),
+  ]);
 
   return {
     student: {
@@ -4394,9 +4564,9 @@ async function buildStudentProfileSummary(studentId) {
       isBlocked: student.is_blocked,
       points: student.points,
       warnings: warnings.map(w => ({ reason: w.reason, time: w.createdAt })),
-      followUpAssistant: await getFollowUpAssistantForStudent(student.id),
+      followUpAssistant,
     },
-    shamelExams: await getShamelExams(student.id),
+    shamelExams,
   };
 }
 
@@ -4914,44 +5084,75 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     // 1) فيديوهات مرتبطة بحصة من مجموعته (عبر VideoSession)
     // 2) فيديوهات له وصول فردي فيها
 
-    // حصص مجموعة الطالب
-    const studentSessions = allVideoAccess ? [] : await Session.findAll({
-      where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
-    });
+    // حصص مجموعة الطالب + كل البيانات اللي مش معتمدة على بعض بتتجاب مع بعض في نفس الوقت
+    const [
+      studentSessions,
+      individualAccesses,
+      attendanceRecords,
+      subjectSessionsWithExamLinks,
+      homeworkAssignments,
+      homeworkParts,
+      subjects,
+    ] = await Promise.all([
+      allVideoAccess ? [] : Session.findAll({
+        where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
+      }),
+      // الفيديوهات التي له وصول فردي
+      VideoStudentAccess.findAll({
+        where: { StudentId: student.id },
+        attributes: ['VideoId'],
+      }),
+      Attendance.findAll({
+        where: { StudentId: student.id },
+        attributes: ['SessionId'],
+      }),
+      Session.findAll({
+        where: { SubjectId: student.SubjectId },
+        attributes: ['lesson_number', 'exam_url', 'exam_video_url'],
+      }),
+      HomeworkAssignment.findAll({
+        where: { SubjectId: student.SubjectId },
+        include: [
+          { model: Session, required: false, attributes: ['id', 'lesson_number', 'week_number', 'CenterId'] },
+          { model: Session, as: 'LinkedSessions', required: false, attributes: ['id', 'lesson_number', 'week_number', 'CenterId'] },
+        ],
+        order: [['order_number', 'ASC']],
+      }),
+      // Fetch homework solution videos (VideoParts with category='homework_solution')
+      VideoPart.findAll({
+        where: { category: 'homework_solution' },
+        order: [['order_index', 'ASC']],
+      }),
+      Subject.findAll({ attributes: ['id', 'name'] }),
+    ]);
     const studentLessonNumbers = [...new Set(studentSessions.map(s => s.lesson_number))];
-    const sameLessonSessions = studentLessonNumbers.length > 0
-      ? await Session.findAll({
-          where: { SubjectId: student.SubjectId, CenterId: student.CenterId, lesson_number: studentLessonNumbers },
-          attributes: ['id', 'lesson_number', 'SubjectId', 'exam_url', 'exam_video_url', 'access_duration_hours'],
-        })
-      : [];
-    const equivalentLessonSessions = studentLessonNumbers.length > 0
-      ? await Session.findAll({
-          where: { SubjectId: student.SubjectId, lesson_number: studentLessonNumbers },
-          attributes: ['id', 'lesson_number', 'SubjectId', 'access_duration_hours'],
-        })
-      : [];
-    const lessonSessionIds = sameLessonSessions.map(s => s.id);
+    // نفس نتيجة استعلام "حصص المجموعة اللي رقمها ضمن أرقام حصص المجموعة" (الحصص اللي رقمها null مش بتدخل)
+    const lessonSessionIds = studentSessions
+      .filter(s => s.lesson_number !== null && s.lesson_number !== undefined)
+      .map(s => s.id);
 
     // الفيديوهات المرتبطة بحصص مجموعته
-    const groupVideoSessions = await VideoSession.findAll({
-      where: { SessionId: lessonSessionIds },
-      attributes: ['VideoId'],
-    });
-    const directlyLinkedVideos = lessonSessionIds.length > 0 ? await Video.findAll({
-      where: { SessionId: lessonSessionIds },
-      attributes: ['id'],
-    }) : [];
+    const [equivalentLessonSessions, groupVideoSessions, directlyLinkedVideos] = await Promise.all([
+      studentLessonNumbers.length > 0
+        ? Session.findAll({
+            where: { SubjectId: student.SubjectId, lesson_number: studentLessonNumbers },
+            attributes: ['id', 'lesson_number', 'SubjectId', 'access_duration_hours'],
+          })
+        : [],
+      VideoSession.findAll({
+        where: { SessionId: lessonSessionIds },
+        attributes: ['VideoId'],
+      }),
+      lessonSessionIds.length > 0 ? Video.findAll({
+        where: { SessionId: lessonSessionIds },
+        attributes: ['id'],
+      }) : [],
+    ]);
     const groupVideoIds = [...new Set([
       ...groupVideoSessions.map(vs => vs.VideoId),
       ...directlyLinkedVideos.map(video => video.id),
     ])];
 
-    // الفيديوهات التي له وصول فردي
-    const individualAccesses = await VideoStudentAccess.findAll({
-      where: { StudentId: student.id },
-      attributes: ['VideoId'],
-    });
     const individualVideoIds = individualAccesses.map(a => a.VideoId);
 
     // دمج الاتنين بدون تكرار
@@ -4961,26 +5162,24 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
 
     if (!allVideoAccess && allAccessibleVideoIds.length === 0) return res.json({ success: true, lessons: [] });
 
-    const videos = await Video.findAll({
-      ...(allVideoAccess ? {} : { where: { id: allAccessibleVideoIds } }),
-      include: [
-        { model: Session, required: false, include: [Center] },
-        {
-          model: VideoSession,
-          required: false,
-          include: [{ model: Session, attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'] }],
-        },
-      ],
-      order: [['createdAt', 'DESC']],
-    });
-
-    const videoIdsWithQuestions = videos.length > 0
-      ? await VideoPart.findAll({
-          where: { VideoId: videos.map(video => video.id), category: 'questions' },
-          attributes: ['VideoId'],
-        })
-      : [];
-    const questionsVideoIdSet = new Set(videoIdsWithQuestions.map(part => part.VideoId));
+    const [videos, grants] = await Promise.all([
+      Video.findAll({
+        ...(allVideoAccess ? {} : { where: { id: allAccessibleVideoIds } }),
+        include: [
+          { model: Session, required: false, include: [Center] },
+          {
+            model: VideoSession,
+            required: false,
+            include: [{ model: Session, attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'] }],
+          },
+        ],
+        order: [['createdAt', 'DESC']],
+      }),
+      (async () => {
+        await cleanupStaleVideoAccessGrants(student.id);
+        return VideoAccessGrant.findAll({ where: { StudentId: student.id } });
+      })(),
+    ]);
 
     const linkedSessionIdsByVideoId = new Map();
     const allLinkedSessionIds = new Set();
@@ -4992,18 +5191,23 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       linkedSessionIdsByVideoId.set(video.id, [...new Set(sessionIds)]);
       sessionIds.forEach(sessionId => allLinkedSessionIds.add(sessionId));
     });
-    const linkedSessionsForVideos = allLinkedSessionIds.size > 0
-      ? await Session.findAll({
-          where: { id: [...allLinkedSessionIds] },
-          attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'],
-        })
-      : [];
+    const [videoIdsWithQuestions, linkedSessionsForVideos] = await Promise.all([
+      videos.length > 0
+        ? VideoPart.findAll({
+            where: { VideoId: videos.map(video => video.id), category: 'questions' },
+            attributes: ['VideoId'],
+          })
+        : [],
+      allLinkedSessionIds.size > 0
+        ? Session.findAll({
+            where: { id: [...allLinkedSessionIds] },
+            attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'],
+          })
+        : [],
+    ]);
+    const questionsVideoIdSet = new Set(videoIdsWithQuestions.map(part => part.VideoId));
     const linkedSessionById = new Map(linkedSessionsForVideos.map(session => [session.id, session]));
 
-    const attendanceRecords = await Attendance.findAll({
-      where: { StudentId: student.id },
-      attributes: ['SessionId'],
-    });
     const attendedSessionIds = new Set(attendanceRecords.map(a => a.SessionId).filter(Boolean));
     const sessionIdsByLesson = new Map();
     equivalentLessonSessions.forEach(s => {
@@ -5013,10 +5217,6 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     const attendedLessonNumbers = new Set(
       equivalentLessonSessions.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number)
     );
-    const subjectSessionsWithExamLinks = await Session.findAll({
-      where: { SubjectId: student.SubjectId },
-      attributes: ['lesson_number', 'exam_url', 'exam_video_url'],
-    });
     const examLinksByLesson = new Map();
     subjectSessionsWithExamLinks.forEach(s => {
       const existing = examLinksByLesson.get(s.lesson_number) || {};
@@ -5026,9 +5226,6 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       });
     });
 
-    await cleanupStaleVideoAccessGrants(student.id);
-
-    const grants = await VideoAccessGrant.findAll({ where: { StudentId: student.id } });
     const cleanedGrants = [];
 
     for (const grant of grants) {
@@ -5048,15 +5245,6 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
 
     const grantBySessionId = {};
     cleanedGrants.forEach(g => { if (g.SessionId) grantBySessionId[g.SessionId] = g; });
-
-    const homeworkAssignments = await HomeworkAssignment.findAll({
-      where: { SubjectId: student.SubjectId },
-      include: [
-        { model: Session, required: false, attributes: ['id', 'lesson_number', 'week_number', 'CenterId'] },
-        { model: Session, as: 'LinkedSessions', required: false, attributes: ['id', 'lesson_number', 'week_number', 'CenterId'] },
-      ],
-      order: [['order_number', 'ASC']],
-    });
 
     const homeworkBySessionId = new Map();
     for (const assignment of homeworkAssignments) {
@@ -5079,31 +5267,23 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       }
     }
 
-    // Fetch homework solution videos (VideoParts with category='homework_solution')
-    const VideoPartModel = require('./models/VideoPart');
-    
-    const homeworkParts = await VideoPartModel.findAll({
-      where: { category: 'homework_solution' },
-      order: [['order_index', 'ASC']],
-    });
-
     // Build map of VideoId -> homework URL
     const homeworkByVideoId = new Map();
     let globalHomeworkUrl = null; // fallback: first homework URL found
-    
+
     homeworkParts.forEach((part, index) => {
       // Use the first homework URL as global fallback
       if (index === 0 && part.video_url) {
         globalHomeworkUrl = part.video_url;
       }
-      
+
       // If this part has a VideoId, map it
       if (part.VideoId && !homeworkByVideoId.has(part.VideoId)) {
         homeworkByVideoId.set(part.VideoId, part.video_url || null);
       }
     });
 
-    const subjectNameById = new Map((await Subject.findAll({ attributes: ['id', 'name'] })).map(s => [s.id, s.name]));
+    const subjectNameById = new Map(subjects.map(s => [s.id, s.name]));
 
     const lessons = videos.map(v => {
       const linkedVideoSessions = (linkedSessionIdsByVideoId.get(v.id) || [])
@@ -5434,8 +5614,10 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
         attributes: ['id'],
       });
       const equivalentSessionIds = equivalentSessions.map(equivalentSession => equivalentSession.id);
-      const grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
-      const attendanceExists = await Attendance.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
+      const [grant, attendanceExists] = await Promise.all([
+        VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } }),
+        Attendance.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds }, attributes: ['id'] }),
+      ]);
       const isValidGrant = !!(grant && (
         grant.method === 'paid' ||
         grant.method === 'admin_free' ||
@@ -5448,7 +5630,13 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
     }
 
     const parts = await VideoPart.findAll({ where: { VideoId: video.id }, order: [['order_index', 'ASC']] });
-    const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
+    // تقدم المشاهدة لأجزاء الفيديو ده بس (بدل كل سجلات الطالب)
+    const watchRecords = parts.length > 0
+      ? await WatchProgress.findAll({
+          where: { StudentId: student.id, VideoPartId: parts.map(p => p.id) },
+          attributes: ['VideoPartId', 'watched_seconds'],
+        })
+      : [];
     const watchMap = {};
     watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
 
@@ -7389,19 +7577,40 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
       visibleAssignments.push(a);
     }
 
-    const result = await Promise.all(visibleAssignments.map(async a => {
-      const submission = await HomeworkSubmission.findOne({
-        where: { HomeworkAssignmentId: a.id, StudentId: student.id },
-      });
+    // بنجيب تسليمات الطالب وحالات الواجب في السنتر مرة واحدة لكل الواجبات بدل استعلامين لكل واجب
+    const sessionIdsForAssignment = (a) => [
+      ...(a.SessionId ? [a.SessionId] : []),
+      ...(a.LinkedSessions || []).map(s => s.id),
+    ].filter(Boolean);
+    const allAssignmentSessionIds = [...new Set(visibleAssignments.flatMap(sessionIdsForAssignment))];
+    const [studentSubmissions, studentHomeworkChecks] = await Promise.all([
+      visibleAssignments.length > 0
+        ? HomeworkSubmission.findAll({
+            where: { HomeworkAssignmentId: visibleAssignments.map(a => a.id), StudentId: student.id },
+            order: [['id', 'ASC']],
+          })
+        : [],
+      allAssignmentSessionIds.length > 0
+        ? HomeworkCheck.findAll({
+            where: { StudentId: student.id, SessionId: allAssignmentSessionIds },
+            attributes: ['id', 'SessionId', 'status'],
+            order: [['id', 'ASC']],
+          })
+        : [],
+    ]);
+    const submissionByAssignmentId = new Map();
+    studentSubmissions.forEach(sub => {
+      if (!submissionByAssignmentId.has(sub.HomeworkAssignmentId)) submissionByAssignmentId.set(sub.HomeworkAssignmentId, sub);
+    });
+
+    const result = visibleAssignments.map(a => {
+      const submission = submissionByAssignmentId.get(a.id) || null;
 
       // حالة في السنتر
       let centerStatus = null;
-      const assignmentSessionIds = [
-        ...(a.SessionId ? [a.SessionId] : []),
-        ...(a.LinkedSessions || []).map(s => s.id),
-      ].filter(Boolean);
-      if (assignmentSessionIds.length) {
-        const hw = await HomeworkCheck.findOne({ where: { StudentId: student.id, SessionId: assignmentSessionIds } });
+      const assignmentSessionIds = new Set(sessionIdsForAssignment(a));
+      if (assignmentSessionIds.size) {
+        const hw = studentHomeworkChecks.find(check => assignmentSessionIds.has(check.SessionId));
         centerStatus = hw ? hw.status : null;
       }
 
@@ -7419,7 +7628,7 @@ app.get('/api/portal/homework', verifyPortalToken('student'), async (req, res) =
         submissionType: a.submission_type || 'upload',
         externalLink: a.submission_type === 'link' ? a.external_link : null,
       };
-    }));
+    });
 
     res.json({ success: true, assignments: result });
   } catch (e) {
@@ -8161,11 +8370,10 @@ app.get('/api/portal/booklets', verifyPortalToken('student'), async (req, res) =
       order: [['order_index', 'ASC']],
     });
 
-    const result = await Promise.all(booklets.map(async b => {
-      const sb = await StudentBooklet.findOne({ where: { StudentId: student.id, BookletId: b.id } });
-      const reservation = await BookletReservation.findOne({
-        where: { StudentId: student.id, BookletId: b.id, status: { [Op.ne]: 'rejected' } },
-      });
+    const { studentBookletByBookletId, reservationByBookletId } = await loadStudentBookletRecords(student.id, booklets.map(b => b.id));
+    const result = booklets.map(b => {
+      const sb = studentBookletByBookletId.get(b.id) || null;
+      const reservation = reservationByBookletId.get(b.id) || null;
       const effectivePrice = getEffectiveBookletPrice(b, sb);
       return {
         id: b.id, name: b.name, sellPrice: effectivePrice,
@@ -8174,7 +8382,7 @@ app.get('/api/portal/booklets', verifyPortalToken('student'), async (req, res) =
         isDelivered: sb ? sb.is_delivered : false,
         reservation: reservation ? { status: reservation.status, method: reservation.payment_method, isDelivered: reservation.is_delivered } : null,
       };
-    }));
+    });
 
     res.json({ success: true, booklets: result });
   } catch (e) { console.error(e); res.status(500).json({ success: false }); }
@@ -8613,13 +8821,35 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
     const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
 
-    // load centers & subjects for filters
-    const centersList = await Center.findAll({ order: [['name', 'ASC']] });
-    const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
+    // load centers & subjects for filters + sessions في نفس الوقت
+    const [centersList, subjectsList, sessions] = await Promise.all([
+      Center.findAll({ order: [['name', 'ASC']] }),
+      Subject.findAll({ order: [['name', 'ASC']] }),
+      Session.findAll({
+        order: [['lesson_number', 'DESC']],
+        include: [Center, Subject],
+      }),
+    ]);
 
-    // Decide which students to show: either all (with optional center/subject filters) or only assigned
+    // لو مفيش session مختار، اختار أحدث حصة
+    const selectedSession = session_id
+      ? sessions.find(s => String(s.id) === String(session_id))
+      : sessions[0];
+
     let students = [];
-    if (show_all) {
+    if (selectedSession) {
+      // A selected session defines the student scope. Do not classify students from
+      // other centers or subjects as absent, even when show_all is enabled.
+      students = await Student.findAll({
+        where: {
+          CenterId: selectedSession.CenterId,
+          SubjectId: selectedSession.SubjectId,
+        },
+        include: [Center, Subject],
+        order: [['name', 'ASC']],
+      });
+    } else if (show_all) {
+      // Decide which students to show: either all (with optional center/subject filters) or only assigned
       const where = {};
       if (center_id) where.CenterId = center_id;
       if (subject_id) where.SubjectId = subject_id;
@@ -8637,29 +8867,6 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       // apply optional center/subject filters on assigned list
       if (center_id) students = students.filter(s => String(s.CenterId) === String(center_id));
       if (subject_id) students = students.filter(s => String(s.SubjectId) === String(subject_id));
-    }
-
-    const sessions = await Session.findAll({
-      order: [['lesson_number', 'DESC']],
-      include: [Center, Subject],
-    });
-
-    // لو مفيش session مختار، اختار أحدث حصة
-    const selectedSession = session_id 
-      ? sessions.find(s => String(s.id) === String(session_id))
-      : sessions[0];
-
-    // A selected session defines the student scope. Do not classify students from
-    // other centers or subjects as absent, even when show_all is enabled.
-    if (selectedSession) {
-      students = await Student.findAll({
-        where: {
-          CenterId: selectedSession.CenterId,
-          SubjectId: selectedSession.SubjectId,
-        },
-        include: [Center, Subject],
-        order: [['name', 'ASC']],
-      });
     }
 
     // If there are no assigned students at all, render empty state immediately
@@ -8696,29 +8903,34 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     }
 
     // بيانات كل طالب في الحصة المختارة
-    const watchRecords = await WatchProgress.findAll({
-      where: { StudentId: students.map(s => s.id) },
-      include: [VideoPart],
-    });
-    const watchMap = {};
-    watchRecords.forEach(w => { watchMap[`${w.StudentId}_${w.VideoPartId}`] = w.watched_seconds; });
-
     const studentIds = students.map(s => s.id);
     const equivalentAttendanceSessions = await Session.findAll({
       where: {
         SubjectId: selectedSession.SubjectId,
         lesson_number: selectedSession.lesson_number,
       },
-      include: [Center],
       attributes: ['id'],
     });
     const equivalentAttendanceSessionIds = equivalentAttendanceSessions.map(session => session.id);
-    const video = await Video.findOne({
-      where: { SessionId: equivalentAttendanceSessionIds },
-      include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
-    });
 
-    const [attendanceRecords, hwRecords, examResults, sessionComments, missingExamFilter] = await Promise.all([
+    const [{ video, watchMap }, attendanceRecords, hwRecords, examResults, sessionComments, missingExamFilter] = await Promise.all([
+      (async () => {
+        const lessonVideo = await Video.findOne({
+          where: { SessionId: equivalentAttendanceSessionIds },
+          include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
+        });
+        // سجلات المشاهدة لأجزاء فيديو الحصة دي بس (بدل كل سجلات مشاهدة الطلاب)
+        const partIds = lessonVideo && lessonVideo.VideoParts ? lessonVideo.VideoParts.map(part => part.id) : [];
+        const lessonWatchMap = {};
+        if (partIds.length > 0) {
+          const watchRecords = await WatchProgress.findAll({
+            where: { StudentId: studentIds, VideoPartId: partIds },
+            attributes: ['StudentId', 'VideoPartId', 'watched_seconds'],
+          });
+          watchRecords.forEach(w => { lessonWatchMap[`${w.StudentId}_${w.VideoPartId}`] = w.watched_seconds; });
+        }
+        return { video: lessonVideo, watchMap: lessonWatchMap };
+      })(),
       Attendance.findAll({
         where: { StudentId: studentIds, SessionId: equivalentAttendanceSessionIds },
         include: [User, { model: Session, include: [Center] }],
@@ -8871,23 +9083,52 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
     const student = await Student.findByPk(req.params.id, { include: [Center, Subject] });
     if (!student) return res.status(404).send('❌');
 
-    const followUpAssistant = await getFollowUpAssistantForStudent(student.id);
-    const assignment = await FollowUpAssignment.findOne({
-      where: { StudentId: student.id },
-      include: [{ model: User, as: 'Assistant', attributes: ['id', 'name', 'username', 'phone'] }],
-    });
-
-    const ownSessions = await Session.findAll({
-      where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
-      include: [Center],
-      order: [['lesson_number', 'ASC']],
-    });
+    // كل البيانات مستقلة عن بعض، فبتتجاب في نفس الوقت
+    const [
+      followUpAssistant,
+      assignment,
+      ownSessions,
+      attendances,
+      hwChecks,
+      examResults,
+      sessionComments,
+      watchRecords,
+      videos,
+    ] = await Promise.all([
+      getFollowUpAssistantForStudent(student.id),
+      FollowUpAssignment.findOne({
+        where: { StudentId: student.id },
+        include: [{ model: User, as: 'Assistant', attributes: ['id', 'name', 'username', 'phone'] }],
+      }),
+      Session.findAll({
+        where: { CenterId: student.CenterId, SubjectId: student.SubjectId },
+        include: [Center],
+        order: [['lesson_number', 'ASC']],
+      }),
+      Attendance.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Session, include: [Center] }, User],
+      }),
+      HomeworkCheck.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Session }],
+      }),
+      ExamResult.findAll({
+        where: { StudentId: student.id },
+        include: [{ model: Exam, include: [Session] }],
+      }),
+      SessionComment.findAll({
+        where: { StudentId: student.id },
+        include: [Session, User],
+      }),
+      WatchProgress.findAll({ where: { StudentId: student.id }, attributes: ['VideoPartId', 'watched_seconds'] }),
+      Video.findAll({
+        where: { SubjectId: student.SubjectId },
+        include: [{ model: VideoPart }, Session],
+      }),
+    ]);
     const ownSessionIds = new Set(ownSessions.map(s => s.id));
 
-    const attendances = await Attendance.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session, include: [Center] }, User],
-    });
     const attMap = {};
     attendances.forEach(a => {
       if (a.Session && a.Session.SubjectId === student.SubjectId) {
@@ -8896,10 +9137,6 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       }
     });
 
-    const hwChecks = await HomeworkCheck.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Session }],
-    });
     const hwMap = {};
     hwChecks.forEach(h => {
       if (h.Session && h.Session.SubjectId === student.SubjectId) {
@@ -8907,31 +9144,18 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       }
     });
 
-    const examResults = await ExamResult.findAll({
-      where: { StudentId: student.id },
-      include: [{ model: Exam, include: [Session] }],
-    });
     const examMap = {};
     examResults.forEach(r => { if (r.Exam?.Session) examMap[r.Exam.Session.lesson_number] = r; });
 
-    const sessionComments = await SessionComment.findAll({
-      where: { StudentId: student.id },
-      include: [Session, User],
-    });
     const commentMap = {};
     sessionComments.forEach(c => {
       const sessionId = c.SessionId || (c.Session && c.Session.id);
       if (sessionId) commentMap[String(sessionId)] = c;
     });
 
-    const watchRecords = await WatchProgress.findAll({ where: { StudentId: student.id } });
     const watchMap = {};
     watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
 
-    const videos = await Video.findAll({
-      where: { SubjectId: student.SubjectId },
-      include: [{ model: VideoPart }, Session],
-    });
     const videoByLesson = {};
     videos.forEach(v => { if (v.Session) videoByLesson[v.Session.lesson_number] = v; });
 
@@ -9545,6 +9769,7 @@ app.post('/user/profile-photo', requireLogin, profilePhotoUpload.single('photo')
             { profile_photo_url: result.secure_url },
             { where: { id: req.session.userId } }
           );
+          invalidateUserContext(req.session.userId);
 
           res.json({ 
             success: true, 
@@ -9599,6 +9824,7 @@ async function startServer() {
     await ensureBookletReservationSchema(sequelize);
     await ensureLessonAccessSchema(sequelize);
     await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
+    normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
   } catch (error) {
@@ -9658,6 +9884,7 @@ async function startServer() {
           await ensureBookletReservationSchema(sequelize);
           await ensureLessonAccessSchema(sequelize);
           await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
+          normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));
           console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
           break;
         } catch (e) {

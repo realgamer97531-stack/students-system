@@ -330,15 +330,14 @@
                 </div>
               </div>
               ${b.studentBookletId && !b.isDelivered ? `
-                <div class="mt-2">
-                  <div class="form-check">
-                    <input class="form-check-input booklet-delivery-checkbox" type="checkbox"
-                      data-student-id="${data.student.id}" data-student-booklet-id="${b.studentBookletId}"
-                      id="booklet-deliver-${b.studentBookletId}">
-                    <label class="form-check-label small" for="booklet-deliver-${b.studentBookletId}">
-                      <span class="booklet-delivery-state text-warning"><span class="ar-only">تم تسليم البوكليت</span><span class="en-only" style="display:none;">Booklet Delivered</span></span>
-                    </label>
-                  </div>
+                <div class="mt-2 d-flex align-items-center gap-2">
+                  <span class="badge bg-warning text-dark booklet-delivery-state" style="font-size:0.65rem;">⚠️ <span class="ar-only">غير مستلم</span><span class="en-only" style="display:none;">Not received</span></span>
+                  ${canDeliverBooklets ? `
+                    <button type="button" class="btn btn-sm btn-success booklet-deliver-btn" style="font-size:0.7rem;padding:1px 8px;"
+                      data-student-id="${data.student.id}" data-student-booklet-id="${b.studentBookletId}">
+                      <span class="ar-only">تسليم</span><span class="en-only" style="display:none;">Deliver</span>
+                    </button>
+                  ` : ''}
                 </div>
               ` : ''}
               ${!isComplete ? `
@@ -373,31 +372,39 @@
       }
       return;
     }
+  });
 
-    if (!event.target.classList.contains('booklet-delivery-checkbox')) return;
-    const checkbox = event.target;
-    if (!checkbox.checked) return;
+  // زرار "تسليم" الخاص بكل بوكليت (نفس زرار بروفايل الطالب)
+  document.addEventListener('click', async function (event) {
+    const btn = event.target.closest('.booklet-deliver-btn');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
 
     try {
       const response = await fetch('/attendance/scan/booklet-deliver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: checkbox.dataset.studentId,
-          studentBookletId: checkbox.dataset.studentBookletId,
+          studentId: btn.dataset.studentId,
+          studentBookletId: btn.dataset.studentBookletId,
         }),
       });
       const data = await response.json();
       if (data.success) {
-        const state = checkbox.closest('.form-check').querySelector('.booklet-delivery-state');
+        const state = btn.parentElement.querySelector('.booklet-delivery-state');
         if (state) {
-          state.className = 'booklet-delivery-state text-success fw-bold';
-          state.textContent = 'تم التسليم';
+          state.className = 'badge bg-success booklet-delivery-state';
+          state.innerHTML = '✓ <span class="ar-only">تم التسليم</span><span class="en-only" style="display:none;">Delivered</span>';
         }
-        checkbox.disabled = true;
+        btn.remove();
+      } else {
+        btn.disabled = false;
+        alert(data.message || 'حصلت مشكلة');
       }
     } catch (err) {
       console.error(err);
+      btn.disabled = false;
+      alert('حصلت مشكلة في الاتصال');
     }
   });
 
