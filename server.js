@@ -1597,8 +1597,19 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
     bookletPaidTotals[row.StudentId] = Number(row.total_paid || 0);
   });
 
+  // تقسيم النتيجة على صفحات: عرض آلاف الصفوف مرة واحدة كان بيتقل المتصفح جدًا
+  const STUDENTS_PAGE_SIZE = 100;
+  const totalStudents = students.length;
+  const totalPages = Math.max(1, Math.ceil(totalStudents / STUDENTS_PAGE_SIZE));
+  const requestedPage = Number.parseInt(req.query.page, 10);
+  const currentPage = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), totalPages) : 1;
+  const pageStudents = students.slice((currentPage - 1) * STUDENTS_PAGE_SIZE, currentPage * STUDENTS_PAGE_SIZE);
+
   res.render('students-list', {
-    students,
+    students: pageStudents,
+    totalStudents,
+    currentPage,
+    totalPages,
     centers,
     subjects,
     bookletPaidTotals,
