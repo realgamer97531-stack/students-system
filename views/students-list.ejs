@@ -29,7 +29,8 @@
   .custom-adaptive-table tbody tr {
     background: var(--sf-card-bg) !important;
     border-bottom: 1px solid var(--sf-input-border) !important;
-    transition: background 0.2s;
+    /* بدون أنيميشن على الصفوف: كان بيعيد رسم الجدول وانت بتعمل سكرول */
+    transition: none !important;
   }
 
   .custom-adaptive-table tbody tr:hover {
@@ -98,7 +99,6 @@
     color: var(--sf-text) !important;
     font-weight: 600;
     text-decoration: none;
-    transition: color 0.2s ease;
   }
   
   .student-name:hover {
@@ -221,7 +221,7 @@
         <tr onclick="window.location.href='/students/<%= student.id %>'">
           <td style="padding: 8px !important;">
             <% if (student.profile_photo_url) { %>
-              <img src="<%= student.profile_photo_url %>" alt="<%= student.name %>" class="student-photo" loading="lazy">
+              <img src="<%= student.profile_photo_url %>" alt="<%= student.name %>" class="student-photo" loading="lazy" decoding="async" fetchpriority="low" width="40" height="40">
             <% } else { %>
               <div class="student-photo-placeholder">👤</div>
             <% } %>
