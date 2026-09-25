@@ -4785,9 +4785,26 @@ app.post('/api/internal/callcenter/session-comment', async (req, res) => {
     });
     if (!created && sessionComment.comment !== combinedComment) {
       const previousComment = String(sessionComment.comment || '').trim();
-      sessionComment.comment = previousComment
-        ? `${previousComment}\n${combinedComment}`
-        : combinedComment;
+      // When a caller edits an already-finished call, the call center sends the
+      // values it synced before; replace that earlier text in place instead of
+      // appending a second copy. Falls back to appending if it can't be found.
+      const { previous_disposition, previous_comment } = req.body || {};
+      const replacedText = (previous_disposition !== undefined || previous_comment !== undefined)
+        ? [
+          String(previous_disposition || '').trim() ? `Call outcome: ${String(previous_disposition).trim()}` : '',
+          String(previous_comment || '').trim(),
+        ].filter(Boolean).join(' | ')
+        : '';
+      const replaceAt = replacedText ? previousComment.lastIndexOf(replacedText) : -1;
+      if (replaceAt >= 0) {
+        sessionComment.comment = previousComment.slice(0, replaceAt)
+          + combinedComment
+          + previousComment.slice(replaceAt + replacedText.length);
+      } else {
+        sessionComment.comment = previousComment
+          ? `${previousComment}\n${combinedComment}`
+          : combinedComment;
+      }
       sessionComment.UserId = commentUser.id;
       await sessionComment.save();
     }

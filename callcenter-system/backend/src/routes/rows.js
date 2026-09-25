@@ -6,7 +6,10 @@ const router = express.Router();
 
 const VALID_DISPOSITIONS = ['no_answer', 'busy', 'wrong_number', 'follow_up', 'rejected', 'skipped', 'deal_done'];
 
-function syncCommentToStudentSystem(row, session, disposition, comment) {
+// `previous` (optional) is the disposition/comment this row was synced with
+// before — sent when a caller edits a finished row, so the student system can
+// replace that earlier text instead of appending a second copy.
+function syncCommentToStudentSystem(row, session, disposition, comment, previous = null) {
   const callbackUrl = process.env.CALLCENTER_COMMENT_CALLBACK_URL
     || 'https://students-system-production-6b89.up.railway.app/api/internal/callcenter/session-comment';
   const serviceToken = process.env.CALLCENTER_SERVICE_TOKEN;
@@ -46,6 +49,10 @@ function syncCommentToStudentSystem(row, session, disposition, comment) {
       subject,
       disposition,
       comment: comment && comment.trim() ? comment.trim() : '',
+      ...(previous ? {
+        previous_disposition: previous.disposition || '',
+        previous_comment: previous.comment || '',
+      } : {}),
     }),
     signal: controller.signal,
   }).then(async (response) => {
@@ -213,6 +220,91 @@ router.post('/rows/:id/disposition', requireAuth, async (req, res) => {
     }
 
     res.json({ ok: true, studentSystemSync, studentSystemSyncError });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Caller's own progress + the rows they finished in this session ---
+// Powers the "finished / remaining" counter, the Prev button and the
+// "My called students" list. Only ever returns the requesting caller's rows.
+
+router.get('/sessions/:id/mine', requireAuth, async (req, res) => {
+  try {
+    const [sessionRows] = await pool.query('SELECT id FROM sessions WHERE id = ?', [req.params.id]);
+    if (!sessionRows[0]) return res.status(404).json({ error: 'Session not found' });
+
+    const [[counts]] = await pool.query(
+      `SELECT COUNT(*) AS total,
+         SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done,
+         SUM(CASE WHEN status <> 'done' THEN 1 ELSE 0 END) AS remaining,
+         SUM(CASE WHEN status = 'done' AND assigned_to = ? THEN 1 ELSE 0 END) AS mine_done
+       FROM call_rows WHERE session_id = ?`,
+      [req.user.id, req.params.id]
+    );
+    const [rows] = await pool.query(
+      `SELECT * FROM call_rows
+       WHERE session_id = ? AND assigned_to = ? AND status = 'done'
+       ORDER BY completed_at ASC, id ASC`,
+      [req.params.id, req.user.id]
+    );
+    res.json({
+      progress: {
+        total: Number(counts.total) || 0,
+        done: Number(counts.done) || 0,
+        remaining: Number(counts.remaining) || 0,
+        mine_done: Number(counts.mine_done) || 0,
+      },
+      rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Caller edits the outcome/comment of a row they already finished ---
+
+router.post('/rows/:id/edit', requireAuth, async (req, res) => {
+  const { disposition, comment } = req.body;
+  if (!VALID_DISPOSITIONS.includes(disposition)) {
+    return res.status(400).json({ error: 'Invalid disposition value' });
+  }
+
+  try {
+    const [rowsRes] = await pool.query('SELECT * FROM call_rows WHERE id = ?', [req.params.id]);
+    const row = rowsRes[0];
+    if (!row) return res.status(404).json({ error: 'Row not found' });
+    if (row.status !== 'done' || row.assigned_to !== req.user.id) {
+      return res.status(403).json({ error: 'You can only edit calls that you finished yourself' });
+    }
+    const [sessionRows] = await pool.query('SELECT * FROM sessions WHERE id = ?', [row.session_id]);
+    const session = sessionRows[0];
+
+    const newComment = comment && comment.trim() ? comment.trim() : null;
+    // Only touch the text fields — completed_at stays the original call time.
+    await pool.query(
+      `UPDATE call_rows SET disposition = ?, comment = ? WHERE id = ?`,
+      [disposition, newComment, row.id]
+    );
+    const [updatedRes] = await pool.query('SELECT * FROM call_rows WHERE id = ?', [row.id]);
+
+    let studentSystemSync = false;
+    let studentSystemSyncError = null;
+    if (row.disposition !== disposition || (row.comment || null) !== newComment) {
+      try {
+        studentSystemSync = await syncCommentToStudentSystem(
+          row, session, disposition, comment,
+          { disposition: row.disposition, comment: row.comment }
+        );
+      } catch (err) {
+        studentSystemSyncError = err.message;
+        console.error(`Student-system comment sync (edit) failed for row ${row.id}:`, err.message);
+      }
+    } else {
+      studentSystemSync = true; // nothing changed, nothing to sync
+    }
+
+    res.json({ ok: true, row: updatedRes[0], studentSystemSync, studentSystemSyncError });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

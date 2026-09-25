@@ -71,6 +71,9 @@ export const api = {
   studentSummary: (rowId) => request(`/rows/${rowId}/student-summary`),
   submitDisposition: (rowId, disposition, comment) =>
     request(`/rows/${rowId}/disposition`, { method: 'POST', body: { disposition, comment } }),
+  myCalls: (sessionId) => request(`/sessions/${sessionId}/mine`),
+  editDisposition: (rowId, disposition, comment) =>
+    request(`/rows/${rowId}/edit`, { method: 'POST', body: { disposition, comment } }),
 };
 
 export function saveSession(token, user) {

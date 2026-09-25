@@ -156,12 +156,99 @@ class SummaryBoundary extends React.Component {
   }
 }
 
+/* ── My called students list ──────────────────────────────────────── */
+
+function dispositionLabel(key) {
+  if (key === 'skipped') return 'Skipped';
+  return DISPOSITIONS.find((d) => d.key === key)?.label || key || '—';
+}
+
+function MyCallsModal({ rows, currentId, onClose, onPick }) {
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  // Newest call first; keep each row's index in `rows` for navigation.
+  const items = rows
+    .map((r, index) => ({ r, index }))
+    .reverse()
+    .filter(({ r }) => !q || [r.name, r.student_id, r.phone, r.parent_phone, r.comment]
+      .some((v) => String(v || '').toLowerCase().includes(q)));
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        style={{ width: 520, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>My called students ({rows.length})</h3>
+          <button className="btn-ghost" onClick={onClose}>Close</button>
+        </div>
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name, ID, phone or comment…"
+          style={{ marginBottom: 10 }}
+        />
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {items.length === 0 && (
+            <div className="empty-state">
+              {rows.length === 0 ? "You haven't finished any calls in this session yet." : 'No matches.'}
+            </div>
+          )}
+          {items.map(({ r, index }) => (
+            <button
+              key={r.id}
+              onClick={() => onPick(index)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
+                padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                border: `1px solid ${r.id === currentId ? 'var(--accent)' : 'var(--line)'}`,
+                background: r.id === currentId ? '#e8f1ef' : 'var(--surface)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontWeight: 600 }}>{index + 1}. {r.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+                  {dispositionLabel(r.disposition)}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                {r.student_id ? `ID ${r.student_id} · ` : ''}{r.phone || '—'}
+              </div>
+              {r.comment && (
+                <div style={{
+                  fontSize: 12, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {r.comment}
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main call card ───────────────────────────────────────────────── */
 
 function CallCard({ session, onLeave }) {
   const [row,           setRow]          = useState(null);
-  const [history,       setHistory]      = useState([]);
   const [finished,      setFinished]     = useState(false);
+  // Rows this caller already finished in this session (oldest first) plus
+  // session counters — loaded from the server so Prev / "My called students"
+  // survive a page refresh.
+  const [myRows,        setMyRows]       = useState([]);
+  const [progress,      setProgress]     = useState(null);
+  // Index into myRows of the finished call being viewed/edited (null = live row).
+  const [viewIndex,     setViewIndex]    = useState(null);
+  const [editDisp,      setEditDisp]     = useState(null);
+  const [editComment,   setEditComment]  = useState('');
+  const [saving,        setSaving]       = useState(false);
+  const [notice,        setNotice]       = useState('');
+  const [showList,      setShowList]     = useState(false);
   const [error,         setError]        = useState('');
   const [loading,       setLoading]      = useState(true);
   const [submitting,    setSubmitting]   = useState(false);
@@ -183,15 +270,36 @@ function CallCard({ session, onLeave }) {
   // apps. We don't clear the comment on resume, only on a genuine new row.
   useEffect(() => { initialFetch(); }, []); // eslint-disable-line
 
-  // Load the brief student history whenever we land on a new row. Purely
+  // Progress counters + my finished calls. Refreshed after every submit/edit
+  // and every 30s so "remaining" also reflects the other callers' work.
+  const loadMine = () => api.myCalls(session.id)
+    .then((res) => {
+      setMyRows(Array.isArray(res.rows) ? res.rows : []);
+      setProgress(res.progress || null);
+    })
+    .catch(() => {}); // counters are informational — never block the call
+  useEffect(() => {
+    loadMine();
+    const t = setInterval(loadMine, 30000);
+    return () => clearInterval(t);
+  }, [session.id]); // eslint-disable-line
+
+  const displayRow = viewIndex !== null ? myRows[viewIndex] : row;
+  const isPrevView = viewIndex !== null && !!displayRow;
+
+  // Load the brief student history whenever the card shows a different
+  // student (live row or a finished one being reviewed). Purely
   // informational for the caller, so a failure here is silent and never
   // blocks the call.
   useEffect(() => {
-    if (!row?.id) { setSummary(null); return; }
+    if (!displayRow?.id) { setSummary(null); setSummaryLoading(false); return; }
     setSummary(null);
     setSummaryLoading(true);
-    api.studentSummary(row.id)
+    // Ignore a late answer for a student we've already navigated away from.
+    let stale = false;
+    api.studentSummary(displayRow.id)
       .then((res) => {
+        if (stale) return;
         const s = res && res.summary;
         // Guard against a stale/mismatched backend still on an older
         // response shape — never let a shape surprise crash the call card.
@@ -200,9 +308,10 @@ function CallCard({ session, onLeave }) {
         // backend response (missing it) still renders the rest fine.
         setSummary(valid ? { ...s, videos: Array.isArray(s.videos) ? s.videos : [] } : null);
       })
-      .catch(() => setSummary(null))
-      .finally(() => setSummaryLoading(false));
-  }, [row?.id]);
+      .catch(() => { if (!stale) setSummary(null); })
+      .finally(() => { if (!stale) setSummaryLoading(false); });
+    return () => { stale = true; };
+  }, [displayRow?.id]);
 
   const initialFetch = async () => {
     if (fetching.current) return;
@@ -276,8 +385,8 @@ function CallCard({ session, onLeave }) {
     setError('');
     try {
       const result = await api.submitDisposition(row.id, disposition, comment);
-      setHistory((h) => [...h, { ...row, disposition, comment }]);
       await fetchNext();
+      loadMine();
       if (!result.studentSystemSync) {
         setError(`Saved in call center, but the student follow-up dashboard was not updated${result.studentSystemSyncError ? `: ${result.studentSystemSyncError}` : '.'}`);
       }
@@ -304,8 +413,8 @@ function CallCard({ session, onLeave }) {
     setError('');
     try {
       const result = await api.submitDisposition(row.id, 'skipped', comment);
-      setHistory((h) => [...h, { ...row, disposition: 'skipped', comment }]);
       await fetchNext();
+      loadMine();
       if (!result.studentSystemSync) {
         setError(`Saved in call center, but the student follow-up dashboard was not updated${result.studentSystemSyncError ? `: ${result.studentSystemSyncError}` : '.'}`);
       }
@@ -316,47 +425,76 @@ function CallCard({ session, onLeave }) {
     }
   };
 
-  // Go back to the previous completed row (read-only view).
-  const [viewingPrev, setViewingPrev] = useState(false);
-  const [prevIndex,   setPrevIndex]   = useState(null);
+  // Open one of my finished calls for review/editing (null = back to live row).
+  const openFinished = (index) => {
+    setNotice('');
+    setError('');
+    if (index === null || !myRows[index]) {
+      setViewIndex(null);
+      return;
+    }
+    setViewIndex(index);
+    setEditDisp(myRows[index].disposition || null);
+    setEditComment(myRows[index].comment || '');
+  };
 
-  const goBack = () => {
-    if (!history.length) return;
-    setPrevIndex(history.length - 1);
-    setViewingPrev(true);
+  // ← Prev: from the live row jump to my most recent finished call, then keep
+  // stepping back through older ones.
+  const goPrev = () => {
+    if (!myRows.length) return;
+    if (viewIndex === null) openFinished(myRows.length - 1);
+    else if (viewIndex > 0) openFinished(viewIndex - 1);
   };
 
   const goForward = () => {
-    if (prevIndex === null) return;
-    if (prevIndex >= history.length - 1) {
-      setViewingPrev(false);
-      setPrevIndex(null);
-    } else {
-      setPrevIndex(prevIndex + 1);
+    if (viewIndex === null) return;
+    openFinished(viewIndex >= myRows.length - 1 ? null : viewIndex + 1);
+  };
+
+  const editChanged = isPrevView && (
+    editDisp !== (displayRow.disposition || null)
+    || editComment.trim() !== (displayRow.comment || '').trim()
+  );
+
+  // Save a corrected outcome/comment on a finished call (also re-syncs it to
+  // the student follow-up dashboard, replacing the earlier text there).
+  const saveEdit = async () => {
+    if (!isPrevView || saving || !editDisp) return;
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.editDisposition(displayRow.id, editDisp, editComment);
+      if (result.row) {
+        setMyRows((list) => list.map((r) => (r.id === result.row.id ? result.row : r)));
+        setEditComment(result.row.comment || '');
+      }
+      if (!result.studentSystemSync) {
+        setError(`Saved in call center, but the student follow-up dashboard was not updated${result.studentSystemSyncError ? `: ${result.studentSystemSyncError}` : '.'}`);
+      } else {
+        setNotice('Changes saved.');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const goPrevStep = () => {
-    if (prevIndex === null || prevIndex <= 0) return;
-    setPrevIndex(prevIndex - 1);
-  };
-
-  const displayRow    = viewingPrev ? history[prevIndex] : row;
-  const isPrevView    = viewingPrev;
   const showAttendanceDetails = isAttendanceSession(session);
 
   return (
     <div className="call-shell">
       {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {/* ← Previous */}
           <button
             className="btn-secondary"
             style={{ padding: '7px 14px', fontSize: 13 }}
-            disabled={history.length === 0}
-            onClick={isPrevView ? goPrevStep : goBack}
-            title="Go to previous student"
+            disabled={myRows.length === 0 || viewIndex === 0}
+            onClick={goPrev}
+            title="Go to the previous student you called"
           >
             ← Prev
           </button>
@@ -366,15 +504,50 @@ function CallCard({ session, onLeave }) {
               style={{ padding: '7px 14px', fontSize: 13 }}
               onClick={goForward}
             >
-              {prevIndex >= history.length - 1 ? 'Back to current' : 'Next →'}
+              {viewIndex >= myRows.length - 1 ? 'Back to current' : 'Next →'}
             </button>
           )}
-          <div style={{ fontWeight: 600 }}>{session.name}</div>
+          <button
+            className="btn-secondary"
+            style={{ padding: '7px 14px', fontSize: 13 }}
+            onClick={() => setShowList(true)}
+            title="Students you already called in this session"
+          >
+            ☰ My called students
+          </button>
         </div>
         <button className="btn-ghost" onClick={onLeave}>Switch session</button>
       </div>
+      <div style={{ fontWeight: 600, marginBottom: 10 }}>{session.name}</div>
+
+      {/* Progress counters — refreshed after every call */}
+      {progress && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14,
+        }}>
+          {[
+            { label: 'You finished', value: progress.mine_done, color: 'var(--good)' },
+            { label: 'Remaining', value: progress.remaining, color: 'var(--warn)' },
+            { label: 'Session done', value: `${progress.done} / ${progress.total}`, color: 'var(--ink)' },
+          ].map((c) => (
+            <div key={c.label} style={{
+              background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10,
+              padding: '8px 10px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: c.color }}>{c.value}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 600 }}>{c.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && <div className="error-banner">{error}</div>}
+      {notice && (
+        <div style={{
+          background: '#e3f4ea', color: 'var(--good)', border: '1px solid #bfe3cd',
+          padding: '10px 14px', borderRadius: 8, fontSize: 13.5, marginBottom: 16,
+        }}>{notice}</div>
+      )}
 
       {/* Previous-record notice */}
       {isPrevView && (
@@ -382,15 +555,15 @@ function CallCard({ session, onLeave }) {
           background: '#fef9e7', border: '1px solid #f0d98a', borderRadius: 10,
           padding: '10px 14px', fontSize: 13, marginBottom: 12, color: '#8a6d00'
         }}>
-          Viewing previous record ({prevIndex + 1} of {history.length}) — already submitted as <strong>{
-            DISPOSITIONS.find(d => d.key === history[prevIndex]?.disposition)?.label
-            || history[prevIndex]?.disposition
-          }</strong>. Read-only.
+          Editing a call you already finished ({viewIndex + 1} of {myRows.length}) — saved as <strong>{
+            DISPOSITIONS.find(d => d.key === displayRow.disposition)?.label
+            || (displayRow.disposition === 'skipped' ? 'Skipped' : displayRow.disposition)
+          }</strong>. Your current student is kept for you — press "Back to current" when done.
         </div>
       )}
 
       <div className="call-card">
-        {loading ? (
+        {loading && !isPrevView ? (
           <div className="empty-state">Loading next record…</div>
         ) : finished && !isPrevView ? (
           <div className="empty-state">
@@ -406,7 +579,7 @@ function CallCard({ session, onLeave }) {
             </div>
 
             {(summaryLoading || summary) && (
-              <SummaryBoundary key={row?.id}>
+              <SummaryBoundary key={displayRow.id}>
               <div style={{ marginTop: 4, marginBottom: 4 }}>
                 <div className="label" style={{ marginBottom: 6 }}>Student history</div>
                 {summaryLoading ? (
@@ -532,39 +705,85 @@ function CallCard({ session, onLeave }) {
               <div className="actions"><CopyButton value={displayRow.parent_phone} /></div>
             </div>
 
-            {/* Call / WhatsApp buttons — hidden when viewing prev (already done) */}
-            {!isPrevView && (
-              <div className="action-grid">
-                <a href={`tel:${digitsOnly(displayRow.phone)}`}>
-                  <button className="call-btn" style={{ width: '100%' }}>📞 Call student</button>
-                </a>
-                <a href={`tel:${digitsOnly(displayRow.parent_phone)}`}>
-                  <button className="call-btn" style={{ width: '100%' }}>📞 Call parent</button>
-                </a>
-                <a href={`https://wa.me/${toWhatsAppNumber(displayRow.phone)}`} target="_blank" rel="noreferrer">
-                  <button className="wa-btn" style={{ width: '100%' }}>💬 WhatsApp student</button>
-                </a>
-                <a href={`https://wa.me/${toWhatsAppNumber(displayRow.parent_phone)}`} target="_blank" rel="noreferrer">
-                  <button className="wa-btn" style={{ width: '100%' }}>💬 WhatsApp parent</button>
-                </a>
-              </div>
-            )}
-
-            {/* Comment box */}
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 20, textAlign: 'left', fontWeight: 600 }}>
-              {isPrevView ? 'Comment left on this record' : '2 — Add a comment (optional)'}
+            {/* Call / WhatsApp buttons (also on finished calls, to call back) */}
+            <div className="action-grid">
+              <a href={`tel:${digitsOnly(displayRow.phone)}`}>
+                <button className="call-btn" style={{ width: '100%' }}>📞 Call student</button>
+              </a>
+              <a href={`tel:${digitsOnly(displayRow.parent_phone)}`}>
+                <button className="call-btn" style={{ width: '100%' }}>📞 Call parent</button>
+              </a>
+              <a href={`https://wa.me/${toWhatsAppNumber(displayRow.phone)}`} target="_blank" rel="noreferrer">
+                <button className="wa-btn" style={{ width: '100%' }}>💬 WhatsApp student</button>
+              </a>
+              <a href={`https://wa.me/${toWhatsAppNumber(displayRow.parent_phone)}`} target="_blank" rel="noreferrer">
+                <button className="wa-btn" style={{ width: '100%' }}>💬 WhatsApp parent</button>
+              </a>
             </div>
-            <textarea
-              value={isPrevView ? (displayRow.comment || '—') : comment}
-              onChange={isPrevView ? undefined : (e) => setComment(e.target.value)}
-              readOnly={isPrevView}
-              placeholder="Any notes about this call…"
-              rows={3}
-              style={{
-                width: '100%', marginTop: 6, resize: 'vertical', fontFamily: 'inherit',
-                background: isPrevView ? 'var(--bg)' : undefined,
-              }}
-            />
+
+            {isPrevView ? (
+              <>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 20, textAlign: 'left', fontWeight: 600 }}>
+                  Outcome
+                </div>
+                <div className="disposition-grid">
+                  {DISPOSITIONS.map((d) => (
+                    <button
+                      key={d.key}
+                      className={[
+                        d.wide ? 'wide' : '',
+                        d.key === 'rejected' ? 'reject' : '',
+                        editDisp === d.key ? 'selected' : '',
+                      ].filter(Boolean).join(' ')}
+                      disabled={saving}
+                      onClick={() => setEditDisp(d.key)}
+                    >
+                      {editDisp === d.key ? '✓ ' : ''}{d.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 16, textAlign: 'left', fontWeight: 600 }}>
+                  Comment
+                </div>
+                <textarea
+                  value={editComment}
+                  onChange={(e) => setEditComment(e.target.value)}
+                  placeholder="Any notes about this call…"
+                  rows={3}
+                  style={{ width: '100%', marginTop: 6, resize: 'vertical', fontFamily: 'inherit' }}
+                />
+                <button
+                  className={editChanged ? 'btn-primary' : 'btn-secondary'}
+                  style={{ width: '100%', marginTop: 12, padding: 13, fontSize: 14.5 }}
+                  disabled={saving || !editChanged || !editDisp}
+                  onClick={saveEdit}
+                >
+                  {saving ? 'Saving…' : editChanged ? 'Save changes' : 'No changes to save'}
+                </button>
+                <button
+                  className="btn-secondary"
+                  style={{ width: '100%', marginTop: 8, padding: 11, fontSize: 13.5 }}
+                  disabled={saving}
+                  onClick={() => openFinished(null)}
+                >
+                  Back to current student
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Comment box */}
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 20, textAlign: 'left', fontWeight: 600 }}>
+                  2 — Add a comment (optional)
+                </div>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Any notes about this call…"
+                  rows={3}
+                  style={{ width: '100%', marginTop: 6, resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </>
+            )}
 
             {/* Outcome buttons — only for the live current record */}
             {!isPrevView && (
@@ -620,6 +839,15 @@ function CallCard({ session, onLeave }) {
           </>
         ) : null}
       </div>
+
+      {showList && (
+        <MyCallsModal
+          rows={myRows}
+          currentId={isPrevView ? displayRow.id : null}
+          onClose={() => setShowList(false)}
+          onPick={(index) => { setShowList(false); openFinished(index); }}
+        />
+      )}
     </div>
   );
 }
