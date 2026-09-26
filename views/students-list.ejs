@@ -262,6 +262,7 @@
             <% } %>
             <% if (userRole === 'admin') { %>
               <form action="/students/<%= student.id %>/delete" method="POST" class="d-inline ms-2"
+                onclick="event.stopPropagation()"
                 onsubmit="event.stopPropagation(); return confirm('متأكد من حذف الطالب <%= student.name %>؟ سيتم حذف كل بياناته نهائياً.')">
                 <button class="btn btn-sm btn-outline-danger">🗑 حذف</button>
               </form>
