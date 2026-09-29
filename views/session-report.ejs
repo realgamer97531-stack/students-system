@@ -84,6 +84,73 @@
       <div class="card-body py-3">
         <label for="attendedStudentSearch" class="form-label small mb-1"><span class="ar-only">البحث في الحاضرين</span><span class="en-only" style="display:none;">Search Present</span></label>
         <input type="search" id="attendedStudentSearch" class="form-control" placeholder="ابحث بالاسم أو الكود أو رقم الهاتف">
+        <%
+          const rfCount = fn => attendedRows.filter(fn).length;
+          const rfOtherCenters = {};
+          attendedRows.forEach(r => {
+            if (r.isOtherCenter && r.location !== 'أونلاين') {
+              rfOtherCenters[r.homeCenterId] = rfOtherCenters[r.homeCenterId] || { name: r.homeCenterName, count: 0 };
+              rfOtherCenters[r.homeCenterId].count++;
+            }
+          });
+        %>
+        <div class="row g-2 mt-2" id="attendedFilters">
+          <div class="col-md-3 col-6">
+            <label class="form-label small mb-1"><span class="ar-only">السنتر الأصلي للطالب</span><span class="en-only" style="display:none;">Student's Home Center</span></label>
+            <select class="form-select form-select-sm" data-filter="center">
+              <option value="">الكل (<%= attendedRows.length %>)</option>
+              <option value="own">من نفس السنتر (<%= rfCount(r => !r.isOtherCenter && r.location !== 'أونلاين') %>)</option>
+              <option value="other">من سناتر تانية (<%= rfCount(r => r.isOtherCenter && r.location !== 'أونلاين') %>)</option>
+              <% Object.keys(rfOtherCenters).forEach(id => { %>
+                <option value="c<%= id %>">↳ <%= rfOtherCenters[id].name %> (<%= rfOtherCenters[id].count %>)</option>
+              <% }) %>
+              <option value="online">أونلاين (<%= rfCount(r => r.location === 'أونلاين') %>)</option>
+            </select>
+          </div>
+          <div class="col-md-2 col-6">
+            <label class="form-label small mb-1"><span class="ar-only">الواجب</span><span class="en-only" style="display:none;">Homework</span></label>
+            <select class="form-select form-select-sm" data-filter="hw">
+              <option value="">الكل</option>
+              <option value="none">لم يُصحح (<%= rfCount(r => !r.homeworkStatus) %>)</option>
+              <option value="marked">تم التصحيح (<%= rfCount(r => !!r.homeworkStatus) %>)</option>
+              <option value="complete">كامل (<%= rfCount(r => r.homeworkStatus === 'complete') %>)</option>
+              <option value="incomplete">مش كامل (<%= rfCount(r => r.homeworkStatus === 'incomplete') %>)</option>
+              <option value="no_steps">من غير خطوات (<%= rfCount(r => r.homeworkStatus === 'no_steps') %>)</option>
+              <option value="not_done">مش معمول (<%= rfCount(r => r.homeworkStatus && !['complete','incomplete','no_steps'].includes(r.homeworkStatus)) %>)</option>
+            </select>
+          </div>
+          <div class="col-md-2 col-6">
+            <label class="form-label small mb-1"><span class="ar-only">الامتحان</span><span class="en-only" style="display:none;">Exam</span></label>
+            <select class="form-select form-select-sm" data-filter="exam">
+              <option value="">الكل</option>
+              <option value="none">لم تُرصد درجته (<%= rfCount(r => r.examScore === null) %>)</option>
+              <option value="marked">تم رصد الدرجة (<%= rfCount(r => r.examScore !== null) %>)</option>
+            </select>
+            <% if (!hasLinkedExam) { %><small class="text-muted" style="font-size:0.7rem;">لا يوجد امتحان مربوط بالحصة</small><% } %>
+          </div>
+          <% if (userRole === 'admin') { %>
+          <div class="col-md-2 col-6">
+            <label class="form-label small mb-1"><span class="ar-only">الدفع وقت الحضور</span><span class="en-only" style="display:none;">Paid at Attendance</span></label>
+            <select class="form-select form-select-sm" data-filter="paid">
+              <option value="">الكل</option>
+              <option value="yes">دفع (<%= rfCount(r => r.payment > 0) %>)</option>
+              <option value="no">لم يدفع (<%= rfCount(r => !(r.payment > 0)) %>)</option>
+            </select>
+          </div>
+          <% } %>
+          <div class="col-md-2 col-6">
+            <label class="form-label small mb-1"><span class="ar-only">الكومنت</span><span class="en-only" style="display:none;">Comment</span></label>
+            <select class="form-select form-select-sm" data-filter="comment">
+              <option value="">الكل</option>
+              <option value="yes">عليه كومنت (<%= rfCount(r => !!(r.comment && String(r.comment).trim())) %>)</option>
+              <option value="no">بدون كومنت (<%= rfCount(r => !(r.comment && String(r.comment).trim())) %>)</option>
+            </select>
+          </div>
+          <div class="col-md-1 col-6 d-flex align-items-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="attendedFiltersReset"><span class="ar-only">مسح</span><span class="en-only" style="display:none;">Reset</span></button>
+          </div>
+        </div>
+        <div class="small text-muted mt-2"><span class="ar-only">المعروض:</span><span class="en-only" style="display:none;">Showing:</span> <strong id="attendedVisibleCount"><%= attendedRows.length %></strong> / <%= attendedRows.length %></div>
       </div>
     </div>
     <div class="table-responsive bg-white rounded shadow-sm p-3">
@@ -107,7 +174,13 @@
         </thead>
         <tbody>
           <% attendedRows.forEach(row => { %>
-            <tr data-student-search="<%= `${row.student.student_code} ${row.student.name} ${row.student.phone} ${row.student.parent_phone}` %>">
+            <tr data-student-search="<%= `${row.student.student_code} ${row.student.name} ${row.student.phone} ${row.student.parent_phone}` %>"
+                data-center="<%= row.location === 'أونلاين' ? 'online' : (row.isOtherCenter ? 'other' : 'own') %>"
+                data-home-center="<%= row.homeCenterId %>"
+                data-hw="<%= row.homeworkStatus ? (['complete','incomplete','no_steps'].includes(row.homeworkStatus) ? row.homeworkStatus : 'not_done') : 'none' %>"
+                data-exam="<%= row.examScore !== null ? 'marked' : 'none' %>"
+                data-paid="<%= row.payment > 0 ? 'yes' : 'no' %>"
+                data-comment="<%= row.comment && String(row.comment).trim() ? 'yes' : 'no' %>">
               <td><a href="/students/<%= row.student.id %>"><%= row.student.student_code %></a></td>
               <td><a href="/students/<%= row.student.id %>"><%= row.student.name %></a></td>
               <td><%= row.student.phone %></td>
@@ -117,6 +190,9 @@
                   <span class="badge bg-info"><span class="ar-only">أونلاين</span><span class="en-only" style="display:none;">Online</span></span>
                 <% } else { %>
                   <span class="badge bg-primary"><%= row.location %></span>
+                  <% if (row.isOtherCenter) { %>
+                    <br><span class="badge bg-warning text-dark mt-1" style="font-size:0.65rem;"><span class="ar-only">من</span><span class="en-only" style="display:none;">From</span> <%= row.homeCenterName %></span>
+                  <% } %>
                 <% } %>
               </td>
               <td>
@@ -432,17 +508,42 @@
     emptyRow.hidden = true;
     table.querySelector('tbody').appendChild(emptyRow);
 
-    searchInput.addEventListener('input', () => {
+    const filterSelects = Array.from(document.querySelectorAll('#attendedFilters [data-filter]'));
+    const visibleCount = document.getElementById('attendedVisibleCount');
+
+    const matchesFilter = (row, key, value) => {
+      if (!value) return true;
+      if (key === 'center') {
+        if (value.startsWith('c')) return row.dataset.center === 'other' && row.dataset.homeCenter === value.slice(1);
+        return row.dataset.center === value;
+      }
+      if (key === 'hw' && value === 'marked') return row.dataset.hw !== 'none';
+      return row.dataset[key] === value;
+    };
+
+    const applyFilters = () => {
       const query = searchInput.value.trim().toLocaleLowerCase();
+      const active = filterSelects.map(s => [s.dataset.filter, s.value]);
       let visibleRows = 0;
 
       rows.forEach(row => {
-        const matches = !query || row.dataset.studentSearch.toLocaleLowerCase().includes(query);
+        const matches = (!query || row.dataset.studentSearch.toLocaleLowerCase().includes(query))
+          && active.every(([key, value]) => matchesFilter(row, key, value));
         row.hidden = !matches;
         if (matches) visibleRows += 1;
       });
 
       emptyRow.hidden = visibleRows !== 0;
+      if (visibleCount) visibleCount.textContent = visibleRows;
+    };
+
+    searchInput.addEventListener('input', applyFilters);
+    filterSelects.forEach(s => s.addEventListener('change', applyFilters));
+    const resetBtn = document.getElementById('attendedFiltersReset');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      filterSelects.forEach(s => { s.value = ''; });
+      applyFilters();
     });
   });
 </script>

@@ -2427,6 +2427,18 @@ app.get('/sessions/:id/report', async (req, res) => {
     // Combine both attended rows
     const allAttendedRows = [...attendedRows, ...onlineAttendedRows];
 
+    // Tag each row with the student's home center so the report can filter
+    // students who came from a different center. Read-only lookup.
+    const centerNameById = new Map(
+      (await Center.findAll({ attributes: ['id', 'name'] })).map(c => [c.id, c.name])
+    );
+    allAttendedRows.forEach(row => {
+      const homeCenterId = row.student ? row.student.CenterId : null;
+      row.homeCenterId = homeCenterId;
+      row.homeCenterName = centerNameById.get(homeCenterId) || 'غير معروف';
+      row.isOtherCenter = homeCenterId != null && homeCenterId !== session.CenterId;
+    });
+
     let absentStudents = [];
     let onlineAttendees = [];
 
@@ -2503,6 +2515,7 @@ app.get('/sessions/:id/report', async (req, res) => {
 
     res.render('session-report', {
       session, attendedRows: allAttendedRows, absentStudents, onlineAttendees,
+      hasLinkedExam: !!linkedExam,
       closing: { normalCount, reducedCount, freeCount, totalRevenue, totalCost },
       totalCashCollected,
       assistantAttendances,
