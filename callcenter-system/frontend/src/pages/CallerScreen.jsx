@@ -586,6 +586,24 @@ function CallCard({ session, onLeave }) {
                   <div className="value" style={{ fontSize: 12.5, fontWeight: 400 }}>Loading…</div>
                 ) : (
                   <>
+                    {summary.student && (
+                      <div style={{
+                        display: 'inline-block', fontSize: 13, fontWeight: 600, marginBottom: 8,
+                        padding: '4px 10px', borderRadius: 8,
+                        background: summary.student.balance < summary.student.pricePerSession ? 'rgba(220, 53, 69, 0.12)' : 'rgba(25, 135, 84, 0.12)',
+                        color: summary.student.balance < summary.student.pricePerSession ? '#dc3545' : '#198754',
+                      }}>
+                        Balance: {summary.student.balance} EGP
+                        {summary.student.pricePerSession > 0 && (
+                          <span style={{ fontWeight: 400, opacity: 0.85 }}>
+                            {' · '}Session price {summary.student.pricePerSession} EGP
+                            {' · '}{summary.student.balance < summary.student.pricePerSession
+                              ? 'Not enough for next session'
+                              : `Covers ${Math.floor(summary.student.balance / summary.student.pricePerSession)} session(s)`}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.6 }}>
                       {summary.totals.attended}/{summary.totals.totalLessons} attended
                       {summary.totals.absent > 0 ? `, ${summary.totals.absent} absent` : ''}

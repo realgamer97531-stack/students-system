@@ -5034,6 +5034,10 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
           examTotal,
           examMaxTotal,
         },
+        student: {
+          balance: Number(student.balance) || 0,
+          pricePerSession: Number(student.price_per_session) || 0,
+        },
         rows,
         comments,
         videos,
