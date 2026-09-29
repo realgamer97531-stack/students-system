@@ -604,6 +604,16 @@ function CallCard({ session, onLeave }) {
                         )}
                       </div>
                     )}
+                    {summary.student && summary.student.registeredAt && !Number.isNaN(new Date(summary.student.registeredAt).getTime()) && (
+                      <div style={{ fontSize: 12.5, marginBottom: 8 }}>
+                        <span style={{ color: 'var(--muted)' }}>Registered since: </span>
+                        <strong>
+                          {new Date(summary.student.registeredAt).toLocaleDateString('en-GB', {
+                            day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Cairo',
+                          })}
+                        </strong>
+                      </div>
+                    )}
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.6 }}>
                       {summary.totals.attended}/{summary.totals.totalLessons} attended
                       {summary.totals.absent > 0 ? `, ${summary.totals.absent} absent` : ''}

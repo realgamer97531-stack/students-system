@@ -1,4 +1,12 @@
 <%- include('partials/header') %>
+<%
+  // قيمة لحقل datetime-local بتوقيت السيرفر المحلي (مصر) بدل UTC
+  const toLocalInputValue = (value) => {
+    const d = new Date(value);
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+%>
 
 <h3 class="mb-3">
   <span class="ar-only">تقرير حصة:</span><span class="en-only" style="display:none;">Session Report:</span> <%= session.Subject.name %> - <%= session.Center.name %>
@@ -427,12 +435,12 @@
                                   <div class="col-6">
                                     <label class="form-label small"><span class="ar-only">وقت الحضور</span><span class="en-only" style="display:none;">Check-in Time</span></label>
                                     <input type="datetime-local" name="check_in" class="form-control form-control-sm"
-                                      value="<%= aa.check_in ? new Date(aa.check_in).toISOString().slice(0,16) : '' %>">
+                                      value="<%= aa.check_in ? toLocalInputValue(aa.check_in) : '' %>">
                                   </div>
                                   <div class="col-6">
                                     <label class="form-label small"><span class="ar-only">وقت الانصراف</span><span class="en-only" style="display:none;">Check-out Time</span></label>
                                     <input type="datetime-local" name="check_out" class="form-control form-control-sm"
-                                      value="<%= aa.check_out ? new Date(aa.check_out).toISOString().slice(0,16) : '' %>">
+                                      value="<%= aa.check_out ? toLocalInputValue(aa.check_out) : '' %>">
                                   </div>
                                   <div class="col-6">
                                     <label class="form-label small"><span class="ar-only">طريقة الراتب</span><span class="en-only" style="display:none;">Salary Method</span></label>

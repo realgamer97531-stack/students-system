@@ -1,4 +1,12 @@
 require('dotenv').config();
+// كل التواريخ والأوقات اللي بتتعرض من السيرفر تبقى بتوقيت مصر (السيرفر نفسه شغال UTC).
+// الداتابيز نفسها مش بتتأثر: Sequelize بيخزن ويقرا بـ UTC زي ما هو.
+process.env.TZ = process.env.TZ || 'Africa/Cairo';
+// YYYY-MM-DD بتوقيت السيرفر المحلي (مصر)، بدل toISOString اللي بيرجع تاريخ UTC
+function localDateString(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 const express = require('express');
 const path = require('path');
 const session = require('express-session');
@@ -5037,6 +5045,7 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
         student: {
           balance: Number(student.balance) || 0,
           pricePerSession: Number(student.price_per_session) || 0,
+          registeredAt: student.createdAt || null,
         },
         rows,
         comments,
@@ -7690,7 +7699,7 @@ app.post('/api/portal/homework/:id/submit', verifyPortalToken('student'), async 
     const assignment = await HomeworkAssignment.findByPk(req.params.id);
     if (!assignment) return res.status(404).json({ success: false, message: 'الواجب غير موجود' });
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString(new Date());
     if (today > assignment.end_date) return res.json({ success: false, message: '⚠️ انتهى وقت التسليم' });
 
     // بنستقبل المسارات بس (مش ملفات) - الصور/الـ PDF اتخزنت على Hostinger بالفعل
@@ -8130,10 +8139,10 @@ app.get('/users/:id/stats', requireAdmin, async (req, res) => {
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekAgo);
     d.setDate(d.getDate() + i);
-    dayCounts[d.toISOString().slice(0, 10)] = 0;
+    dayCounts[localDateString(d)] = 0;
   }
   recentAttendance.forEach(a => {
-    const key = new Date(a.createdAt).toISOString().slice(0, 10);
+    const key = localDateString(new Date(a.createdAt));
     if (dayCounts[key] !== undefined) dayCounts[key]++;
   });
 
