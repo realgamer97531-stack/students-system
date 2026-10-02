@@ -12,6 +12,21 @@
             <div class="alert alert-danger"><%= errorMessage %></div>
           <% } %>
 
+          <% if (typeof existingStudent !== 'undefined' && existingStudent) { %>
+            <div class="alert alert-warning text-center">
+              <h5 class="fw-bold mb-3">⚠️ <span class="ar-only">الطالب ده متسجل بالفعل</span><span class="en-only" style="display:none;">This student already exists</span></h5>
+              <p class="mb-1"><span class="ar-only">الاسم:</span><span class="en-only" style="display:none;">Name:</span> <strong><%= existingStudent.name %></strong></p>
+              <p class="mb-1"><span class="ar-only">الكود:</span><span class="en-only" style="display:none;">Code:</span> <strong><%= existingStudent.student_code %></strong></p>
+              <p class="small text-muted mb-2">
+                <%= existingStudent.Subject ? existingStudent.Subject.name : '' %> - <%= existingStudent.Center ? existingStudent.Center.name : '' %>
+              </p>
+              <% if (existingQrCodeImage) { %>
+                <div class="p-2 d-inline-block bg-white rounded mb-3"><img src="<%= existingQrCodeImage %>" alt="QR" style="max-width:180px;"></div><br>
+              <% } %>
+              <a href="/students/<%= existingStudent.id %>" class="btn btn-sm btn-outline-primary"><span class="ar-only">فتح بروفايل الطالب</span><span class="en-only" style="display:none;">Open Student Profile</span></a>
+            </div>
+          <% } %>
+
           <form action="/students" method="POST" id="addStudentForm">
             <div class="row g-3">
               <div class="col-md-6">

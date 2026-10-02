@@ -587,6 +587,8 @@
   document.getElementById('newStudentModal').addEventListener('show.bs.modal', function () {
     const form = document.getElementById('quickAddForm');
     form.reset();
+    const confirmDuplicate = form.querySelector('input[name="confirm_duplicate"]');
+    if (confirmDuplicate) confirmDuplicate.remove();
     form.style.display = '';
     form.querySelector('button[type="submit"]').disabled = false;
     document.getElementById('quickAddError').innerHTML = '';
@@ -613,6 +615,37 @@
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+
+      if (data.isDuplicate) {
+        const ex = data.existingStudent;
+        const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        document.getElementById('quickAddError').innerHTML = `
+          <div class="alert alert-warning text-center">
+            <h6 class="fw-bold mb-2">⚠️ <span class="ar-only">الطالب ده متسجل بالفعل</span><span class="en-only" style="display:none;">This student already exists</span></h6>
+            <p class="mb-1"><span class="ar-only">الاسم:</span><span class="en-only" style="display:none;">Name:</span> <strong>${esc(ex.name)}</strong></p>
+            <p class="mb-2"><span class="ar-only">الكود:</span><span class="en-only" style="display:none;">Code:</span> <strong>${esc(ex.student_code)}</strong></p>
+            ${data.qrCodeImage ? `<div class="p-2 d-inline-block bg-white rounded mb-2"><img src="${data.qrCodeImage}" style="max-width:150px;"></div>` : ''}
+            <div class="d-flex gap-2 justify-content-center flex-wrap">
+              <a href="/students/${encodeURIComponent(ex.id)}" target="_blank" class="btn btn-sm btn-outline-primary"><span class="ar-only">فتح البروفايل</span><span class="en-only" style="display:none;">Open Profile</span></a>
+              <button type="button" id="quickAddConfirmDuplicate" class="btn btn-sm btn-outline-danger"><span class="ar-only">سجله كطالب جديد برضه</span><span class="en-only" style="display:none;">Register as new anyway</span></button>
+            </div>
+          </div>`;
+        document.getElementById('quickAddConfirmDuplicate').addEventListener('click', () => {
+          if (!confirm('متأكد إنك عايز تسجل طالب جديد بنفس البيانات؟')) return;
+          let hidden = this.querySelector('input[name="confirm_duplicate"]');
+          if (!hidden) {
+            hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'confirm_duplicate';
+            this.appendChild(hidden);
+          }
+          hidden.value = '1';
+          submitButton.disabled = false;
+          this.requestSubmit();
+        });
+        submitButton.disabled = false;
+        return;
+      }
 
       if (!data.success) {
         document.getElementById('quickAddError').innerHTML = `<div class="alert alert-danger small">${data.message}</div>`;

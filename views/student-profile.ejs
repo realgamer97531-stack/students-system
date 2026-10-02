@@ -86,7 +86,14 @@
               </div>
               <div class="mb-2">
                 <label class="form-label small"><span class="ar-only">رقم الطالب</span><span class="en-only" style="display:none;">Student ID</span></label>
-                <div class="form-control form-control-sm bg-light"><%= student.id %></div>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="form-control form-control-sm bg-light"><%= student.id %><% if (student.student_code) { %> — <%= student.student_code %><% } %></div>
+                  <% if (student.student_code) { %>
+                    <a href="/students/<%= student.id %>/qr.png" target="_blank" title="QR" class="flex-shrink-0">
+                      <img src="/students/<%= student.id %>/qr.png" alt="QR" width="64" height="64" style="background:#fff;border-radius:4px;">
+                    </a>
+                  <% } %>
+                </div>
               </div>
               <div class="mb-2">
                 <label class="form-label small"><span class="ar-only">الاسم</span><span class="en-only" style="display:none;">Name</span></label>

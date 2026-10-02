@@ -1768,6 +1768,21 @@ app.get('/students/export', async (req, res) => {
     }
   });
 
+// صورة QR لكود الطالب (بتتعرض جنب الكود في البروفايل وقائمة الطلاب)
+app.get('/students/:id/qr.png', async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.params.id, { attributes: ['id', 'student_code'] });
+    if (!student || !student.student_code) return res.status(404).send('Not found');
+    const png = await QRCode.toBuffer(student.student_code, { margin: 1, width: 300 });
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'private, max-age=86400');
+    res.send(png);
+  } catch (error) {
+    console.error('Failed to generate student QR:', error);
+    res.status(500).send('Error');
+  }
+});
+
   // عرض بروفايل طالب واحد بالتفصيل
 app.get('/students/:id', async (req, res) => {
   try {
@@ -2090,6 +2105,20 @@ app.get('/admin/points/:id', requireAdmin, async (req, res) => {
   res.render('admin-points-student', { student, pointHistory, currentPoints });
 });
 
+// بيدور على طالب متسجل قبل كده بنفس الاسم والتليفونات والسنتر والمادة
+async function findDuplicateStudent({ name, phone, parent_phone, center_id, subject_id }) {
+  return Student.findOne({
+    where: {
+      name: { [Op.in]: [...new Set([String(name || ''), String(name || '').trim()])] },
+      phone: Student.stripPhoneSpaces(String(phone || '')),
+      parent_phone: Student.stripPhoneSpaces(String(parent_phone || '')),
+      CenterId: center_id,
+      SubjectId: subject_id,
+    },
+    include: [Center, Subject],
+  });
+}
+
 app.post('/students', async (req, res) => {
   try {
     const {
@@ -2125,24 +2154,14 @@ app.post('/students', async (req, res) => {
       }
     }
 
-    const existingStudent = await Student.findOne({
-      where: {
-        name: name,
-        phone: phone,
-        parent_phone: parent_phone,
-        CenterId: center_id,
-        SubjectId: subject_id,
-      },
-    });
+    const existingStudent = await findDuplicateStudent({ name, phone, parent_phone, center_id, subject_id });
 
     if (existingStudent) {
       if (admin_password !== process.env.ADMIN_DUPLICATE_PASSWORD) {
-        return res.status(409).json({
-          success: false,
-          isDuplicate: true,
-          message: `⚠️ تحذير: وجدنا طالب بنفس البيانات!\n\nالاسم: ${existingStudent.name}\nالتليفون: ${existingStudent.phone}\nولي الأمر: ${existingStudent.parent_phone}\n\nهل تريد المتابعة بإدخال كلمة المرور الإدارية؟`,
-          studentCode: existingStudent.student_code,
-        });
+        const centers = await Center.findAll();
+        const subjects = await Subject.findAll();
+        const existingQrCodeImage = existingStudent.student_code ? await QRCode.toDataURL(existingStudent.student_code) : null;
+        return res.status(409).render('add-student', { centers, subjects, existingStudent, existingQrCodeImage });
       }
     }
 
@@ -3074,7 +3093,29 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
       booklet_paid_amount,
       register_attendance,
       comment,
+      confirm_duplicate,
     } = req.body;
+
+    if (confirm_duplicate !== '1') {
+      const existingStudent = await findDuplicateStudent({ name, phone, parent_phone, center_id, subject_id });
+      if (existingStudent) {
+        const existingQrCodeImage = existingStudent.student_code ? await QRCode.toDataURL(existingStudent.student_code) : null;
+        return res.status(409).json({
+          success: false,
+          isDuplicate: true,
+          existingStudent: {
+            id: existingStudent.id,
+            name: existingStudent.name,
+            student_code: existingStudent.student_code,
+            phone: existingStudent.phone,
+            parent_phone: existingStudent.parent_phone,
+            center: existingStudent.Center ? existingStudent.Center.name : null,
+            subject: existingStudent.Subject ? existingStudent.Subject.name : null,
+          },
+          qrCodeImage: existingQrCodeImage,
+        });
+      }
+    }
 
     const initialBalance = parseFloat(balance) || 0;
     const paidAmount = parseFloat(booklet_paid_amount) || 0;

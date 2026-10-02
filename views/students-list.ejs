@@ -226,7 +226,16 @@
               <div class="student-photo-placeholder">👤</div>
             <% } %>
           </td>
-          <td><%= student.student_code %></td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <span><%= student.student_code %></span>
+              <% if (student.student_code) { %>
+                <a href="/students/<%= student.id %>/qr.png" target="_blank" title="QR" onclick="event.stopPropagation()">
+                  <img src="/students/<%= student.id %>/qr.png" alt="QR" width="40" height="40" loading="lazy" decoding="async" style="background:#fff;border-radius:4px;">
+                </a>
+              <% } %>
+            </div>
+          </td>
           <td><span class="student-name"><%= student.name %></span></td>
           <td><%= student.phone %></td>
           <td><%= student.parent_phone %></td>
