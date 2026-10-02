@@ -117,9 +117,12 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <span class="badge" style="background:var(--sf-primary-light);color:var(--sf-primary);"><span class="ar-only">واجب رقم</span><span class="en-only" style="display:none;">Homework #</span> <%= a.order_number %></span>
-            <form action="/hw/assignments/<%= a.id %>/delete" method="POST" onsubmit="return confirm('حذف الواجب؟')">
-              <button class="btn btn-sm btn-outline-danger">🗑️</button>
-            </form>
+            <div class="d-flex gap-1">
+              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editAssignment<%= a.id %>" title="تعديل">✏️</button>
+              <form action="/hw/assignments/<%= a.id %>/delete" method="POST" onsubmit="return confirm('حذف الواجب؟')">
+                <button class="btn btn-sm btn-outline-danger">🗑️</button>
+              </form>
+            </div>
           </div>
           <h6 class="mb-1"><%= a.title %></h6>
           <% if (a.submission_type === 'link') { %>
@@ -140,6 +143,87 @@
     </div>
   <% }) %>
 </div>
+
+<!-- نوافذ تعديل الواجبات -->
+<% assignments.forEach(a => {
+  const selectedIds = new Set([
+    ...(a.SessionId ? [String(a.SessionId)] : []),
+    ...(a.LinkedSessions || []).map(s => String(s.id)),
+  ]);
+  const sessionOptions = [...sessions];
+  const knownIds = new Set(sessions.map(s => String(s.id)));
+  [a.Session, ...(a.LinkedSessions || [])].forEach(s => {
+    if (s && !knownIds.has(String(s.id))) { sessionOptions.push(s); knownIds.add(String(s.id)); }
+  });
+%>
+  <div class="modal fade" id="editAssignment<%= a.id %>" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <form action="/hw/assignments/<%= a.id %>/edit" method="POST" class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title">✏️ <span class="ar-only">تعديل الواجب</span><span class="en-only" style="display:none;">Edit Homework</span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-2">
+          <div class="col-md-3">
+            <label class="form-label small"><span class="ar-only">رقم الواجب</span><span class="en-only" style="display:none;">Homework #</span></label>
+            <input type="number" name="order_number" class="form-control" required min="1" value="<%= a.order_number %>">
+          </div>
+          <div class="col-md-9">
+            <label class="form-label small"><span class="ar-only">عنوان الواجب</span><span class="en-only" style="display:none;">Title</span></label>
+            <input type="text" name="title" class="form-control" required value="<%= a.title %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label small"><span class="ar-only">وصف الواجب</span><span class="en-only" style="display:none;">Description</span></label>
+            <textarea name="description" class="form-control" rows="3"><%= a.description || '' %></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
+            <select name="subject_id" class="form-select">
+              <option value="">--</option>
+              <% subjects.forEach(s => { %><option value="<%= s.id %>" <%= String(a.SubjectId) === String(s.id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check" style="margin-top: 2rem;">
+              <input class="form-check-input" type="checkbox" name="show_for_all" id="showForAll<%= a.id %>" value="1" <%= a.show_for_all ? 'checked' : '' %>>
+              <label class="form-check-label small" for="showForAll<%= a.id %>"><span class="ar-only">اظهر هذا الواجب للجميع</span><span class="en-only" style="display:none;">Show this homework to everyone</span></label>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label small"><span class="ar-only">الحصص</span><span class="en-only" style="display:none;">Sessions</span></label>
+            <select name="session_ids" class="form-select" multiple size="6">
+              <% sessionOptions.forEach(s => { %><option value="<%= s.id %>" <%= selectedIds.has(String(s.id)) ? 'selected' : '' %>><%= s.Subject ? s.Subject.name : '' %> - <%= s.Center ? s.Center.name : '' %> - حصة <%= s.lesson_number %></option><% }) %>
+            </select>
+            <small class="text-muted"><span class="ar-only">اضغط Ctrl لاختيار أكثر من حصة</span><span class="en-only" style="display:none;">Hold Ctrl to select multiple sessions</span></small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small"><span class="ar-only">بداية التسليم</span><span class="en-only" style="display:none;">Start Date</span></label>
+            <input type="date" name="start_date" class="form-control" required value="<%= a.start_date %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small"><span class="ar-only">نهاية التسليم</span><span class="en-only" style="display:none;">End Date</span></label>
+            <input type="date" name="end_date" class="form-control" required value="<%= a.end_date %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small"><span class="ar-only">طريقة التسليم</span><span class="en-only" style="display:none;">Submission Method</span></label>
+            <select name="submission_type" class="form-select" onchange="document.getElementById('editExternalLink<%= a.id %>').style.display = this.value === 'link' ? 'block' : 'none';">
+              <option value="upload" <%= a.submission_type !== 'link' ? 'selected' : '' %>>رفع على المنصة</option>
+              <option value="link" <%= a.submission_type === 'link' ? 'selected' : '' %>>رابط خارجي (تسليم برة المنصة)</option>
+            </select>
+          </div>
+          <div class="col-md-6" id="editExternalLink<%= a.id %>" style="display:<%= a.submission_type === 'link' ? 'block' : 'none' %>;">
+            <label class="form-label small"><span class="ar-only">رابط التسليم الخارجي</span><span class="en-only" style="display:none;">External Submission Link</span></label>
+            <input type="url" name="external_link" class="form-control" placeholder="https://..." value="<%= a.external_link || '' %>">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
+          <button type="submit" class="btn btn-primary"><span class="ar-only">حفظ التعديلات</span><span class="en-only" style="display:none;">Save Changes</span></button>
+        </div>
+      </form>
+    </div>
+  </div>
+<% }) %>
 
 <script>
 function openAssignment(event, assignmentId) {

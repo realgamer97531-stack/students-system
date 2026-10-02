@@ -7279,6 +7279,52 @@ app.post('/hw/assignments/create', requirePermission('homework_online'), async (
   }
 });
 
+app.post('/hw/assignments/:id/edit', requirePermission('homework_online'), async (req, res) => {
+  try {
+    const assignment = await HomeworkAssignment.findByPk(req.params.id);
+    if (!assignment) return res.status(404).send('❌ غير موجود');
+
+    const { title, description, order_number, start_date, end_date, subject_id, session_ids, show_for_all, submission_type, external_link } = req.body;
+    const sessionIdList = Array.isArray(session_ids)
+      ? session_ids.filter(Boolean)
+      : (session_ids ? [session_ids] : []);
+    const uniqueSessionIds = [...new Set(sessionIdList.map(id => Number(id)).filter(id => Number.isInteger(id)))];
+    const showForAll = show_for_all === '1' || show_for_all === 'on';
+    const submissionType = submission_type === 'link' ? 'link' : 'upload';
+    const externalLink = submissionType === 'link' ? String(external_link || '').trim() : null;
+
+    if (submissionType === 'link' && !externalLink) {
+      return res.status(400).send('❌ لازم تكتب الرابط لما يكون نوع التسليم رابط خارجي');
+    }
+
+    await assignment.update({
+      title,
+      description,
+      order_number,
+      start_date,
+      end_date,
+      SubjectId: subject_id || null,
+      SessionId: uniqueSessionIds.length ? uniqueSessionIds[0] : null,
+      show_for_all: showForAll,
+      submission_type: submissionType,
+      external_link: externalLink,
+    });
+
+    await HomeworkAssignmentSession.destroy({ where: { HomeworkAssignmentId: assignment.id } });
+    const linkedSessionIds = uniqueSessionIds.filter(id => id !== assignment.SessionId);
+    if (linkedSessionIds.length) {
+      await HomeworkAssignmentSession.bulkCreate(
+        linkedSessionIds.map(sessionId => ({ HomeworkAssignmentId: assignment.id, SessionId: sessionId }))
+      );
+    }
+
+    res.redirect('/hw/assignments');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
 app.post('/hw/assignments/:id/delete', requireAdmin, async (req, res) => {
   await HomeworkSubmission.destroy({ where: { HomeworkAssignmentId: req.params.id } });
   await HomeworkAssignment.destroy({ where: { id: req.params.id } });
