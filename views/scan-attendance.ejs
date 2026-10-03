@@ -623,7 +623,8 @@
           <div class="alert alert-warning text-center">
             <h6 class="fw-bold mb-2">⚠️ <span class="ar-only">الطالب ده متسجل بالفعل</span><span class="en-only" style="display:none;">This student already exists</span></h6>
             <p class="mb-1"><span class="ar-only">الاسم:</span><span class="en-only" style="display:none;">Name:</span> <strong>${esc(ex.name)}</strong></p>
-            <p class="mb-2"><span class="ar-only">الكود:</span><span class="en-only" style="display:none;">Code:</span> <strong>${esc(ex.student_code)}</strong></p>
+            <p class="mb-1"><span class="ar-only">الكود:</span><span class="en-only" style="display:none;">Code:</span> <strong>${esc(ex.student_code)}</strong></p>
+            <p class="small text-muted mb-2">${esc(ex.subject)} - ${esc(ex.center)}</p>
             ${data.qrCodeImage ? `<div class="p-2 d-inline-block bg-white rounded mb-2"><img src="${data.qrCodeImage}" style="max-width:150px;"></div>` : ''}
             <div class="d-flex gap-2 justify-content-center flex-wrap">
               <a href="/students/${encodeURIComponent(ex.id)}" target="_blank" class="btn btn-sm btn-outline-primary"><span class="ar-only">فتح البروفايل</span><span class="en-only" style="display:none;">Open Profile</span></a>

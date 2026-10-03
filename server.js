@@ -2105,14 +2105,13 @@ app.get('/admin/points/:id', requireAdmin, async (req, res) => {
   res.render('admin-points-student', { student, pointHistory, currentPoints });
 });
 
-// بيدور على طالب متسجل قبل كده بنفس الاسم والتليفونات والسنتر والمادة
-async function findDuplicateStudent({ name, phone, parent_phone, center_id, subject_id }) {
+// بيدور على طالب متسجل قبل كده بنفس الاسم والتليفونات والمادة (في أي سنتر)
+async function findDuplicateStudent({ name, phone, parent_phone, subject_id }) {
   return Student.findOne({
     where: {
       name: { [Op.in]: [...new Set([String(name || ''), String(name || '').trim()])] },
       phone: Student.stripPhoneSpaces(String(phone || '')),
       parent_phone: Student.stripPhoneSpaces(String(parent_phone || '')),
-      CenterId: center_id,
       SubjectId: subject_id,
     },
     include: [Center, Subject],
