@@ -272,7 +272,9 @@
             <% if (userRole === 'admin') { %>
               <form action="/students/<%= student.id %>/delete" method="POST" class="d-inline ms-2"
                 onclick="event.stopPropagation()"
-                onsubmit="event.stopPropagation(); return confirm('متأكد من حذف الطالب <%= student.name %>؟ سيتم حذف كل بياناته نهائياً.')">
+                data-student-name="<%= student.name %>"
+                onsubmit="event.stopPropagation(); return askStudentDeletePassword(this)">
+                <input type="hidden" name="admin_password" value="">
                 <button class="btn btn-sm btn-outline-danger">🗑 حذف</button>
               </form>
             <% } %>
@@ -336,6 +338,16 @@
     if (submitButton.disabled) return false;
     submitButton.disabled = true;
   });
+
+  // حذف الطالب محتاج تأكيد + باسورد الأدمن (الطالب بيتحفظ في أرشيف المحذوفين ويقدر يرجع)
+  function askStudentDeletePassword(form) {
+    const name = form.dataset.studentName || '';
+    if (!confirm('متأكد من حذف الطالب ' + name + '؟ سيتم حذف كل بياناته (وتتحفظ نسخة في أرشيف الطلاب المحذوفين).')) return false;
+    const password = prompt('اكتب كلمة مرور الأدمن لتأكيد الحذف:');
+    if (!password) return false;
+    form.querySelector('input[name="admin_password"]').value = password;
+    return true;
+  }
 </script>
 
 <%- include('partials/footer') %>

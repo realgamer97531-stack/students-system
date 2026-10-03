@@ -128,8 +128,9 @@ module.exports = function (app, deps) {
           aiRawResponse: JSON.stringify(ex),
         }, { transaction: t });
 
-        student.balance += Number(ex.amount);
-        await student.save({ transaction: t });
+        // تعديل الرصيد جوه الداتابيز مباشرة عشان عمليتين في نفس اللحظة ميمسحوش بعض
+        await student.constructor.increment({ balance: Number(ex.amount) }, { where: { id: student.id }, transaction: t });
+        await student.reload({ attributes: ['balance'], include: [], transaction: t });
 
         await BalanceTransaction.create({
           StudentId: student.id,

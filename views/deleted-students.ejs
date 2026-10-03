@@ -1,0 +1,84 @@
+<%- include('partials/header') %>
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-lg-10 mx-auto">
+      <div class="mb-4">
+        <h2 class="mb-2">🗂️ الطلاب المحذوفين</h2>
+        <p class="text-muted mb-0">
+          أي طالب بيتحذف بيتحفظ هنا بكل بياناته (الحضور، المعاملات، الامتحانات، الواجب، البوكليتس...) ومين اللي حذفه.
+          تقدر ترجّعه زي ما كان بنفس الكود والتواريخ.
+        </p>
+      </div>
+
+      <% if (successMessage) { %>
+      <div class="alert alert-success"><%= successMessage %></div>
+      <% } %>
+      <% if (errorMessage) { %>
+      <div class="alert alert-danger"><%= errorMessage %></div>
+      <% } %>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <% if (!archives.length) { %>
+            <p class="text-muted mb-0">مفيش طلاب اتحذفوا من ساعة تفعيل الأرشيف.</p>
+          <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>الطالب</th>
+                  <th>الكود</th>
+                  <th>اتحذف بواسطة</th>
+                  <th>وقت الحذف</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% archives.forEach(a => { %>
+                <tr>
+                  <td><%= a.student_name || '-' %></td>
+                  <td><%= a.student_code || '-' %></td>
+                  <td><%= a.deleted_by_name || '-' %></td>
+                  <td><%= new Date(a.createdAt).toLocaleString('ar-EG') %></td>
+                  <td>
+                    <% if (a.restored_at) { %>
+                      <span class="badge bg-success">اترجع</span>
+                      <div class="small text-muted"><%= a.restored_by_name || '' %> - <%= new Date(a.restored_at).toLocaleString('ar-EG') %></div>
+                    <% } else { %>
+                      <form action="/admin/deleted-students/<%= a.id %>/restore" method="POST" class="d-inline"
+                        data-student-name="<%= a.student_name || '' %>"
+                        onsubmit="return askRestorePassword(this)">
+                        <input type="hidden" name="admin_password" value="">
+                        <button class="btn btn-sm btn-outline-success">♻️ إرجاع الطالب</button>
+                      </form>
+                    <% } %>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="my-4">
+        <a href="/settings" class="btn btn-secondary">← رجوع للإعدادات</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function askRestorePassword(form) {
+    const name = form.dataset.studentName || '';
+    if (!confirm('إرجاع الطالب ' + name + ' بكل بياناته؟')) return false;
+    const password = prompt('اكتب كلمة مرور الأدمن لتأكيد الإرجاع:');
+    if (!password) return false;
+    form.querySelector('input[name="admin_password"]').value = password;
+    return true;
+  }
+</script>
+
+<%- include('partials/footer') %>

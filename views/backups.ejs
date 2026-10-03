@@ -1,0 +1,86 @@
+<%- include('partials/header') %>
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-lg-9 mx-auto">
+      <div class="mb-4">
+        <h2 class="mb-2">🛡️ النسخ الاحتياطية</h2>
+        <p class="text-muted mb-0">
+          نسخة كاملة من قاعدة البيانات بتتعمل تلقائيًا كل يوم الساعة 12 بالليل (توقيت مصر)، ومع أي مسح أو استيراد من الإعدادات.
+          النسخ متشفرة ومحفوظة على Cloudinary (فولدر <code><%= folder %></code>) بره السيرفر، فالتحديثات مش بتمسحها.
+        </p>
+      </div>
+
+      <% if (!encryptionConfigured) { %>
+      <div class="alert alert-danger">
+        ⚠️ النسخ الاحتياطي <strong>متوقف</strong>: لازم تضيف المتغير <code>BACKUP_ENCRYPTION_PASSWORD</code> (12 حرف على الأقل) في إعدادات السيرفر.
+        احتفظ بالباسورد ده في مكان آمن — من غيره مينفعش تفتح النسخ.
+      </div>
+      <% } %>
+      <% if (successMessage) { %>
+      <div class="alert alert-success"><%= successMessage %></div>
+      <% } %>
+      <% if (errorMessage) { %>
+      <div class="alert alert-danger"><%= errorMessage %></div>
+      <% } %>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div>
+            <h6 class="mb-1">آخر محاولة من ساعة تشغيل السيرفر</h6>
+            <% if (!lastResult) { %>
+              <span class="text-muted small">لسه مفيش محاولة من ساعة آخر تشغيل.</span>
+            <% } else if (lastResult.ok) { %>
+              <span class="text-success small">
+                ✅ نجحت (<%= lastResult.reason %>) — <%= new Date(lastResult.finishedAt).toLocaleString('ar-EG') %> —
+                <%= lastResult.tables %> جدول، <%= lastResult.totalRows %> صف<% if (lastResult.studentsCount !== undefined) { %>، <%= lastResult.studentsCount %> طالب<% } %>
+              </span>
+            <% } else { %>
+              <span class="text-danger small">❌ فشلت (<%= lastResult.reason %>) — <%= new Date(lastResult.finishedAt).toLocaleString('ar-EG') %>: <%= lastResult.error %></span>
+            <% } %>
+          </div>
+          <form action="/admin/backups/run" method="POST" onsubmit="this.querySelector('button').disabled = true;">
+            <button class="btn btn-primary" <%= encryptionConfigured ? '' : 'disabled' %>>💾 اعمل نسخة احتياطية دلوقتي</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h5 class="mb-3">النسخ المحفوظة</h5>
+          <% if (listError) { %>
+            <div class="alert alert-warning mb-0">تعذر جلب قائمة النسخ من Cloudinary: <%= listError %></div>
+          <% } else if (!backups.length) { %>
+            <p class="text-muted mb-0">مفيش نسخ محفوظة لسه.</p>
+          <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>الملف</th><th>الوقت</th><th>الحجم</th><th></th></tr></thead>
+              <tbody>
+                <% backups.forEach(b => { %>
+                <tr>
+                  <td class="small" dir="ltr"><%= b.publicId.replace(folder + '/', '') %></td>
+                  <td class="small"><%= b.createdAt.toLocaleString('ar-EG') %></td>
+                  <td class="small"><%= (b.bytes / 1024).toFixed(0) %> KB</td>
+                  <td><a class="btn btn-sm btn-outline-secondary" href="/admin/backups/download?id=<%= encodeURIComponent(b.publicId) %>">⬇️ تحميل</a></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+          <p class="small text-muted mt-3 mb-0">
+            الملفات بتنزل متشفرة. لفتح ملف: حط <code>BACKUP_ENCRYPTION_PASSWORD</code> في ملف <code>.env</code> على جهازك وشغّل
+            <code dir="ltr">node scripts/decrypt_backup.js &lt;الملف&gt;</code> — هيطلع ملف .sql عادي ينفع يترجع في phpMyAdmin على قاعدة بيانات فاضية.
+          </p>
+        </div>
+      </div>
+
+      <div class="my-4">
+        <a href="/settings" class="btn btn-secondary">← رجوع للإعدادات</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

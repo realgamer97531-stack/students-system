@@ -60,6 +60,12 @@ const PaymentVerification = require('./models/PaymentVerification');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
 const ensureLessonAccessSchema = require('./utils/ensureLessonAccessSchema');
 const ensurePopupQuestionSchema = require('./utils/ensurePopupQuestionSchema');
+const {
+  ensureDeletedStudentArchiveSchema, archiveAndDeleteStudent, restoreArchivedStudent, listArchivedStudents,
+} = require('./utils/studentArchive');
+const {
+  buildSqlDump, runBackup, listBackups, getDownloadUrl, getLastResult, BACKUP_FOLDER,
+} = require('./utils/dailyBackup');
 const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
@@ -822,6 +828,18 @@ async function markDefaultBookletDelivered(student) {
   return sb;
 }
 
+// بيعدّل رصيد الطالب جوه الداتابيز مباشرة (balance = balance + delta) بدل ما نحسبه في الذاكرة ونحفظه،
+// عشان لو عمليتين حصلوا لنفس الطالب في نفس اللحظة (سكان + شحن مثلاً) محدش فيهم يمسح التاني.
+// بعدها بيحدّث الرصيد في النسخة اللي في الذاكرة من غير ما يعلّمه "متغير" (فأي save بعد كده مش هيكتب رصيد قديم).
+async function adjustStudentBalance(student, delta, transaction = null) {
+  const amount = Number(delta) || 0;
+  if (amount !== 0) {
+    await Student.increment({ balance: amount }, { where: { id: student.id }, transaction });
+  }
+  await student.reload({ attributes: ['balance'], include: [], transaction });
+  return student.balance;
+}
+
 async function recordAttendanceCharge(student, userId, reason = 'رسوم الحضور', transaction = null) {
   if (!student) return 0;
 
@@ -829,8 +847,7 @@ async function recordAttendanceCharge(student, userId, reason = 'رسوم الح
   if (!Number.isFinite(amount) || amount <= 0) return 0;
 
   const signedAmount = -amount;
-  student.balance += signedAmount;
-  await student.save({ transaction });
+  await adjustStudentBalance(student, signedAmount, transaction);
 
   await BalanceTransaction.create({
     StudentId: student.id,
@@ -1228,14 +1245,6 @@ app.use((req, res, next) => {
   next();
 });
 
-function escapeSqlValue(value) {
-  if (value === null || value === undefined) return 'NULL';
-  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
-  if (value instanceof Date) return `'${value.toISOString().replace(/'/g, "\\'")}'`;
-  const normalized = String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  return `'${normalized}'`;
-}
-
 function splitSqlStatements(sql) {
   const statements = [];
   let current = '';
@@ -1283,36 +1292,11 @@ function splitSqlStatements(sql) {
   return statements;
 }
 
+// نفس كود النسخة الاحتياطية اليومية: لقطة واحدة متسقة، اسم الداتابيز من إعدادات الاتصال نفسها
+// (مش DB_NAME بس)، والتواريخ بصيغة MySQL الصحيحة
 async function exportDatabaseSql() {
-  const databaseName = process.env.DB_NAME;
-  const tables = await sequelize.query(
-    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME',
-    { replacements: [databaseName], type: QueryTypes.SELECT }
-  );
-
-  const statements = [];
-
-  for (const tableRow of tables) {
-    const tableName = tableRow.TABLE_NAME;
-    const createResult = await sequelize.query(`SHOW CREATE TABLE \`${tableName}\``, { type: QueryTypes.SELECT });
-    const createSql = createResult[0] && (createResult[0]['Create Table'] || createResult[0]['Create table']);
-    if (createSql) {
-      statements.push(`${createSql};`);
-    }
-
-    const rows = await sequelize.query(`SELECT * FROM \`${tableName}\``, { type: QueryTypes.SELECT });
-    if (!rows.length) continue;
-
-    const columns = Object.keys(rows[0]);
-    if (!columns.length) continue;
-
-    for (const row of rows) {
-      const values = columns.map((column) => escapeSqlValue(row[column]));
-      statements.push(`INSERT INTO \`${tableName}\` (\`${columns.join('`, `')}\`) VALUES (${values.join(', ')});`);
-    }
-  }
-
-  return statements.join('\n');
+  const { sql } = await buildSqlDump(sequelize);
+  return sql;
 }
 
 async function importDatabaseSql(sqlText) {
@@ -1385,6 +1369,49 @@ app.post('/settings/session-tools', requireAdmin, async (req, res) => {
   }
 });
 
+// ===== النسخ الاحتياطي على Cloudinary (utils/dailyBackup.js) =====
+function backupExtraFiles() {
+  return [{ name: 'center-recharge-ledger', path: centerLedgerPath }];
+}
+
+async function backupBeforeDestructiveAction(reason) {
+  return runBackup(sequelize, { reason, extraFiles: backupExtraFiles() });
+}
+
+app.get('/admin/backups', requireAdmin, async (req, res) => {
+  let backups = [];
+  let listError = null;
+  try {
+    backups = await listBackups();
+  } catch (e) {
+    listError = e.message || String(e.error && e.error.message || e);
+  }
+  res.render('backups', {
+    backups,
+    listError,
+    lastResult: getLastResult(),
+    folder: BACKUP_FOLDER,
+    encryptionConfigured: !!(process.env.BACKUP_ENCRYPTION_PASSWORD && process.env.BACKUP_ENCRYPTION_PASSWORD.length >= 12),
+    successMessage: req.query.done ? 'تم عمل نسخة احتياطية ورفعها بنجاح' : null,
+    errorMessage: req.query.error || null,
+  });
+});
+
+app.post('/admin/backups/run', requireAdmin, async (req, res) => {
+  try {
+    await runBackup(sequelize, { reason: 'manual', extraFiles: backupExtraFiles() });
+    res.redirect('/admin/backups?done=1');
+  } catch (e) {
+    res.redirect('/admin/backups?error=' + encodeURIComponent('فشلت النسخة الاحتياطية: ' + e.message));
+  }
+});
+
+app.get('/admin/backups/download', requireAdmin, (req, res) => {
+  const publicId = String(req.query.id || '');
+  if (!publicId.startsWith(BACKUP_FOLDER + '/')) return res.status(400).send('❌ ملف غير صحيح');
+  res.redirect(getDownloadUrl(publicId));
+});
+
 app.get('/settings/export-database', requireAdmin, async (req, res) => {
   try {
     const filename = `database_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.sql`;
@@ -1405,6 +1432,12 @@ app.post('/settings/import-database', requireAdmin, databaseBackupUpload.single(
     }
 
     const sqlText = req.file.buffer.toString('utf8');
+    // نسخة احتياطية إجبارية قبل الاستيراد — لو فشلت، الاستيراد مش بيحصل
+    try {
+      await backupBeforeDestructiveAction('before-import');
+    } catch (backupError) {
+      return res.status(500).render('settings', { errorMessage: 'لم يتم الاستيراد: فشلت النسخة الاحتياطية قبل الاستيراد (' + backupError.message + ')' });
+    }
     await importDatabaseSql(sqlText);
     res.render('settings', { successMessage: 'تم استيراد قاعدة البيانات بنجاح' });
   } catch (error) {
@@ -1425,6 +1458,13 @@ app.post('/settings/clear-db', requireAdmin, async (req, res) => {
     const verified = await verifyAdminPassword(req.session.userId, password);
     if (!verified) {
       return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
+    }
+
+    // نسخة احتياطية إجبارية قبل أي مسح — لو فشلت، المسح مش بيحصل
+    try {
+      await backupBeforeDestructiveAction('before-clear-db');
+    } catch (backupError) {
+      return res.status(500).render('settings', { errorMessage: 'لم يتم المسح: فشلت النسخة الاحتياطية قبل المسح (' + backupError.message + ')' });
     }
 
     await Promise.all([
@@ -1460,6 +1500,13 @@ app.post('/settings/clear-students', requireAdmin, async (req, res) => {
       return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
     }
 
+    // نسخة احتياطية إجبارية قبل أي مسح — لو فشلت، المسح مش بيحصل
+    try {
+      await backupBeforeDestructiveAction('before-clear-students');
+    } catch (backupError) {
+      return res.status(500).render('settings', { errorMessage: 'لم يتم المسح: فشلت النسخة الاحتياطية قبل المسح (' + backupError.message + ')' });
+    }
+
     await Promise.all([
       Attendance.destroy({ where: {} }),
       HomeworkCheck.destroy({ where: {} }),
@@ -1490,6 +1537,13 @@ app.post('/settings/clear-sessions', requireAdmin, async (req, res) => {
       return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
     }
 
+    // نسخة احتياطية إجبارية قبل أي مسح — لو فشلت، المسح مش بيحصل
+    try {
+      await backupBeforeDestructiveAction('before-clear-sessions');
+    } catch (backupError) {
+      return res.status(500).render('settings', { errorMessage: 'لم يتم المسح: فشلت النسخة الاحتياطية قبل المسح (' + backupError.message + ')' });
+    }
+
     await Promise.all([
       Attendance.destroy({ where: {} }),
       HomeworkCheck.destroy({ where: {} }),
@@ -1510,6 +1564,13 @@ app.post('/settings/clear-videos', requireAdmin, async (req, res) => {
     const verified = await verifyAdminPassword(req.session.userId, password);
     if (!verified) {
       return res.status(403).render('settings', { errorMessage: 'كلمة المرور غير صحيحة' });
+    }
+
+    // نسخة احتياطية إجبارية قبل أي مسح — لو فشلت، المسح مش بيحصل
+    try {
+      await backupBeforeDestructiveAction('before-clear-videos');
+    } catch (backupError) {
+      return res.status(500).render('settings', { errorMessage: 'لم يتم المسح: فشلت النسخة الاحتياطية قبل المسح (' + backupError.message + ')' });
     }
 
     await Promise.all([
@@ -2031,8 +2092,7 @@ app.post('/students/:id/balance', async (req, res) => {
 
     const signedAmount = type === 'deduct' ? -Math.abs(amount) : Math.abs(amount);
 
-    student.balance += parseFloat(signedAmount);
-    await student.save();
+    await adjustStudentBalance(student, parseFloat(signedAmount));
 
     await BalanceTransaction.create({
       StudentId: student.id,
@@ -3412,9 +3472,11 @@ app.post('/attendance/scan', async (req, res) => {
       });
     }
 
-    // لو فيه مبلغ مدفوع وقت الحضور، يتضاف للرصيد ويتسجل في سجل المعاملات
+    // لو فيه مبلغ مدفوع وقت الحضور، يتضاف للرصيد ويتسجل في سجل المعاملات.
+    // بيتحفظ في الرصيد فورًا: قبل كده لو الرصيد فضل ناقص بعد الدفع، المعاملة كانت بتتسجل
+    // والفلوس مكانتش بتتضاف للرصيد خالص.
     if (paymentAmount > 0) {
-      student.balance += paymentAmount;
+      await adjustStudentBalance(student, paymentAmount);
       await BalanceTransaction.create({
         StudentId: student.id,
         amount: paymentAmount,
@@ -5583,8 +5645,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       return res.json({ success: false, message: 'رصيدك غير كافٍ لدفع ثمن هذه الحصة' });
     }
 
-    student.balance -= totalPrice;
-    await student.save();
+    await adjustStudentBalance(student, -totalPrice);
 
     await BalanceTransaction.create({
       StudentId: student.id,
@@ -6724,8 +6785,7 @@ app.post('/api/portal/student/video-broadcasts/:id/purchase', verifyPortalToken(
       return res.json({ success: false, message: 'رصيدك غير كافٍ لدفع ثمن هذا الفيديو' });
     }
 
-    student.balance -= broadcast.price;
-    await student.save();
+    await adjustStudentBalance(student, -broadcast.price);
 
     await BalanceTransaction.create({
       StudentId: student.id,
@@ -6802,8 +6862,7 @@ app.post('/attendance/:id/delete', requireAdmin, async (req, res) => {
     const redirectTo = req.body.redirect_to;
 
     const student = await Student.findByPk(studentId);
-    student.balance += student.price_per_session;
-    await student.save();
+    await adjustStudentBalance(student, student.price_per_session);
 
     await BalanceTransaction.create({
       StudentId: studentId,
@@ -6864,14 +6923,29 @@ app.get('/admin/closing', requireClosingAuth, async (req, res) => {
   res.render('closing-period', { result, centers, filters: { start: start || '', end: end || '', center_id: center_id || '' } });
 });
 
-// نسخة احتياطية تلقائية كل يوم الساعة 3 الفجر
-if (!process.env.VERCEL) cron.schedule('0 3 * * *', () => {
-  console.log('⏳ جاري عمل نسخة احتياطية تلقائية...');
-  exec('node backup.js', (error, stdout) => {
-    if (error) console.error('❌ فشل:', error.message);
-    else console.log(stdout);
-  });
-});
+// نسخة احتياطية تلقائية كل يوم الساعة 12 بالليل بتوقيت مصر، بترفع على Cloudinary (بره السيرفر).
+// (الطريقة القديمة كانت mysqldump في فولدر backups على السيرفر نفسه، وده بيتمسح مع كل تحديث)
+if (!process.env.VERCEL) {
+  cron.schedule('0 0 * * *', () => {
+    console.log('⏳ جاري عمل النسخة الاحتياطية اليومية...');
+    runBackup(sequelize, { reason: 'daily', extraFiles: backupExtraFiles() }).catch(() => {});
+  }, { timezone: 'Africa/Cairo', noOverlap: true });
+
+  // لو السيرفر كان واقف أو اتعمله تحديث وقت 12 بالليل: بعد التشغيل بـ 3 دقايق نشوف آخر نسخة،
+  // ولو أقدم من 26 ساعة (أو مفيش خالص) نعمل واحدة فورًا
+  setTimeout(async () => {
+    try {
+      if (!dbReady || !process.env.BACKUP_ENCRYPTION_PASSWORD) return;
+      const [latest] = await listBackups();
+      if (!latest || Date.now() - latest.createdAt.getTime() > 26 * 60 * 60 * 1000) {
+        console.log('⏳ آخر نسخة احتياطية قديمة أو مش موجودة — جاري عمل نسخة تعويضية...');
+        await runBackup(sequelize, { reason: 'catch-up', extraFiles: backupExtraFiles() });
+      }
+    } catch (e) {
+      console.error('⚠️ فحص النسخة الاحتياطية بعد التشغيل فشل:', e.message);
+    }
+  }, 3 * 60 * 1000);
+}
 
 // تشغيل السيرفر + التأكد من الاتصال بقاعدة البيانات
 // async function startServer() {
@@ -7172,8 +7246,13 @@ app.post('/api/portal/recharge', verifyPortalToken('student'), async (req, res) 
     if (!rechargeCode) return res.json({ success: false, message: '❌ الكود غير صحيح أو تم استخدامه من قبل' });
 
     const student = await Student.findByPk(req.portalStudentId);
-    student.balance += rechargeCode.amount;
-    await student.save();
+
+    // بنحجز الكود الأول في خطوة واحدة (بشرط إنه لسه مش مستخدم)، عشان لو اتبعت مرتين في نفس اللحظة
+    // ميتضافش رصيده مرتين
+    const [claimedCount] = await RechargeCode.update({ is_used: true }, { where: { id: rechargeCode.id, is_used: false } });
+    if (!claimedCount) return res.json({ success: false, message: '❌ الكود غير صحيح أو تم استخدامه من قبل' });
+
+    await adjustStudentBalance(student, rechargeCode.amount);
 
     await BalanceTransaction.create({
       StudentId: student.id,
@@ -7181,7 +7260,6 @@ app.post('/api/portal/recharge', verifyPortalToken('student'), async (req, res) 
       reason: `شحن رصيد بكود (${rechargeCode.code})`,
     });
 
-    await RechargeCode.update({ is_used: true }, { where: { id: rechargeCode.id } });
     const ledger = readCenterLedger();
     if (ledger.codes[rechargeCode.code]) {
       ledger.codes[rechargeCode.code].used = true;
@@ -9569,26 +9647,68 @@ app.post('/admin/follow-up-management/unassign/:studentId', requireAdmin, async 
   res.redirect('/admin/follow-up-management');
 });
 
+// الجداول اللي بتتحذف مع الطالب (وبتتحفظ في أرشيف المحذوفين قبل الحذف)
+const STUDENT_RELATED_MODELS = {
+  Attendance, HomeworkCheck, ExamResult, BalanceTransaction, WatchProgress, VideoAccessGrant,
+  FollowUpAssignment, SessionComment, StudentBooklet, BookletReservation, Warning,
+};
+
 app.post('/students/:id/delete', requireAdmin, async (req, res) => {
   try {
     const studentId = req.params.id;
-    // حذف كل البيانات المرتبطة بالطالب
-    await Attendance.destroy({ where: { StudentId: studentId } });
-    await HomeworkCheck.destroy({ where: { StudentId: studentId } });
-    await ExamResult.destroy({ where: { StudentId: studentId } });
-    await BalanceTransaction.destroy({ where: { StudentId: studentId } });
-    await WatchProgress.destroy({ where: { StudentId: studentId } });
-    await VideoAccessGrant.destroy({ where: { StudentId: studentId } });
-    await FollowUpAssignment.destroy({ where: { StudentId: studentId } });
-    await SessionComment.destroy({ where: { StudentId: studentId } });
-    await StudentBooklet.destroy({ where: { StudentId: studentId } });
-    await BookletReservation.destroy({ where: { StudentId: studentId } });
-    await Warning.destroy({ where: { StudentId: studentId } });
-    await Student.destroy({ where: { id: studentId } });
+    // الحذف محتاج باسورد الأدمن عشان ميحصلش بالغلط
+    const verified = await verifyAdminPassword(req.session.userId, (req.body && req.body.admin_password) || '');
+    if (!verified) return res.status(403).send('❌ كلمة المرور الإدارية غير صحيحة، لم يتم حذف الطالب.');
+
+    // بناخد نسخة كاملة من الطالب وبياناته في الأرشيف، وبعدين نحذف — الاتنين في transaction واحدة
+    const archive = await archiveAndDeleteStudent({
+      sequelize,
+      Student,
+      related: STUDENT_RELATED_MODELS,
+      studentId,
+      user: { id: req.session.userId, name: req.session.userName },
+    });
+    if (!archive) return res.status(404).send('❌ الطالب غير موجود');
+    console.log(`🗑 تم حذف الطالب ${archive.student_name} (${archive.student_code}) بواسطة ${req.session.userName} - أرشيف رقم ${archive.id}`);
     res.redirect('/students');
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// صفحة الطلاب المحذوفين: مين اتحذف، مين حذفه، وإمكانية إرجاعه
+app.get('/admin/deleted-students', requireAdmin, async (req, res) => {
+  try {
+    const archives = await listArchivedStudents();
+    res.render('deleted-students', {
+      archives,
+      successMessage: req.query.restored ? 'تم إرجاع الطالب وكل بياناته بنجاح' : null,
+      errorMessage: req.query.error || null,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+app.post('/admin/deleted-students/:id/restore', requireAdmin, async (req, res) => {
+  try {
+    const verified = await verifyAdminPassword(req.session.userId, (req.body && req.body.admin_password) || '');
+    if (!verified) return res.redirect('/admin/deleted-students?error=' + encodeURIComponent('كلمة المرور الإدارية غير صحيحة'));
+
+    const { student } = await restoreArchivedStudent({
+      sequelize,
+      Student,
+      related: STUDENT_RELATED_MODELS,
+      archiveId: req.params.id,
+      user: { id: req.session.userId, name: req.session.userName },
+    });
+    console.log(`♻️ تم إرجاع الطالب ${student.name} (${student.student_code}) بواسطة ${req.session.userName}`);
+    res.redirect('/admin/deleted-students?restored=1');
+  } catch (e) {
+    console.error('❌ فشل إرجاع الطالب:', e.message);
+    res.redirect('/admin/deleted-students?error=' + encodeURIComponent('فشل إرجاع الطالب: ' + e.message));
   }
 });
 
@@ -9964,6 +10084,7 @@ async function startServer() {
     await ensureBookletReservationSchema(sequelize);
     await ensureLessonAccessSchema(sequelize);
     await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
+    await ensureDeletedStudentArchiveSchema().catch((e) => console.error('⚠️ تجهيز جدول أرشيف الطلاب المحذوفين فشل:', e.message));
     normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
@@ -10024,6 +10145,7 @@ async function startServer() {
           await ensureBookletReservationSchema(sequelize);
           await ensureLessonAccessSchema(sequelize);
           await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
+          await ensureDeletedStudentArchiveSchema().catch((e) => console.error('⚠️ تجهيز جدول أرشيف الطلاب المحذوفين فشل:', e.message));
           normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));
           console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
           break;
