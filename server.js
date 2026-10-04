@@ -34,7 +34,7 @@ const Center = require('./models/Center');
 const Subject = require('./models/Subject');
 const { findSurchargeRule, surchargeReason } = require('./utils/onlineSessionSurcharge');
 const Student = require('./models/Student');
-const QRCode = require('qrcode');
+const { studentQrSvg, studentQrDataUrl } = require('./utils/studentQr');
 const CenterSubjectSeries = require('./models/CenterSubjectSeries');
 const Session = require('./models/Session');
 const Attendance = require('./models/Attendance');
@@ -840,6 +840,31 @@ async function adjustStudentBalance(student, delta, transaction = null) {
   return student.balance;
 }
 
+// بيحوّل الكود المكتوب يدويًا لصيغة STU-0XXXX: "12" أو "0012" أو "stu12" أو "STU-0012" أو "١٢" → STU-00012
+// (نفس الصيغة اللي بتتولد للطالب في Student afterCreate)
+function normalizeStudentCode(input) {
+  const text = String(input || '')
+    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .trim()
+    .toUpperCase();
+  const match = text.match(/^(?:STU)?[\s-]*0*(\d+)$/);
+  if (!match) return text;
+  return `STU-${match[1].padStart(5, '0')}`;
+}
+
+// بيدور على الطالب بالكود زي ما اتكتب بالظبط الأول، ولو مش موجود بالصيغة المختصرة (STU-0XXXX)
+async function findStudentByCode(rawCode, options = {}) {
+  const raw = String(rawCode || '').trim();
+  if (!raw) return null;
+  const candidates = [...new Set([raw, normalizeStudentCode(raw)])];
+  const attributes = options.attributes && !options.attributes.includes('student_code')
+    ? [...options.attributes, 'student_code']
+    : options.attributes;
+  const matches = await Student.findAll({ ...options, attributes, where: { student_code: candidates }, limit: 2 });
+  return matches.find((s) => s.student_code === raw) || matches[0] || null;
+}
+
 async function recordAttendanceCharge(student, userId, reason = 'رسوم الحضور', transaction = null) {
   if (!student) return 0;
 
@@ -1027,7 +1052,7 @@ app.post('/api/public/student-register', async (req, res) => {
       }
       throw error;
     }
-    const qrCodeImage = await QRCode.toDataURL(student.student_code);
+    const qrCodeImage = studentQrDataUrl(student.student_code);
     res.json({
       success: true,
       student: { name: student.name, student_code: student.student_code, balance: student.balance },
@@ -1834,10 +1859,10 @@ app.get('/students/:id/qr.png', async (req, res) => {
   try {
     const student = await Student.findByPk(req.params.id, { attributes: ['id', 'student_code'] });
     if (!student || !student.student_code) return res.status(404).send('Not found');
-    const png = await QRCode.toBuffer(student.student_code, { margin: 1, width: 300 });
-    res.set('Content-Type', 'image/png');
+    // نفس تصميم QR الجديد (SVG). الرابط فاضل qr.png عشان اللينكات القديمة تفضل شغالة
+    res.set('Content-Type', 'image/svg+xml');
     res.set('Cache-Control', 'private, max-age=86400');
-    res.send(png);
+    res.send(studentQrSvg(student.student_code));
   } catch (error) {
     console.error('Failed to generate student QR:', error);
     res.status(500).send('Error');
@@ -2219,7 +2244,7 @@ app.post('/students', async (req, res) => {
       if (admin_password !== process.env.ADMIN_DUPLICATE_PASSWORD) {
         const centers = await Center.findAll();
         const subjects = await Subject.findAll();
-        const existingQrCodeImage = existingStudent.student_code ? await QRCode.toDataURL(existingStudent.student_code) : null;
+        const existingQrCodeImage = existingStudent.student_code ? studentQrDataUrl(existingStudent.student_code) : null;
         return res.status(409).render('add-student', { centers, subjects, existingStudent, existingQrCodeImage });
       }
     }
@@ -2287,7 +2312,7 @@ app.post('/students', async (req, res) => {
       }
     }
 
-    const qrCodeImage = await QRCode.toDataURL(student.student_code);
+    const qrCodeImage = studentQrDataUrl(student.student_code);
     res.render('student-created', { student, qrCodeImage, attendanceNote });
   } catch (error) {
     console.error(error);
@@ -3158,7 +3183,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
     if (confirm_duplicate !== '1') {
       const existingStudent = await findDuplicateStudent({ name, phone, parent_phone, center_id, subject_id });
       if (existingStudent) {
-        const existingQrCodeImage = existingStudent.student_code ? await QRCode.toDataURL(existingStudent.student_code) : null;
+        const existingQrCodeImage = existingStudent.student_code ? studentQrDataUrl(existingStudent.student_code) : null;
         return res.status(409).json({
           success: false,
           isDuplicate: true,
@@ -3237,7 +3262,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
       }
     }
 
-    const qrCodeImage = await QRCode.toDataURL(student.student_code);
+    const qrCodeImage = studentQrDataUrl(student.student_code);
     res.json({ success: true, student, qrCodeImage, attendanceNote });
   } catch (error) {
     console.error(error);
@@ -3252,7 +3277,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     const sessionId = req.session.activeSessionId;
 
     const [student, activeSession] = await Promise.all([
-      Student.findOne({ where: { student_code }, include: [Center, Subject] }),
+      findStudentByCode(student_code, { include: [Center, Subject] }),
       sessionId ? Session.findByPk(sessionId, { include: [Center] }) : null,
     ]);
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
@@ -3428,7 +3453,7 @@ app.post('/attendance/scan', async (req, res) => {
       return res.json({ success: false, message: 'مفيش حصة شغالة دلوقتي' });
     }
 
-    const student = await Student.findOne({ where: { student_code } });
+    const student = await findStudentByCode(student_code);
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     }
@@ -3527,7 +3552,7 @@ app.post('/attendance/scan/force', requirePermission('attendance_scan'), async (
       return res.json({ success: false, message: 'كلمة المرور غير صحيحة' });
     }
 
-    const student = await Student.findOne({ where: { student_code } });
+    const student = await findStudentByCode(student_code);
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     }
@@ -3768,7 +3793,7 @@ app.get('/homework/scan', requirePermission('homework_scan'), async (req, res) =
 app.post('/homework/scan/summary', async (req, res) => {
   try {
     const { student_code } = req.body;
-    const student = await Student.findOne({ where: { student_code } });
+    const student = await findStudentByCode(student_code);
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
 
     const [attendanceRecords, homeworkRecords] = await Promise.all([
@@ -3812,7 +3837,7 @@ app.post('/homework/scan/lookup', async (req, res) => {
   try {
     const { student_code } = req.body;
 
-    const student = await Student.findOne({ where: { student_code } });
+    const student = await findStudentByCode(student_code);
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     }
@@ -3833,7 +3858,7 @@ app.post('/homework/scan/save', async (req, res) => {
       return res.json({ success: false, message: 'مفيش حصة شغالة دلوقتي' });
     }
 
-    const student = await Student.findOne({ where: { student_code } });
+    const student = await findStudentByCode(student_code);
     if (!student) {
       return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     }
@@ -3891,7 +3916,7 @@ app.post('/door/scan', async (req, res) => {
     const sessionId = req.session.activeSessionId;
 
     const [student, currentSession] = await Promise.all([
-      Student.findOne({ where: { student_code }, attributes: ['id', 'name'] }),
+      findStudentByCode(student_code, { attributes: ['id', 'name'] }),
       sessionId ? Session.findByPk(sessionId, { attributes: ['lesson_number', 'CenterId', 'SubjectId'] }) : null,
     ]);
     if (!student) {
@@ -5164,7 +5189,7 @@ app.get('/api/internal/callcenter/student-summary/:studentId', async (req, res) 
 app.get('/api/portal/student/qrcode', verifyPortalToken('student'), async (req, res) => {
   const student = await Student.findByPk(req.portalStudentId);
   if (!student) return res.status(404).json({ success: false });
-  const qrCodeImage = await QRCode.toDataURL(student.student_code);
+  const qrCodeImage = studentQrDataUrl(student.student_code);
   res.json({ success: true, qrCodeImage, code: student.student_code });
 });
 
