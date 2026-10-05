@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>تسجيل الجهاز</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #F4F5FC; color: #181527; padding: 28px 32px; }
+  h1 { font-size: 21px; margin: 0 0 6px; }
+  p.lead { color: #6B7280; margin: 0 0 22px; line-height: 1.8; font-size: 14px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin: 14px 0 6px; }
+  input {
+    width: 100%; font-family: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid #E2E4F3;
+    border-radius: 11px; background: #fff; outline: none;
+  }
+  input:focus { border-color: #4338CA; box-shadow: 0 0 0 3px rgba(67,56,202,.15); }
+  input[dir="ltr"] { text-align: left; }
+  .hint { color: #6B7280; font-size: 12px; margin-top: 4px; }
+  button {
+    margin-top: 24px; width: 100%; font-family: inherit; font-size: 16px; font-weight: 700; padding: 12px;
+    border: 0; border-radius: 11px; background: #4338CA; color: #fff; cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: default; }
+  #error { margin-top: 16px; background: #FEE2E2; color: #B91C1C; border-radius: 11px; padding: 10px 14px; display: none; line-height: 1.7; font-size: 14px; }
+  .version { margin-top: 18px; color: #9CA3AF; font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>👋 أهلاً بيك في Studyisfunny</h1>
+  <p class="lead">
+    أول مرة بس: سجّل الجهاز ده بيوزر وباسورد <strong>أدمن</strong>. بعد كده البرنامج هينزل كل البيانات
+    (محتاج إنترنت المرة دي)، وبعدها يشتغل حتى من غير نت.
+  </p>
+  <form id="form">
+    <label for="deviceName">اسم الجهاز</label>
+    <input id="deviceName" required maxlength="100">
+    <div class="hint">اسم يميز الجهاز ده (مثلاً: لابتوب سنتر المعادي) — هيظهر للأدمن في صفحة الأجهزة.</div>
+
+    <label for="username">يوزر الأدمن</label>
+    <input id="username" required autocomplete="username" dir="ltr">
+
+    <label for="password">باسورد الأدمن</label>
+    <input id="password" type="password" required autocomplete="current-password" dir="ltr">
+
+    <label for="serverUrl">عنوان السيرفر</label>
+    <input id="serverUrl" required dir="ltr">
+    <div class="hint">سيبه زي ما هو إلا لو اتغير عنوان السيستم.</div>
+
+    <button id="submit" type="submit">تسجيل الجهاز</button>
+    <div id="error"></div>
+  </form>
+  <div class="version" id="version"></div>
+<script>
+  const $ = id => document.getElementById(id);
+  window.desktop.setup.defaults().then((d) => {
+    $('serverUrl').value = d.serverUrl;
+    $('deviceName').value = d.deviceName;
+    $('version').textContent = `إصدار ${d.version}`;
+    $('username').focus();
+  });
+  $('form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    $('error').style.display = 'none';
+    $('submit').disabled = true;
+    $('submit').textContent = 'بيسجل...';
+    const result = await window.desktop.setup.register({
+      serverUrl: $('serverUrl').value,
+      username: $('username').value.trim(),
+      password: $('password').value,
+      deviceName: $('deviceName').value.trim(),
+    });
+    if (result.success) {
+      $('submit').textContent = '✔ اتسجل — بيفتح البرنامج...';
+      return;
+    }
+    $('error').textContent = result.message;
+    $('error').style.display = 'block';
+    $('submit').disabled = false;
+    $('submit').textContent = 'تسجيل الجهاز';
+  });
+</script>
+</body>
+</html>

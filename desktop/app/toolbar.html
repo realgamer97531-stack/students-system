@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>شريط المزامنة</title>
+<style>
+  :root {
+    --primary: #4338CA; --primary-dark: #312E81; --bar: #191653; --text: #fff; --muted: #A5A3D9;
+    --ok: #14B8A6; --warn: #F59E0B; --danger: #E11D48;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 13px; background: var(--bar); color: var(--text);
+    display: flex; align-items: center; gap: 10px; padding: 0 12px; user-select: none;
+  }
+  .group { display: flex; align-items: center; gap: 6px; }
+  .brand { font-weight: 700; font-size: 15px; margin-left: 6px; white-space: nowrap; }
+  .spacer { flex: 1; }
+  button {
+    font-family: inherit; font-size: 13px; color: var(--text); background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 7px 12px; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px; transition: background .15s;
+  }
+  button:hover:not(:disabled) { background: rgba(255,255,255,.18); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.icon { padding: 7px 10px; font-size: 15px; }
+  button.primary { background: var(--primary); border-color: var(--primary); }
+  button.primary:hover:not(:disabled) { background: #5B4FE0; }
+  button.warn { background: var(--warn); border-color: var(--warn); color: #1f1300; font-weight: 700; }
+  button.danger { background: var(--danger); border-color: var(--danger); font-weight: 700; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,.08); white-space: nowrap; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(20,184,166,.25); }
+  .dot.off { background: var(--danger); box-shadow: 0 0 0 3px rgba(225,29,72,.25); }
+  .muted { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #toast {
+    position: fixed; top: 6px; left: 50%; transform: translateX(-50%); max-width: 70%;
+    background: #fff; color: #181527; border-radius: 10px; padding: 8px 14px; font-weight: 600; display: none;
+    box-shadow: 0 6px 20px rgba(0,0,0,.3); z-index: 5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #toast.error { background: #FEE2E2; color: #B91C1C; }
+  #toast.success { background: #D1FAE5; color: #047857; }
+</style>
+</head>
+<body>
+  <div class="group">
+    <button class="icon" id="back" title="رجوع">→</button>
+    <button class="icon" id="forward" title="للأمام">←</button>
+    <button class="icon" id="reload" title="إعادة تحميل الصفحة">⟳</button>
+    <button class="icon" id="home" title="الصفحة الرئيسية">⌂</button>
+  </div>
+  <span class="brand">Studyisfunny</span>
+
+  <span class="pill" id="conn"><span class="dot" id="dot"></span><span id="connText">بيجهز...</span></span>
+  <span class="pill" id="pendingPill" title="عمليات اتعملت على الجهاز ولسه ماترفعتش على السيرفر">⬆ <span id="pending">0</span> مستنية الرفع</span>
+  <span class="muted" id="lastPull"></span>
+
+  <span class="spacer"></span>
+
+  <div class="group">
+    <button class="warn" id="problems" style="display:none">⚠ <span id="problemsCount">0</span> عمليات مرفوضة</button>
+    <button class="primary" id="pullBtn" title="ينزل نسخة كاملة جديدة من السيرفر">⬇ تحديث البيانات</button>
+    <button class="primary" id="pushBtn" title="يرفع كل العمليات اللي على الجهاز للسيرفر دلوقتي">⬆ رفع البيانات</button>
+    <button id="updateBtn" title="تحديثات البرنامج">⭳ تحديثات البرنامج</button>
+    <button class="icon" id="settings" title="معلومات وإعدادات">⚙</button>
+  </div>
+  <div id="toast"></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let toastTimer = null;
+  function toast(message, kind) {
+    const el = $('toast');
+    el.textContent = message;
+    el.title = message;
+    el.className = kind || '';
+    el.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, kind === 'error' ? 9000 : 4000);
+  }
+
+  function timeAgo(iso) {
+    if (!iso) return 'لسه ماتنزلش';
+    const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (minutes < 1) return 'آخر تحديث: دلوقتي';
+    if (minutes < 60) return `آخر تحديث: من ${minutes} دقيقة`;
+    return `آخر تحديث: ${new Date(iso).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  let status = null;
+  function renderStatus(s) {
+    status = s;
+    if (!s) return;
+    const dot = $('dot');
+    if (s.deviceRevoked) {
+      dot.className = 'dot off';
+      $('connText').textContent = 'الجهاز اتلغى تسجيله — اضغط ⚙';
+    } else if (s.online) {
+      dot.className = 'dot ok';
+      $('connText').textContent = s.pulling ? 'بينزل البيانات...' : s.pushing ? 'بيرفع...' : 'متصل';
+    } else {
+      dot.className = 'dot off';
+      $('connText').textContent = 'أوفلاين — شغال عادي';
+    }
+    $('pending').textContent = s.pending;
+    $('pendingPill').style.display = s.pending ? '' : 'none';
+    $('problemsCount').textContent = s.problems;
+    $('problems').style.display = s.problems ? '' : 'none';
+    $('lastPull').textContent = s.progress || timeAgo(s.lastPullAt);
+    $('pullBtn').disabled = s.pulling;
+    $('pushBtn').disabled = s.pushing;
+  }
+
+  function renderUpdate(u) {
+    const btn = $('updateBtn');
+    btn.className = '';
+    btn.disabled = false;
+    switch (u && u.state) {
+      case 'checking': btn.innerHTML = '<span class="spin">⟳</span> بيدور على تحديث'; btn.disabled = true; break;
+      case 'available': btn.className = 'warn'; btn.textContent = `⭳ تنزيل التحديث ${u.version}`; break;
+      case 'downloading': btn.textContent = `⭳ بينزل التحديث ${u.percent || 0}%`; btn.disabled = true; break;
+      case 'downloaded': btn.className = 'warn'; btn.textContent = `✔ تثبيت التحديث ${u.version}`; break;
+      case 'latest': btn.textContent = '✔ البرنامج محدث'; break;
+      case 'error': btn.textContent = '⭳ تحديثات البرنامج'; if (u.message) toast(`التحديث: ${u.message}`, 'error'); break;
+      default: btn.textContent = '⭳ تحديثات البرنامج';
+    }
+  }
+
+  window.desktop.onStatus(renderStatus);
+  window.desktop.onUpdate(renderUpdate);
+  window.desktop.onNavState((nav) => {
+    $('back').disabled = !nav.canGoBack;
+    $('forward').disabled = !nav.canGoForward;
+  });
+  window.desktop.getStatus().then(({ status: s, update }) => { renderStatus(s); renderUpdate(update); });
+  setInterval(() => status && !status.progress && ($('lastPull').textContent = timeAgo(status.lastPullAt)), 30000);
+
+  $('back').onclick = () => window.desktop.nav('back');
+  $('forward').onclick = () => window.desktop.nav('forward');
+  $('reload').onclick = () => window.desktop.nav('reload');
+  $('home').onclick = () => window.desktop.nav('home');
+  $('settings').onclick = () => window.desktop.openSettings();
+  $('problems').onclick = () => window.desktop.problems.open();
+  $('updateBtn').onclick = () => window.desktop.updateAction();
+
+  $('pullBtn').onclick = async () => {
+    $('pullBtn').disabled = true;
+    toast('بينزل نسخة جديدة من السيرفر...');
+    const result = await window.desktop.pull();
+    if (result.success) {
+      toast('✔ البيانات اتحدثت من السيرفر', 'success');
+      window.desktop.nav('reload');
+    } else toast(result.message, 'error');
+    $('pullBtn').disabled = false;
+  };
+  $('pushBtn').onclick = async () => {
+    $('pushBtn').disabled = true;
+    const result = await window.desktop.push();
+    if (!result.success) toast(result.message, 'error');
+    else if (result.remaining) toast(`اترفع ${result.sent}، ولسه ${result.remaining} مستنيين`, 'error');
+    else toast(result.sent ? `✔ اترفع ${result.sent} عملية${result.failed ? ` (و${result.failed} اترفضت)` : ''}` : '✔ مفيش حاجة مستنية الرفع', result.failed ? 'error' : 'success');
+    $('pushBtn').disabled = false;
+  };
+</script>
+</body>
+</html>

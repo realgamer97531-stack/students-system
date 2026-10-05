@@ -1,0 +1,102 @@
+<%- include('partials/header') %>
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-lg-10 mx-auto">
+      <div class="mb-4">
+        <h2 class="mb-2">💻 أجهزة برنامج الديسكتوب</h2>
+        <p class="text-muted mb-0">
+          الأجهزة اللي عليها برنامج الديسكتوب (الأوفلاين). كل جهاز اتسجل مرة واحدة بيوزر وباسورد أدمن،
+          ولو جهاز ضاع أو اتسرق اعمله "إلغاء تسجيل" فورًا عشان مايقدرش يرفع أو ينزل أي بيانات تاني.
+        </p>
+      </div>
+
+      <% if (message) { %>
+      <div class="alert alert-success"><%= message %></div>
+      <% } %>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <% if (!devices.length) { %>
+            <p class="text-muted mb-0">لسه مفيش أي جهاز متسجل.</p>
+          <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>الجهاز</th>
+                  <th>اتسجل بواسطة</th>
+                  <th>إصدار البرنامج</th>
+                  <th>آخر اتصال</th>
+                  <th>عمليات مرفوعة</th>
+                  <th>اترفضت</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% devices.forEach(function(device) { %>
+                <tr class="<%= device.revoked_at ? 'text-muted' : '' %>">
+                  <td><%= device.name %></td>
+                  <td><%= device.registered_by_name || '-' %></td>
+                  <td dir="ltr"><%= device.app_version || '-' %></td>
+                  <td><%= device.last_seen_at ? new Date(device.last_seen_at + 'Z').toLocaleString('ar-EG') : 'لسه' %></td>
+                  <td><%= device.ops_count %></td>
+                  <td><%= device.rejected_count %></td>
+                  <td>
+                    <% if (device.revoked_at) { %>
+                      <span class="badge bg-secondary">ملغي</span>
+                    <% } else { %>
+                      <form method="POST" action="/admin/sync-devices/<%= device.id %>/revoke" onsubmit="return confirm('متأكد؟ الجهاز ده مش هيقدر يزامن تاني إلا لو اتسجل من جديد.');">
+                        <button class="btn btn-sm btn-outline-danger">إلغاء تسجيل</button>
+                      </form>
+                    <% } %>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h5 class="mb-3">⚠️ عمليات أوفلاين السيرفر رفضها</h5>
+          <p class="small text-muted">
+            دي عمليات اتعملت على جهاز وهو أوفلاين، ولما اترفعت السيرفر رفضها (مثلاً رصيد الطالب كان خلص من جهاز تاني).
+            العملية دي <strong>ماتسجلتش</strong> — لازم حد يراجعها ويعملها يدوي لو لازم.
+          </p>
+          <% if (!recentRejected.length) { %>
+            <p class="text-success mb-0">مفيش عمليات مرفوضة 👌</p>
+          <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr><th>وقت العملية</th><th>الجهاز</th><th>اليوزر</th><th>العملية</th><th>رد السيرفر</th></tr>
+              </thead>
+              <tbody>
+                <% recentRejected.forEach(function(op) { %>
+                <tr>
+                  <td><%= op.client_time ? new Date(op.client_time + 'Z').toLocaleString('ar-EG') : '-' %></td>
+                  <td><%= op.device_name %></td>
+                  <td><%= op.user_name || '-' %></td>
+                  <td dir="ltr" class="small"><%= op.method %> <%= op.path %></td>
+                  <td class="small"><%= op.status !== 'done' ? 'مش معروف هل كملت (اتقطعت في النص)' : ((op.result && op.result.message) || '-') %></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="my-4">
+        <a href="/settings" class="btn btn-secondary">← رجوع للإعدادات</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

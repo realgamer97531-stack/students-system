@@ -1,0 +1,94 @@
+{
+  "name": "studyisfunny-desktop",
+  "productName": "Studyisfunny",
+  "version": "1.0.0",
+  "description": "Studyisfunny - نظام المتابعة (نسخة الديسكتوب بتشتغل أوفلاين)",
+  "author": "Shady Elsharkawy",
+  "main": "app/main.js",
+  "private": true,
+  "scripts": {
+    "prepare-build": "node scripts/prepare.js",
+    "start": "npm run prepare-build && electron .",
+    "dev": "electron .",
+    "dist": "npm run prepare-build && electron-builder --win --publish never",
+    "release": "node scripts/bump-version.js && npm run prepare-build && electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.studyisfunny.desktop",
+    "productName": "Studyisfunny",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "staging/server",
+        "to": "server",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "staging/server/node_modules",
+        "to": "server/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "staging/mariadb",
+        "to": "mariadb",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "staging/cdn",
+        "to": "cdn",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Studyisfunny",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Studyisfunny-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "realgamer97531-stack",
+        "repo": "studyisfunny-desktop-releases",
+        "releaseType": "release"
+      }
+    ],
+    "electronDist": "node_modules/electron/dist"
+  }
+}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>عمليات السيرفر رفضها</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #F4F5FC; color: #181527; margin: 0; padding: 22px 26px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p.lead { color: #6B7280; line-height: 1.8; margin: 0 0 18px; font-size: 14px; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 8px rgba(30,27,75,.06); padding: 14px 16px; margin-bottom: 12px; }
+  .row { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+  .what { font-weight: 700; direction: ltr; text-align: right; word-break: break-all; font-size: 13px; color: #312E81; }
+  .meta { color: #6B7280; font-size: 12px; margin-top: 4px; }
+  .reason { margin-top: 10px; background: #FEE2E2; color: #B91C1C; border-radius: 10px; padding: 8px 12px; font-size: 14px; line-height: 1.7; }
+  .details { margin-top: 6px; color: #374151; font-size: 12px; direction: ltr; text-align: right; word-break: break-all; }
+  .actions { display: flex; gap: 8px; flex-shrink: 0; }
+  button { font-family: inherit; font-size: 13px; border-radius: 9px; padding: 7px 12px; cursor: pointer; border: 1px solid #E2E4F3; background: #fff; }
+  button.retry { background: #4338CA; color: #fff; border-color: #4338CA; }
+  .empty { text-align: center; color: #047857; background: #D1FAE5; padding: 18px; border-radius: 14px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>⚠ عمليات اتعملت أوفلاين والسيرفر رفضها</h1>
+  <p class="lead">
+    العمليات دي اتعملت على الجهاز وهو من غير نت، ولما اترفعت السيرفر رفضها (مثلاً رصيد الطالب كان خلص من جهاز تاني).
+    <strong>العملية دي ماتسجلتش على السيرفر</strong>، والبيانات على الجهاز رجعت زي السيرفر.
+    راجع كل واحدة: لو لازم تتعمل، صلّح السبب (مثلاً اشحن رصيد الطالب) واضغط "حاول تاني"، أو اضغط "تم المراجعة".
+  </p>
+  <div id="list"></div>
+<script>
+  const list = document.getElementById('list');
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  async function load() {
+    const problems = await window.desktop.problems.list();
+    if (!problems.length) {
+      list.innerHTML = '<div class="empty">✔ مفيش عمليات مرفوضة</div>';
+      return;
+    }
+    list.innerHTML = problems.map(p => `
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="what">${esc(p.method)} ${esc(p.url)}</div>
+            <div class="meta">${esc(new Date(Number(p.client_time)).toLocaleString('ar-EG'))} — ${esc(p.user_name || '')}</div>
+            <div class="details">${esc(p.summary || '')}</div>
+          </div>
+          <div class="actions">
+            <button class="retry" data-retry="${p.seq}">حاول تاني</button>
+            <button data-dismiss="${p.seq}">تم المراجعة</button>
+          </div>
+        </div>
+        <div class="reason">رد السيرفر: ${esc(p.server_message || p.last_error || 'غير معروف')}</div>
+      </div>`).join('');
+  }
+  list.addEventListener('click', async (event) => {
+    const retry = event.target.getAttribute('data-retry');
+    const dismiss = event.target.getAttribute('data-dismiss');
+    if (retry) {
+      if (!confirm('هتتبعت العملية دي للسيرفر تاني. اتأكد إنك صلحت سبب الرفض الأول. متأكد؟')) return;
+      await window.desktop.problems.retry(Number(retry));
+    }
+    if (dismiss) await window.desktop.problems.dismiss(Number(dismiss));
+    load();
+  });
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>

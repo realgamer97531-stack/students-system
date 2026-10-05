@@ -68,6 +68,9 @@ const {
 } = require('./utils/dailyBackup');
 const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
+const syncServer = require('./utils/sync/server');
+// برنامج الديسكتوب (أوفلاين) بيشغل نفس السيرفر ده على الجهاز مع DESKTOP_MODE=1
+const desktopRuntime = process.env.DESKTOP_MODE === '1' ? require('./desktop/runtime/server-hooks') : null;
 const checkReceiptWithAI = require('./utils/checkReceiptWithAI');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
@@ -919,6 +922,9 @@ app.use(cors({
   credentials: true 
 }));
 
+// على برنامج الديسكتوب: صفحات التحكم في المزامنة + العمليات اللي محتاجة إنترنت (لازم قبل قراءة الفورمز)
+if (desktopRuntime) app.use(desktopRuntime.earlyMiddleware);
+
 // Middleware عشان السيرفر يقدر يقرا بيانات الفورمز
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -970,6 +976,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
 }));
+
+// مزامنة برنامج الديسكتوب: تسجيل الأجهزة + تنزيل البيانات + تنفيذ العمليات اللي اتعملت أوفلاين
+syncServer.install(app, { sequelize, User, bcrypt });
+if (desktopRuntime) app.use(desktopRuntime.sessionMiddleware);
 
 // إعداد محرك الصفحات EJS
 app.set('view engine', 'ejs');
@@ -1228,6 +1238,8 @@ function requireClosingAuth(req, res, next) {
 }
 
 app.get('/admin/closing/lock', requireAdmin, (req, res) => res.render('closing-lock', { error: null }));
+
+syncServer.installAdminRoutes(app, { sequelize, requireAdmin });
 
 app.post('/admin/closing/unlock', requireAdmin, async (req, res) => {
   const adminUser = await User.findByPk(req.session.userId);
@@ -3733,7 +3745,7 @@ app.post('/exams/:id/scores', async (req, res) => {
       const scoreCase = updatedResults.map(result => `WHEN ${result.id} THEN ${sequelize.escape(result.score)}`).join(' ');
       const userCase = updatedResults.map(result => `WHEN ${result.id} THEN ${sequelize.escape(req.session.userId)}`).join(' ');
       await sequelize.query(
-        `UPDATE examresults SET score = CASE id ${scoreCase} END, UserId = CASE id ${userCase} END WHERE id IN (${updatedResults.map(result => result.id).join(',')})`,
+        `UPDATE examresults SET score = CASE id ${scoreCase} END, UserId = CASE id ${userCase} END, updatedAt = ${sequelize.escape(new Date())} WHERE id IN (${updatedResults.map(result => result.id).join(',')})`,
         { transaction },
       );
     }
@@ -3743,7 +3755,7 @@ app.post('/exams/:id/scores', async (req, res) => {
       const deltaCase = nonZeroDeltas.map(([studentId, delta]) => `WHEN ${studentId} THEN ${sequelize.escape(delta)}`).join(' ');
       const deltaIds = nonZeroDeltas.map(([studentId]) => studentId).join(',');
       await sequelize.query(
-        `UPDATE students SET points = points + CASE id ${deltaCase} END WHERE id IN (${deltaIds})`,
+        `UPDATE students SET points = points + CASE id ${deltaCase} END, updatedAt = ${sequelize.escape(new Date())} WHERE id IN (${deltaIds})`,
         { transaction },
       );
       await BalanceTransaction.bulkCreate(nonZeroDeltas.map(([studentId, delta]) => ({
@@ -10110,6 +10122,7 @@ async function startServer() {
     await ensureLessonAccessSchema(sequelize);
     await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
     await ensureDeletedStudentArchiveSchema().catch((e) => console.error('⚠️ تجهيز جدول أرشيف الطلاب المحذوفين فشل:', e.message));
+    if (!desktopRuntime) await syncServer.ensureSyncSchema(sequelize).catch((e) => console.error('⚠️ تجهيز جداول مزامنة الديسكتوب فشل:', e.message));
     normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));
     console.log('RechargeCode table is ready');
     console.log('✅ تم تجهيز اتصال قاعدة البيانات بنجاح (تم تعطيل sequelize.sync مؤقتًا)');
@@ -10124,7 +10137,7 @@ async function startServer() {
 
   // start HTTP/HTTPS server regardless of DB readiness so pages can load
   if (process.env.NODE_ENV === 'production') {
-    app.listen(PORT, '0.0.0.0', () => {
+    app.listen(PORT, process.env.LISTEN_HOST || '0.0.0.0', () => {
       console.log(`🚀 السيرفر شغال على البورت ${PORT}`);
     });
   } else {
@@ -10171,6 +10184,7 @@ async function startServer() {
           await ensureLessonAccessSchema(sequelize);
           await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
           await ensureDeletedStudentArchiveSchema().catch((e) => console.error('⚠️ تجهيز جدول أرشيف الطلاب المحذوفين فشل:', e.message));
+          if (!desktopRuntime) await syncServer.ensureSyncSchema(sequelize).catch((e) => console.error('⚠️ تجهيز جداول مزامنة الديسكتوب فشل:', e.message));
           normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));
           console.log('✅ إعادة الاتصال بقاعدة البيانات ناجحة — المزامنة مكتملة');
           break;
