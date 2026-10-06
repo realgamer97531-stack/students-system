@@ -56,6 +56,26 @@ class Cache {
     }
   }
 
+  /// نسخة كبيرة (JSON جاهز): من غير ما نفك ونعيد تكوينها على الشاشة. بترجع (النص, وقت الحفظ)
+  static Future<(String, DateTime)?> readRaw(String key) async {
+    try {
+      final file = File('${(await _dir()).path}/${_safe(key)}.raw');
+      if (!file.existsSync()) return null;
+      return (file.readAsStringSync(), file.lastModifiedSync());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> writeRaw(String key, String json) async {
+    try {
+      final file = File('${(await _dir()).path}/${_safe(key)}.raw');
+      final tmp = File('${file.path}.tmp');
+      tmp.writeAsStringSync(json, flush: true);
+      tmp.renameSync(file.path);
+    } catch (_) {}
+  }
+
   static Future<void> remove(String key) async {
     try {
       final file = File('${(await _dir()).path}/${_safe(key)}.json');

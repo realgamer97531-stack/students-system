@@ -2,6 +2,7 @@
 //   الرفع (push): العمليات اللي في الطابور بتتبعت للسيرفر بالترتيب، والسيرفر بينفذها بنفس قواعده
 //                (فالرصيد والنقط بيتجمعوا صح ومفيش ids بتتداخل — السيرفر هو اللي بيدي الـ ids).
 //   التنزيل (pull): بعد ما الطابور يفضى، بننزل التغييرات من السيرفر: أول ما البرنامج يفتح، وكل 5 دقايق، ومع زرار "تنزيل".
+//   التنزيل نفسه في الخلفية (البرنامج شغال عادي)، والحفظ بس هو اللي بيأخر الكتابة ثواني.
 const store = require('./store');
 
 const PULL_INTERVAL_MS = 5 * 60 * 1000;
@@ -26,7 +27,9 @@ const state = {
 };
 
 const inflight = new Map(); // op_id → وقت البداية (طلبات شغالة دلوقتي على الجهاز)
-let gate = null; // وعد شغال وقت التنزيل: العمليات الجديدة بتستنى لحد ما يخلص
+let gate = null; // وعد شغال وقت حفظ التنزيل: العمليات الجديدة (الكتابة) بتستنى لحد ما يخلص
+let fullApplying = false; // شكل جدول بيتغير (DROP/CREATE): حتى الصفحات بتستنى
+let writeSeq = 0; // بيزيد مع كل عملية كتابة: لو حصلت كتابة وقت التنزيل بنأجل الحفظ للمرة الجاية
 let pushTimer = null;
 let listeners = [];
 
@@ -106,12 +109,18 @@ async function waitForGate() {
   while (gate) await gate;
 }
 
+// الصفحات (قراءة بس) مش بتستنى التحديثات العادية، بس بتستنى النسخة الكاملة (اللي بتفضي الجداول وتملاها)
+async function waitForFullApply() {
+  while (gate && fullApplying) await gate;
+}
+
 function opStarted(opId) {
   inflight.set(opId, Date.now());
 }
 
 function opFinished(opId, wrote) {
   inflight.delete(opId);
+  if (wrote) writeSeq += 1;
   if (wrote) schedulePush(300);
   notify();
 }
@@ -411,8 +420,20 @@ async function pull({ full = false } = {}) {
         return { skipped: 'pending-uploads' };
       }
     }
-    const result = await holdGate(() => doPull(full));
-    return result;
+    // التنزيل من النت بيحصل في الخلفية والبرنامج شغال عادي؛ الحفظ بس هو اللي بيوقف الكتابة ثواني
+    const prepared = await downloadPull(full);
+    const seqBefore = prepared.seq;
+    return await holdGate(async () => {
+      if (writeSeq !== seqBefore) return { skipped: 'writes-during-download' };
+      // كل جدول بيتحفظ جوه transaction، فالصفحات بتشوف البيانات القديمة لحد ما الجديدة تخلص.
+      // الاستثناء الوحيد: تغيير شكل جدول (DROP/CREATE) — ساعتها بس الصفحات تستنى
+      fullApplying = Object.values(prepared.response.tables || {}).some(entry => entry.ddl);
+      try {
+        return await applyPull(prepared);
+      } finally {
+        fullApplying = false;
+      }
+    });
   } catch (error) {
     if (error.code !== 'DEVICE_REVOKED') {
       if (error.name === 'TimeoutError' || error.name === 'TypeError') setOnline(false, error);
@@ -426,9 +447,12 @@ async function pull({ full = false } = {}) {
   }
 }
 
-async function doPull(full) {
+async function downloadPull(full) {
+  const seq = writeSeq;
   const lastFull = await store.getKv('last_full_pull', 0);
-  const doFull = full || !lastFull || Date.now() - lastFull > FULL_REFRESH_EVERY_MS;
+  // نسخة كاملة مرة واحدة بعد إصلاح الجداول اللي أساميها بتفرق في الحروف الكبيرة بس (عشان ترجع البيانات اللي اتمسحت)
+  const caseFixed = await store.getKv('case_fix_v1', false);
+  const doFull = full || !caseFixed || !lastFull || Date.now() - lastFull > FULL_REFRESH_EVERY_MS;
   const tablesState = await store.getKv('tables', {});
   const refreshTables = await store.getKv('refresh_tables', []);
   const since = await store.getKv('last_server_time', null);
@@ -437,6 +461,40 @@ async function doPull(full) {
   notify();
   const response = await requestPull({ full: doFull, since, tables: tablesState, fullTables: refreshTables });
   setOnline(true);
+  return { seq, doFull, tablesState, response };
+}
+
+// السيرفر (لينكس) ممكن يكون فيه جدولين الفرق بينهم الحروف الكبيرة بس (VideoSessions و videosessions)،
+// وويندوز بيعتبرهم جدول واحد — فلو اتحفظوا الاتنين، الفاضي بيمسح اللي فيه بيانات.
+// بنحتفظ باللي فيه صفوف أكتر بس.
+function rowCount(entry) {
+  const fromFingerprint = Number(String(entry.fingerprint || '').split('|')[0]);
+  if (Number.isFinite(fromFingerprint) && !String(entry.fingerprint).startsWith('checksum|')) return fromFingerprint;
+  return (entry.rows || []).length;
+}
+
+function dropCaseDuplicates(tables) {
+  const byLower = new Map();
+  for (const name of Object.keys(tables)) {
+    const key = name.toLowerCase();
+    if (!byLower.has(key)) byLower.set(key, []);
+    byLower.get(key).push(name);
+  }
+  const dropped = [];
+  for (const names of byLower.values()) {
+    if (names.length < 2) continue;
+    names.sort((a, b) => rowCount(tables[b]) - rowCount(tables[a]));
+    for (const loser of names.slice(1)) {
+      delete tables[loser];
+      dropped.push(loser);
+    }
+  }
+  return dropped;
+}
+
+async function applyPull({ doFull, tablesState, response }) {
+  const dropped = dropCaseDuplicates(response.tables);
+  for (const name of dropped) delete tablesState[name];
 
   const conn = await store.data().getConnection();
   const mismatched = [];
@@ -468,7 +526,10 @@ async function doPull(full) {
   await store.setKv('tables', tablesState);
   await store.setKv('last_server_time', response.serverTime);
   await store.setKv('refresh_tables', []);
-  if (doFull) await store.setKv('last_full_pull', Date.now());
+  if (doFull) {
+    await store.setKv('last_full_pull', Date.now());
+    await store.setKv('case_fix_v1', true);
+  }
   await store.purgeOldHistory().catch(() => {});
   state.lastPullAt = new Date().toISOString();
   state.initialDataReady = true;
@@ -553,5 +614,5 @@ function start() {
 
 module.exports = {
   state, init, start, ping, push, pull, status, onChange, correctedNow,
-  waitForGate, opStarted, opFinished, schedulePush,
+  waitForGate, waitForFullApply, opStarted, opFinished, schedulePush,
 };

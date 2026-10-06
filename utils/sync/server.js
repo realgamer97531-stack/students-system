@@ -478,8 +478,10 @@ function installMobileRoutes(app, { sequelize, User, bcrypt }) {
         db.query('SELECT id, name FROM centers ORDER BY name'),
         db.query('SELECT id, name FROM subjects ORDER BY name'),
         db.query({
-          sql: `SELECT id, student_code, name, SubjectId, CenterId, balance, price_per_session, is_blocked, admin_note
-                FROM students`,
+          // أعمدة جديدة بتتضاف في الآخر بس (عشان الإصدارات القديمة من البرنامج تفضل شغالة)
+          sql: `SELECT id, student_code, name, SubjectId, CenterId, balance, price_per_session, is_blocked, admin_note,
+                phone, parent_phone, points
+                FROM students ORDER BY name`,
           rowsAsArray: true,
         }),
         sessionIds.length
@@ -495,7 +497,7 @@ function installMobileRoutes(app, { sequelize, User, bcrypt }) {
         centers,
         subjects,
         sessions,
-        studentColumns: ['id', 'code', 'name', 'subjectId', 'centerId', 'balance', 'price', 'blocked', 'note'],
+        studentColumns: ['id', 'code', 'name', 'subjectId', 'centerId', 'balance', 'price', 'blocked', 'note', 'phone', 'parentPhone', 'points'],
         students,
         attendance,
         homework,

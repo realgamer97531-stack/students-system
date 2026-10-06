@@ -71,10 +71,15 @@ class StaffApi {
     return StaffUser.fromJson({...(body['user'] as Map).cast<String, dynamic>(), 'username': username});
   }
 
-  /// نسخة المسح أوفلاين: الحصص الأخيرة + الطلاب + حضورهم وواجبهم
-  static Future<Map<String, dynamic>> snapshot() async {
+  /// نسخة المسح أوفلاين (نص JSON زي ما هو، بيتفك بعيد عن الشاشة): الحصص الأخيرة + الطلاب + حضورهم وواجبهم
+  static Future<String> snapshotJson() async {
     final headers = await _deviceHeaders();
-    return _deviceJson(() => client.get(_uri('/api/sync/mobile/snapshot'), headers: headers).timeout(const Duration(seconds: 60)));
+    final response = await Net.raw(() => client.get(_uri('/api/sync/mobile/snapshot'), headers: headers), limit: const Duration(seconds: 90));
+    if (response.statusCode != 200) {
+      await _deviceJson(() async => response); // بيرمي الخطأ المناسب
+      throw ApiException('حصلت مشكلة (${response.statusCode})');
+    }
+    return utf8.decode(response.bodyBytes);
   }
 
   /// طلب لصفحة من السيستم باسم الموظف.

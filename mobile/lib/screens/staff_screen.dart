@@ -9,6 +9,7 @@ import '../services/updater.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'staff/scan_tabs.dart';
+import 'staff/students_tab.dart';
 import 'web_screen.dart';
 
 /// شاشة الموظف: مسح الحضور/الواجب/الباب (بيشتغل من غير نت) + السيستم كامل
@@ -63,15 +64,31 @@ class _StaffScreenState extends State<StaffScreen> {
       if (u.can('attendance_scan')) _StaffTab('الحضور', Icons.how_to_reg_outlined, (_) => _ScanPage(ctx: _ctx, child: AttendanceTab(ctx: _ctx))),
       if (u.can('homework_scan')) _StaffTab('الواجب', Icons.assignment_turned_in_outlined, (_) => _ScanPage(ctx: _ctx, child: HomeworkScanTab(ctx: _ctx))),
       if (u.can('door_scan')) _StaffTab('الباب', Icons.door_front_door_outlined, (_) => _ScanPage(ctx: _ctx, child: DoorTab(ctx: _ctx))),
+      if (u.can('students_view')) _StaffTab('الطلاب', Icons.groups_outlined, (_) => Scaffold(body: StudentsTab(openWeb: _openWeb))),
       _StaffTab('السيستم', Icons.dashboard_outlined, (_) => WebScreen(
             key: _web,
             title: 'السيستم',
-            url: '${AppConfig.staffWebBase}/sessions',
+            url: _webStartUrl ?? '${AppConfig.staffWebBase}/sessions',
             showAppBar: false,
             autoLogin: true,
           )),
     ];
   }
+
+  /// فتح صفحة معينة من السيستم في تابه
+  void _openWeb(String path) {
+    final i = _tabs.indexWhere((t) => t.label == 'السيستم');
+    final url = '${AppConfig.staffWebBase}$path';
+    final alreadyOpen = _opened.contains(i);
+    setState(() {
+      _tab = i;
+      _opened.add(i);
+      if (!alreadyOpen) _webStartUrl = url;
+    });
+    if (alreadyOpen) _web.currentState?.open(url);
+  }
+
+  String? _webStartUrl;
 
   Future<void> _onBack() async {
     final nav = _navKeys[_tab].currentState;

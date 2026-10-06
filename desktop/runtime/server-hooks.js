@@ -235,7 +235,8 @@ async function sessionMiddleware(req, res, next) {
   if (!req.session || !req.session.userId) return next();
 
   const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
-  await engine.waitForGate();
+  if (isWrite) await engine.waitForGate();
+  else await engine.waitForFullApply();
 
   const opId = crypto.randomUUID();
   const ctx = syncContext.newContext({ desktop: true });

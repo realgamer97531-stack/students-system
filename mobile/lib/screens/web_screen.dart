@@ -99,6 +99,8 @@ class WebScreenState extends State<WebScreen> {
 
   void reload() => _controller.reload();
 
+  void open(String url) => _controller.loadRequest(Uri.parse(url));
+
   Future<NavigationDecision> _onNavigation(NavigationRequest request) async {
     final uri = Uri.parse(request.url);
     // لينكات واتساب/تليفون/خرائط بتفتح في برامجها

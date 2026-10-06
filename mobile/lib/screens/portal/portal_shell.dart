@@ -42,6 +42,9 @@ class _PortalShellState extends State<PortalShell> {
   late final List<GlobalKey<NavigatorState>> _navKeys = List.generate(_tabs.length, (_) => GlobalKey<NavigatorState>());
   int _tab = 0;
 
+  /// كل صفحة بتتبني أول ما تتفتح بس (أخف وأسرع في الفتح)
+  final Set<int> _opened = {0};
+
   bool get _isStudent => widget.type == AccountType.student;
 
   @override
@@ -85,7 +88,10 @@ class _PortalShellState extends State<PortalShell> {
       _navKeys[i].currentState?.popUntil((r) => r.isFirst);
       return;
     }
-    setState(() => _tab = i);
+    setState(() {
+      _tab = i;
+      _opened.add(i);
+    });
   }
 
   Future<void> _onBack() async {
@@ -115,10 +121,12 @@ class _PortalShellState extends State<PortalShell> {
             for (var i = 0; i < _tabs.length; i++)
               TickerMode(
                 enabled: i == _tab,
-                child: Navigator(
-                  key: _navKeys[i],
-                  onGenerateRoute: (_) => MaterialPageRoute(builder: _tabs[i].builder),
-                ),
+                child: _opened.contains(i)
+                    ? Navigator(
+                        key: _navKeys[i],
+                        onGenerateRoute: (_) => MaterialPageRoute(builder: _tabs[i].builder),
+                      )
+                    : const SizedBox.shrink(),
               ),
           ],
         ),

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:isolate';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -10,7 +12,8 @@ import 'staff_api.dart';
 
 /// بيانات طالب في نسخة المسح أوفلاين
 class SnapStudent {
-  SnapStudent(this.id, this.code, this.name, this.subjectId, this.centerId, this.balance, this.price, this.blocked, this.note);
+  SnapStudent(this.id, this.code, this.name, this.subjectId, this.centerId, this.balance, this.price, this.blocked, this.note,
+      {this.phone, this.parentPhone, this.points});
   final int id;
   final String code;
   final String name;
@@ -19,6 +22,11 @@ class SnapStudent {
   final num price;
   final bool blocked;
   final String? note;
+  final String? phone, parentPhone;
+  final num? points;
+
+  /// للبحث: الاسم + الكود + التليفونات
+  late final String searchText = '${name.toLowerCase()} ${code.toLowerCase()} ${phone ?? ''} ${parentPhone ?? ''}';
 }
 
 num _num(dynamic v) => v is num ? v : num.tryParse('$v') ?? 0;
@@ -49,7 +57,10 @@ class Snapshot {
     sessions = (raw['sessions'] as List? ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
     for (final row in (raw['students'] as List? ?? [])) {
       final r = row as List;
-      final s = SnapStudent(_int(r[0])!, '${r[1]}', '${r[2]}', _int(r[3]), _int(r[4]), _num(r[5]), _num(r[6]), r[7] == true || r[7] == 1 || r[7] == '1', r[8] == null ? null : '${r[8]}');
+      String? at(int i) => r.length > i && r[i] != null ? '${r[i]}' : null;
+      final s = SnapStudent(_int(r[0])!, '${r[1]}', '${r[2]}', _int(r[3]), _int(r[4]), _num(r[5]), _num(r[6]), r[7] == true || r[7] == 1 || r[7] == '1', at(8),
+          phone: at(9), parentPhone: at(10), points: r.length > 11 ? _num(r[11]) : null);
+      students.add(s);
       byCode[s.code] = s;
       byId[s.id] = s;
     }
@@ -66,6 +77,7 @@ class Snapshot {
   final Map<int, String> subjects = {};
   late final List<Map<String, dynamic>> sessions;
   final Map<String, SnapStudent> byCode = {};
+  final List<SnapStudent> students = [];
   final Map<int, SnapStudent> byId = {};
   final Set<String> attendance = {};
   final Map<String, String> homework = {};
@@ -85,7 +97,16 @@ class Snapshot {
 }
 
 /// العمليات اللي اتعملت والنت فاصل + نسخة المسح أوفلاين + المشاكل اللي السيرفر رفضها
+/// تحويل النسخة لـ Snapshot بعيد عن الشاشة (عشان البرنامج ميتقلش مع آلاف الطلاب)
+Future<Snapshot> parseSnapshot(String json) async {
+  if (!StaffStore.useIsolate) return Snapshot((jsonDecode(json) as Map).cast<String, dynamic>());
+  return Isolate.run(() => Snapshot((jsonDecode(json) as Map).cast<String, dynamic>()));
+}
+
 class StaffStore {
+  /// في الاختبارات بنشتغل من غير isolate
+  static bool useIsolate = true;
+
   static final snapshot = ValueNotifier<Snapshot?>(null);
   static final snapshotAt = ValueNotifier<DateTime?>(null);
   static final queue = ValueNotifier<List<Map<String, dynamic>>>([]);
@@ -100,11 +121,11 @@ class StaffStore {
     if (_started) return;
     _started = true;
     Cache.setScope('staff_device');
-    final snap = await Cache.read('snapshot');
+    final snap = await Cache.readRaw('snapshot');
     if (snap != null) {
       try {
-        snapshot.value = Snapshot((snap.data as Map).cast<String, dynamic>());
-        snapshotAt.value = snap.savedAt;
+        snapshot.value = await parseSnapshot(snap.$1);
+        snapshotAt.value = snap.$2;
       } catch (_) {}
     }
     queue.value = (((await Cache.read('queue'))?.data as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
@@ -132,9 +153,10 @@ class StaffStore {
 
   static Future<bool> refreshSnapshot() async {
     try {
-      final raw = await StaffApi.snapshot();
-      await Cache.write('snapshot', raw);
-      snapshot.value = Snapshot(raw);
+      final raw = await StaffApi.snapshotJson();
+      final parsed = await parseSnapshot(raw);
+      await Cache.writeRaw('snapshot', raw);
+      snapshot.value = parsed;
       snapshotAt.value = DateTime.now();
       _applyQueueToSnapshot();
       deviceRevoked.value = false;

@@ -86,6 +86,7 @@ void main() {
     final icons = '$flutterRoot/bin/cache/artifacts/material_fonts/materialicons-regular.otf';
     if (File(icons).existsSync()) await loadFont('MaterialIcons', icons);
     ScannerBox.useCamera = false;
+    StaffStore.useIsolate = false;
   });
 
   setUp(() {
@@ -297,6 +298,20 @@ void main() {
     expect(context['userId'], 3);
     expect(context['activeSessionId'], 12);
     expect(jsonDecode(op.body)['student_code'], '1');
+
+    // قايمة الطلاب جوه البرنامج ومن غير نت
+    server.offline = true;
+    await tester.tap(find.text('الطلاب').last);
+    await tester.pumpAndSettle();
+    expect(find.text('طالب واحد'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, '01000000001');
+    await tester.pumpAndSettle();
+    expect(find.text('1 طالب'), findsOneWidget);
+    await tester.tap(find.text('طالب واحد'));
+    await tester.pumpAndSettle();
+    expect(find.text('تليفون الطالب'), findsOneWidget);
+    expect(find.text('حضر (سنتر الاختبار)'), findsWidgets);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/15_staff_student.png'));
 
     // تنظيف التايمرز
     await tester.pumpWidget(const SizedBox());
