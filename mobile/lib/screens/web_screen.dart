@@ -8,17 +8,16 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-/// صفحة من الموقع جوه البرنامج.
-/// - صفحات الطالب/ولي الأمر: بنحط الـ token في localStorage قبل ما الصفحة تفتح، فبتفتح والمستخدم داخل على طول.
-/// - سيستم الموظفين: بيفتح عادي والدخول بيتحفظ (cookies).
-/// الكاميرا (مسح QR) ورفع الصور والفيديو بشاشة كاملة شغالين.
+import '../services/session_store.dart';
+
+/// سيستم الموظفين كامل جوه البرنامج (باقي الصفحات اللي مش معمولة في البرنامج نفسه).
+/// بيدخل لوحده بيوزر الموظف المحفوظ، والكاميرا ورفع الصور شغالين.
 class WebScreen extends StatefulWidget {
   const WebScreen({
     super.key,
     required this.title,
     required this.url,
-    this.portalLogin,
-    this.onLoggedOut,
+    this.autoLogin = false,
     this.showAppBar = true,
     this.extraActions = const [],
   });
@@ -26,11 +25,8 @@ class WebScreen extends StatefulWidget {
   final String title;
   final String url;
 
-  /// بيانات دخول البوابة اللي بتتحط في localStorage قبل الفتح (للطالب وولي الأمر)
-  final Map<String, String>? portalLogin;
-
-  /// لما المستخدم يعمل "خروج" من جوه الموقع
-  final VoidCallback? onLoggedOut;
+  /// لو صفحة الدخول ظهرت: يدخل لوحده بيوزر وباسورد الموظف المحفوظين
+  final bool autoLogin;
   final bool showAppBar;
   final List<Widget> extraActions;
 
@@ -53,6 +49,7 @@ class WebScreenState extends State<WebScreen> {
       ..setNavigationDelegate(NavigationDelegate(
         onProgress: (p) => mounted ? setState(() => _progress = p) : null,
         onPageStarted: (_) => mounted ? setState(() => _error = null) : null,
+        onPageFinished: _onPageFinished,
         onWebResourceError: (error) {
           if (error.isForMainFrame == true && mounted) {
             setState(() => _error = 'مش قادر يفتح الصفحة — اتأكد من النت');
@@ -79,18 +76,25 @@ class WebScreenState extends State<WebScreen> {
     _load();
   }
 
-  void _load() {
-    final login = widget.portalLogin;
-    if (login == null) {
-      _controller.loadRequest(Uri.parse(widget.url));
-      return;
-    }
-    // صفحة صغيرة على نفس الدومين: تحط بيانات الدخول في localStorage وتحوّل للصفحة المطلوبة
-    final uri = Uri.parse(widget.url);
-    final setters = login.entries.map((e) => 'localStorage.setItem(${jsonEncode(e.key)}, ${jsonEncode(e.value)});').join();
-    final html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="background:#F4F5FC">'
-        '<script>$setters location.replace(${jsonEncode(widget.url)});</script></body></html>';
-    _controller.loadHtmlString(html, baseUrl: '${uri.scheme}://${uri.host}/');
+  void _load() => _controller.loadRequest(Uri.parse(widget.url));
+
+  DateTime _lastAutoLogin = DateTime.fromMillisecondsSinceEpoch(0);
+
+  Future<void> _onPageFinished(String url) async {
+    if (!widget.autoLogin || Uri.tryParse(url)?.path != '/login') return;
+    // مرة واحدة كل شوية بس (عشان لو الباسورد اتغير منفضلش ندخل في لفة)
+    if (DateTime.now().difference(_lastAutoLogin).inSeconds < 20) return;
+    final user = await SessionStore.staffUser();
+    final password = await SessionStore.staffPassword();
+    if (user == null || password == null) return;
+    _lastAutoLogin = DateTime.now();
+    final body = 'username=${Uri.encodeQueryComponent(user.username)}&password=${Uri.encodeQueryComponent(password)}';
+    await _controller.loadRequest(
+      Uri.parse(url),
+      method: LoadRequestMethod.post,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: Uint8List.fromList(utf8.encode(body)),
+    );
   }
 
   void reload() => _controller.reload();
@@ -101,14 +105,6 @@ class WebScreenState extends State<WebScreen> {
     if (!['http', 'https', 'about', 'data'].contains(uri.scheme) || uri.host.contains('wa.me') || uri.host.contains('whatsapp')) {
       launchUrl(uri, mode: LaunchMode.externalApplication);
       return NavigationDecision.prevent;
-    }
-    // المستخدم عمل خروج من جوه الموقع (رجّعه لصفحة الدخول)
-    if (widget.onLoggedOut != null && widget.portalLogin != null) {
-      final path = uri.path;
-      if (path == '/' || path.endsWith('/index.html') || path.endsWith('/login')) {
-        widget.onLoggedOut!();
-        return NavigationDecision.prevent;
-      }
     }
     return NavigationDecision.navigate;
   }

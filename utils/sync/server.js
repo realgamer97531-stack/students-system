@@ -435,7 +435,76 @@ function install(app, { sequelize, User, bcrypt }) {
     }
   });
 
+  installMobileRoutes(app, { sequelize, User, bcrypt });
+
   app.use(deviceRequestMiddleware({ sequelize, User }));
+}
+
+// ===== تطبيق الموبايل (مسح الحضور/الواجب/الباب) =====
+// الموبايل جهاز متسجل زي اللابتوب بالظبط، بس مش بينزل الداتابيز كلها:
+//   POST /api/sync/mobile/staff-login  يتأكد من يوزر وباسورد الموظف ويرجع بياناته وصلاحياته
+//   GET  /api/sync/mobile/snapshot     نسخة صغيرة للمسح أوفلاين: الحصص الأخيرة + الطلاب + حضورهم وواجبهم فيها
+// والعمليات نفسها بتتبعت لنفس صفحات السيستم بـ X-Sync-Device-Token (نفس طريقة الديسكتوب).
+const MOBILE_SNAPSHOT_SESSIONS = 150;
+
+function installMobileRoutes(app, { sequelize, User, bcrypt }) {
+  app.post('/api/sync/mobile/staff-login', requireDevice(sequelize), async (req, res) => {
+    try {
+      const { username, password } = req.body || {};
+      const user = username ? await User.findOne({ where: { username: String(username).trim() } }) : null;
+      const valid = user && await bcrypt.compare(String(password || ''), user.password);
+      if (!valid) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return res.status(401).json({ success: false, message: 'اليوزرنيم أو الباسورد غلط' });
+      }
+      let permissions = [];
+      try { permissions = JSON.parse(user.permissions || '[]') || []; } catch (e) { permissions = []; }
+      res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, permissions } });
+    } catch (error) {
+      console.error('Mobile staff login error:', error);
+      res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
+    }
+  });
+
+  app.get('/api/sync/mobile/snapshot', requireDevice(sequelize), async (req, res) => {
+    try {
+      const db = getPool(sequelize);
+      const [sessions] = await db.query(
+        `SELECT id, lesson_number, week_number, serial_number, session_date, status, CenterId, SubjectId, createdAt
+         FROM sessions ORDER BY createdAt DESC, id DESC LIMIT ?`, [MOBILE_SNAPSHOT_SESSIONS],
+      );
+      const sessionIds = sessions.map(s => s.id);
+      const [[centers], [subjects], [students], [attendance], [homework]] = await Promise.all([
+        db.query('SELECT id, name FROM centers ORDER BY name'),
+        db.query('SELECT id, name FROM subjects ORDER BY name'),
+        db.query({
+          sql: `SELECT id, student_code, name, SubjectId, CenterId, balance, price_per_session, is_blocked, admin_note
+                FROM students`,
+          rowsAsArray: true,
+        }),
+        sessionIds.length
+          ? db.query({ sql: 'SELECT StudentId, SessionId FROM attendances WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
+          : [[]],
+        sessionIds.length
+          ? db.query({ sql: 'SELECT StudentId, SessionId, status FROM homeworkchecks WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
+          : [[]],
+      ]);
+      res.json({
+        success: true,
+        serverTime: utcNowString(),
+        centers,
+        subjects,
+        sessions,
+        studentColumns: ['id', 'code', 'name', 'subjectId', 'centerId', 'balance', 'price', 'blocked', 'note'],
+        students,
+        attendance,
+        homework,
+      });
+    } catch (error) {
+      console.error('Mobile snapshot error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
 }
 
 // صفحة الأدمن: الأجهزة المتسجلة + إلغاء تسجيل جهاز
