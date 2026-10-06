@@ -1,7 +1,7 @@
 {
   "name": "studyisfunny-desktop",
   "productName": "Studyisfunny",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Studyisfunny - نظام المتابعة (نسخة الديسكتوب بتشتغل أوفلاين)",
   "author": "Shady Elsharkawy",
   "main": "app/main.js",
@@ -74,12 +74,16 @@
       "icon": "build/icon.png"
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "Studyisfunny",
+      "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
       "artifactName": "Studyisfunny-Setup-${version}.${ext}"
     },
     "publish": [
