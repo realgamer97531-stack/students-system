@@ -12,6 +12,7 @@ import '../../widgets/broadcasts.dart';
 import '../../widgets/cached_view.dart';
 import '../../widgets/common.dart';
 import '../../widgets/popup_question.dart';
+import '../../widgets/video_source.dart';
 import 'lesson_view_screen.dart';
 import 'video_screen.dart';
 
@@ -219,6 +220,29 @@ class _WeekScreenState extends State<WeekScreen> {
     widget.onChanged();
   }
 
+  /// كل فيديوهات الواجب للدرس (السيرفر القديم كان بيبعت لينك واحد بس في realHomeworkUrl)
+  List<Map<String, dynamic>> _homeworkVideos(Map<String, dynamic> lesson) {
+    final list = ((lesson['homeworkVideos'] as List?) ?? []).whereType<Map>().map((p) => p.cast<String, dynamic>()).toList();
+    if (list.isNotEmpty) return list;
+    final url = '${lesson['realHomeworkUrl'] ?? ''}';
+    return url.isEmpty ? [] : [{'sourceType': 'url', 'videoUrl': url}];
+  }
+
+  Future<void> _openHomework(Map<String, dynamic> lesson) async {
+    final parts = _homeworkVideos(lesson).map((p) {
+      final url = '${p['videoUrl'] ?? ''}'.trim();
+      if (p['sourceType'] == 'upload' || url.isEmpty || url.startsWith('http://') || url.startsWith('https://')) return p;
+      return {...p, 'videoUrl': 'https://$url'};
+    }).toList();
+    if (parts.isEmpty) return;
+    // لينك واحد مش فيديو (موقع عادي) بيفتح في المتصفح زي الأول، غير كده كله جوه البرنامج
+    if (parts.length == 1 && sourceForPart(parts.first).kind == VideoKind.unknown) {
+      await openVideoOrLink(context, '${parts.first['videoUrl']}', 'فيديو الواجب');
+      return;
+    }
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => VideoScreen(title: 'فيديو الواجب', parts: parts)));
+  }
+
   Future<void> _openQuestions(Map<String, dynamic> lesson) async {
     final id = asInt(lesson['videoId'])!;
     if (!await ensureLessonAccess(context, id) || !mounted) return;
@@ -336,7 +360,7 @@ class _WeekScreenState extends State<WeekScreen> {
           onTap: () => openVideoOrLink(context, examVideo, 'فيديو إجابة الاختبار'),
         ));
       }
-      if ('${l['realHomeworkUrl'] ?? ''}'.isNotEmpty) {
+      if (_homeworkVideos(l).isNotEmpty) {
         cards.add(_card(
           top: const Color(0xFF10B3A3),
           badge: const Pill('فيديو الواجب', AppColors.successSoft, AppColors.successText),
@@ -345,7 +369,7 @@ class _WeekScreenState extends State<WeekScreen> {
           iconColors: const [Color(0xFF10B3A3), Color(0xFF4F46E5)],
           title: 'فيديو الواجب',
           date: date,
-          onTap: () => openVideoOrLink(context, '${l['homeworkVideoUrl'] ?? l['realHomeworkUrl']}', 'فيديو الواجب'),
+          onTap: () => _openHomework(l),
         ));
       }
     }

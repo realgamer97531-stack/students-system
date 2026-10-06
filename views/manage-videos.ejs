@@ -26,18 +26,34 @@
   </div>
 </div>
 
+<%
+  const examSubjects = new Map();
+  (examTargets || []).forEach(t => { if (!examSubjects.has(t.subjectId)) examSubjects.set(t.subjectId, t.subjectName); });
+%>
 <div class="card mb-4">
   <div class="card-body">
-    <h5 class="mb-3 fw-bold">🔗 <span class="ar-only">روابط الامتحان لفيديو</span><span class="en-only" style="display:none;">Video Exam Links</span></h5>
-    <form action="/admin/videos/session/exam" method="POST" class="row g-2 align-items-end">
+    <h5 class="mb-3 fw-bold">🔗 <span class="ar-only">روابط الاختبار</span><span class="en-only" style="display:none;">Exam Links</span></h5>
+    <form action="/admin/videos/exam-links" method="POST" id="examLinksForm" class="row g-2 align-items-end">
       <div class="col-md-4">
-        <label class="form-label small"><span class="ar-only">اختر الفيديو</span><span class="en-only" style="display:none;">Choose Video</span></label>
-        <select name="video_id" class="form-select" required>
-          <option value=""><span class="ar-only">-- اختر فيديو --</span><span class="en-only" style="display:none;">-- Choose Video --</span></option>
-          <% videos.forEach(video => { %>
-            <option value="<%= video.id %>"><%= video.title %> (ID: <%= video.id %>)</option>
+        <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
+        <select name="subject_id" id="examSubject" class="form-select" required onchange="refreshExamForm()">
+          <option value="">-- اختر المادة --</option>
+          <% [...examSubjects.entries()].forEach(([id, name]) => { %>
+            <option value="<%= id %>"><%= name %></option>
           <% }) %>
         </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small"><span class="ar-only">رقم الحصة</span><span class="en-only" style="display:none;">Session Number</span></label>
+        <select name="lesson_number" id="examLesson" class="form-select" required onchange="refreshExamForm(true)">
+          <option value="">-- اختر رقم الحصة --</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label small mb-1"><span class="ar-only">السناتر (لو مختارتش أي سنتر الرابط هيظهر لكل سناتر المادة)</span><span class="en-only" style="display:none;">Centers (none selected = all centers of this subject)</span></label>
+        <div id="examCenters" class="d-flex flex-wrap gap-3 border rounded p-2 small text-muted">
+          <span>اختر المادة ورقم الحصة الأول</span>
+        </div>
       </div>
       <div class="col-md-5">
         <label class="form-label small"><span class="ar-only">رابط الاختبار</span><span class="en-only" style="display:none;">Exam Link</span></label>
@@ -48,12 +64,77 @@
         <input type="url" name="exam_video_url" class="form-control" placeholder="https://vimeo.com/...">
       </div>
       <div class="col-md-2">
-        <button type="submit" class="btn btn-warning w-100"><span class="ar-only">حفظ روابط الاختبار</span><span class="en-only" style="display:none;">Save Exam Links</span></button>
+        <button type="submit" name="action" value="save" class="btn btn-warning w-100"><span class="ar-only">حفظ روابط الاختبار</span><span class="en-only" style="display:none;">Save Exam Links</span></button>
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-3 align-items-center small">
+        <label class="mb-0"><input type="checkbox" name="delete_exam_url" value="1"> <span class="ar-only">رابط الاختبار</span><span class="en-only" style="display:none;">Exam link</span></label>
+        <label class="mb-0"><input type="checkbox" name="delete_exam_video_url" value="1"> <span class="ar-only">فيديو الإجابة</span><span class="en-only" style="display:none;">Answer video</span></label>
+        <button type="submit" name="action" value="delete" formnovalidate class="btn btn-sm btn-outline-danger" onclick="return confirmExamDelete()"><span class="ar-only">حذف المحدد من السناتر المختارة</span><span class="en-only" style="display:none;">Delete checked for selected centers</span></button>
       </div>
     </form>
-    <p class="text-muted small mt-2 mb-0"><span class="ar-only">سيتم تطبيق الرابط على كل الحصص المرتبطة بهذا الفيديو، وسيظهر للطلاب في بطاقة فيديو إجابة الاختبار.</span><span class="en-only" style="display:none;">The link will apply to all sessions linked to this video, and will appear to students in the exam answer video card.</span></p>
+    <div id="examCurrentLinks" class="small mt-2"></div>
+    <p class="text-muted small mt-2 mb-0"><span class="ar-only">الرابط بيتحط لكل حصص المادة اللي بالرقم ده في السناتر المختارة (أو كل السناتر لو مختارتش)، وبيظهر للطلاب في كارت الاختبار جوه الأسبوع.</span><span class="en-only" style="display:none;">The link is applied to every session of this subject with this number in the selected centers (or all centers if none selected), and appears to students as the exam card inside the week.</span></p>
   </div>
 </div>
+
+<script>
+  const EXAM_TARGETS = <%- JSON.stringify(examTargets || []).replace(/</g, '\\u003c') %>;
+
+  function escapeExamHtml(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  function refreshExamForm(lessonChanged) {
+    const subjectId = Number(document.getElementById('examSubject').value);
+    const lessonSelect = document.getElementById('examLesson');
+    const subjectTargets = EXAM_TARGETS.filter(t => t.subjectId === subjectId);
+
+    if (!lessonChanged) {
+      const previous = lessonSelect.value;
+      const numbers = [...new Set(subjectTargets.map(t => t.lessonNumber))].sort((a, b) => a - b);
+      lessonSelect.innerHTML = '<option value="">-- اختر رقم الحصة --</option>' +
+        numbers.map(n => `<option value="${n}">${n}</option>`).join('');
+      if (numbers.includes(Number(previous))) lessonSelect.value = previous;
+    }
+
+    const lessonNumber = lessonSelect.value === '' ? null : Number(lessonSelect.value);
+    const centersBox = document.getElementById('examCenters');
+    const currentBox = document.getElementById('examCurrentLinks');
+    if (!subjectId || lessonNumber === null) {
+      centersBox.innerHTML = '<span>اختر المادة ورقم الحصة الأول</span>';
+      currentBox.innerHTML = '';
+      return;
+    }
+
+    const centers = new Map();
+    subjectTargets.filter(t => t.lessonNumber === lessonNumber).forEach(t => {
+      const c = centers.get(t.centerId) || { name: t.centerName, examUrl: '', examVideoUrl: '' };
+      c.examUrl = c.examUrl || t.examUrl;
+      c.examVideoUrl = c.examVideoUrl || t.examVideoUrl;
+      centers.set(t.centerId, c);
+    });
+
+    centersBox.innerHTML = [...centers.entries()].map(([id, c]) =>
+      `<label class="mb-0 text-body"><input type="checkbox" name="center_ids" value="${id}"> ${escapeExamHtml(c.name)}</label>`
+    ).join('');
+
+    currentBox.innerHTML = [...centers.values()].map(c => {
+      const links = [
+        c.examUrl ? `🔗 <a href="${escapeExamHtml(c.examUrl)}" target="_blank" rel="noopener noreferrer">رابط الاختبار</a>` : '',
+        c.examVideoUrl ? `▶ <a href="${escapeExamHtml(c.examVideoUrl)}" target="_blank" rel="noopener noreferrer">فيديو الإجابة</a>` : '',
+      ].filter(Boolean).join(' &nbsp; ');
+      return `<div><strong>${escapeExamHtml(c.name)}:</strong> ${links || '<span class="text-muted">لا توجد روابط</span>'}</div>`;
+    }).join('');
+  }
+
+  function confirmExamDelete() {
+    const form = document.getElementById('examLinksForm');
+    if (!form.subject_id.value || form.lesson_number.value === '') { alert('اختر المادة ورقم الحصة'); return false; }
+    if (!form.delete_exam_url.checked && !form.delete_exam_video_url.checked) { alert('علّم على الرابط اللي عايز تحذفه'); return false; }
+    const anyCenter = form.querySelectorAll('input[name="center_ids"]:checked').length > 0;
+    return confirm(anyCenter ? 'حذف الروابط المحددة من السناتر المختارة؟' : 'حذف الروابط المحددة من كل سناتر المادة؟');
+  }
+</script>
 
 <%
   const centersMap = new Map();

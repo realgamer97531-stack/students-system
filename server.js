@@ -5311,7 +5311,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       }),
       Session.findAll({
         where: { SubjectId: student.SubjectId },
-        attributes: ['lesson_number', 'exam_url', 'exam_video_url'],
+        attributes: ['lesson_number', 'CenterId', 'exam_url', 'exam_video_url'],
       }),
       HomeworkAssignment.findAll({
         where: { SubjectId: student.SubjectId },
@@ -5323,7 +5323,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       }),
       // Fetch homework solution videos (VideoParts with category='homework_solution')
       VideoPart.findAll({
-        where: { category: 'homework_solution' },
+        where: { category: ['homework_solution', 'homework'] },
         order: [['order_index', 'ASC']],
       }),
       Subject.findAll({ attributes: ['id', 'name'] }),
@@ -5421,12 +5421,22 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       equivalentLessonSessions.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number)
     );
     const examLinksByLesson = new Map();
+    // روابط الاختبار ممكن تتحط لسناتر معينة بس: لو سنتر الطالب فيه الحصة دي نعتمد على روابط سنتره هو بس
+    const ownCenterExamLinksByLesson = new Map();
+    const ownCenterLessonNumbers = new Set(studentSessions.map(s => s.lesson_number));
     subjectSessionsWithExamLinks.forEach(s => {
       const existing = examLinksByLesson.get(s.lesson_number) || {};
       examLinksByLesson.set(s.lesson_number, {
         examUrl: existing.examUrl || s.exam_url || null,
         examVideoUrl: existing.examVideoUrl || s.exam_video_url || null,
       });
+      if (s.CenterId === student.CenterId) {
+        const own = ownCenterExamLinksByLesson.get(s.lesson_number) || {};
+        ownCenterExamLinksByLesson.set(s.lesson_number, {
+          examUrl: own.examUrl || s.exam_url || null,
+          examVideoUrl: own.examVideoUrl || s.exam_video_url || null,
+        });
+      }
     });
 
     const cleanedGrants = [];
@@ -5472,6 +5482,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
 
     // Build map of VideoId -> homework URL
     const homeworkByVideoId = new Map();
+    // كل فيديوهات الواجب لكل درس (مش أول واحد بس) — بتتعرض في نافذة جوه الموقع/الأبلكيشن
+    const homeworkVideosByVideoId = new Map();
     let globalHomeworkUrl = null; // fallback: first homework URL found
 
     homeworkParts.forEach((part, index) => {
@@ -5483,6 +5495,16 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       // If this part has a VideoId, map it
       if (part.VideoId && !homeworkByVideoId.has(part.VideoId)) {
         homeworkByVideoId.set(part.VideoId, part.video_url || null);
+      }
+
+      if (part.VideoId && (part.video_url || part.file_path)) {
+        if (!homeworkVideosByVideoId.has(part.VideoId)) homeworkVideosByVideoId.set(part.VideoId, []);
+        homeworkVideosByVideoId.get(part.VideoId).push({
+          id: part.id,
+          sourceType: part.source_type,
+          videoUrl: part.video_url,
+          filePath: part.file_path,
+        });
       }
     });
 
@@ -5540,6 +5562,11 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       // For clicking, use the real URL or global fallback
       const homeworkVideoUrl = realHomeworkUrl || globalHomeworkUrl;
 
+      const homeworkVideos = [...(homeworkVideosByVideoId.get(v.id) || [])];
+      if (session.homework_video_url && !homeworkVideos.some(item => item.videoUrl === session.homework_video_url)) {
+        homeworkVideos.push({ id: null, sourceType: 'url', videoUrl: session.homework_video_url, filePath: null });
+      }
+
       return {
         videoId: v.id,
         title: v.title,
@@ -5554,9 +5581,14 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         price: student.price_per_session + (findSurchargeRule(subjectNameById.get(session.SubjectId), session.lesson_number)?.extra || 0),
         homeworkVideoUrl,
         realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
+        homeworkVideos, // كل فيديوهات الواجب للدرس (الإصدارات القديمة من الأبلكيشن بتستخدم realHomeworkUrl)
         homeworkItems,
-        examUrl: linkedExamSession?.exam_url || examLinksByLesson.get(session.lesson_number)?.examUrl || null,
-        examVideoUrl: linkedExamSession?.exam_video_url || examLinksByLesson.get(session.lesson_number)?.examVideoUrl || null,
+        examUrl: ownCenterLessonNumbers.has(session.lesson_number)
+          ? (ownCenterExamLinksByLesson.get(session.lesson_number)?.examUrl || null)
+          : (linkedExamSession?.exam_url || examLinksByLesson.get(session.lesson_number)?.examUrl || null),
+        examVideoUrl: ownCenterLessonNumbers.has(session.lesson_number)
+          ? (ownCenterExamLinksByLesson.get(session.lesson_number)?.examVideoUrl || null)
+          : (linkedExamSession?.exam_video_url || examLinksByLesson.get(session.lesson_number)?.examVideoUrl || null),
         hasQuestions: questionsVideoIdSet.has(v.id),
         questionsDisplay: v.questions_display,
       };
@@ -5891,7 +5923,68 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
     ],
     order: [['createdAt', 'DESC']],
   });
-  res.render('manage-videos', { allSessions, videos });
+  // بيانات فورم روابط الاختبار: المادة + رقم الحصة + السناتر
+  const examTargetSessions = await Session.findAll({
+    attributes: ['id', 'lesson_number', 'SubjectId', 'CenterId', 'exam_url', 'exam_video_url'],
+    include: [
+      { model: Center, attributes: ['id', 'name'] },
+      { model: Subject, attributes: ['id', 'name'] },
+    ],
+  });
+  const examTargets = examTargetSessions
+    .filter(session => session.lesson_number !== null && session.lesson_number !== undefined && session.SubjectId && session.CenterId)
+    .map(session => ({
+      subjectId: session.SubjectId,
+      subjectName: session.Subject?.name || '',
+      centerId: session.CenterId,
+      centerName: session.Center?.name || '',
+      lessonNumber: session.lesson_number,
+      examUrl: session.exam_url || '',
+      examVideoUrl: session.exam_video_url || '',
+    }));
+  res.render('manage-videos', { allSessions, videos, examTargets });
+});
+
+// روابط الاختبار حسب المادة + رقم الحصة، ولسناتر معينة (لو مفيش سنتر متحدد = كل سناتر المادة)
+app.post('/admin/videos/exam-links', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const subjectId = Number(req.body.subject_id);
+    const lessonNumber = Number(req.body.lesson_number);
+    if (!subjectId || !Number.isInteger(lessonNumber)) return res.status(400).send('❌ اختر المادة ورقم الحصة');
+
+    const rawCenterIds = Array.isArray(req.body.center_ids) ? req.body.center_ids : (req.body.center_ids ? [req.body.center_ids] : []);
+    const centerIds = [...new Set(rawCenterIds.map(Number).filter(Boolean))];
+    const where = {
+      SubjectId: subjectId,
+      lesson_number: lessonNumber,
+      ...(centerIds.length > 0 ? { CenterId: centerIds } : {}),
+    };
+
+    let changes;
+    if (req.body.action === 'delete') {
+      const fields = ['exam_url', 'exam_video_url'].filter(field => req.body[`delete_${field}`]);
+      if (fields.length === 0) return res.status(400).send('❌ اختر الرابط اللي عايز تحذفه');
+      changes = Object.fromEntries(fields.map(field => [field, null]));
+    } else {
+      const cleanExamUrl = typeof req.body.exam_url === 'string' ? req.body.exam_url.trim() : '';
+      const cleanExamVideoUrl = typeof req.body.exam_video_url === 'string' ? req.body.exam_video_url.trim() : '';
+      if (!cleanExamUrl && !cleanExamVideoUrl) return res.status(400).send('❌ أضف رابط الاختبار أو رابط فيديو الإجابة');
+      changes = {
+        ...(cleanExamUrl ? { exam_url: cleanExamUrl } : {}),
+        ...(cleanExamVideoUrl ? { exam_video_url: cleanExamVideoUrl } : {}),
+      };
+    }
+
+    const [updatedCount] = await Session.update(changes, { where });
+    if (updatedCount === 0) {
+      const exists = await Session.count({ where });
+      if (exists === 0) return res.status(404).send('❌ مفيش حصص بالرقم ده في المادة/السناتر المختارة');
+    }
+    res.redirect('/admin/videos');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
 });
 
 app.post('/admin/videos/session/exam', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
