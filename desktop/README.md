@@ -51,19 +51,18 @@ After that, it works offline.
 
 ## Publishing an update (the in-app update button)
 
-One-time setup:
-1. Create a **public** GitHub repo `realgamer97531-stack/studyisfunny-desktop-releases`. It only holds installer files; the source code stays private.
-2. Create a GitHub token that can write releases to that repo (fine-grained: *Contents: Read and write* on that repo).
+Releases go to the public repo https://github.com/realgamer97531-stack/studyisfunny-desktop-releases. It only holds installer files; the source code stays private.
 
-Each release:
+Each release, on this PC:
 
 ```bash
 cd desktop
-set GH_TOKEN=<your token>        # PowerShell: $env:GH_TOKEN="<your token>"
-npm run release                  # bumps the version, builds, uploads to GitHub Releases
+npm run release   # bumps the version, builds, uploads to GitHub Releases
 ```
 
-Laptops then show "⭳ تنزيل التحديث" in the toolbar (they check automatically every 6 hours, or when the button is pressed). After downloading, "✔ تثبيت التحديث" closes the app, installs the update, and reopens it. Data and the upload queue are kept.
+It uses the GitHub login already saved for git on this PC. On another PC, set `GH_TOKEN` to a token that can write that repo. `npm run publish` re-uploads the current version if an upload was interrupted.
+
+Laptops then show "⭳ تنزيل التحديث" in the toolbar (they check automatically every 6 hours, or when the button is pressed). After downloading, "✔ تثبيت التحديث" closes the app, installs the update, and reopens it. Data and the upload queue are kept. Updates only download the parts that changed.
 
 ## Where things are on a laptop
 

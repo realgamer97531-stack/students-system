@@ -1,7 +1,7 @@
 {
   "name": "studyisfunny-desktop",
   "productName": "Studyisfunny",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Studyisfunny - نظام المتابعة (نسخة الديسكتوب بتشتغل أوفلاين)",
   "author": "Shady Elsharkawy",
   "main": "app/main.js",
@@ -11,7 +11,8 @@
     "start": "npm run prepare-build && electron .",
     "dev": "electron .",
     "dist": "npm run prepare-build && electron-builder --win --publish never",
-    "release": "node scripts/bump-version.js && npm run prepare-build && electron-builder --win --publish always"
+    "release": "node scripts/bump-version.js && npm run prepare-build && electron-builder --win --publish never && node scripts/publish.js",
+    "publish": "node scripts/publish.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
