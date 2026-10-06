@@ -501,6 +501,7 @@ async function applyPull({ doFull, tablesState, response }) {
   try {
     await conn.query("SET FOREIGN_KEY_CHECKS = 0, sql_mode = 'NO_AUTO_VALUE_ON_ZERO'");
     const tableNames = Object.keys(response.tables);
+    const rebuild = [];
     let index = 0;
     for (const table of tableNames) {
       index += 1;
@@ -509,7 +510,17 @@ async function applyPull({ doFull, tablesState, response }) {
         state.progress = `${doFull ? 'نسخة كاملة' : 'تحديثات'}: ${index}/${tableNames.length} (${table})`;
         notify();
       }
-      const touched = await applyTable(conn, table, entry);
+      let touched;
+      try {
+        touched = await applyTable(conn, table, entry);
+      } catch (error) {
+        // شكل الجدول على الجهاز مش مطابق للسيرفر (مثلاً قيد unique مش موجود هناك): نعيد بناءه بشكل السيرفر
+        if (!['ER_DUP_ENTRY', 'ER_BAD_FIELD_ERROR', 'ER_WRONG_VALUE_COUNT_ON_ROW', 'ER_NO_DEFAULT_FOR_FIELD'].includes(error.code)) throw error;
+        console.error(`Sync: rebuilding ${table} with the server structure:`, error.message);
+        rebuild.push(table);
+        delete tablesState[table];
+        continue;
+      }
       if (touched) await resetAutoIncrement(conn, table, entry);
       if (touched && entry.idColumn && entry.fingerprint && !entry.fingerprint.startsWith('checksum|')) {
         if (await localFingerprint(conn, table) !== entry.fingerprint) mismatched.push(table);
@@ -517,6 +528,7 @@ async function applyPull({ doFull, tablesState, response }) {
       tablesState[table] = { ddlHash: entry.ddlHash, fingerprint: entry.fingerprint };
     }
 
+    if (rebuild.length) await rebuildTables(conn, rebuild, tablesState);
     if (mismatched.length) await reconcileIds(conn, mismatched, tablesState);
   } finally {
     await conn.query('SET FOREIGN_KEY_CHECKS = 1').catch(() => {});
@@ -534,6 +546,22 @@ async function applyPull({ doFull, tablesState, response }) {
   state.lastPullAt = new Date().toISOString();
   state.initialDataReady = true;
   return { ok: true, full: doFull, mismatched };
+}
+
+// جداول شكلها على الجهاز غلط: بنطلبها تاني من غير ما نقول للسيرفر إننا عارفين شكلها، فبيبعت الشكل (DDL) + كل الصفوف
+async function rebuildTables(conn, tables, tablesState) {
+  state.progress = `إعادة بناء: ${tables.join(', ')}`;
+  notify();
+  const response = await requestPull({ full: false, since: await store.getKv('last_server_time', null), tables: tablesState, fullTables: tables });
+  dropCaseDuplicates(response.tables);
+  for (const table of tables) {
+    const entry = response.tables[table];
+    if (!entry) continue;
+    if (!entry.ddl) throw new Error(`مش قادر يعيد بناء جدول ${table}`);
+    await applyTable(conn, table, { ...entry, mode: 'full' });
+    await resetAutoIncrement(conn, table, entry);
+    tablesState[table] = { ddlHash: entry.ddlHash, fingerprint: entry.fingerprint };
+  }
 }
 
 // بعد التحديثات لو عدد الصفوف لسه مختلف عن السيرفر: يبقى فيه صفوف اتحذفت على السيرفر (أو فاتتنا)

@@ -287,6 +287,7 @@ function handleServerMessage(message) {
   if (message.type === 'ready') {
     contentView.webContents.loadURL(`http://127.0.0.1:${appPort}/login`);
     pollStatus();
+    setTimeout(reportFinishedUpdate, 2500);
     setTimeout(() => checkForUpdates(false), 15000);
     setInterval(() => checkForUpdates(false), 6 * 60 * 60 * 1000);
   }
@@ -431,6 +432,35 @@ function checkForUpdates(manual) {
   autoUpdater.checkForUpdates().catch(() => { /* بيتعامل معاه في autoUpdater.on('error') */ });
 }
 
+// ===== شاشة "جاري التثبيت" (عشان المستخدم يعرف إن فيه حاجة بتحصل) =====
+const updateMarker = path.join(userData, 'updating.json');
+let installingWindow = null;
+
+function showInstallingWindow(version) {
+  const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><style>
+    body{margin:0;font-family:Segoe UI,Tahoma,sans-serif;background:#312E81;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center}
+    .s{width:46px;height:46px;border:5px solid rgba(255,255,255,.25);border-top-color:#14B8A6;border-radius:50%;animation:r 1s linear infinite;margin-bottom:18px}
+    @keyframes r{to{transform:rotate(360deg)}} h2{margin:0 0 8px;font-size:20px} p{margin:0 24px;opacity:.85;line-height:1.7}
+  </style></head><body><div class="s"></div><h2>جاري تثبيت التحديث ${version || ''}</h2>
+  <p>البرنامج هيتقفل ثواني ويفتح لوحده خلال دقيقة تقريبًا.<br>متقفلش الجهاز. بياناتك محفوظة.</p></body></html>`;
+  installingWindow = new BrowserWindow({
+    width: 460, height: 260, frame: false, resizable: false, alwaysOnTop: true, center: true, skipTaskbar: false,
+    title: PROGRAM_NAME, icon: path.join(__dirname, 'icon.png'),
+  });
+  installingWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+}
+
+// بعد ما البرنامج يفتح تاني: نقول للمستخدم إن التحديث تم (أو إنه فشل)
+function reportFinishedUpdate() {
+  let marker = null;
+  try { marker = JSON.parse(fs.readFileSync(updateMarker, 'utf8')); } catch (_) { return; }
+  try { fs.unlinkSync(updateMarker); } catch (_) {}
+  if (!marker) return;
+  if (marker.version === app.getVersion()) setUpdateState({ state: 'installed', version: marker.version });
+  else setUpdateState({ state: 'error', message: `تثبيت الإصدار ${marker.version} ماكملش — اضغط "تحديثات البرنامج" وجرب تاني` });
+}
+
 ipcMain.handle('update:action', async () => {
   if (updateState.state === 'available') {
     autoUpdater.downloadUpdate().catch(error => setUpdateState({ state: 'error', message: error.message }));
@@ -443,7 +473,11 @@ ipcMain.handle('update:action', async () => {
       buttons: ['بعدين', 'ثبّت دلوقتي'],
       cancelId: 0,
     });
-    if (response === 1) await shutdownAndQuit({ install: true });
+    if (response === 1) {
+      showInstallingWindow(updateState.version);
+      try { fs.writeFileSync(updateMarker, JSON.stringify({ version: updateState.version, at: Date.now() })); } catch (_) {}
+      await shutdownAndQuit({ install: true });
+    }
   } else if (updateState.state !== 'downloading' && updateState.state !== 'checking') {
     checkForUpdates(true);
   }

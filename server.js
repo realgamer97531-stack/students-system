@@ -3165,6 +3165,11 @@ app.get('/attendance/scan', requirePermission('attendance_scan'), async (req, re
     Subject.findAll(),
     Center.findAll(),
   ]);
+  if (!activeSession) {
+    // الحصة المختارة مبقتش موجودة (اتمسحت، أو اتغير رقمها بعد المزامنة)
+    req.session.activeSessionId = null;
+    return res.send('⚠️ الحصة اللي كانت مختارة مبقتش موجودة — اختار حصة تانية من <a href="/sessions">هنا</a>');
+  }
   res.render('scan-attendance', {
     activeSession,
     recentSessions,
@@ -3793,6 +3798,11 @@ app.get('/homework/scan', requirePermission('homework_scan'), async (req, res) =
       limit: 30,
     }),
   ]);
+  if (!activeSession) {
+    // الحصة المختارة مبقتش موجودة (اتمسحت، أو اتغير رقمها بعد المزامنة)
+    req.session.activeSessionId = null;
+    return res.send('⚠️ الحصة اللي كانت مختارة مبقتش موجودة — اختار حصة تانية من <a href="/sessions">هنا</a>');
+  }
   res.render('scan-homework', {
     activeSession,
     recentSessions,
@@ -10091,6 +10101,16 @@ app.post('/user/profile-photo', requireLogin, profilePhotoUpload.single('photo')
 registerPopupQuestionRoutes(app, {
   requirePermissionOrAdmin, verifyPortalToken, hasAllVideoAccess, addPoints, uploadBufferToCloudinary,
   adImageUpload, Student, Video, VideoPart, Session, VideoSession, VideoStudentAccess,
+});
+
+// آخر حاجة: أي خطأ مش متوقع في صفحة بيتسجل في اللوج وبيظهر برسالة مفهومة (بدل "Internal Server Error" من غير سبب)
+app.use((err, req, res, next) => {
+  console.error(`❌ Unhandled error on ${req.method} ${req.originalUrl}:`, err);
+  if (res.headersSent) return next(err);
+  const message = `❌ حصلت مشكلة: ${err && err.message ? err.message : 'خطأ غير معروف'}`;
+  const wantsJson = req.xhr || /json/i.test(req.get('accept') || '') || /json/i.test(req.get('content-type') || '') || req.path.startsWith('/api/');
+  if (wantsJson) return res.status(500).json({ success: false, message });
+  res.status(500).send(message);
 });
 
 async function startServer() {

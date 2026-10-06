@@ -125,6 +125,7 @@
       case 'downloading': btn.textContent = `⭳ بينزل التحديث ${u.percent || 0}%`; btn.disabled = true; break;
       case 'downloaded': btn.className = 'warn'; btn.textContent = `✔ تثبيت التحديث ${u.version}`; break;
       case 'latest': btn.textContent = '✔ البرنامج محدث'; break;
+      case 'installed': btn.textContent = '✔ البرنامج محدث'; toast(`✔ تم تحديث البرنامج للإصدار ${u.version}`, 'success'); break;
       case 'error': btn.textContent = '⭳ تحديثات البرنامج'; if (u.message) toast(`التحديث: ${u.message}`, 'error'); break;
       default: btn.textContent = '⭳ تحديثات البرنامج';
     }
