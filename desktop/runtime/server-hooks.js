@@ -172,7 +172,7 @@ async function proxyToServer(req, res) {
   const isWrite = !['GET', 'HEAD'].includes(req.method);
   if (isWrite) {
     // نجيب نتيجة العملية دي على الجهاز قبل ما نعرض الرد (مثلاً الطالب الجديد لازم يبقى موجود)
-    await engine.pull().catch(() => {});
+    await engine.pull({ quick: true }).catch(() => {});
   }
   res.status(response.status);
   for (const name of PASS_THROUGH_HEADERS) {

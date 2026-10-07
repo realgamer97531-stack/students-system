@@ -12,6 +12,10 @@ const REQUEST_TIMEOUT_MS = 60 * 1000;
 const INSERT_CHUNK = 500;
 const MAX_SERVER_ERROR_ATTEMPTS = 3;
 const STALE_STARTED_MS = 2 * 60 * 1000;
+// التنزيل بعد الرفع: بعد دقيقة (وكل الرفعات اللي ورا بعض بتتجمع في تنزيل واحد) بدل ما يحصل بعد كل عملية
+const PULL_AFTER_PUSH_MS = 60 * 1000;
+// النسخة الكاملة اليومية تقيلة (بتمسح كل جدول وتملاه): بتستنى لحد ما محدش يشتغل على البرنامج 3 دقايق
+const IDLE_FOR_FULL_MS = 3 * 60 * 1000;
 
 const state = {
   online: false,
@@ -31,6 +35,8 @@ let gate = null; // وعد شغال وقت حفظ التنزيل: العمليا
 let fullApplying = false; // شكل جدول بيتغير (DROP/CREATE): حتى الصفحات بتستنى
 let writeSeq = 0; // بيزيد مع كل عملية كتابة: لو حصلت كتابة وقت التنزيل بنأجل الحفظ للمرة الجاية
 let pushTimer = null;
+let pullTimer = null;
+let lastWriteAt = 0; // آخر مرة حد حفظ حاجة على البرنامج
 let listeners = [];
 
 function serverUrl(path) {
@@ -120,7 +126,10 @@ function opStarted(opId) {
 
 function opFinished(opId, wrote) {
   inflight.delete(opId);
-  if (wrote) writeSeq += 1;
+  if (wrote) {
+    writeSeq += 1;
+    lastWriteAt = Date.now();
+  }
   if (wrote) schedulePush(300);
   notify();
 }
@@ -315,8 +324,8 @@ async function push({ force = false } = {}) {
     }
     if (summary.sent || summary.failed) {
       state.lastPushAt = new Date().toISOString();
-      // اللي اترفع لازم يرجع من السيرفر بالـ ids الحقيقية
-      setTimeout(() => pull().catch(() => {}), 200);
+      // اللي اترفع لازم يرجع من السيرفر بالـ ids الحقيقية (بعد شوية، مش وسط الشغل)
+      schedulePull(PULL_AFTER_PUSH_MS);
     }
     return summary;
   } finally {
@@ -406,7 +415,15 @@ async function requestPull(body) {
   return response.json();
 }
 
-async function pull({ full = false } = {}) {
+function schedulePull(delayMs) {
+  if (pullTimer) return;
+  pullTimer = setTimeout(() => {
+    pullTimer = null;
+    pull().catch(() => {});
+  }, delayMs);
+}
+
+async function pull({ full = false, quick = false } = {}) {
   if (state.pulling) return { busy: true };
   if (!process.env.SYNC_DEVICE_TOKEN) return { skipped: 'not-registered' };
   state.pulling = true;
@@ -421,7 +438,7 @@ async function pull({ full = false } = {}) {
       }
     }
     // التنزيل من النت بيحصل في الخلفية والبرنامج شغال عادي؛ الحفظ بس هو اللي بيوقف الكتابة ثواني
-    const prepared = await downloadPull(full);
+    const prepared = await downloadPull(full, quick);
     const seqBefore = prepared.seq;
     return await holdGate(async () => {
       if (writeSeq !== seqBefore) return { skipped: 'writes-during-download' };
@@ -447,12 +464,16 @@ async function pull({ full = false } = {}) {
   }
 }
 
-async function downloadPull(full) {
+async function downloadPull(full, quick = false) {
   const seq = writeSeq;
   const lastFull = await store.getKv('last_full_pull', 0);
   // نسخة كاملة مرة واحدة بعد إصلاح الجداول اللي أساميها بتفرق في الحروف الكبيرة بس (عشان ترجع البيانات اللي اتمسحت)
   const caseFixed = await store.getKv('case_fix_v1', false);
-  const doFull = full || !caseFixed || !lastFull || Date.now() - lastFull > FULL_REFRESH_EVERY_MS;
+  const fullDue = lastFull && Date.now() - lastFull > FULL_REFRESH_EVERY_MS;
+  const idle = Date.now() - lastWriteAt > IDLE_FOR_FULL_MS && !inflight.size;
+  // النسخة الكاملة اليومية بتستنى وقت الهدوء؛ لحد ساعتها التحديثات العادية بتكفي
+  // quick: حد مستني الرد على الشاشة (زي إضافة طالب) — تحديثات بس، عمره ما يبقى نسخة كاملة
+  const doFull = full || (!quick && (!caseFixed || !lastFull || (fullDue && idle)));
   const tablesState = await store.getKv('tables', {});
   const refreshTables = await store.getKv('refresh_tables', []);
   const since = await store.getKv('last_server_time', null);
