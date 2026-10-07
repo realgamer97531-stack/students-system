@@ -57,7 +57,7 @@ const TOKEN = token();
     console.log(`uploading ${file} (${(data.length / 1048576).toFixed(1)} MB)...`);
     await gh('POST', `${uploadBase}?name=${encodeURIComponent(file)}`, data, { 'content-type': 'application/octet-stream' });
   }
-  const published = await gh('PATCH', `/repos/${owner}/${repo}/releases/${release.id}`, JSON.stringify({ draft: false, tag_name: tag }), { 'content-type': 'application/json' });
+  const published = await gh('PATCH', `/repos/${owner}/${repo}/releases/${release.id}`, JSON.stringify({ draft: false, tag_name: tag, make_latest: 'true' }), { 'content-type': 'application/json' });
   console.log(`published ${published.html_url}`);
 })().catch((error) => {
   console.error(error.message);
