@@ -5990,7 +5990,6 @@ app.get('/admin/videos', requirePermissionOrAdmin('admin_videos'), async (req, r
       { model: Subject, attributes: ['id', 'name'] },
     ],
     order: [['createdAt', 'DESC']],
-    limit: 200,
   });
   const videos = await Video.findAll({
     include: [
@@ -6256,8 +6255,7 @@ app.get('/admin/videos/:id', requirePermissionOrAdmin('admin_videos'), async (re
   // كل الحصص للاختيار منها
   const allSessions = await Session.findAll({
     include: [Center, Subject],
-    order: [['lesson_number', 'ASC']],
-    limit: 200,
+    order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']],
   });
 
   res.render('manage-video-parts', { video, videoParts, videoSessions, studentAccesses, allSessions });
@@ -6430,8 +6428,7 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
 
   const allSessions = await Session.findAll({
     include: [Center, Subject],
-    order: [['lesson_number', 'ASC']],
-    limit: 200,
+    order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']],
   });
 
   res.render('video-access-control', {
@@ -7533,7 +7530,8 @@ app.get('/hw/assignments', requirePermission('homework_online'), async (req, res
   });
   const subjects = await Subject.findAll();
   const centers = await Center.findAll({ order: [['name', 'ASC']] });
-  const sessions = await Session.findAll({ include: [Center, Subject], order: [['lesson_number', 'ASC']], limit: 100 });
+  // كل الحصص (الأحدث فوق) — كان فيه limit 100 بالترتيب القديم فالحصص الجديدة مكانتش بتظهر
+  const sessions = await Session.findAll({ include: [Center, Subject], order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']] });
 
   const filteredAssignments = assignments.filter(a => {
     if (subject_id && String(a.SubjectId) !== String(subject_id)) return false;
