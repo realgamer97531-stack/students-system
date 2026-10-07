@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#4338CA">
+  <title>لا يوجد اتصال بالإنترنت</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
+           font-family: Cairo, Tahoma, sans-serif; background: #F4F5FC; color: #181527; text-align: center; }
+    .card { background: #fff; border-radius: 16px; padding: 32px 24px; max-width: 380px; width: 100%; box-shadow: 0 8px 24px rgba(30,27,75,.08); }
+    img { width: 72px; height: 72px; border-radius: 18px; }
+    h1 { font-size: 1.3rem; margin: 18px 0 8px; }
+    p { color: #6B7280; margin: 0 0 22px; line-height: 1.7; }
+    button { background: #4338CA; color: #fff; border: 0; border-radius: 11px; padding: 12px 28px; font: inherit; font-weight: 700; cursor: pointer; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0f172a; color: #f8fafc; }
+      .card { background: #1e293b; box-shadow: none; }
+      p { color: #94a3b8; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/icons/icon-192.png" alt="">
+    <h1>لا يوجد اتصال بالإنترنت</h1>
+    <p>اتأكد إن النت شغال وجرب تاني.<br>You're offline — check your connection and try again.</p>
+    <button onclick="location.reload()">إعادة المحاولة</button>
+  </div>
+</body>
+</html>

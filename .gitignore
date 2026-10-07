@@ -11,3 +11,9 @@ public/*
 !public/video-broadcasts.js
 !public/video-embed.js
 !public/popup-question.js
+!public/sw.js
+!public/pwa.js
+!public/manifest.json
+!public/staff-manifest.json
+!public/offline.html
+!public/icons/
