@@ -8,6 +8,7 @@ import '../services/staff_store.dart';
 import '../services/updater.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'staff/create_forms.dart';
 import 'staff/scan_tabs.dart';
 import 'staff/students_tab.dart';
 import 'web_screen.dart';
@@ -64,7 +65,7 @@ class _StaffScreenState extends State<StaffScreen> {
       if (u.can('attendance_scan')) _StaffTab('الحضور', Icons.how_to_reg_outlined, (_) => _ScanPage(ctx: _ctx, child: AttendanceTab(ctx: _ctx))),
       if (u.can('homework_scan')) _StaffTab('الواجب', Icons.assignment_turned_in_outlined, (_) => _ScanPage(ctx: _ctx, child: HomeworkScanTab(ctx: _ctx))),
       if (u.can('door_scan')) _StaffTab('الباب', Icons.door_front_door_outlined, (_) => _ScanPage(ctx: _ctx, child: DoorTab(ctx: _ctx))),
-      if (u.can('students_view')) _StaffTab('الطلاب', Icons.groups_outlined, (_) => Scaffold(body: StudentsTab(openWeb: _openWeb))),
+      if (u.can('students_view')) _StaffTab('الطلاب', Icons.groups_outlined, (_) => Scaffold(body: StudentsTab(openWeb: _openWeb, user: u, activeSession: _activeSession))),
       _StaffTab('السيستم', Icons.dashboard_outlined, (_) => WebScreen(
             key: _web,
             title: 'السيستم',
@@ -196,7 +197,7 @@ class _SessionPicker extends StatelessWidget {
       useRootNavigator: true,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _SessionList(selected: ctx.activeSession.value),
+      builder: (_) => _SessionList(selected: ctx.activeSession.value, user: ctx.user),
     );
     if (id != null) ctx.activeSession.value = id;
   }
@@ -241,8 +242,9 @@ class _SessionPicker extends StatelessWidget {
 }
 
 class _SessionList extends StatefulWidget {
-  const _SessionList({required this.selected});
+  const _SessionList({required this.selected, required this.user});
   final int? selected;
+  final StaffUser user;
   @override
   State<_SessionList> createState() => _SessionListState();
 }
@@ -257,6 +259,17 @@ class _SessionListState extends State<_SessionList> {
     if (!mounted) return;
     setState(() => _refreshing = false);
     if (!ok) toast(context, 'مش قادر يحدّث — اتأكد من النت', error: true);
+  }
+
+  Future<void> _newSession() async {
+    final id = await showModalBottomSheet<int>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => NewSessionSheet(user: widget.user),
+    );
+    if (id != null && mounted) Navigator.pop(context, id);
   }
 
   @override
@@ -285,10 +298,15 @@ class _SessionListState extends State<_SessionList> {
                   ),
                 ]),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('عشان تبدأ حصة جديدة: من تاب "السيستم" ← بدء حصة، وبعدين ارجع هنا واضغط تحديث.', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-              ),
+              if (widget.user.can('sessions_create'))
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: OutlinedButton.icon(
+                    onPressed: _newSession,
+                    icon: const Icon(Icons.add),
+                    label: const Text('بدء حصة جديدة (محتاج نت)'),
+                  ),
+                ),
               Expanded(
                 child: snap == null
                     ? const Center(child: Text('مفيش بيانات لسه — اضغط تحديث وفيه نت'))

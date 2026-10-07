@@ -2231,6 +2231,12 @@ app.post('/students', async (req, res) => {
       subject_id,
       admin_password,
     } = req.body;
+    // تطبيق الموبايل بيطلب الرد JSON بدل الصفحة
+    const wantsJson = req.body.response_format === 'json';
+
+    if (wantsJson && (!String(name || '').trim() || !center_id || !subject_id)) {
+      return res.status(400).json({ success: false, message: '❌ لازم الاسم والسنتر والمادة' });
+    }
 
     // Validate phone lengths (must be 11 digits). Admin password can override.
     const cleanDigits = v => (v || '').toString().replace(/[^0-9]/g, '');
@@ -2238,12 +2244,14 @@ app.post('/students', async (req, res) => {
     const parentDigits = cleanDigits(parent_phone);
     if (phoneDigits.length !== 11 || parentDigits.length !== 11) {
       if (!admin_password) {
+        if (wantsJson) return res.status(400).json({ success: false, code: 'PHONE_INVALID', message: 'أرقام التليفون لازم تكون 11 رقم — اكتب باسورد حسابك عشان توافق' });
         const centers = await Center.findAll();
         const subjects = await Subject.findAll();
         return res.status(400).render('add-student', { centers, subjects, errorMessage: 'أرقام التليفون غير صحيحة: يجب أن تكون مكونة من 11 رقمًا. يمكنك إدخال كلمة المرور الإدارية للموافقة.' });
       }
       const verified = await verifyAdminPassword(req.session.userId, admin_password);
       if (!verified) {
+        if (wantsJson) return res.status(403).json({ success: false, code: 'PHONE_INVALID', message: 'الباسورد غلط' });
         const centers = await Center.findAll();
         const subjects = await Subject.findAll();
         return res.status(403).render('add-student', { centers, subjects, errorMessage: 'كلمة المرور الإدارية غير صحيحة.' });
@@ -2254,6 +2262,14 @@ app.post('/students', async (req, res) => {
 
     if (existingStudent) {
       if (admin_password !== process.env.ADMIN_DUPLICATE_PASSWORD) {
+        if (wantsJson) {
+          return res.status(409).json({
+            success: false,
+            code: 'DUPLICATE',
+            message: `الطالب ده موجود قبل كده: ${existingStudent.name} (${existingStudent.student_code})`,
+            existingStudent: { id: existingStudent.id, name: existingStudent.name, student_code: existingStudent.student_code },
+          });
+        }
         const centers = await Center.findAll();
         const subjects = await Subject.findAll();
         const existingQrCodeImage = existingStudent.student_code ? studentQrDataUrl(existingStudent.student_code) : null;
@@ -2324,10 +2340,20 @@ app.post('/students', async (req, res) => {
       }
     }
 
+    if (wantsJson) {
+      return res.json({
+        success: true,
+        message: '✅ تم إضافة الطالب',
+        student: { id: student.id, student_code: student.student_code, name: student.name },
+        attendanceNote,
+      });
+    }
+
     const qrCodeImage = studentQrDataUrl(student.student_code);
     res.render('student-created', { student, qrCodeImage, attendanceNote });
   } catch (error) {
     console.error(error);
+    if (req.body && req.body.response_format === 'json') return res.status(500).json({ success: false, message: '❌ حصلت مشكلة في الحفظ: ' + error.message });
     res.status(500).send('❌ حصلت مشكلة في الحفظ: ' + error.message);
   }
 });
@@ -2387,6 +2413,23 @@ app.post('/sessions', async (req, res) => {
     // تخزين رقم الحصة الشغالة في جلسة الأسيستانت
     req.session.activeSessionId = newSession.id;
 
+    if (req.body.response_format === 'json') {
+      return res.json({
+        success: true,
+        message: `✅ اتعملت حصة ${fullSession.lesson_number} (سيريال ${fullSession.serial_number})`,
+        session: {
+          id: fullSession.id,
+          lesson_number: fullSession.lesson_number,
+          week_number: fullSession.week_number,
+          serial_number: fullSession.serial_number,
+          session_date: fullSession.session_date,
+          status: fullSession.status,
+          CenterId: fullSession.CenterId,
+          SubjectId: fullSession.SubjectId,
+        },
+      });
+    }
+
     res.render('session-started', { session: fullSession });
   } catch (error) {
     console.error(error);
@@ -2407,7 +2450,8 @@ app.get('/sessions', requirePermission('sessions_view'), async (req, res) => {
     Session.findAll({
       where: sessionWhere,
       include: [Center, Subject],
-      order: [['lesson_number', 'ASC'], ['session_date', 'ASC'], ['serial_number', 'ASC']],
+      // الأحدث فوق
+      order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']],
       limit: 100,
     }),
     Center.findAll({ order: [['name', 'ASC']] }),
@@ -3058,8 +3102,40 @@ app.post('/sessions/:id/restore', requireAdmin, async (req, res) => {
 // تعديل بيانات حصة (تاريخها مثلًا، لو اتسجلت غلط)
 app.post('/sessions/:id/edit', requireAdmin, async (req, res) => {
   try {
-    const { session_date } = req.body;
-    await Session.update({ session_date }, { where: { id: req.params.id } });
+    const { session_date, lesson_number } = req.body;
+    const session = await Session.findByPk(req.params.id);
+    if (!session) return res.status(404).send('❌ الحصة غير موجودة');
+
+    const updates = { session_date };
+
+    // تعديل الرقم النسبي (والسيريال بيتحسب من جديد = أساس السيريال + الرقم النسبي)
+    if (lesson_number !== undefined && lesson_number !== '') {
+      const newLessonNumber = parseInt(lesson_number, 10);
+      if (!newLessonNumber || newLessonNumber < 1) {
+        return res.status(400).send('❌ لازم تكتب رقم نسبي صحيح');
+      }
+      if (newLessonNumber !== session.lesson_number) {
+        const conflict = await Session.findOne({
+          where: {
+            CenterId: session.CenterId,
+            SubjectId: session.SubjectId,
+            lesson_number: newLessonNumber,
+            id: { [Op.ne]: session.id },
+          },
+        });
+        if (conflict) {
+          return res.status(400).send(`❌ فيه حصة تانية في نفس السنتر والمادة برقم نسبي ${newLessonNumber} (سيريال ${conflict.serial_number})`);
+        }
+        const series = await CenterSubjectSeries.findOne({
+          where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
+        });
+        const base = series ? series.base_number : session.serial_number - session.lesson_number;
+        updates.lesson_number = newLessonNumber;
+        updates.serial_number = base + newLessonNumber;
+      }
+    }
+
+    await Session.update(updates, { where: { id: req.params.id } });
     res.redirect('/sessions');
   } catch (error) {
     console.error(error);

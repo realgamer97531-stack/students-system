@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../services/session_store.dart';
 import '../../services/staff_store.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
+import 'create_forms.dart';
 
 /// قايمة الطلاب جوه البرنامج (شغالة من غير نت من آخر بيانات اتحفظت)
 class StudentsTab extends StatefulWidget {
-  const StudentsTab({super.key, required this.openWeb});
+  const StudentsTab({super.key, required this.openWeb, required this.user, required this.activeSession});
 
   /// فتح صفحة من السيستم (الملف الكامل للطالب) في تاب "السيستم"
   final void Function(String path) openWeb;
+  final StaffUser user;
+  final ValueNotifier<int?> activeSession;
 
   @override
   State<StudentsTab> createState() => _StudentsTabState();
@@ -54,7 +58,7 @@ class _StudentsTabState extends State<StudentsTab> {
           return ErrorView(message: 'لسه مفيش بيانات طلاب على الموبايل — افتح البرنامج وفيه نت مرة', onRetry: StaffStore.refreshSnapshot);
         }
         final list = _filter(snap);
-        return Column(children: [
+        final body = Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Column(children: [
@@ -78,7 +82,7 @@ class _StudentsTabState extends State<StudentsTab> {
             child: RefreshIndicator(
               onRefresh: StaffStore.refreshSnapshot,
               child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
                 itemCount: list.length,
                 itemExtent: 74,
                 itemBuilder: (context, i) {
@@ -99,6 +103,22 @@ class _StudentsTabState extends State<StudentsTab> {
                   );
                 },
               ),
+            ),
+          ),
+        ]);
+        if (!widget.user.can('students_add')) return body;
+        return Stack(children: [
+          body,
+          PositionedDirectional(
+            end: 16,
+            bottom: 16,
+            child: FloatingActionButton.extended(
+              heroTag: 'add_student',
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => AddStudentScreen(user: widget.user, activeSession: widget.activeSession),
+              )),
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('إضافة طالب'),
             ),
           ),
         ]);
