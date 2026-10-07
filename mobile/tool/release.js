@@ -72,7 +72,7 @@ function currentVersion() {
   await gh('POST', `${release.upload_url.replace(/\{.*$/, '')}?name=${encodeURIComponent(name)}`, data, {
     'content-type': 'application/vnd.android.package-archive',
   });
-  const published = await gh('PATCH', `/repos/${OWNER}/${REPO}/releases/${release.id}`, JSON.stringify({ draft: false, tag_name: tag }), {
+  const published = await gh('PATCH', `/repos/${OWNER}/${REPO}/releases/${release.id}`, JSON.stringify({ draft: false, tag_name: tag, make_latest: 'true' }), {
     'content-type': 'application/json',
   });
   console.log(`published ${published.html_url}`);
