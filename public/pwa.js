@@ -191,7 +191,7 @@
     overlay.innerHTML =
       '<div style="background:#fff;color:#181527;border-radius:18px;padding:20px 18px calc(16px + env(safe-area-inset-bottom,0px));width:100%;max-width:440px;max-height:90vh;overflow:auto;box-shadow:0 -10px 40px rgba(0,0,0,.25)">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'
-      + '<img src="' + base + 'icons/icon-192.png" alt="" style="width:44px;height:44px;border-radius:11px">'
+      + '<img src="' + base + 'icons/icon-192.png?v=3" alt="" style="width:44px;height:44px;border-radius:11px">'
       + '<div style="font-weight:800;font-size:1.05rem">' + t.guideTitle + '</div></div>'
       + '<div style="font-size:.92rem">' + body + '</div>'
       + (needsCopy ? '<button type="button" data-g="copy" style="' + btn + 'background:#EEF0FB;color:#4338CA;border:0">' + t.copy + '</button>' : '')
@@ -297,7 +297,7 @@
       + 'background:#fff;color:#181527;border-radius:16px;box-shadow:0 12px 32px rgba(30,27,75,.25);padding:14px;'
       + 'display:flex;gap:12px;align-items:center;font-family:Cairo,Tahoma,sans-serif;max-width:480px;margin:0 auto;';
     banner.innerHTML =
-      '<img src="' + base + 'icons/icon-192.png" alt="" style="width:46px;height:46px;border-radius:12px;flex:none">'
+      '<img src="' + base + 'icons/icon-192.png?v=3" alt="" style="width:46px;height:46px;border-radius:12px;flex:none">'
       + '<div style="flex:1;min-width:0">'
       + '<div style="font-weight:800;font-size:.95rem">' + t.bannerTitle + '</div>'
       + '<div style="font-size:.8rem;color:#6B7280;line-height:1.5;margin-top:2px">' + (guideMode ? t.bannerBodyIOS : t.bannerBody) + '</div>'

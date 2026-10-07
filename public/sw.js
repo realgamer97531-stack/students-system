@@ -2,7 +2,7 @@
 // القاعدة: النت دايمًا الأول — الكاش بيستخدم بس لما النت يقطع، فالموقع وهو أونلاين بيشتغل زي ما هو بالظبط.
 // مش بنخزن أبدًا: طلبات الـ API، الملفات المرفوعة/الفيديوهات، أي طلب غير GET، ولا صفحات نظام الموظفين (فيها بيانات خاصة).
 // لو حصلت أي مشكلة: غير VERSION أو خلي الملف ده فاضي من الـ fetch handler وكل الأجهزة هتاخد النسخة الجديدة.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const PAGE_CACHE = `sf-pages-${VERSION}`;
 const ASSET_CACHE = `sf-assets-${VERSION}`;
 const CDN_CACHE = `sf-cdn-${VERSION}`;
@@ -19,7 +19,7 @@ const PORTAL_PAGES = new Set([
 
 const PRECACHE = [
   OFFLINE_URL,
-  `${BASE}icons/icon-192.png`,
+  `${BASE}icons/icon-192.png?v=3`,
   `${BASE}manifest.json`,
 ];
 
