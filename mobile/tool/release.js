@@ -49,7 +49,12 @@ function currentVersion() {
 (async () => {
   const version = process.argv.includes('--no-bump') ? currentVersion() : bumpVersion();
   console.log(`building ${version}...`);
-  execSync('flutter build apk --release', { cwd: MOBILE, stdio: 'inherit' });
+  // C: شبه مليان: لازم كاشات Gradle و pub تكون على D:\dev، وإلا Gradle بينزّل كل حاجة من الأول على C: وبيعلق
+  const buildEnv = { ...process.env };
+  if (!buildEnv.GRADLE_USER_HOME && fs.existsSync('D:/dev/gradle')) buildEnv.GRADLE_USER_HOME = 'D:\\dev\\gradle';
+  if (!buildEnv.PUB_CACHE && fs.existsSync('D:/dev/pub-cache')) buildEnv.PUB_CACHE = 'D:\\dev\\pub-cache';
+  console.log(`GRADLE_USER_HOME=${buildEnv.GRADLE_USER_HOME || '(default)'}  PUB_CACHE=${buildEnv.PUB_CACHE || '(default)'}`);
+  execSync('flutter build apk --release', { cwd: MOBILE, stdio: 'inherit', env: buildEnv });
   const apk = path.join(MOBILE, 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk');
   const name = `Studyisfunny-${version}.apk`;
 
