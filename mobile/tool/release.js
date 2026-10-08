@@ -64,7 +64,7 @@ function currentVersion() {
     for (const asset of release.assets) await gh('DELETE', `/repos/${OWNER}/${REPO}/releases/assets/${asset.id}`);
   } else {
     release = await gh('POST', `/repos/${OWNER}/${REPO}/releases`, JSON.stringify({
-      tag_name: tag, name: `Studyisfunny ${version}`, body: `Studyisfunny mobile ${version}`, draft: true,
+      tag_name: tag, name: `Shady Elsharkawy ${version}`, body: `Shady Elsharkawy mobile ${version}`, draft: true,
     }), { 'content-type': 'application/json' });
   }
   const data = fs.readFileSync(apk);

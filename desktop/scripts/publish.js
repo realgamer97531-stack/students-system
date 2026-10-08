@@ -48,7 +48,7 @@ const TOKEN = token();
     for (const asset of release.assets) await gh('DELETE', `/repos/${owner}/${repo}/releases/assets/${asset.id}`);
   } else {
     release = await gh('POST', `/repos/${owner}/${repo}/releases`, JSON.stringify({
-      tag_name: tag, name: `Studyisfunny ${version}`, body: `Studyisfunny desktop ${version}`, draft: true,
+      tag_name: tag, name: `Shady Elsharkawy ${version}`, body: `Shady Elsharkawy desktop ${version}`, draft: true,
     }), { 'content-type': 'application/json' });
   }
   const uploadBase = release.upload_url.replace(/\{.*$/, '');

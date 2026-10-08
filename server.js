@@ -9895,6 +9895,16 @@ app.post('/students/:id/delete', requireAdmin, async (req, res) => {
 app.get('/admin/deleted-students', requireAdmin, async (req, res) => {
   try {
     const archives = await listArchivedStudents();
+    const [centers, subjects] = await Promise.all([
+      Center.findAll({ attributes: ['id', 'name'], raw: true }),
+      Subject.findAll({ attributes: ['id', 'name'], raw: true }),
+    ]);
+    const centerNames = Object.fromEntries(centers.map((c) => [String(c.id), c.name]));
+    const subjectNames = Object.fromEntries(subjects.map((s) => [String(s.id), s.name]));
+    archives.forEach((a) => {
+      a.centerName = a.snapshot.CenterId ? (centerNames[String(a.snapshot.CenterId)] || null) : null;
+      a.subjectName = a.snapshot.SubjectId ? (subjectNames[String(a.snapshot.SubjectId)] || null) : null;
+    });
     res.render('deleted-students', {
       archives,
       successMessage: req.query.restored ? 'تم إرجاع الطالب وكل بياناته بنجاح' : null,

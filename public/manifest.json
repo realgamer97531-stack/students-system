@@ -8,7 +8,6 @@
   "start_url": "./index.html?source=pwa",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#F4F5FC",
   "theme_color": "#4338CA",
   "icons": [

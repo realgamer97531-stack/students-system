@@ -1,12 +1,41 @@
 <%- include('partials/header') %>
 
+<%
+  const total = archives.length;
+  const restoredCount = archives.filter(a => a.restored_at).length;
+  const deletedCount = total - restoredCount;
+  const fmtDate = (d) => d ? new Date(d).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' }) : '-';
+  const fmtDay = (d) => d ? new Date(d).toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium' }) : '-';
+%>
+
+<style>
+  .dh-stat { border: 0; border-radius: 14px; box-shadow: 0 6px 18px rgba(30,27,75,.06); }
+  .dh-stat strong { font-size: 1.7rem; display: block; line-height: 1.2; }
+  .dh-filters .btn.active { background: var(--sf-primary); color: #fff; border-color: var(--sf-primary); }
+  .dh-row-restored td { opacity: .75; }
+  .dh-muted { color: #6B7280; font-size: .82rem; }
+  .dh-nowrap { white-space: nowrap; }
+  .dh-stat .dh-muted { white-space: nowrap; }
+  @media (max-width: 767px) {
+    .dh-table thead { display: none; }
+    .dh-table tr { display: block; border: 1px solid #E5E7EB; border-radius: 12px; margin-bottom: 10px; padding: 10px 12px; background: #fff; }
+    .dh-table td { display: flex; justify-content: space-between; gap: 12px; border: 0; padding: 4px 0; text-align: start; }
+    .dh-table td::before { content: attr(data-label); font-weight: 700; color: #6B7280; flex: none; }
+    .dh-table td > * { text-align: end; }
+    .dh-table td.dh-nowrap { white-space: normal; }
+  }
+</style>
+
 <div class="container-fluid">
   <div class="row">
-    <div class="col-lg-10 mx-auto">
+    <div class="col-xl-11 mx-auto">
       <div class="mb-4">
-        <h2 class="mb-2">🗂️ الطلاب المحذوفين</h2>
+        <h2 class="mb-2">
+          <span class="ar-only">🗂️ سجل الطلاب المحذوفين</span>
+          <span class="en-only" style="display:none;">🗂️ Deleted Students History</span>
+        </h2>
         <p class="text-muted mb-0">
-          أي طالب بيتحذف بيتحفظ هنا بكل بياناته (الحضور، المعاملات، الامتحانات، الواجب، البوكليتس...) ومين اللي حذفه.
+          أي طالب بيتحذف بيتحفظ هنا بكل بياناته (الحضور، المعاملات، الامتحانات، الواجب، البوكليتس...) ومين اللي حذفه وإمتى.
           تقدر ترجّعه زي ما كان بنفس الكود والتواريخ.
         </p>
       </div>
@@ -18,33 +47,67 @@
       <div class="alert alert-danger"><%= errorMessage %></div>
       <% } %>
 
+      <div class="row g-3 mb-3">
+        <div class="col-4"><div class="card dh-stat"><div class="card-body text-center py-3"><strong><%= total %></strong><span class="dh-muted">الإجمالي</span></div></div></div>
+        <div class="col-4"><div class="card dh-stat"><div class="card-body text-center py-3"><strong class="text-danger"><%= deletedCount %></strong><span class="dh-muted">محذوفين</span></div></div></div>
+        <div class="col-4"><div class="card dh-stat"><div class="card-body text-center py-3"><strong class="text-success"><%= restoredCount %></strong><span class="dh-muted">اترجعوا</span></div></div></div>
+      </div>
+
       <div class="card shadow-sm">
         <div class="card-body">
-          <% if (!archives.length) { %>
+          <% if (!total) { %>
             <p class="text-muted mb-0">مفيش طلاب اتحذفوا من ساعة تفعيل الأرشيف.</p>
           <% } else { %>
+          <div class="d-flex flex-column flex-md-row gap-2 mb-3">
+            <input type="search" id="dhSearch" class="form-control" placeholder="🔍 دور بالاسم أو الكود أو رقم التليفون أو اللي حذف...">
+            <div class="btn-group dh-filters flex-none" role="group">
+              <button type="button" class="btn btn-outline-secondary active" data-filter="all">الكل</button>
+              <button type="button" class="btn btn-outline-secondary" data-filter="deleted">محذوفين</button>
+              <button type="button" class="btn btn-outline-secondary" data-filter="restored">اترجعوا</button>
+            </div>
+          </div>
+
           <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 dh-table">
               <thead>
                 <tr>
                   <th>الطالب</th>
                   <th>الكود</th>
+                  <th>التليفون</th>
+                  <th>السنتر / المادة</th>
+                  <th>الرصيد وقت الحذف</th>
                   <th>اتحذف بواسطة</th>
                   <th>وقت الحذف</th>
                   <th>الحالة</th>
                 </tr>
               </thead>
               <tbody>
-                <% archives.forEach(a => { %>
-                <tr>
-                  <td><%= a.student_name || '-' %></td>
-                  <td><%= a.student_code || '-' %></td>
-                  <td><%= a.deleted_by_name || '-' %></td>
-                  <td><%= new Date(a.createdAt).toLocaleString('ar-EG') %></td>
-                  <td>
+                <% archives.forEach(a => { const s = a.snapshot || {}; %>
+                <tr class="<%= a.restored_at ? 'dh-row-restored' : '' %>"
+                    data-status="<%= a.restored_at ? 'restored' : 'deleted' %>"
+                    data-search="<%= [a.student_name, a.student_code, s.phone, s.parent_phone, a.deleted_by_name, a.centerName, a.subjectName].filter(Boolean).join(' ').toLowerCase() %>">
+                  <td data-label="الطالب">
+                    <div class="fw-bold"><%= a.student_name || '-' %></div>
+                    <% if (s.createdAt) { %><div class="dh-muted">مسجّل من <%= fmtDay(s.createdAt + 'Z') %></div><% } %>
+                  </td>
+                  <td data-label="الكود" class="dh-nowrap"><%= a.student_code || '-' %></td>
+                  <td data-label="التليفون">
+                    <div dir="ltr"><%= s.phone || '-' %></div>
+                    <% if (s.parent_phone) { %><div class="dh-muted" dir="ltr">ولي الأمر: <%= s.parent_phone %></div><% } %>
+                  </td>
+                  <td data-label="السنتر / المادة">
+                    <div><%= a.centerName || '-' %></div>
+                    <% if (a.subjectName) { %><div class="dh-muted"><%= a.subjectName %></div><% } %>
+                  </td>
+                  <td data-label="الرصيد وقت الحذف"><%= s.balance !== null && s.balance !== undefined ? s.balance + ' ج' : '-' %></td>
+                  <td data-label="اتحذف بواسطة"><%= a.deleted_by_name || '-' %></td>
+                  <td data-label="وقت الحذف" class="dh-nowrap"><%= fmtDate(a.createdAt) %></td>
+                  <td data-label="الحالة">
                     <% if (a.restored_at) { %>
-                      <span class="badge bg-success">اترجع</span>
-                      <div class="small text-muted"><%= a.restored_by_name || '' %> - <%= new Date(a.restored_at).toLocaleString('ar-EG') %></div>
+                      <div>
+                        <span class="badge bg-success">اترجع</span>
+                        <div class="dh-muted"><%= a.restored_by_name || '' %> - <%= fmtDate(a.restored_at) %></div>
+                      </div>
                     <% } else { %>
                       <form action="/admin/deleted-students/<%= a.id %>/restore" method="POST" class="d-inline"
                         data-student-name="<%= a.student_name || '' %>"
@@ -59,13 +122,11 @@
               </tbody>
             </table>
           </div>
+          <p id="dhEmpty" class="text-muted text-center my-3" style="display:none">مفيش نتايج مطابقة.</p>
           <% } %>
         </div>
       </div>
-
-      <div class="my-4">
-        <a href="/settings" class="btn btn-secondary">← رجوع للإعدادات</a>
-      </div>
+      <p class="dh-muted mt-3">السجل بيبدأ من يوم تفعيل الأرشيف (3 أكتوبر 2026) — الطلاب اللي اتحذفوا قبل كده مش متسجلين هنا.</p>
     </div>
   </div>
 </div>
@@ -79,6 +140,33 @@
     form.querySelector('input[name="admin_password"]').value = password;
     return true;
   }
+
+  (function () {
+    const search = document.getElementById('dhSearch');
+    if (!search) return;
+    const rows = Array.from(document.querySelectorAll('.dh-table tbody tr'));
+    const empty = document.getElementById('dhEmpty');
+    let filter = 'all';
+    function apply() {
+      const q = search.value.trim().toLowerCase();
+      let shown = 0;
+      rows.forEach((row) => {
+        const ok = (filter === 'all' || row.dataset.status === filter) && (!q || row.dataset.search.includes(q));
+        row.style.display = ok ? '' : 'none';
+        if (ok) shown += 1;
+      });
+      empty.style.display = shown ? 'none' : '';
+    }
+    search.addEventListener('input', apply);
+    document.querySelectorAll('.dh-filters [data-filter]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.dh-filters [data-filter]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        filter = btn.dataset.filter;
+        apply();
+      });
+    });
+  })();
 </script>
 
 <%- include('partials/footer') %>

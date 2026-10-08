@@ -114,7 +114,7 @@ class _StaffScreenState extends State<StaffScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.user.name.isEmpty ? 'Studyisfunny' : widget.user.name),
+          title: Text(widget.user.name.isEmpty ? 'Shady Elsharkawy' : widget.user.name),
           actions: [
             _SyncBadge(onTap: _openSync),
             if (isWeb) IconButton(onPressed: () => _web.currentState?.reload(), icon: const Icon(Icons.refresh), tooltip: 'إعادة تحميل'),

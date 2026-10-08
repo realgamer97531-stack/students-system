@@ -112,12 +112,30 @@ async function restoreArchivedStudent({ sequelize, Student, related, archiveId, 
   });
 }
 
-async function listArchivedStudents(limit = 500) {
+// بيانات الطالب اللي بتظهر في سجل المحذوفين بتتقرا من الـ JSON جوه قاعدة البيانات نفسها،
+// عشان منحمّلش كل الحضور والمعاملات المتأرشفة لكل طالب في الصفحة
+const SNAPSHOT_FIELDS = ['phone', 'parent_phone', 'balance', 'points', 'CenterId', 'SubjectId', 'createdAt'];
+
+async function listArchivedStudents(limit = 1000) {
   await ensureDeletedStudentArchiveSchema();
-  return DeletedStudentArchive.findAll({
-    attributes: ['id', 'student_id', 'student_code', 'student_name', 'deleted_by_name', 'createdAt', 'restored_at', 'restored_by_name'],
+  const { sequelize } = DeletedStudentArchive;
+  const rows = await DeletedStudentArchive.findAll({
+    attributes: [
+      'id', 'student_id', 'student_code', 'student_name', 'deleted_by_name', 'createdAt', 'restored_at', 'restored_by_name',
+      ...SNAPSHOT_FIELDS.map((field) => [sequelize.literal(`JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.student.${field}'))`), `snap_${field}`]),
+    ],
     order: [['createdAt', 'DESC']],
     limit,
+    raw: true,
+  });
+  return rows.map((row) => {
+    const snapshot = {};
+    for (const field of SNAPSHOT_FIELDS) {
+      const value = row[`snap_${field}`];
+      snapshot[field] = value === undefined || value === null || value === 'null' ? null : value;
+      delete row[`snap_${field}`];
+    }
+    return { ...row, snapshot };
   });
 }
 

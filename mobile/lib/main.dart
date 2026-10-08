@@ -101,7 +101,7 @@ class _StudyisfunnyAppState extends State<StudyisfunnyApp> with WidgetsBindingOb
     };
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'Studyisfunny',
+      title: 'Shady Elsharkawy',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       locale: const Locale('ar'),

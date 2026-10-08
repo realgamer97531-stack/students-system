@@ -10,7 +10,10 @@ const { autoUpdater } = require('electron-updater');
 const mariadb = require('./mariadb');
 const cdnCache = require('./cdn-cache');
 
+// PROGRAM_NAME = اسم داخلي (فولدر البيانات + اسم خدمة قاعدة البيانات) — لازم ميتغيرش عشان الأجهزة المتثبتة متفقدش بياناتها.
+// DISPLAY_NAME = الاسم اللي بيظهر للمستخدم في العناوين والرسايل.
 const PROGRAM_NAME = 'Studyisfunny';
+const DISPLAY_NAME = 'Shady Elsharkawy';
 const DEFAULT_SERVER_URL = 'https://students-system-production-6b89.up.railway.app';
 const TOOLBAR_HEIGHT = 56;
 
@@ -88,7 +91,7 @@ function createMainWindow() {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: PROGRAM_NAME,
+    title: DISPLAY_NAME,
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     show: false,
@@ -154,7 +157,7 @@ function showSetup() {
       width: 560,
       height: 640,
       resizable: false,
-      title: `${PROGRAM_NAME} — تسجيل الجهاز`,
+      title: `${DISPLAY_NAME} — تسجيل الجهاز`,
       icon: path.join(__dirname, 'icon.png'),
       autoHideMenuBar: true,
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
@@ -257,7 +260,7 @@ async function startSystem() {
     serverProcess = null;
     if (!quitting) {
       setLoadingMessage('السيستم وقف فجأة — هيتقفل البرنامج، افتحه تاني. لو المشكلة اتكررت ابعت فولدر السجلات.', true);
-      dialog.showMessageBox({ type: 'error', title: PROGRAM_NAME, message: 'السيستم وقف فجأة. البرنامج هيتقفل، افتحه تاني.\nالعمليات اللي ماترفعتش محفوظة على الجهاز ومش هتضيع.' })
+      dialog.showMessageBox({ type: 'error', title: DISPLAY_NAME, message: 'السيستم وقف فجأة. البرنامج هيتقفل، افتحه تاني.\nالعمليات اللي ماترفعتش محفوظة على الجهاز ومش هتضيع.' })
         .then(() => shutdownAndQuit());
     }
   });
@@ -367,8 +370,8 @@ ipcMain.handle('settings:open', async () => {
   const config = readConfig();
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'info',
-    title: PROGRAM_NAME,
-    message: `${PROGRAM_NAME} — إصدار ${app.getVersion()}`,
+    title: DISPLAY_NAME,
+    message: `${DISPLAY_NAME} — إصدار ${app.getVersion()}`,
     detail: `اسم الجهاز: ${config.deviceName || '-'}\nالسيرفر: ${config.serverUrl || '-'}\nالبيانات محفوظة في: ${dataRoot}`,
     buttons: ['تمام', 'فتح فولدر السجلات', 'إعادة تسجيل الجهاز'],
     cancelId: 0,
@@ -377,7 +380,7 @@ ipcMain.handle('settings:open', async () => {
   if (response === 2) {
     const confirm = await dialog.showMessageBox(mainWindow, {
       type: 'warning',
-      title: PROGRAM_NAME,
+      title: DISPLAY_NAME,
       message: 'إعادة تسجيل الجهاز',
       detail: 'هتحتاج يوزر وباسورد أدمن تاني. البيانات اللي على الجهاز والعمليات اللي ماترفعتش مش هتتمسح.',
       buttons: ['إلغاء', 'إعادة التسجيل'],
@@ -445,7 +448,7 @@ function showInstallingWindow(version) {
   <p>البرنامج هيتقفل ثواني ويفتح لوحده خلال دقيقة تقريبًا.<br>متقفلش الجهاز. بياناتك محفوظة.</p></body></html>`;
   installingWindow = new BrowserWindow({
     width: 460, height: 260, frame: false, resizable: false, alwaysOnTop: true, center: true, skipTaskbar: false,
-    title: PROGRAM_NAME, icon: path.join(__dirname, 'icon.png'),
+    title: DISPLAY_NAME, icon: path.join(__dirname, 'icon.png'),
   });
   installingWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
@@ -467,7 +470,7 @@ ipcMain.handle('update:action', async () => {
   } else if (updateState.state === 'downloaded') {
     const { response } = await dialog.showMessageBox(mainWindow, {
       type: 'question',
-      title: PROGRAM_NAME,
+      title: DISPLAY_NAME,
       message: `تثبيت الإصدار ${updateState.version} دلوقتي؟`,
       detail: 'البرنامج هيتقفل ويتحدث ويفتح تاني لوحده (أقل من دقيقة). البيانات والعمليات اللي ماترفعتش محفوظة.',
       buttons: ['بعدين', 'ثبّت دلوقتي'],

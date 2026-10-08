@@ -41,6 +41,21 @@
     navigator.serviceWorker.register(base + 'sw.js', { scope: base, updateViaCache: 'none' }).catch(function () {});
   });
 
+  // فيديو في وضع ملء الشاشة: نلف الشاشة بالعرض زي يوتيوب، ونرجعها لما يخرج.
+  // مهم للتطبيق المثبت: النسخ القديمة منه كانت مقفولة على الوضع الطولي.
+  function onFullscreenChange() {
+    var orientation = screen.orientation;
+    if (!orientation) return;
+    var fsElement = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsElement) {
+      if (orientation.lock) orientation.lock('landscape').catch(function () {});
+    } else if (orientation.unlock) {
+      try { orientation.unlock(); } catch (e) { /* مش مدعوم */ }
+    }
+  }
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
   if (isStandalone) return; // التطبيق متثبت ومفتوح كتطبيق — مفيش داعي لأي زرار تثبيت
 
   // التثبيت للموبايل والتابلت بس
