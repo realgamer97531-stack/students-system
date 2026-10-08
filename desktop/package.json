@@ -1,7 +1,7 @@
 {
   "name": "studyisfunny-desktop",
   "productName": "Studyisfunny",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Shady Elsharkawy - نظام المتابعة (نسخة الديسكتوب بتشتغل أوفلاين)",
   "author": "Shady Elsharkawy",
   "main": "app/main.js",
