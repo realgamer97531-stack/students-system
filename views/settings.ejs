@@ -134,6 +134,89 @@
           </form>
         </div>
       </div>
+      <%
+        const lessonToolSessions = availableSessions.map(s => ({
+          id: s.id, lesson: s.lesson_number, serial: s.serial_number, date: s.session_date, cancelled: s.status === 'cancelled',
+          centerId: s.CenterId, subjectId: s.SubjectId,
+          center: s.Center ? s.Center.name : '', subject: s.Subject ? s.Subject.name : '',
+        }));
+        const lessonToolCenters = typeof settingsCenters !== 'undefined' ? settingsCenters : [];
+        const lessonToolSubjects = typeof settingsSubjects !== 'undefined' ? settingsSubjects : [];
+      %>
+      <div class="card mb-4 shadow-sm" id="lesson-number-tool">
+        <div class="card-body">
+          <h5 class="mb-2">🔢 تغيير الرقم النسبي لحصة</h5>
+          <p class="text-muted small mb-3">
+            اختار السنتر والمادة والحصة واكتب الرقم النسبي الجديد. السيريال بيتحسب من جديد تلقائي،
+            ومينفعش تختار رقم موجود بالفعل لحصة تانية في نفس السنتر والمادة.
+          </p>
+          <form action="/settings/session-lesson-number" method="POST" class="row g-2 align-items-end" id="lessonNumberForm">
+            <div class="col-md-3">
+              <label class="form-label" for="lnCenter">السنتر</label>
+              <select id="lnCenter" class="form-select">
+                <option value="">كل السناتر</option>
+                <% lessonToolCenters.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="lnSubject">المادة</label>
+              <select id="lnSubject" class="form-select">
+                <option value="">كل المواد</option>
+                <% lessonToolSubjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="lnSession">الحصة</label>
+              <select id="lnSession" name="session_id" class="form-select" required></select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" for="lnNumber">الرقم الجديد</label>
+              <input type="number" min="1" id="lnNumber" name="lesson_number" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <div id="lnHint" class="small text-muted mb-2"></div>
+              <button type="submit" class="btn btn-primary">💾 غيّر الرقم النسبي</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <script>
+        (function () {
+          const sessions = <%- JSON.stringify(lessonToolSessions).replace(/</g, '\\u003c') %>;
+          const center = document.getElementById('lnCenter');
+          const subject = document.getElementById('lnSubject');
+          const select = document.getElementById('lnSession');
+          const number = document.getElementById('lnNumber');
+          const hint = document.getElementById('lnHint');
+          const form = document.getElementById('lessonNumberForm');
+          function current() { return sessions.find(s => String(s.id) === select.value); }
+          function fill() {
+            const list = sessions.filter(s => (!center.value || String(s.centerId) === center.value) && (!subject.value || String(s.subjectId) === subject.value));
+            select.innerHTML = '<option value="">' + (list.length ? 'اختار الحصة' : 'مفيش حصص') + '</option>' + list.map(s =>
+              '<option value="' + s.id + '">حصة ' + s.lesson + ' | ' + s.subject + ' | ' + s.center + ' | سيريال ' + s.serial + ' | ' + (s.date || '') + (s.cancelled ? ' | ملغاة' : '') + '</option>').join('');
+            check();
+          }
+          function check() {
+            const s = current();
+            if (!s) { hint.textContent = ''; return; }
+            const n = Number(number.value);
+            if (!n) { hint.className = 'small text-muted mb-2'; hint.textContent = 'الرقم الحالي: ' + s.lesson; return; }
+            const clash = sessions.find(o => o.id !== s.id && o.centerId === s.centerId && o.subjectId === s.subjectId && o.lesson === n);
+            if (n === s.lesson) { hint.className = 'small text-muted mb-2'; hint.textContent = 'ده نفس الرقم الحالي.'; }
+            else if (clash) { hint.className = 'small text-danger fw-bold mb-2'; hint.textContent = '❌ فيه حصة تانية برقم ' + n + ' في نفس السنتر والمادة (سيريال ' + clash.serial + ').'; }
+            else { hint.className = 'small text-success mb-2'; hint.textContent = '✔️ حصة ' + s.lesson + ' هتبقى حصة ' + n + '.'; }
+          }
+          center.addEventListener('change', fill);
+          subject.addEventListener('change', fill);
+          select.addEventListener('change', check);
+          number.addEventListener('input', check);
+          form.addEventListener('submit', (e) => {
+            const s = current();
+            if (!s || !confirm('تغيير حصة ' + s.lesson + ' (' + s.subject + ' - ' + s.center + ') إلى رقم ' + number.value + '؟')) e.preventDefault();
+          });
+          fill();
+        })();
+      </script>
       <div class="card mb-4 shadow-sm">
         <div class="card-body">
           <h5 class="mb-2">📚 البوكليتس</h5>

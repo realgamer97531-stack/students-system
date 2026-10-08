@@ -13,7 +13,7 @@ const syncContext = require('./context');
 const { judgeOutcome } = require('./outcome');
 
 // جداول مش بتنزل على الأجهزة
-const EXCLUDED_TABLES = new Set(['sync_devices', 'sync_applied_ops', 'deleted_student_archive']);
+const EXCLUDED_TABLES = new Set(['sync_devices', 'sync_applied_ops', 'deleted_student_archive', 'mobile_app_users']);
 const RESPONSE_CAPTURE_LIMIT = 256 * 1024;
 const STUCK_OP_MS = 10 * 60 * 1000;
 
@@ -384,7 +384,7 @@ function deviceRequestMiddleware({ sequelize, User }) {
 
 // ===== التركيب =====
 
-function install(app, { sequelize, User, bcrypt }) {
+function install(app, { sequelize, User, bcrypt, onMobileStaffLogin }) {
   syncContext.install(sequelize);
 
   app.post('/api/sync/register-device', async (req, res) => {
@@ -435,7 +435,7 @@ function install(app, { sequelize, User, bcrypt }) {
     }
   });
 
-  installMobileRoutes(app, { sequelize, User, bcrypt });
+  installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin });
 
   app.use(deviceRequestMiddleware({ sequelize, User }));
 }
@@ -447,7 +447,7 @@ function install(app, { sequelize, User, bcrypt }) {
 // والعمليات نفسها بتتبعت لنفس صفحات السيستم بـ X-Sync-Device-Token (نفس طريقة الديسكتوب).
 const MOBILE_SNAPSHOT_SESSIONS = 150;
 
-function installMobileRoutes(app, { sequelize, User, bcrypt }) {
+function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin }) {
   app.post('/api/sync/mobile/staff-login', requireDevice(sequelize), async (req, res) => {
     try {
       const { username, password } = req.body || {};
@@ -459,6 +459,9 @@ function installMobileRoutes(app, { sequelize, User, bcrypt }) {
       }
       let permissions = [];
       try { permissions = JSON.parse(user.permissions || '[]') || []; } catch (e) { permissions = []; }
+      if (typeof onMobileStaffLogin === 'function') {
+        try { onMobileStaffLogin(user, req); } catch (e) { /* التسجيل مينفعش يوقف الدخول */ }
+      }
       res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, permissions } });
     } catch (error) {
       console.error('Mobile staff login error:', error);

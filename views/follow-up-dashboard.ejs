@@ -21,7 +21,7 @@
         <% }) %>
       </select>
     </form>
-    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', show_only_attended: filters.show_only_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '', filter_missing_exam: filters.filter_missing_exam || '' }).toString(); %>
+    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', show_only_attended: filters.show_only_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '', filter_missing_exam: filters.filter_missing_exam || '', show_blocked: filters.show_blocked || '', only_blocked: filters.only_blocked || '' }).toString(); %>
     <a href="/follow-up-dashboard/export?<%= exportQuery %>" class="btn btn-success btn-sm">📥 <span class="ar-only">تصدير</span><span class="en-only" style="display:none;">Export</span> Excel</a>
     <% if (callCenterIntegrationEnabled && selectedSession && sessionRows.length > 0) { %>
       <button type="button" id="sendFollowUpToCallcenter" class="btn btn-outline-primary btn-sm">☎️ <span class="ar-only">إرسال الظاهرين للاتصال</span><span class="en-only" style="display:none;">Send Visible to Call Center</span></button>
@@ -44,7 +44,9 @@
       show_attended: filters.show_attended || '',
       show_only_attended: filters.show_only_attended || '',
       center_id: filters.center_id || '',
-      subject_id: filters.subject_id || ''
+      subject_id: filters.subject_id || '',
+      show_blocked: filters.show_blocked || '',
+      only_blocked: filters.only_blocked || ''
     }
   }).replace(/</g, '\\u003c') %></script>
 <% } %>
@@ -61,6 +63,8 @@
       <input type="hidden" name="show_all" value="<%= filters.show_all || '' %>">
       <input type="hidden" name="show_attended" value="<%= filters.show_attended || '' %>">
       <input type="hidden" name="show_only_attended" value="<%= filters.show_only_attended || '' %>">
+      <input type="hidden" name="show_blocked" value="<%= filters.show_blocked || '' %>">
+      <input type="hidden" name="only_blocked" value="<%= filters.only_blocked || '' %>">
       <div class="col-md-2">
         <label class="form-label small fw-bold"><span class="ar-only">نوع الفيديو</span><span class="en-only" style="display:none;">Video Type</span></label>
         <select name="filter_video_type" class="form-select form-select-sm">
@@ -135,6 +139,17 @@
         </div>
       </div>
       <div class="col-md-2">
+        <label class="form-label small fw-bold"><span class="ar-only">الطلاب المحظورين</span><span class="en-only" style="display:none;">Blocked Students</span></label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="showBlockedCheckbox" <%= filters.show_blocked ? 'checked':'' %> >
+          <label class="form-check-label small" for="showBlockedCheckbox"><span class="ar-only">إظهار المحظورين</span><span class="en-only" style="display:none;">Show blocked</span></label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="onlyBlockedCheckbox" <%= filters.only_blocked ? 'checked':'' %> >
+          <label class="form-check-label small" for="onlyBlockedCheckbox"><span class="ar-only">المحظورين بس</span><span class="en-only" style="display:none;">Blocked only</span></label>
+        </div>
+      </div>
+      <div class="col-md-2">
         <button class="btn btn-primary btn-sm w-100"><span class="ar-only">تطبيق</span><span class="en-only" style="display:none;">Apply</span></button>
       </div>
       <div class="col-md-2">
@@ -202,7 +217,7 @@
             <tr class="follow-up-search-item" data-student-id="<%= row.student.id %>" data-search="<%= `${row.student.name} ${row.student.student_code}`.toLowerCase() %>">
               <td><%= index + 1 %></td>
               <td>
-                <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="fw-bold d-block"><%= row.student.name %></a>
+                <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="fw-bold d-block"><%= row.student.name %><% if (row.student.is_blocked) { %> <span class="badge bg-danger">🚫 محظور</span><% } %></a>
                 <span class="text-muted" style="font-size:0.7rem;"><%= row.student.student_code %></span><br>
                 <span class="text-muted" style="font-size:0.65rem;"><%= row.student.Center?.name %> | <%= row.student.Subject?.name %></span>
               </td>
@@ -280,7 +295,7 @@
       <% absentStudents.forEach(row => { %>
           <div class="col-md-3 follow-up-search-item" data-search="<%= `${row.student.name} ${row.student.student_code}`.toLowerCase() %>">
           <div class="p-2 rounded" style="background:var(--sf-danger-soft-bg);">
-            <div class="small fw-bold"><%= row.student.name %></div>
+            <div class="small fw-bold"><%= row.student.name %><% if (row.student.is_blocked) { %> <span class="badge bg-danger">🚫 محظور</span><% } %></div>
             <div style="font-size:0.7rem;color:var(--sf-muted);"><%= row.student.student_code %></div>
             <div style="font-size:0.7rem;color:var(--sf-muted);"><%= row.student.Center?.name %></div>
             <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="btn btn-sm mt-1" style="font-size:0.65rem;padding:2px 8px;background:var(--sf-danger-soft-text);color:#fff;"><span class="ar-only">عرض الملف</span><span class="en-only" style="display:none;">View Profile</span></a>
@@ -320,6 +335,24 @@
     if (showOnlyAttendedCheckbox && showOnlyAttendedHidden) {
       showOnlyAttendedCheckbox.addEventListener('change', () => {
         showOnlyAttendedHidden.value = showOnlyAttendedCheckbox.checked ? '1' : '';
+      });
+    }
+
+    // المحظورين: "إظهار المحظورين" = مع الباقيين، "المحظورين بس" = هما لوحدهم (الاتنين مع بعض = بس)
+    const showBlockedCheckbox = document.getElementById('showBlockedCheckbox');
+    const onlyBlockedCheckbox = document.getElementById('onlyBlockedCheckbox');
+    const showBlockedHidden = document.querySelector('form.row input[name="show_blocked"]');
+    const onlyBlockedHidden = document.querySelector('form.row input[name="only_blocked"]');
+    if (showBlockedCheckbox && showBlockedHidden) {
+      showBlockedCheckbox.addEventListener('change', () => {
+        showBlockedHidden.value = showBlockedCheckbox.checked ? '1' : '';
+        if (!showBlockedCheckbox.checked && onlyBlockedCheckbox) { onlyBlockedCheckbox.checked = false; onlyBlockedHidden.value = ''; }
+      });
+    }
+    if (onlyBlockedCheckbox && onlyBlockedHidden) {
+      onlyBlockedCheckbox.addEventListener('change', () => {
+        onlyBlockedHidden.value = onlyBlockedCheckbox.checked ? '1' : '';
+        if (onlyBlockedCheckbox.checked && showBlockedCheckbox) { showBlockedCheckbox.checked = true; showBlockedHidden.value = '1'; }
       });
     }
 

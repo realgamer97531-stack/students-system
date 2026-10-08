@@ -64,6 +64,7 @@ class PortalApi {
     return {
       'Authorization': 'Bearer $token',
       'Accept': 'application/json',
+      'X-App-Client': await AppConfig.clientId(),
       if (json) 'Content-Type': 'application/json',
     };
   }

@@ -1,0 +1,130 @@
+<%- include('partials/header') %>
+
+<%
+  const t = stats.byType;
+  const totalAll = t.student.total + t.parent.total + t.staff.total;
+  const activeAll = t.student.active + t.parent.active + t.staff.active;
+  const typeLabel = { student: '🎓 طالب', parent: '👨‍👩‍👦 ولي أمر', staff: '🧑‍💼 موظف' };
+  const roleLabel = { admin: 'أدمن', assistant: 'أسيستانت' };
+  // الأوقات متخزنة UTC
+  const toDate = (d) => (d instanceof Date ? d : new Date(String(d).replace(' ', 'T') + 'Z'));
+  const fmt = (d) => d ? toDate(d).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' }) : '-';
+%>
+
+<style>
+  .au-card { border: 0; border-radius: 16px; box-shadow: 0 6px 18px rgba(30,27,75,.06); }
+  .au-card strong { font-size: 2rem; line-height: 1.1; display: block; }
+  .au-sub { color: #6B7280; font-size: .82rem; }
+  .au-filters .btn.active { background: var(--sf-primary); color: #fff; border-color: var(--sf-primary); }
+  @media (max-width: 767px) {
+    .au-table thead { display: none; }
+    .au-table tr { display: block; border: 1px solid #E5E7EB; border-radius: 12px; margin-bottom: 10px; padding: 8px 12px; background: #fff; }
+    .au-table td { display: flex; justify-content: space-between; gap: 12px; border: 0; padding: 3px 0; }
+    .au-table td::before { content: attr(data-label); font-weight: 700; color: #6B7280; }
+  }
+</style>
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-xl-11 mx-auto">
+      <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+        <div>
+          <h2 class="mb-1">📱 مستخدمي تطبيق الموبايل</h2>
+          <p class="text-muted mb-0">مين بيستخدم تطبيق الأندرويد: طلاب وأولياء أمور وموظفين. الصفحة دي ظاهرة ليك بس كأدمن رئيسي.</p>
+        </div>
+        <div class="btn-group au-filters" role="group">
+          <% [7, 30, 90].forEach(d => { %>
+            <a href="/admin/app-users?days=<%= d %>" class="btn btn-outline-secondary btn-sm <%= stats.activeDays === d ? 'active' : '' %>">نشطين آخر <%= d %> يوم</a>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+          <div class="card au-card h-100"><div class="card-body text-center">
+            <span class="au-sub">إجمالي المستخدمين</span>
+            <strong><%= totalAll %></strong>
+            <span class="au-sub">منهم <%= activeAll %> نشطين</span>
+          </div></div>
+        </div>
+        <% ['student', 'parent', 'staff'].forEach(type => { %>
+        <div class="col-6 col-lg-3">
+          <div class="card au-card h-100"><div class="card-body text-center">
+            <span class="au-sub"><%= typeLabel[type] %></span>
+            <strong><%= t[type].total %></strong>
+            <span class="au-sub"><%= t[type].active %> نشطين — <%= t[type].today %> النهارده</span>
+          </div></div>
+        </div>
+        <% }) %>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <% if (!stats.recent.length) { %>
+            <p class="text-muted mb-0">لسه محدش استخدم التطبيق من ساعة تفعيل العداد. أول ما حد يفتح التطبيق هيظهر هنا.</p>
+          <% } else { %>
+          <div class="d-flex flex-column flex-md-row gap-2 mb-3">
+            <input type="search" id="auSearch" class="form-control" placeholder="🔍 دور بالاسم أو الكود...">
+            <div class="btn-group au-filters" role="group" id="auTypeFilter">
+              <button type="button" class="btn btn-outline-secondary active" data-type="">الكل</button>
+              <button type="button" class="btn btn-outline-secondary" data-type="student">طلاب</button>
+              <button type="button" class="btn btn-outline-secondary" data-type="parent">أولياء أمور</button>
+              <button type="button" class="btn btn-outline-secondary" data-type="staff">موظفين</button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 au-table">
+              <thead>
+                <tr><th>الاسم</th><th>النوع</th><th>الكود</th><th>نسخة التطبيق</th><th>أول استخدام</th><th>آخر استخدام</th></tr>
+              </thead>
+              <tbody>
+                <% stats.recent.forEach(r => { %>
+                <tr data-type="<%= r.account_type %>" data-search="<%= [r.name, r.code].filter(Boolean).join(' ').toLowerCase() %>">
+                  <td data-label="الاسم" class="fw-bold"><%= r.name || '(حساب اتحذف)' %></td>
+                  <td data-label="النوع"><%= typeLabel[r.account_type] || r.account_type %><% if (r.account_type === 'staff' && r.staff_role) { %> <span class="au-sub">(<%= roleLabel[r.staff_role] || r.staff_role %>)</span><% } %></td>
+                  <td data-label="الكود"><%= r.code || '-' %></td>
+                  <td data-label="نسخة التطبيق"><%= r.app_version || 'قديمة' %></td>
+                  <td data-label="أول استخدام"><%= fmt(r.first_seen_at) %></td>
+                  <td data-label="آخر استخدام"><%= fmt(r.last_seen_at) %></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <p id="auEmpty" class="text-muted text-center my-3" style="display:none">مفيش نتايج مطابقة.</p>
+          <% } %>
+        </div>
+      </div>
+      <p class="au-sub mt-3">العداد بدأ من 8 أكتوبر 2026 — اللي استخدموا التطبيق قبل كده هيتحسبوا أول ما يفتحوه تاني. "نشط" = استخدم التطبيق في المدة اللي فوق.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const search = document.getElementById('auSearch');
+    if (!search) return;
+    const rows = Array.from(document.querySelectorAll('.au-table tbody tr'));
+    const empty = document.getElementById('auEmpty');
+    let type = '';
+    function apply() {
+      const q = search.value.trim().toLowerCase();
+      let shown = 0;
+      rows.forEach((row) => {
+        const ok = (!type || row.dataset.type === type) && (!q || row.dataset.search.includes(q));
+        row.style.display = ok ? '' : 'none';
+        if (ok) shown += 1;
+      });
+      empty.style.display = shown ? 'none' : '';
+    }
+    search.addEventListener('input', apply);
+    document.querySelectorAll('#auTypeFilter [data-type]').forEach((btn) => btn.addEventListener('click', () => {
+      document.querySelectorAll('#auTypeFilter [data-type]').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      type = btn.dataset.type;
+      apply();
+    }));
+  })();
+</script>
+
+<%- include('partials/footer') %>

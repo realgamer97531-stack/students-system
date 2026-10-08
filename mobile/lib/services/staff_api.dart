@@ -42,7 +42,7 @@ class StaffApi {
   static Future<Map<String, String>> _deviceHeaders() async {
     final token = await SessionStore.deviceToken();
     if (token == null) throw DeviceNotAuthorized();
-    return {'X-Sync-Device-Token': token, 'Accept': 'application/json'};
+    return {'X-Sync-Device-Token': token, 'Accept': 'application/json', 'X-App-Client': await AppConfig.clientId()};
   }
 
   static Future<Map<String, dynamic>> _deviceJson(Future<http.Response> Function() request) async {

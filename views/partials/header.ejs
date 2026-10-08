@@ -933,6 +933,12 @@ span.text-muted {
         <span class="ar-only">🗂️ سجل الطلاب المحذوفين</span>
         <span class="en-only" style="display:none;">🗂️ Deleted Students</span>
       </a>
+      <% if (typeof isMainAdmin !== 'undefined' && isMainAdmin) { %>
+      <a href="/admin/app-users">
+        <span class="ar-only">📱 مستخدمي التطبيق</span>
+        <span class="en-only" style="display:none;">📱 App Users</span>
+      </a>
+      <% } %>
     <% } %>
     <% if (userRole === 'admin') { %>
   <a href="/admin/booklets">📚 البوكليتس</a>

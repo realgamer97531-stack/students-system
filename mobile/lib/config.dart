@@ -1,3 +1,5 @@
+import 'package:package_info_plus/package_info_plus.dart';
+
 // عناوين السيستم. لو أي عنوان اتغير، غيّره هنا بس.
 class AppConfig {
   // السيرفر (الـ API بتاع بوابة الطالب وولي الأمر + سيستم الموظفين)
@@ -14,4 +16,16 @@ class AppConfig {
   static const releasesRepo = 'studyisfunny-mobile-releases';
 
   static const supportWhatsapp = '201000733148';
+
+  /// بيعرّف السيرفر إن الطلب جاي من التطبيق ونسخته (عداد مستخدمي التطبيق عند الأدمن الرئيسي)
+  static String? _clientId;
+  static Future<String> clientId() async {
+    if (_clientId != null) return _clientId!;
+    try {
+      _clientId = 'shadyelsharkawy-android/${(await PackageInfo.fromPlatform()).version}';
+    } catch (_) {
+      _clientId = 'shadyelsharkawy-android';
+    }
+    return _clientId!;
+  }
 }

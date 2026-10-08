@@ -320,6 +320,26 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (res == null) return;
+    if (!res.ok && res.data['code'] == 'DUPLICATE_SESSION') {
+      // الحصة موجودة بالفعل بنفس الرقم في نفس السنتر والمادة: مش بنعمل واحدة تانية، بنقترح تفعيل الموجودة
+      final existingId = ((res.data['session'] as Map?)?['id'] as num?)?.toInt();
+      final activate = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('الحصة دي موجودة بالفعل'),
+          content: Text(res.message),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('رجوع')),
+            if (existingId != null) FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('فعّل الحصة الموجودة')),
+          ],
+        ),
+      );
+      if (activate != true || existingId == null) return;
+      await StaffStore.refreshSnapshot();
+      if (!mounted) return;
+      Navigator.pop(context, existingId);
+      return;
+    }
     if (!res.ok) {
       toast(context, res.message, error: true);
       return;
@@ -353,7 +373,7 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                       groupValue: _repeat,
                       onChanged: (v) => setState(() => _repeat = v ?? false),
                       child: const Column(children: [
-                        RadioListTile<bool>(contentPadding: EdgeInsets.zero, value: false, title: Text('حصة جديدة (السيستم يحسب رقمها)')),
+                        RadioListTile<bool>(contentPadding: EdgeInsets.zero, value: false, title: Text('الحصة الجاية تلقائي (بعد آخر حصة لنفس السنتر والمادة)')),
                         RadioListTile<bool>(contentPadding: EdgeInsets.zero, value: true, title: Text('تكرار حصة سابقة في سنتر تاني (أنا أحدد رقمها)')),
                       ]),
                     ),

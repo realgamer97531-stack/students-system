@@ -63,6 +63,7 @@ const ensurePopupQuestionSchema = require('./utils/ensurePopupQuestionSchema');
 const {
   ensureDeletedStudentArchiveSchema, archiveAndDeleteStudent, restoreArchivedStudent, listArchivedStudents,
 } = require('./utils/studentArchive');
+const { appUsageMiddleware, recordAppUser, getAppUsageStats, ensureAppUsageSchema, appVersionOf } = require('./utils/appUsage');
 const {
   buildSqlDump, runBackup, listBackups, getDownloadUrl, getLastResult, BACKUP_FOLDER,
 } = require('./utils/dailyBackup');
@@ -929,6 +930,9 @@ if (desktopRuntime) app.use(desktopRuntime.earlyMiddleware);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// عدد مستخدمي تطبيق الموبايل (طلاب / أولياء أمور / موظفين) — بيسجل بس، مش بيغير أي طلب
+app.use(appUsageMiddleware(sequelize));
+
 // الملفات المرفوعة أسماؤها فيها وقت الرفع فمش بتتغير أبدًا، فالمتصفح يقدر يحتفظ بيها بدل ما يحملها كل مرة
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), { maxAge: '7d' }));
 // عشان نقدر نستخدم ملفات CSS / JS / صور من فولدر public
@@ -978,7 +982,10 @@ app.use(session({
 }));
 
 // مزامنة برنامج الديسكتوب: تسجيل الأجهزة + تنزيل البيانات + تنفيذ العمليات اللي اتعملت أوفلاين
-syncServer.install(app, { sequelize, User, bcrypt });
+syncServer.install(app, {
+  sequelize, User, bcrypt,
+  onMobileStaffLogin: (user, req) => recordAppUser(sequelize, 'staff', user.id, appVersionOf(req)),
+});
 if (desktopRuntime) app.use(desktopRuntime.sessionMiddleware);
 
 // إعداد محرك الصفحات EJS
@@ -1191,12 +1198,12 @@ async function getUserContext(userId) {
   const cached = userContextCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-  const user = await User.findByPk(userId, { attributes: ['id', 'profile_photo_url', 'permissions'] });
+  const user = await User.findByPk(userId, { attributes: ['id', 'username', 'profile_photo_url', 'permissions'] });
   let permissions = [];
   if (user && user.permissions) {
     try { permissions = JSON.parse(user.permissions) || []; } catch (e) { permissions = []; }
   }
-  const value = { exists: !!user, profilePhotoUrl: user ? user.profile_photo_url || null : null, permissions };
+  const value = { exists: !!user, username: user ? user.username : null, profilePhotoUrl: user ? user.profile_photo_url || null : null, permissions };
   userContextCache.set(key, { value, expiresAt: Date.now() + USER_CONTEXT_TTL_MS });
   return value;
 }
@@ -1206,11 +1213,13 @@ app.use(async (req, res, next) => {
   res.locals.userName = req.session.userName || null;
   res.locals.userRole = req.session.userRole || null;
   res.locals.userProfilePhoto = null;
+  res.locals.isMainAdmin = false;
 
   if (req.session.userId) {
     try {
       const context = await getUserContext(req.session.userId);
       res.locals.userProfilePhoto = context.profilePhotoUrl;
+      res.locals.isMainAdmin = req.session.userRole === 'admin' && isMainAdminUsername(context.username);
       // تحميل صلاحيات الأسيستانت في الجلسة عند كل طلب (يضمن التحديث الفوري لو الأدمن غيّرها)
       if (req.session.userRole === 'assistant') {
         req.session.userPermissions = context.permissions;
@@ -1222,6 +1231,22 @@ app.use(async (req, res, next) => {
 
   next();
 });
+
+// الأدمن الرئيسي: الحساب الأصلي (اليوزر admin) — أو اليوزرات اللي في MAIN_ADMIN_USERNAMES مفصولة بفاصلة
+function isMainAdminUsername(username) {
+  const allowed = String(process.env.MAIN_ADMIN_USERNAMES || 'admin').split(',').map((u) => u.trim().toLowerCase()).filter(Boolean);
+  return Boolean(username) && allowed.includes(String(username).trim().toLowerCase());
+}
+
+async function requireMainAdmin(req, res, next) {
+  try {
+    if (req.session.userRole === 'admin' && req.session.userId) {
+      const context = await getUserContext(req.session.userId);
+      if (isMainAdminUsername(context.username)) return next();
+    }
+  } catch (e) { console.error(e); }
+  return res.status(403).send('⛔ هذه الصفحة للأدمن الرئيسي فقط');
+}
 
 // حماية إضافية لصفحات الأدمن بس
 function requireAdmin(req, res, next) {
@@ -1353,29 +1378,59 @@ async function importDatabaseSql(sqlText) {
 }
 
 // ===== Settings Route =====
+// حصص صفحة الإعدادات (مع السنتر والمادة عشان أداة تغيير الرقم النسبي)
+async function loadSettingsSessions() {
+  const [sessions, centers, subjects] = await Promise.all([
+    Session.findAll({
+      attributes: ['id', 'serial_number', 'lesson_number', 'session_date', 'status', 'CenterId', 'SubjectId'],
+      include: [{ model: Center, attributes: ['id', 'name'] }, { model: Subject, attributes: ['id', 'name'] }],
+      order: [['serial_number', 'DESC']],
+    }),
+    Center.findAll({ attributes: ['id', 'name'], order: [['name', 'ASC']] }),
+    Subject.findAll({ attributes: ['id', 'name'], order: [['name', 'ASC']] }),
+  ]);
+  return { sessions, settingsCenters: centers, settingsSubjects: subjects };
+}
+
 app.get('/settings', requireAdmin, async (req, res) => {
-  const sessions = await Session.findAll({
-    attributes: ['id', 'serial_number', 'lesson_number', 'session_date', 'status'],
-    order: [['serial_number', 'DESC']],
-  });
-  res.render('settings', { sessions });
+  const data = await loadSettingsSessions();
+  if (req.query.lesson_changed) data.successMessage = String(req.query.lesson_changed);
+  if (req.query.lesson_error) data.errorMessage = String(req.query.lesson_error);
+  res.render('settings', data);
+});
+
+// تغيير الرقم النسبي لحصة من الإعدادات (نفس قواعد تعديل الحصة: السيريال بيتحسب من جديد وممنوع التكرار)
+app.post('/settings/session-lesson-number', requireAdmin, async (req, res) => {
+  const back = (key, message) => res.redirect(`/settings?${key}=${encodeURIComponent(message)}#lesson-number-tool`);
+  try {
+    const session = await Session.findByPk(req.body.session_id, { include: [Center, Subject] });
+    if (!session) return back('lesson_error', '❌ الحصة غير موجودة');
+    const oldDescription = describeSession(session);
+    const change = await changeSessionLessonNumber(session, req.body.lesson_number);
+    if (change.error) return back('lesson_error', change.error);
+    if (change.unchanged) return back('lesson_error', 'الرقم ده هو نفس رقم الحصة الحالي');
+    await Session.update(change.updates, { where: { id: session.id } });
+    console.log(`🔢 ${req.session.userName || 'admin'} غيّر ${oldDescription} → حصة ${change.updates.lesson_number} (سيريال ${change.updates.serial_number})`);
+    back('lesson_changed', `✅ اتغيرت ${oldDescription} إلى حصة ${change.updates.lesson_number} (سيريال ${change.updates.serial_number})`);
+  } catch (error) {
+    console.error(error);
+    back('lesson_error', '❌ ' + error.message);
+  }
 });
 
 app.post('/settings/session-tools', requireAdmin, async (req, res) => {
   const serial = String(req.body.session_serial || '').trim();
   const action = req.body.action;
-  const sessions = await Session.findAll({
-    attributes: ['id', 'serial_number', 'lesson_number', 'session_date', 'status'],
-    order: [['serial_number', 'DESC']],
-  });
+  const settingsData = await loadSettingsSessions();
+  const { sessions } = settingsData;
 
   if (!/^\d+$/.test(serial) || !['preview-delete', 'delete', 'mark-complete'].includes(action)) {
-    return res.status(400).render('settings', { sessions, errorMessage: 'اختر حصة وعملية صحيحة.' });
+    return res.status(400).render('settings', { ...settingsData, errorMessage: 'اختر حصة وعملية صحيحة.' });
   }
 
   const target = sessions.find(session => String(session.serial_number) === serial);
   if (!target) {
-    return res.status(404).render('settings', { sessions, errorMessage: 'الحصة المختارة غير موجودة.' });
+    return res.status(404).render('settings', { ...settingsData, errorMessage: 'الحصة المختارة غير موجودة.' });
   }
 
   const script = action === 'mark-complete'
@@ -1393,13 +1448,13 @@ app.post('/settings/session-tools', requireAdmin, async (req, res) => {
       windowsHide: true,
     });
     return res.render('settings', {
-      sessions,
+      ...settingsData,
       successMessage: action === 'preview-delete' ? 'تم إنشاء المعاينة بدون أي تعديل.' : 'تم تنفيذ العملية بنجاح.',
       sessionToolsOutput: result.stdout || result.stderr,
     });
   } catch (error) {
     return res.status(500).render('settings', {
-      sessions,
+      ...settingsData,
       errorMessage: 'فشلت العملية ولم يتم ضمان إكمالها. راجع التفاصيل أدناه.',
       sessionToolsOutput: [error.stdout, error.stderr, error.message].filter(Boolean).join('\n'),
     });
@@ -2360,10 +2415,67 @@ app.post('/students', async (req, res) => {
 
 // ===== Routes بتاعة الحصص =====
 
+// رقم الحصة الجاية = آخر رقم نسبي لنفس السنتر ونفس المادة + 1 (من غير أي فلاتر تانية)
+async function nextLessonNumberFor(centerId, subjectId) {
+  const last = await Session.max('lesson_number', { where: { CenterId: centerId, SubjectId: subjectId } });
+  return (Number(last) || 0) + 1;
+}
+
+// حصة موجودة بالفعل بنفس الرقم النسبي في نفس السنتر والمادة (عشان منعملش نسخة مكررة)
+function findSameLessonSession(centerId, subjectId, lessonNumber, excludeId = null) {
+  const where = { CenterId: centerId, SubjectId: subjectId, lesson_number: lessonNumber };
+  if (excludeId) where.id = { [Op.ne]: excludeId };
+  return Session.findOne({ where, include: [Center, Subject], order: [['id', 'ASC']] });
+}
+
+function describeSession(session) {
+  return `حصة ${session.lesson_number} - ${session.Subject ? session.Subject.name : ''} - ${session.Center ? session.Center.name : ''} (سيريال ${session.serial_number}${session.session_date ? `، ${session.session_date}` : ''})`;
+}
+
+// تغيير الرقم النسبي لحصة: السيريال بيتحسب من جديد = أساس السيريال + الرقم النسبي، وممنوع يتكرر في نفس السنتر والمادة
+async function changeSessionLessonNumber(session, rawNumber) {
+  const newLessonNumber = parseInt(rawNumber, 10);
+  if (!newLessonNumber || newLessonNumber < 1) return { error: '❌ لازم تكتب رقم نسبي صحيح' };
+  if (newLessonNumber === session.lesson_number) return { unchanged: true };
+  const conflict = await findSameLessonSession(session.CenterId, session.SubjectId, newLessonNumber, session.id);
+  if (conflict) return { error: `❌ فيه حصة تانية في نفس السنتر والمادة برقم نسبي ${newLessonNumber} (سيريال ${conflict.serial_number})` };
+  const series = await CenterSubjectSeries.findOne({ where: { CenterId: session.CenterId, SubjectId: session.SubjectId } });
+  const base = series ? series.base_number : session.serial_number - session.lesson_number;
+  return { updates: { lesson_number: newLessonNumber, serial_number: base + newLessonNumber } };
+}
+
 app.get('/sessions/new', requirePermission('sessions_create'), async (req, res) => {
   const centers = await Center.findAll();
   const subjects = await Subject.findAll();
-  res.render('start-session', { centers, subjects });
+  const duplicateId = Number.parseInt(req.query.duplicate, 10);
+  const duplicate = Number.isInteger(duplicateId) ? await Session.findByPk(duplicateId, { include: [Center, Subject] }) : null;
+  res.render('start-session', { centers, subjects, duplicate, describeSession });
+});
+
+// معاينة: آخر حصة لنفس السنتر والمادة والرقم اللي الحصة الجاية هتاخده (+ هل رقم معين موجود قبل كده)
+app.get('/sessions/next-number', requirePermission('sessions_create'), async (req, res) => {
+  try {
+    const centerId = Number.parseInt(req.query.center_id, 10);
+    const subjectId = Number.parseInt(req.query.subject_id, 10);
+    if (!Number.isInteger(centerId) || !Number.isInteger(subjectId)) return res.status(400).json({ success: false });
+    const [next, last, series] = await Promise.all([
+      nextLessonNumberFor(centerId, subjectId),
+      Session.findOne({ where: { CenterId: centerId, SubjectId: subjectId }, order: [['lesson_number', 'DESC'], ['id', 'DESC']] }),
+      CenterSubjectSeries.findOne({ where: { CenterId: centerId, SubjectId: subjectId } }),
+    ]);
+    const lessonNumber = Number.parseInt(req.query.lesson_number, 10);
+    const existing = Number.isInteger(lessonNumber) && lessonNumber > 0 ? await findSameLessonSession(centerId, subjectId, lessonNumber) : null;
+    res.json({
+      success: true,
+      next,
+      hasSeries: Boolean(series),
+      last: last ? { id: last.id, lesson_number: last.lesson_number, serial_number: last.serial_number, session_date: last.session_date } : null,
+      existing: existing ? { id: existing.id, lesson_number: existing.lesson_number, serial_number: existing.serial_number, session_date: existing.session_date } : null,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 app.post('/sessions', async (req, res) => {
@@ -2381,16 +2493,34 @@ app.post('/sessions', async (req, res) => {
     let finalLessonNumber;
 
     if (mode === 'new') {
-      const lastSession = await Session.findOne({
-        where: { SubjectId: subject_id },
-        order: [['lesson_number', 'DESC']],
-      });
-      finalLessonNumber = lastSession ? lastSession.lesson_number + 1 : 1;
+      finalLessonNumber = await nextLessonNumberFor(center_id, subject_id);
     } else {
       finalLessonNumber = parseInt(lesson_number);
       if (!finalLessonNumber || finalLessonNumber < 1) {
         return res.status(400).send('❌ لازم تكتب رقم حصة صحيح');
       }
+    }
+
+    // ممنوع حصتين بنفس الرقم النسبي في نفس السنتر والمادة: بنرفض ونقترح تفعيل الموجودة
+    const duplicate = await findSameLessonSession(center_id, subject_id, finalLessonNumber);
+    if (duplicate) {
+      const message = `⚠️ الحصة دي موجودة بالفعل: ${describeSession(duplicate)}. فعّل الحصة الموجودة بدل ما تعمل واحدة جديدة.`;
+      if (req.body.response_format === 'json') {
+        return res.status(400).json({
+          success: false,
+          code: 'DUPLICATE_SESSION',
+          message,
+          session: {
+            id: duplicate.id,
+            lesson_number: duplicate.lesson_number,
+            serial_number: duplicate.serial_number,
+            session_date: duplicate.session_date,
+            CenterId: duplicate.CenterId,
+            SubjectId: duplicate.SubjectId,
+          },
+        });
+      }
+      return res.redirect(`/sessions/new?duplicate=${duplicate.id}`);
     }
 
     const serialNumber = series.base_number + finalLessonNumber;
@@ -3110,29 +3240,9 @@ app.post('/sessions/:id/edit', requireAdmin, async (req, res) => {
 
     // تعديل الرقم النسبي (والسيريال بيتحسب من جديد = أساس السيريال + الرقم النسبي)
     if (lesson_number !== undefined && lesson_number !== '') {
-      const newLessonNumber = parseInt(lesson_number, 10);
-      if (!newLessonNumber || newLessonNumber < 1) {
-        return res.status(400).send('❌ لازم تكتب رقم نسبي صحيح');
-      }
-      if (newLessonNumber !== session.lesson_number) {
-        const conflict = await Session.findOne({
-          where: {
-            CenterId: session.CenterId,
-            SubjectId: session.SubjectId,
-            lesson_number: newLessonNumber,
-            id: { [Op.ne]: session.id },
-          },
-        });
-        if (conflict) {
-          return res.status(400).send(`❌ فيه حصة تانية في نفس السنتر والمادة برقم نسبي ${newLessonNumber} (سيريال ${conflict.serial_number})`);
-        }
-        const series = await CenterSubjectSeries.findOne({
-          where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
-        });
-        const base = series ? series.base_number : session.serial_number - session.lesson_number;
-        updates.lesson_number = newLessonNumber;
-        updates.serial_number = base + newLessonNumber;
-      }
+      const change = await changeSessionLessonNumber(session, lesson_number);
+      if (change.error) return res.status(400).send(change.error);
+      if (change.updates) Object.assign(updates, change.updates);
     }
 
     await Session.update(updates, { where: { id: req.params.id } });
@@ -8301,8 +8411,7 @@ app.post('/schedule/:id/start-session', requirePermission('sessions_create'), as
     const series = await CenterSubjectSeries.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId } });
     if (!series) return res.status(400).send('❌ مفيش أساس سيريال');
 
-    const lastSession = await Session.findOne({ where: { SubjectId: entry.SubjectId }, order: [['lesson_number', 'DESC']] });
-    const finalLessonNumber = lastSession ? lastSession.lesson_number + 1 : 1;
+    const finalLessonNumber = await nextLessonNumberFor(entry.CenterId, entry.SubjectId);
     const serialNumber = series.base_number + finalLessonNumber;
 
     const newSession = await Session.create({
@@ -8335,8 +8444,7 @@ cron.schedule('* * * * *', async () => {
       const series = await CenterSubjectSeries.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId } });
       if (!series) continue;
 
-      const lastSession = await Session.findOne({ where: { SubjectId: entry.SubjectId }, order: [['lesson_number', 'DESC']] });
-      const finalLessonNumber = lastSession ? lastSession.lesson_number + 1 : 1;
+      const finalLessonNumber = await nextLessonNumberFor(entry.CenterId, entry.SubjectId);
       const serialNumber = series.base_number + finalLessonNumber;
 
       await Session.create({
@@ -8993,10 +9101,17 @@ async function loadFollowUpMissingExamFilter(selectedSession, studentIds, examId
   return { unlinkedExams, missingExam, gradedStudentIds };
 }
 
+// الطلاب المحظورين مش بيظهروا في المتابعة إلا لو اخترت تعرضهم (أو تعرضهم هما بس)
+function applyBlockedFilter(students, { show_blocked, only_blocked } = {}) {
+  if (only_blocked) return students.filter((s) => s && s.is_blocked);
+  if (show_blocked) return students;
+  return students.filter((s) => s && !s.is_blocked);
+}
+
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
 app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id, show_blocked, only_blocked } = req.query;
 
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
     const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
@@ -9032,6 +9147,8 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
         order: [['name', 'ASC']],
       });
     }
+
+    students = applyBlockedFilter(students, { show_blocked, only_blocked });
 
     if (!selectedSession || students.length === 0) {
       const workbook = new ExcelJS.Workbook();
@@ -9251,7 +9368,7 @@ app.post('/follow-up-dashboard/send-to-callcenter', requireFollowUp, async (req,
 
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id, show_blocked, only_blocked } = req.query;
 
     // load centers & subjects for filters + sessions في نفس الوقت
     const [centersList, subjectsList, sessions] = await Promise.all([
@@ -9301,11 +9418,13 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       if (subject_id) students = students.filter(s => String(s.SubjectId) === String(subject_id));
     }
 
+    students = applyBlockedFilter(students, { show_blocked, only_blocked });
+
     // If there are no assigned students at all, render empty state immediately
     if (students.length === 0) {
       return res.render('follow-up-dashboard', {
         students: [], sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '' },
         absentStudents: [],
         unlinkedExams: [],
         missingExam: null,
@@ -9322,7 +9441,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     if (!selectedSession) {
       return res.render('follow-up-dashboard', {
         students, sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '' },
         absentStudents: [],
         unlinkedExams: [],
         missingExam: null,
@@ -9464,7 +9583,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
 
     res.render('follow-up-dashboard', {
       students, sessionRows: filteredRows, sessions, selectedSession,
-      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: effectiveMissingExamId, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '' },
+      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: effectiveMissingExamId, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '' },
       absentStudents: absentStudents,
       unlinkedExams,
       missingExam,
@@ -9486,6 +9605,8 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
           show_only_attended: show_only_attended || '',
           center_id: center_id || '',
           subject_id: subject_id || '',
+          show_blocked: show_blocked || '',
+          only_blocked: only_blocked || '',
         }
       ),
     });
@@ -9885,6 +10006,18 @@ app.post('/students/:id/delete', requireAdmin, async (req, res) => {
     if (!archive) return res.status(404).send('❌ الطالب غير موجود');
     console.log(`🗑 تم حذف الطالب ${archive.student_name} (${archive.student_code}) بواسطة ${req.session.userName} - أرشيف رقم ${archive.id}`);
     res.redirect('/students');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// مستخدمي تطبيق الموبايل (للأدمن الرئيسي بس): عددهم حسب النوع + آخر مرة استخدموا التطبيق
+app.get('/admin/app-users', requireMainAdmin, async (req, res) => {
+  try {
+    const activeDays = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+    const stats = await getAppUsageStats(sequelize, { activeDays });
+    res.render('app-users', { stats });
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
