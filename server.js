@@ -461,6 +461,28 @@ async function ensureSessionWeekNumberColumn() {
   }
 }
 
+async function ensureSessionVideoPriceColumns() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('sessions');
+    for (const column of ['video_price_center', 'video_price_online']) {
+      if (!tableInfo[column]) {
+        await queryInterface.addColumn('sessions', column, {
+          type: sequelize.Sequelize.FLOAT,
+          allowNull: true,
+          defaultValue: null,
+        });
+        console.log(`✅ Added ${column} column to sessions table`);
+      }
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure sessions video price columns:', error.message);
+  }
+}
+
 async function ensureSessionHomeworkFields() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -5463,11 +5485,41 @@ app.post('/api/portal/watch-progress', verifyPortalToken('student'), async (req,
 });
 
 // قائمة الدروس (الفيديوهات) المتاحة لمادة الطالب - بدون استهلاك مشاهدة، بس لعرض الحالة
+// ===== سعر مشاهدة الحصة أونلاين =====
+// الأدمن يقدر يحدد سعر للحصة من صفحة التحكم في الفيديو (لطلاب السناتر و/أو طلاب الأونلاين).
+// من غير سعر محدد: سعر حصة الطالب العادي + أي رسوم إضافية للحصة (onlineSessionSurcharge).
+const ONLINE_VIDEO_PAYMENT_REASON = 'دفع لمشاهدة حصة أونلاين';
+const ONLINE_VIDEO_PRICE_ADJUST_REASON = 'تعديل سعر حصة أونلاين';
+
+function isOnlineCenterName(name) {
+  const normalized = String(name || '').trim().toLowerCase();
+  return ['أونلاين', 'اونلاين', 'online', 'on-line', 'online center'].includes(normalized);
+}
+
+async function isStudentInOnlineCenter(student) {
+  if (!student || !student.CenterId) return false;
+  const center = student.Center || await Center.findByPk(student.CenterId, { attributes: ['id', 'name'] });
+  return isOnlineCenterName(center && center.name);
+}
+
+function videoSessionPriceFor(student, session, subjectName, studentIsOnline) {
+  const customPrice = studentIsOnline ? session.video_price_online : session.video_price_center;
+  if (customPrice !== null && customPrice !== undefined && customPrice !== '') {
+    const total = Math.max(0, Number(customPrice) || 0);
+    return { total, base: total, surcharge: 0, rule: null, custom: true };
+  }
+  const base = Number(student.price_per_session) || 0;
+  const rule = findSurchargeRule(subjectName, session.lesson_number);
+  const surcharge = rule ? rule.extra : 0;
+  return { total: base + surcharge, base, surcharge, rule, custom: false };
+}
+
 app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
     if (!student) return res.status(404).json({ success: false, message: 'غير موجود' });
     const allVideoAccess = hasAllVideoAccess(student);
+    const studentIsOnline = await isStudentInOnlineCenter(student);
 
     // نجيب الفيديوهات المتاحة للطالب:
     // 1) فيديوهات مرتبطة بحصة من مجموعته (عبر VideoSession)
@@ -5559,7 +5611,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
           {
             model: VideoSession,
             required: false,
-            include: [{ model: Session, attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'] }],
+            include: [{ model: Session, attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url', 'video_price_center', 'video_price_online'] }],
           },
         ],
         order: [['createdAt', 'DESC']],
@@ -5590,7 +5642,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       allLinkedSessionIds.size > 0
         ? Session.findAll({
             where: { id: [...allLinkedSessionIds] },
-            attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url'],
+            attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'SubjectId', 'CenterId', 'is_free_for_all', 'homework_video_url', 'exam_url', 'exam_video_url', 'video_price_center', 'video_price_online'],
           })
         : [],
     ]);
@@ -5764,7 +5816,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         accessExpiresAt,
         viewsUsed,
         maxViews,
-        price: student.price_per_session + (findSurchargeRule(subjectNameById.get(session.SubjectId), session.lesson_number)?.extra || 0),
+        price: videoSessionPriceFor(student, session, subjectNameById.get(session.SubjectId), studentIsOnline).total,
         homeworkVideoUrl,
         realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
         homeworkVideos, // كل فيديوهات الواجب للدرس (الإصدارات القديمة من الأبلكيشن بتستخدم realHomeworkUrl)
@@ -5891,9 +5943,10 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
 
     // رسوم إضافية لحصص محددة (مثلاً ماث تالتة ثانوي حصة 5) - تنطبق على أي طالب من أي سنتر
     const sessionSubject = await Subject.findByPk(session.SubjectId, { attributes: ['name'] });
-    const surchargeRule = findSurchargeRule(sessionSubject?.name, session.lesson_number);
-    const surchargeAmount = surchargeRule ? surchargeRule.extra : 0;
-    const totalPrice = student.price_per_session + surchargeAmount;
+    const videoPrice = videoSessionPriceFor(student, session, sessionSubject?.name, await isStudentInOnlineCenter(student));
+    const surchargeRule = videoPrice.rule;
+    const surchargeAmount = videoPrice.surcharge;
+    const totalPrice = videoPrice.total;
 
     // 4) لسه مدفوعش - لو ماأكدش الدفع، نرجع نطلب تأكيد
     if (!confirm_payment) {
@@ -5914,8 +5967,9 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
 
     await BalanceTransaction.create({
       StudentId: student.id,
-      amount: -student.price_per_session,
-      reason: `دفع لمشاهدة حصة أونلاين (سيريال ${session.serial_number})`,
+      SessionId: session.id,
+      amount: -videoPrice.base,
+      reason: `${ONLINE_VIDEO_PAYMENT_REASON} (سيريال ${session.serial_number})`,
     });
     if (surchargeAmount > 0) {
       await BalanceTransaction.create({
@@ -6548,6 +6602,7 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
     manualAccessMap,
     videoSessions,
     allSessions,
+    priceMessage: typeof req.query.price_msg === 'string' ? req.query.price_msg.slice(0, 300) : null,
   });
 });
 
@@ -6572,6 +6627,152 @@ app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_v
   }, { where: { id: sessionIds } });
   await extendGrantWindows([...new Set(sessionIds)], durationHours);
   res.redirect('/admin/videos/' + req.params.id + '/access');
+});
+
+// ===== سعر الحصة من صفحة التحكم في الفيديو =====
+// scope: center = طلاب السناتر بس، online = طلاب الأونلاين بس، both = الاتنين.
+// price فاضي = يرجع لسعر حصة الطالب العادي.
+const VIDEO_PRICE_SCOPES = ['center', 'online', 'both'];
+
+function parseVideoPriceInput(body) {
+  const scope = VIDEO_PRICE_SCOPES.includes(body.scope) ? body.scope : null;
+  const raw = String(body.price ?? '').trim();
+  if (raw === '') return { scope, price: null };
+  const price = Number(raw);
+  if (!Number.isFinite(price) || price < 0) return { scope, error: 'السعر لازم يكون رقم أكبر من أو يساوي صفر' };
+  return { scope, price };
+}
+
+async function videoSessionIdsFor(video, transaction = null) {
+  const linkedSessionIds = (await VideoSession.findAll({ where: { VideoId: video.id }, attributes: ['SessionId'], transaction })).map(row => row.SessionId);
+  return [...new Set([video.SessionId, ...linkedSessionIds].filter(Boolean))];
+}
+
+// الطلاب اللي اشتروا الحصة أونلاين من رصيدهم: دفعوا كام، وهيبقى سعرهم كام بالسعر الجديد
+async function planVideoPriceChange(video, { scope, price }, transaction = null) {
+  const sessionIds = await videoSessionIdsFor(video, transaction);
+  if (sessionIds.length === 0) return { sessionIds, rows: [] };
+  const grants = await VideoAccessGrant.findAll({
+    where: { SessionId: sessionIds, method: 'paid' },
+    include: [{ model: Student, include: [Center] }, { model: Session, include: [Subject] }],
+    transaction,
+  });
+  const studentIds = [...new Set(grants.map(grant => grant.StudentId))];
+  const transactions = studentIds.length ? await BalanceTransaction.findAll({
+    where: {
+      StudentId: studentIds,
+      [Op.or]: [
+        { reason: { [Op.like]: `${ONLINE_VIDEO_PAYMENT_REASON} (سيريال %` } },
+        { reason: { [Op.like]: 'رسوم إضافية مشاهدة أونلاين%' } },
+        { reason: { [Op.like]: `${ONLINE_VIDEO_PRICE_ADJUST_REASON}%` } },
+      ],
+    },
+    transaction,
+  }) : [];
+
+  const rows = [];
+  for (const grant of grants) {
+    const student = grant.Student;
+    const session = grant.Session;
+    if (!student || !session) continue;
+    const studentIsOnline = isOnlineCenterName(student.Center && student.Center.name);
+    if (scope === 'center' && studentIsOnline) continue;
+    if (scope === 'online' && !studentIsOnline) continue;
+
+    const paymentReason = `${ONLINE_VIDEO_PAYMENT_REASON} (سيريال ${session.serial_number})`;
+    const own = transactions.filter(tx => tx.StudentId === student.id);
+    const payment = own.filter(tx => tx.reason === paymentReason && (tx.SessionId === null || tx.SessionId === session.id));
+    const extras = own.filter(tx => tx.SessionId === session.id && !payment.includes(tx)
+      && (String(tx.reason).startsWith('رسوم إضافية مشاهدة أونلاين') || String(tx.reason).startsWith(ONLINE_VIDEO_PRICE_ADJUST_REASON)));
+    // لو مش لاقيين حركة الدفع الأصلية مش هنخمّن المبلغ: الطالب بيتساب زي ما هو
+    const paid = payment.length ? -[...payment, ...extras].reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0) : null;
+
+    const newSession = {
+      lesson_number: session.lesson_number,
+      video_price_center: scope === 'online' ? session.video_price_center : price,
+      video_price_online: scope === 'center' ? session.video_price_online : price,
+    };
+    const newPrice = videoSessionPriceFor(student, newSession, session.Subject && session.Subject.name, studentIsOnline).total;
+    rows.push({ student, session, studentIsOnline, paid, newPrice, diff: paid === null ? 0 : paid - newPrice });
+  }
+  return { sessionIds, rows };
+}
+
+function summarizeVideoPricePlan(rows) {
+  const summary = { buyers: rows.length, refund: { count: 0, total: 0 }, charge: { count: 0, total: 0 }, unchanged: 0, unknown: 0, students: [] };
+  rows.forEach(row => {
+    if (row.paid === null) summary.unknown += 1;
+    else if (row.diff > 0.001) { summary.refund.count += 1; summary.refund.total += row.diff; }
+    else if (row.diff < -0.001) { summary.charge.count += 1; summary.charge.total += -row.diff; }
+    else summary.unchanged += 1;
+    summary.students.push({
+      name: row.student.name,
+      code: row.student.student_code,
+      online: row.studentIsOnline,
+      paid: row.paid,
+      newPrice: row.newPrice,
+      diff: row.diff,
+    });
+  });
+  return summary;
+}
+
+app.get('/admin/videos/:id/price-preview', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const video = await Video.findByPk(req.params.id);
+    if (!video) return res.status(404).json({ success: false, message: 'الفيديو غير موجود' });
+    const input = parseVideoPriceInput(req.query);
+    if (!input.scope) return res.status(400).json({ success: false, message: 'اختار السعر يطبق على مين' });
+    if (input.error) return res.status(400).json({ success: false, message: input.error });
+    const { rows } = await planVideoPriceChange(video, input);
+    res.json({ success: true, ...summarizeVideoPricePlan(rows) });
+  } catch (error) {
+    console.error('Video price preview failed:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/admin/videos/:id/price', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const video = await Video.findByPk(req.params.id);
+    if (!video) return res.status(404).send('❌ الفيديو غير موجود');
+    const input = parseVideoPriceInput(req.body);
+    if (!input.scope) return res.status(400).send('❌ اختار السعر يطبق على مين');
+    if (input.error) return res.status(400).send('❌ ' + input.error);
+    const applyExisting = req.body.apply_existing === 'yes';
+
+    let adjusted = 0;
+    await sequelize.transaction(async (transaction) => {
+      // الحساب بيتعمل قبل تغيير السعر (اللي دفعوه فعلاً مش بيتأثر بالسعر)
+      const { sessionIds, rows } = await planVideoPriceChange(video, input, transaction);
+      const update = {};
+      if (input.scope !== 'online') update.video_price_center = input.price;
+      if (input.scope !== 'center') update.video_price_online = input.price;
+      if (sessionIds.length) await Session.update(update, { where: { id: sessionIds }, transaction });
+      if (!applyExisting) return;
+
+      for (const row of rows) {
+        if (row.paid === null || Math.abs(row.diff) < 0.001) continue;
+        await adjustStudentBalance(row.student, row.diff, transaction);
+        await BalanceTransaction.create({
+          StudentId: row.student.id,
+          SessionId: row.session.id,
+          amount: row.diff,
+          reason: `${ONLINE_VIDEO_PRICE_ADJUST_REASON} (سيريال ${row.session.serial_number}): ${row.diff > 0 ? 'استرداد فرق' : 'دفع فرق'} - السعر الجديد ${row.newPrice} ج`,
+          UserId: req.session.userId,
+        }, { transaction });
+        adjusted += 1;
+      }
+    });
+
+    const priceText = input.price === null ? 'سعر حصة الطالب العادي' : `${input.price} ج`;
+    const scopeText = { center: 'طلاب السناتر', online: 'طلاب الأونلاين', both: 'طلاب السناتر والأونلاين' }[input.scope];
+    const message = `✅ سعر الحصة بقى ${priceText} لـ ${scopeText}` + (applyExisting ? ` - واتعدّل حساب ${adjusted} طالب من اللي اشتروها قبل كده` : ' (اللي اشتروها قبل كده متغيرش حسابهم)');
+    res.redirect(`/admin/videos/${video.id}/access?price_msg=${encodeURIComponent(message)}`);
+  } catch (error) {
+    console.error('Video price update failed:', error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
 });
 
 app.post('/admin/videos/:id/session-link/delete', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
@@ -10441,6 +10642,7 @@ async function startServer() {
     await ensureUserPhoneColumn();
     await ensureSessionWeekNumberColumn();
     await ensureSessionHomeworkFields();
+    await ensureSessionVideoPriceColumns();
     await ensureStudentBookletCustomPriceColumn();
     await ensureVideoQuestionsDisplayColumn();
     await ensureBalanceTransactionSessionColumn();
@@ -10506,6 +10708,7 @@ async function startServer() {
           await ensureUserPhoneColumn();
           await ensureSessionWeekNumberColumn();
           await ensureSessionHomeworkFields();
+          await ensureSessionVideoPriceColumns();
           await ensureStudentBookletCustomPriceColumn();
           await ensureVideoQuestionsDisplayColumn();
           await ensureUserProfilePhotoColumn();

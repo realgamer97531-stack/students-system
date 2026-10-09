@@ -56,6 +56,162 @@
   </div>
 </div>
 
+<% const priceSession = video.Session || {}; %>
+<% const showPrice = (value) => (value === null || value === undefined || value === '') ? 'سعر حصة الطالب العادي' : (value + ' ج'); %>
+<% if (priceMessage) { %>
+  <div class="alert alert-success"><%= priceMessage %></div>
+<% } %>
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h6 class="mb-2">💰 <span class="ar-only">سعر الحصة (للي بيدفع من رصيده عشان يشوفها أونلاين)</span><span class="en-only" style="display:none;">Session price (paid from balance to watch online)</span></h6>
+    <p class="small text-muted mb-3">
+      <span class="ar-only">السعر الحالي — طلاب السناتر:</span><span class="en-only" style="display:none;">Current price — center students:</span>
+      <strong><%= showPrice(priceSession.video_price_center) %></strong>
+      &nbsp;•&nbsp;
+      <span class="ar-only">طلاب الأونلاين:</span><span class="en-only" style="display:none;">online students:</span>
+      <strong><%= showPrice(priceSession.video_price_online) %></strong>
+      <br>
+      <span class="ar-only">سيب السعر فاضي عشان يرجع لسعر حصة كل طالب العادي.</span><span class="en-only" style="display:none;">Leave the price empty to go back to each student's normal session price.</span>
+    </p>
+    <form id="videoPriceForm" action="/admin/videos/<%= video.id %>/price" method="POST" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small"><span class="ar-only">السعر (ج)</span><span class="en-only" style="display:none;">Price (EGP)</span></label>
+        <input type="number" name="price" min="0" step="0.5" class="form-control" placeholder="سعر الطالب العادي">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small d-block"><span class="ar-only">السعر ده لمين؟</span><span class="en-only" style="display:none;">Who does this price apply to?</span></label>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="scope" id="priceScopeCenter" value="center" required>
+          <label class="form-check-label" for="priceScopeCenter"><span class="ar-only">طلاب السناتر بس</span><span class="en-only" style="display:none;">Center students only</span></label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="scope" id="priceScopeOnline" value="online">
+          <label class="form-check-label" for="priceScopeOnline"><span class="ar-only">طلاب الأونلاين بس</span><span class="en-only" style="display:none;">Online students only</span></label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="scope" id="priceScopeBoth" value="both">
+          <label class="form-check-label" for="priceScopeBoth"><span class="ar-only">الاتنين</span><span class="en-only" style="display:none;">Both</span></label>
+        </div>
+      </div>
+      <input type="hidden" name="apply_existing" value="no">
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100"><span class="ar-only">حفظ السعر</span><span class="en-only" style="display:none;">Save price</span></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="videoPriceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><span class="ar-only">تأكيد سعر الحصة</span><span class="en-only" style="display:none;">Confirm session price</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="videoPriceModalBody"></div>
+      <div class="modal-footer flex-column align-items-stretch gap-2">
+        <button type="button" class="btn btn-warning" id="videoPriceApplyAll"><span class="ar-only">طبّق السعر الجديد على اللي اشتروها كمان</span><span class="en-only" style="display:none;">Also apply to students who already bought it</span></button>
+        <button type="button" class="btn btn-primary" id="videoPriceApplyNew"><span class="ar-only">السعر الجديد للي هيشتري بعد كده بس</span><span class="en-only" style="display:none;">Only for future purchases</span></button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><span class="ar-only">رجوع</span><span class="en-only" style="display:none;">Back</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const form = document.getElementById('videoPriceForm');
+    const modalEl = document.getElementById('videoPriceModal');
+    const body = document.getElementById('videoPriceModalBody');
+    const applyAll = document.getElementById('videoPriceApplyAll');
+    const applyNew = document.getElementById('videoPriceApplyNew');
+    let confirmed = false;
+
+    const line = (text, className) => {
+      const el = document.createElement('div');
+      if (className) el.className = className;
+      el.textContent = text;
+      body.appendChild(el);
+      return el;
+    };
+    const money = (n) => (Math.round(Number(n) * 100) / 100) + ' ج';
+
+    function submitWith(applyExisting) {
+      form.querySelector('input[name="apply_existing"]').value = applyExisting ? 'yes' : 'no';
+      confirmed = true;
+      applyAll.disabled = applyNew.disabled = true;
+      form.submit();
+    }
+    applyAll.addEventListener('click', () => {
+      if (confirm('متأكد؟ رصيد الطلاب اللي اشتروا الحصة هيتعدل بالفرق دلوقتي.')) submitWith(true);
+    });
+    applyNew.addEventListener('click', () => submitWith(false));
+
+    form.addEventListener('submit', async (event) => {
+      if (confirmed) return;
+      event.preventDefault();
+      const data = new FormData(form);
+      const scope = data.get('scope');
+      if (!scope) return alert('اختار السعر ده لطلاب السناتر ولا الأونلاين ولا الاتنين');
+      const price = String(data.get('price') || '').trim();
+      const scopeText = { center: 'طلاب السناتر بس', online: 'طلاب الأونلاين بس', both: 'طلاب السناتر والأونلاين' }[scope];
+
+      body.textContent = '';
+      line('السعر الجديد: ' + (price === '' ? 'سعر حصة الطالب العادي' : money(price)) + ' — لـ ' + scopeText, 'fw-bold mb-2');
+      const loading = line('بيحسب مين اشترى الحصة...', 'text-muted');
+      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+      applyAll.disabled = applyNew.disabled = true;
+
+      try {
+        const query = new URLSearchParams({ price, scope });
+        const response = await fetch('/admin/videos/<%= video.id %>/price-preview?' + query.toString(), { headers: { Accept: 'application/json' } });
+        const result = await response.json();
+        loading.remove();
+        if (!response.ok || !result.success) {
+          line('❌ ' + (result.message || 'حصلت مشكلة'), 'text-danger');
+          return;
+        }
+        applyNew.disabled = false;
+        if (result.buyers === 0) {
+          line('محدش من ' + scopeText + ' اشترى الحصة دي من رصيده لسه — السعر الجديد هيطبق على اللي هيشتري بعد كده.');
+          applyAll.style.display = 'none';
+          return;
+        }
+        applyAll.style.display = '';
+        applyAll.disabled = false;
+        line('فيه ' + result.buyers + ' طالب من ' + scopeText + ' اشتروا الحصة دي قبل كده من رصيدهم. لو طبّقت عليهم السعر الجديد:');
+        const list = document.createElement('ul');
+        list.className = 'mb-2';
+        body.appendChild(list);
+        const item = (text) => { const li = document.createElement('li'); li.textContent = text; list.appendChild(li); };
+        if (result.refund.count) item(result.refund.count + ' طالب هيرجعلهم فرق (إجمالي ' + money(result.refund.total) + ')');
+        if (result.charge.count) item(result.charge.count + ' طالب هيتخصم منهم فرق (إجمالي ' + money(result.charge.total) + ')');
+        if (result.unchanged) item(result.unchanged + ' طالب دفعوا نفس السعر — مش هيتغير حاجة');
+        if (result.unknown) item(result.unknown + ' طالب مش لاقيين حركة دفعهم — مش هيتغير حسابهم');
+
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = 'تفاصيل الطلاب';
+        details.appendChild(summary);
+        result.students.forEach((s) => {
+          const row = document.createElement('div');
+          row.className = 'small border-bottom py-1';
+          const change = s.paid === null ? 'مش معروف دفع كام' : (s.diff > 0 ? 'يرجعله ' + money(s.diff) : s.diff < 0 ? 'يتخصم منه ' + money(-s.diff) : 'من غير تغيير');
+          row.textContent = s.name + ' (' + s.code + (s.online ? '، أونلاين' : '') + ') — دفع ' + (s.paid === null ? '؟' : money(s.paid)) + ' ← ' + money(s.newPrice) + ' — ' + change;
+          details.appendChild(row);
+        });
+        body.appendChild(details);
+      } catch (error) {
+        loading.remove();
+        line('❌ مش قادر يوصل للسيرفر — جرب تاني', 'text-danger');
+      }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', () => { if (!confirmed) applyAll.disabled = applyNew.disabled = false; });
+  })();
+</script>
+
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h6 class="mb-3">🏫 <span class="ar-only">الحصص المسموح لها بمشاهدة هذا الفيديو</span><span class="en-only" style="display:none;">Sessions Allowed to Watch This Video</span></h6>

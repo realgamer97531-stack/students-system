@@ -68,6 +68,9 @@ const Session = sequelize.define('Session', {
   },
   cost_per_normal: { type: DataTypes.FLOAT, allowNull: true },
   cost_per_reduced: { type: DataTypes.FLOAT, allowNull: true },
+  // سعر مشاهدة الحصة أونلاين (من صفحة التحكم في الفيديو). فاضي = سعر حصة الطالب العادي
+  video_price_center: { type: DataTypes.FLOAT, allowNull: true, defaultValue: null }, // لطلاب السناتر
+  video_price_online: { type: DataTypes.FLOAT, allowNull: true, defaultValue: null }, // لطلاب الأونلاين
 }, {
   tableName: 'sessions',
 });
