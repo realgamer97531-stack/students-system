@@ -82,6 +82,23 @@ class StaffApi {
     return utf8.decode(response.bodyBytes);
   }
 
+  /// ملف طالب واحد من السيرفر: الرصيد الحالي + البوكليتات + آخر حركات الرصيد (محتاج نت)
+  static Future<Map<String, dynamic>> studentDetails(int studentId) async {
+    final headers = await _deviceHeaders();
+    return _deviceJson(() => client.get(_uri('/api/sync/mobile/student/$studentId'), headers: headers));
+  }
+
+  /// صورة QR بتاعة الطالب (SVG بنفس تصميم السيستم)
+  static Future<String> studentQrSvg(int studentId, {required int userId}) async {
+    final headers = await _deviceHeaders();
+    final context = base64Encode(utf8.encode(jsonEncode({'userId': userId, 'clientTime': DateTime.now().millisecondsSinceEpoch})));
+    final response = await Net.raw(() => client.get(_uri('/students/$studentId/qr.png'), headers: {...headers, 'X-Sync-Context': context}));
+    if (response.statusCode == 401) await _deviceJson(() async => response);
+    final svg = utf8.decode(response.bodyBytes);
+    if (response.statusCode != 200 || !svg.contains('<svg')) throw ApiException('مش قادر يجيب الـ QR (${response.statusCode})', status: response.statusCode);
+    return svg;
+  }
+
   /// طلب لصفحة من السيستم باسم الموظف.
   /// opId: للعمليات اللي بتكتب (بتتسجل على السيرفر ومستحيل تتكرر). من غيره: طلب قراءة عادي.
   static Future<OpResult> call(

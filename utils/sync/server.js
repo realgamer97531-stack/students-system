@@ -444,6 +444,7 @@ function install(app, { sequelize, User, bcrypt, onMobileStaffLogin }) {
 // الموبايل جهاز متسجل زي اللابتوب بالظبط، بس مش بينزل الداتابيز كلها:
 //   POST /api/sync/mobile/staff-login  يتأكد من يوزر وباسورد الموظف ويرجع بياناته وصلاحياته
 //   GET  /api/sync/mobile/snapshot     نسخة صغيرة للمسح أوفلاين: الحصص الأخيرة + الطلاب + حضورهم وواجبهم فيها
+//   GET  /api/sync/mobile/student/:id  ملف طالب واحد: الرصيد + البوكليتات + آخر حركات الرصيد
 // والعمليات نفسها بتتبعت لنفس صفحات السيستم بـ X-Sync-Device-Token (نفس طريقة الديسكتوب).
 const MOBILE_SNAPSHOT_SESSIONS = 150;
 
@@ -507,6 +508,47 @@ function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin 
       });
     } catch (error) {
       console.error('Mobile snapshot error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // ملف طالب واحد (قراءة بس): الرصيد الحالي + البوكليتات (نفس حسبة صفحة الطالب) + آخر حركات الرصيد.
+  // الدفع نفسه بيتبعت لنفس صفحات السيستم (/students/:id/booklet-payment و /students/:id/balance).
+  app.get('/api/sync/mobile/student/:id', requireDevice(sequelize), async (req, res) => {
+    try {
+      const { Student, Booklet, StudentBooklet, BalanceTransaction } = sequelize.models;
+      const student = await Student.findByPk(req.params.id, { attributes: ['id', 'balance', 'SubjectId', 'booklet_status'], raw: true });
+      if (!student) return res.status(404).json({ success: false, message: 'الطالب غير موجود' });
+      const [booklets, owned, transactions] = await Promise.all([
+        Booklet.findAll({ where: { SubjectId: student.SubjectId, is_active: true }, order: [['order_index', 'ASC'], ['id', 'ASC']], raw: true }),
+        StudentBooklet.findAll({ where: { StudentId: student.id }, raw: true }),
+        BalanceTransaction.findAll({ where: { StudentId: student.id }, order: [['createdAt', 'DESC']], limit: 15, raw: true }),
+      ]);
+      res.json({
+        success: true,
+        student: { id: student.id, balance: Number(student.balance) || 0, hasBooklet: !!student.booklet_status },
+        booklets: booklets.map((b) => {
+          const sb = owned.find(s => s.BookletId === b.id);
+          const paid = sb ? Number(sb.paid_amount) || 0 : 0;
+          const hasCustom = sb && sb.custom_price !== null && sb.custom_price !== undefined && sb.custom_price !== '';
+          const price = hasCustom ? Number(sb.custom_price) : Number(b.sell_price) || 0;
+          return {
+            id: b.id,
+            name: b.name,
+            sellPrice: Number(b.sell_price) || 0,
+            price,
+            customPrice: !!hasCustom,
+            paid,
+            remaining: price - paid,
+            owned: !!sb,
+            delivered: !!(sb && sb.is_delivered),
+            notes: sb ? sb.notes : null,
+          };
+        }),
+        transactions: transactions.map(t => ({ amount: Number(t.amount) || 0, reason: t.reason, createdAt: t.createdAt })),
+      });
+    } catch (error) {
+      console.error('Mobile student details error:', error);
       res.status(500).json({ success: false, message: error.message });
     }
   });

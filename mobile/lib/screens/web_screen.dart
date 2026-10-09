@@ -76,18 +76,36 @@ class WebScreenState extends State<WebScreen> {
     _load();
   }
 
-  void _load() => _controller.loadRequest(Uri.parse(widget.url));
+  void _load() => _openTarget(widget.url);
+
+  /// الصفحة اللي اتطلبت (مثلاً ملف طالب). لو السيستم حوّل على صفحة الدخول،
+  /// بعد الدخول التلقائي السيرفر بيودّي على /sessions، فبنرجع للصفحة دي تاني.
+  String? _target;
+  String? _afterLogin;
+
+  void _openTarget(String url) {
+    _target = url;
+    _controller.loadRequest(Uri.parse(url));
+  }
 
   DateTime _lastAutoLogin = DateTime.fromMillisecondsSinceEpoch(0);
 
   Future<void> _onPageFinished(String url) async {
-    if (!widget.autoLogin || Uri.tryParse(url)?.path != '/login') return;
+    if (!widget.autoLogin) return;
+    if (Uri.tryParse(url)?.path != '/login') {
+      final next = _afterLogin;
+      _afterLogin = null;
+      if (next != null && Uri.tryParse(next)?.path != Uri.tryParse(url)?.path) await _controller.loadRequest(Uri.parse(next));
+      return;
+    }
     // مرة واحدة كل شوية بس (عشان لو الباسورد اتغير منفضلش ندخل في لفة)
     if (DateTime.now().difference(_lastAutoLogin).inSeconds < 20) return;
     final user = await SessionStore.staffUser();
     final password = await SessionStore.staffPassword();
     if (user == null || password == null) return;
     _lastAutoLogin = DateTime.now();
+    final target = _target;
+    if (target != null && !const ['/login', '/logout'].contains(Uri.tryParse(target)?.path)) _afterLogin = target;
     final body = 'username=${Uri.encodeQueryComponent(user.username)}&password=${Uri.encodeQueryComponent(password)}';
     await _controller.loadRequest(
       Uri.parse(url),
@@ -99,7 +117,7 @@ class WebScreenState extends State<WebScreen> {
 
   void reload() => _controller.reload();
 
-  void open(String url) => _controller.loadRequest(Uri.parse(url));
+  void open(String url) => _openTarget(url);
 
   Future<NavigationDecision> _onNavigation(NavigationRequest request) async {
     final uri = Uri.parse(request.url);
@@ -108,6 +126,7 @@ class WebScreenState extends State<WebScreen> {
       launchUrl(uri, mode: LaunchMode.externalApplication);
       return NavigationDecision.prevent;
     }
+    if (request.isMainFrame && !const ['/login', '/logout'].contains(uri.path)) _target = request.url;
     return NavigationDecision.navigate;
   }
 

@@ -7,11 +7,12 @@ import '../../services/staff_api.dart';
 import '../../services/staff_store.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
+import 'student_qr.dart';
 
 /// إضافة طالب / بدء حصة من الموبايل: محتاجين نت (مش بيتحطوا في الطابور).
 /// كل محاولة ليها رقم عملية ثابت لحد ما السيرفر يرد، فلو النت قطع في النص وجربت تاني
 /// مستحيل الطالب أو الحصة يتعملوا مرتين.
-class _OnlineOp {
+class OnlineOp {
   String? _opId;
 
   Future<OpResult?> send(BuildContext context, String path, Map<String, dynamic> body, {required StaffUser user, int? activeSessionId}) async {
@@ -80,7 +81,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final _balance = TextEditingController(text: '0');
   final _bookletPaid = TextEditingController(text: '0');
   final _comment = TextEditingController();
-  final _op = _OnlineOp();
+  final _op = OnlineOp();
   int? _center;
   int? _subject;
   bool _hasBooklet = false;
@@ -157,18 +158,25 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
     final student = (res.data['student'] as Map?)?.cast<String, dynamic>() ?? {};
     final note = res.data['attendanceNote'];
+    final studentId = (student['id'] as num?)?.toInt();
     await StaffStore.refreshSnapshot();
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('✅ تم إضافة الطالب'),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${student['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
           const SizedBox(height: 8),
           SelectableText('الكود: ${student['student_code'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: AppColors.primary)),
+          if (studentId != null) ...[
+            const SizedBox(height: 12),
+            Center(child: StudentQr(studentId: studentId, user: widget.user, size: 220)),
+          ],
           if (note != null) ...[const SizedBox(height: 10), Text('$note')],
-        ]),
+          ]),
+        ),
         actions: [
           TextButton(
             onPressed: () => Clipboard.setData(ClipboardData(text: '${student['student_code'] ?? ''}')),
@@ -289,7 +297,7 @@ class NewSessionSheet extends StatefulWidget {
 class _NewSessionSheetState extends State<NewSessionSheet> {
   final _form = GlobalKey<FormState>();
   final _lesson = TextEditingController();
-  final _op = _OnlineOp();
+  final _op = OnlineOp();
   int? _center;
   int? _subject;
   int? _week;

@@ -313,6 +313,68 @@ void main() {
     expect(find.text('حضر (سنتر الاختبار)'), findsWidgets);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/15_staff_student.png'));
 
+    // النت رجع: المحفظة والبوكليتات من السيرفر، ودفع بوكليت + إضافة رصيد
+    final payments = <http.Request>[];
+    var walletBalance = 250;
+    var bookletPaid = 100;
+    http.Response envelopeOk(http.Request r) {
+      payments.add(r);
+      return json(jsonEncode({'envelope': true, 'ok': true, 'status': 302, 'body': 'Found. Redirecting to /students/1'}));
+    }
+
+    server.routes['/api/sync/mobile/student/1'] = (r) => json(jsonEncode({
+          'success': true,
+          'student': {'id': 1, 'balance': walletBalance, 'hasBooklet': true},
+          'booklets': [
+            {'id': 4, 'name': 'بوكليت الترم الأول', 'sellPrice': 300, 'price': 300, 'customPrice': false, 'paid': bookletPaid, 'remaining': 300 - bookletPaid, 'owned': true, 'delivered': false, 'notes': null},
+          ],
+          'transactions': [
+            {'amount': 100, 'reason': 'دفع بوكليت: بوكليت الترم الأول', 'createdAt': '2026-10-06T10:00:00.000Z'},
+          ],
+        }));
+    server.routes['/students/1/booklet-payment'] = (r) {
+      bookletPaid += 50;
+      return envelopeOk(r);
+    };
+    server.routes['/students/1/balance'] = (r) {
+      walletBalance += 100;
+      return envelopeOk(r);
+    };
+    server.offline = false;
+    await tester.tap(find.text('حاول تاني'));
+    await tester.pumpAndSettle();
+    expect(find.text('المحفظة'), findsOneWidget);
+    expect(find.text('بوكليت الترم الأول'), findsOneWidget);
+    expect(find.text('متبقي: 200 ج'), findsOneWidget);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/16_staff_student_wallet.png'));
+
+    await tester.ensureVisible(find.text('دفع للبوكليت'));
+    await tester.tap(find.text('دفع للبوكليت'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, '500');
+    await tester.tap(find.text('تأكيد'));
+    await tester.pumpAndSettle();
+    expect(find.text('أقصى مبلغ 200 ج'), findsOneWidget); // أكتر من المتبقي مرفوض
+    await tester.enterText(find.byType(TextFormField).first, '50');
+    await tester.tap(find.text('تأكيد'));
+    await tester.pumpAndSettle();
+    expect(payments, hasLength(1));
+    expect(payments.last.headers['X-Sync-Op-Id'], isNotEmpty);
+    expect(jsonDecode(payments.last.body), containsPair('booklet_id', 4));
+    expect(jsonDecode(payments.last.body), containsPair('paid_amount', 50));
+    expect(find.text('متبقي: 150 ج'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('إضافة رصيد'));
+    await tester.tap(find.text('إضافة رصيد'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, '100');
+    await tester.tap(find.text('تأكيد'));
+    await tester.pumpAndSettle();
+    expect(payments, hasLength(2));
+    expect(jsonDecode(payments.last.body), containsPair('type', 'add'));
+    expect(jsonDecode(payments.last.body), containsPair('amount', 100));
+    expect(find.text('350 ج'), findsOneWidget);
+
     // تنظيف التايمرز
     await tester.pumpWidget(const SizedBox());
   });
