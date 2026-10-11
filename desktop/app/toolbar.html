@@ -56,6 +56,7 @@
   <span class="brand">Shady Elsharkawy</span>
 
   <span class="pill" id="conn"><span class="dot" id="dot"></span><span id="connText">بيجهز...</span></span>
+  <button class="icon" id="pingBtn" title="جرب الاتصال بالسيرفر تاني">🔌 جرب الاتصال</button>
   <span class="pill" id="pendingPill" title="عمليات اتعملت على الجهاز ولسه ماترفعتش على السيرفر">⬆ <span id="pending">0</span> مستنية الرفع</span>
   <span class="muted" id="lastPull"></span>
 
@@ -63,7 +64,7 @@
 
   <div class="group">
     <button class="warn" id="problems" style="display:none">⚠ <span id="problemsCount">0</span> عمليات مرفوضة</button>
-    <button class="primary" id="pullBtn" title="ينزل نسخة كاملة جديدة من السيرفر">⬇ تحديث البيانات</button>
+    <button class="primary" id="pullBtn" title="ينزل التغييرات الجديدة بس من السيرفر ويصلّح أي فرق (مش نسخة كاملة)">⬇ تحديث البيانات</button>
     <button class="primary" id="pushBtn" title="يرفع كل العمليات اللي على الجهاز للسيرفر دلوقتي">⬆ رفع البيانات</button>
     <button id="updateBtn" title="تحديثات البرنامج">⭳ تحديثات البرنامج</button>
     <button class="icon" id="settings" title="معلومات وإعدادات">⚙</button>
@@ -148,9 +149,20 @@
   $('problems').onclick = () => window.desktop.problems.open();
   $('updateBtn').onclick = () => window.desktop.updateAction();
 
+  $('pingBtn').onclick = async () => {
+    const btn = $('pingBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin">⟳</span> بيجرب...';
+    const result = await window.desktop.ping();
+    if (result.online) toast('✔ متصل بالسيرفر', 'success');
+    else toast(`لسه مفيش اتصال بالسيرفر${result.message ? ` — ${result.message}` : ''}. البرنامج شغال عادي أوفلاين.`, 'error');
+    btn.textContent = '🔌 جرب الاتصال';
+    btn.disabled = false;
+  };
+
   $('pullBtn').onclick = async () => {
     $('pullBtn').disabled = true;
-    toast('بينزل نسخة جديدة من السيرفر...');
+    toast('بينزل التغييرات الجديدة بس من السيرفر...');
     const result = await window.desktop.pull();
     if (result.success) {
       toast('✔ البيانات اتحدثت من السيرفر', 'success');

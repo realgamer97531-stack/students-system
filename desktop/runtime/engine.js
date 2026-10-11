@@ -7,15 +7,17 @@ const store = require('./store');
 
 const PULL_INTERVAL_MS = 5 * 60 * 1000;
 const PING_INTERVAL_MS = 30 * 1000;
-const FULL_REFRESH_EVERY_MS = 24 * 60 * 60 * 1000;
+// مرة في اليوم بنتأكد إن كل جدول على الجهاز مطابق للسيرفر (عدد/ids) ونصلّح الفرق بس — مفيش نسخة كاملة
+const VERIFY_EVERY_MS = 24 * 60 * 60 * 1000;
+const ROWS_CHUNK = 2000;
 const REQUEST_TIMEOUT_MS = 60 * 1000;
 const INSERT_CHUNK = 500;
 const MAX_SERVER_ERROR_ATTEMPTS = 3;
 const STALE_STARTED_MS = 2 * 60 * 1000;
 // التنزيل بعد الرفع: بعد دقيقة (وكل الرفعات اللي ورا بعض بتتجمع في تنزيل واحد) بدل ما يحصل بعد كل عملية
 const PULL_AFTER_PUSH_MS = 60 * 1000;
-// النسخة الكاملة اليومية تقيلة (بتمسح كل جدول وتملاه): بتستنى لحد ما محدش يشتغل على البرنامج 3 دقايق
-const IDLE_FOR_FULL_MS = 3 * 60 * 1000;
+// المراجعة اليومية بتستنى لحد ما محدش يشتغل على البرنامج 3 دقايق
+const IDLE_FOR_VERIFY_MS = 3 * 60 * 1000;
 
 const state = {
   online: false,
@@ -423,7 +425,9 @@ function schedulePull(delayMs) {
   }, delayMs);
 }
 
-async function pull({ full = false, quick = false } = {}) {
+// full: نسخة كاملة (أول مرة بس، أو من الإعدادات لو فيه مشكلة). verify: بعد التحديثات نراجع كل الجداول
+// ونصلّح الفرق بس (زرار "تحديث البيانات" + مرة في اليوم)
+async function pull({ full = false, quick = false, verify = false } = {}) {
   if (state.pulling) return { busy: true };
   if (!process.env.SYNC_DEVICE_TOKEN) return { skipped: 'not-registered' };
   state.pulling = true;
@@ -438,7 +442,7 @@ async function pull({ full = false, quick = false } = {}) {
       }
     }
     // التنزيل من النت بيحصل في الخلفية والبرنامج شغال عادي؛ الحفظ بس هو اللي بيوقف الكتابة ثواني
-    const prepared = await downloadPull(full, quick);
+    const prepared = await downloadPull(full, quick, verify);
     const seqBefore = prepared.seq;
     return await holdGate(async () => {
       if (writeSeq !== seqBefore) return { skipped: 'writes-during-download' };
@@ -464,25 +468,106 @@ async function pull({ full = false, quick = false } = {}) {
   }
 }
 
-async function downloadPull(full, quick = false) {
+async function downloadPull(full, quick = false, verify = false) {
   const seq = writeSeq;
   const lastFull = await store.getKv('last_full_pull', 0);
   // نسخة كاملة مرة واحدة بعد إصلاح الجداول اللي أساميها بتفرق في الحروف الكبيرة بس (عشان ترجع البيانات اللي اتمسحت)
   const caseFixed = await store.getKv('case_fix_v1', false);
-  const fullDue = lastFull && Date.now() - lastFull > FULL_REFRESH_EVERY_MS;
-  const idle = Date.now() - lastWriteAt > IDLE_FOR_FULL_MS && !inflight.size;
-  // النسخة الكاملة اليومية بتستنى وقت الهدوء؛ لحد ساعتها التحديثات العادية بتكفي
-  // quick: حد مستني الرد على الشاشة (زي إضافة طالب) — تحديثات بس، عمره ما يبقى نسخة كاملة
-  const doFull = full || (!quick && (!caseFixed || !lastFull || (fullDue && idle)));
+  const lastVerify = await store.getKv('last_verify', 0) || lastFull;
+  const idle = Date.now() - lastWriteAt > IDLE_FOR_VERIFY_MS && !inflight.size;
+  // النسخة الكاملة بقت أول مرة بس (الجهاز فاضي) أو لو حد طلبها من الإعدادات.
+  // غير كده دايمًا تحديثات بس، ومرة في اليوم (وقت الهدوء) مراجعة بتصلّح الفرق بس.
+  // quick: حد مستني الرد على الشاشة (زي إضافة طالب) — تحديثات بس
+  const doFull = full || (!quick && (!caseFixed || !lastFull));
+  const doVerify = !doFull && !quick && (verify || (idle && Date.now() - lastVerify > VERIFY_EVERY_MS));
   const tablesState = await store.getKv('tables', {});
   const refreshTables = await store.getKv('refresh_tables', []);
   const since = await store.getKv('last_server_time', null);
 
-  state.progress = doFull ? 'بينزل نسخة كاملة من السيرفر...' : 'بينزل التحديثات...';
+  state.progress = doFull ? 'بينزل نسخة كاملة من السيرفر...' : 'بينزل التحديثات الجديدة بس...';
   notify();
-  const response = await requestPull({ full: doFull, since, tables: tablesState, fullTables: refreshTables });
+  // schemaDiff: لو جدول اتضافله عمود على السيرفر، بنضيفه هنا وننزل قيمه بس (مش الجدول كله)
+  const response = await requestPull({ full: doFull, since, tables: tablesState, fullTables: refreshTables, schemaDiff: true });
   setOnline(true);
-  return { seq, doFull, tablesState, response };
+  return { seq, doFull, doVerify, tablesState, response };
+}
+
+// عمود (أو أكتر) اتضاف للجدول على السيرفر: نضيفه هنا بنفس تعريفه وننزل قيمه للصفوف اللي قيمتها مش الافتراضية بس.
+// بيرجع false لو التغيير مش إضافة أعمدة (ساعتها الجدول بيتبني من جديد زي الأول)
+async function addNewColumns(conn, table, entry) {
+  let local;
+  try {
+    [local] = await conn.query(`SHOW COLUMNS FROM ${quoteId(table)}`);
+  } catch (error) {
+    return false; // الجدول مش موجود على الجهاز
+  }
+  const serverColumns = entry.columns || [];
+  if (local.some(column => !serverColumns.includes(column.Field))) return false; // عمود اتشال من السيرفر
+  const localNames = new Set(local.map(column => column.Field));
+  const added = serverColumns.filter(name => !localNames.has(name));
+  if (!added.length) return true; // التغيير في فهرس/نوع بس: البيانات زي ما هي
+
+  const lines = String(entry.ddl || '').split('\n').map(line => line.trim());
+  for (const name of added) {
+    const line = lines.find(l => l.startsWith(`${quoteId(name)} `));
+    if (!line) return false;
+    await conn.query(`ALTER TABLE ${quoteId(table)} ADD COLUMN ${line.replace(/,$/, '')}`);
+  }
+
+  const response = await serverFetch('/api/sync/columns', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ table, columns: added }),
+    timeout: 5 * 60 * 1000,
+  });
+  if (!response.ok) throw new Error(`فشل تنزيل الأعمدة الجديدة (HTTP ${response.status})`);
+  const body = await response.json();
+  const columns = (body.columns || []).slice(1);
+  const rows = (body.rows || []).map(decodeRow);
+  if (rows.length && columns.length) {
+    const sql = `UPDATE ${quoteId(table)} SET ${columns.map(c => `${quoteId(c)} = ?`).join(', ')} WHERE id = ?`;
+    await conn.beginTransaction();
+    try {
+      for (const row of rows) await conn.query(sql, [...row.slice(1), row[0]]);
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      throw error;
+    }
+  }
+  return true;
+}
+
+// صفوف معينة ناقصة على الجهاز: بننزلها هي بس بالـ id
+async function fetchMissingRows(conn, table, ids) {
+  for (let i = 0; i < ids.length; i += ROWS_CHUNK) {
+    const response = await serverFetch('/api/sync/rows', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ table, ids: ids.slice(i, i + ROWS_CHUNK) }),
+      timeout: 5 * 60 * 1000,
+    });
+    if (!response.ok) throw new Error(`فشل تنزيل الصفوف الناقصة (HTTP ${response.status})`);
+    const body = await response.json();
+    const rows = (body.rows || []).map(decodeRow);
+    if (!rows.length) continue;
+    const idIndex = body.columns.indexOf('id');
+    if (rows.some(row => Number(row[idIndex]) >= store.LOCAL_ID_BASE)) {
+      throw new Error(`السيرفر فيه ids كبيرة جدًا في جدول ${table} — المزامنة وقفت للأمان`);
+    }
+    const columns = body.columns.map(quoteId).join(', ');
+    const update = body.columns.map(c => `${quoteId(c)} = VALUES(${quoteId(c)})`).join(', ');
+    await conn.beginTransaction();
+    try {
+      for (let j = 0; j < rows.length; j += INSERT_CHUNK) {
+        await conn.query(`INSERT INTO ${quoteId(table)} (${columns}) VALUES ? ON DUPLICATE KEY UPDATE ${update}`, [rows.slice(j, j + INSERT_CHUNK)]);
+      }
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      throw error;
+    }
+  }
 }
 
 // السيرفر (لينكس) ممكن يكون فيه جدولين الفرق بينهم الحروف الكبيرة بس (VideoSessions و videosessions)،
@@ -513,7 +598,7 @@ function dropCaseDuplicates(tables) {
   return dropped;
 }
 
-async function applyPull({ doFull, tablesState, response }) {
+async function applyPull({ doFull, doVerify, tablesState, response }) {
   const dropped = dropCaseDuplicates(response.tables);
   for (const name of dropped) delete tablesState[name];
 
@@ -531,12 +616,28 @@ async function applyPull({ doFull, tablesState, response }) {
         state.progress = `${doFull ? 'نسخة كاملة' : 'تحديثات'}: ${index}/${tableNames.length} (${table})`;
         notify();
       }
+      let applyEntry = entry;
+      if (entry.mode === 'schema') {
+        // الجدول اتغير شكله على السيرفر: نضيف الأعمدة الجديدة هنا وناخد التغييرات بس
+        let added = false;
+        try {
+          added = await addNewColumns(conn, table, entry);
+        } catch (error) {
+          console.error(`Sync: could not add new columns to ${table}:`, error.message);
+        }
+        if (!added) {
+          rebuild.push(table);
+          delete tablesState[table];
+          continue;
+        }
+        applyEntry = { ...entry, ddl: undefined, mode: 'delta' };
+      }
       let touched;
       try {
-        touched = await applyTable(conn, table, entry);
+        touched = await applyTable(conn, table, applyEntry);
       } catch (error) {
         // شكل الجدول على الجهاز مش مطابق للسيرفر (مثلاً قيد unique مش موجود هناك): نعيد بناءه بشكل السيرفر
-        if (!['ER_DUP_ENTRY', 'ER_BAD_FIELD_ERROR', 'ER_WRONG_VALUE_COUNT_ON_ROW', 'ER_NO_DEFAULT_FOR_FIELD'].includes(error.code)) throw error;
+        if (!['ER_DUP_ENTRY', 'ER_BAD_FIELD_ERROR', 'ER_WRONG_VALUE_COUNT_ON_ROW', 'ER_NO_DEFAULT_FOR_FIELD', 'ER_DATA_TOO_LONG', 'ER_BAD_NULL_ERROR'].includes(error.code)) throw error;
         console.error(`Sync: rebuilding ${table} with the server structure:`, error.message);
         rebuild.push(table);
         delete tablesState[table];
@@ -547,6 +648,19 @@ async function applyPull({ doFull, tablesState, response }) {
         if (await localFingerprint(conn, table) !== entry.fingerprint) mismatched.push(table);
       }
       tablesState[table] = { ddlHash: entry.ddlHash, fingerprint: entry.fingerprint };
+    }
+
+    // المراجعة: كل جدول (مش اللي اتغير بس) نقارن عدد صفوفه ومجموع ids بتاعته بالسيرفر
+    if (doVerify) {
+      state.progress = 'بيراجع البيانات مع السيرفر...';
+      notify();
+      for (const table of tableNames) {
+        const entry = response.tables[table];
+        if (!entry || !entry.idColumn || !entry.fingerprint || entry.fingerprint.startsWith('checksum|')) continue;
+        if (mismatched.includes(table) || rebuild.includes(table)) continue;
+        const local = await localFingerprint(conn, table).catch(() => null);
+        if (local !== null && local !== entry.fingerprint) mismatched.push(table);
+      }
     }
 
     if (rebuild.length) await rebuildTables(conn, rebuild, tablesState);
@@ -563,10 +677,11 @@ async function applyPull({ doFull, tablesState, response }) {
     await store.setKv('last_full_pull', Date.now());
     await store.setKv('case_fix_v1', true);
   }
+  if (doFull || doVerify) await store.setKv('last_verify', Date.now());
   await store.purgeOldHistory().catch(() => {});
   state.lastPullAt = new Date().toISOString();
   state.initialDataReady = true;
-  return { ok: true, full: doFull, mismatched };
+  return { ok: true, full: doFull, verified: doVerify, mismatched };
 }
 
 // جداول شكلها على الجهاز غلط: بنطلبها تاني من غير ما نقول للسيرفر إننا عارفين شكلها، فبيبعت الشكل (DDL) + كل الصفوف
@@ -604,10 +719,22 @@ async function reconcileIds(conn, tables, tablesState) {
     for (let i = 0; i < toDelete.length; i += 1000) {
       await conn.query(`DELETE FROM ${quoteId(table)} WHERE id IN (?)`, [toDelete.slice(i, i + 1000)]);
     }
-    if ([...ids].some(id => !localIds.has(id))) needFull.push(table);
+    const missing = [...ids].filter(id => !localIds.has(id));
+    if (missing.length) {
+      // فيه صفوف على السيرفر مش عندنا: ننزلها هي بس بالـ id
+      state.progress = `بينزل ${missing.length} صف ناقص (${table})`;
+      notify();
+      try {
+        await fetchMissingRows(conn, table, missing);
+      } catch (error) {
+        if (/ids كبيرة جدًا/.test(error.message)) throw error;
+        console.error(`Sync: fetching missing rows of ${table} failed, downloading the table instead:`, error.message);
+        needFull.push(table);
+      }
+    }
   }
   if (needFull.length) {
-    // فيه صفوف على السيرفر مش عندنا: ننزل الجداول دي كاملة
+    // آخر حل لو تنزيل الصفوف الناقصة فشل: ننزل الجداول دي كاملة
     const response2 = await requestPull({ full: false, since: null, tables: {}, fullTables: needFull });
     for (const table of needFull) {
       const entry = response2.tables[table];

@@ -317,9 +317,10 @@ function pollStatus() {
 }
 
 // ===== أزرار الشريط =====
+// تحديث البيانات: التغييرات الجديدة بس + مراجعة كل الجداول وتصليح الفرق (مش نسخة كاملة)
 ipcMain.handle('sync:pull', async () => {
   try {
-    const result = await control('POST', '/pull?full=1');
+    const result = await control('POST', '/pull?verify=1');
     if (result.skipped === 'pending-uploads') {
       return { success: false, message: 'فيه عمليات على الجهاز لسه ماترفعتش (مفيش نت؟). لازم تترفع الأول قبل التنزيل عشان متضيعش.' };
     }
@@ -327,6 +328,17 @@ ipcMain.handle('sync:pull', async () => {
     return { success: true };
   } catch (error) {
     return { success: false, message: error.message };
+  }
+});
+
+ipcMain.handle('sync:ping', async () => {
+  try {
+    const result = await control('POST', '/ping');
+    lastStatus = await control('GET', '/status').catch(() => lastStatus);
+    sendToolbar('status', lastStatus);
+    return { success: true, online: Boolean(result.online), message: result.lastError || '' };
+  } catch (error) {
+    return { success: false, online: false, message: error.message };
   }
 });
 
@@ -373,10 +385,32 @@ ipcMain.handle('settings:open', async () => {
     title: DISPLAY_NAME,
     message: `${DISPLAY_NAME} — إصدار ${app.getVersion()}`,
     detail: `اسم الجهاز: ${config.deviceName || '-'}\nالسيرفر: ${config.serverUrl || '-'}\nالبيانات محفوظة في: ${dataRoot}`,
-    buttons: ['تمام', 'فتح فولدر السجلات', 'إعادة تسجيل الجهاز'],
+    buttons: ['تمام', 'فتح فولدر السجلات', 'إعادة تسجيل الجهاز', 'نسخة كاملة من السيرفر'],
     cancelId: 0,
   });
   if (response === 1) shell.openPath(logsDir);
+  if (response === 3) {
+    // آخر حل لو البيانات على الجهاز فيها مشكلة: ينزل كل الجداول من الأول
+    const confirm = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: DISPLAY_NAME,
+      message: 'تنزيل نسخة كاملة من السيرفر',
+      detail: 'ده بينزل كل البيانات من الأول وبياخد وقت أطول. "تحديث البيانات" العادي بينزل التغييرات بس ويصلّح أي فرق — استخدم ده بس لو فيه مشكلة.',
+      buttons: ['إلغاء', 'نزّل نسخة كاملة'],
+      cancelId: 0,
+    });
+    if (confirm.response === 1) {
+      const result = await control('POST', '/pull?full=1').catch(error => ({ success: false, message: error.message }));
+      const ok = result.success !== false && !result.skipped;
+      await dialog.showMessageBox(mainWindow, {
+        type: ok ? 'info' : 'error',
+        title: DISPLAY_NAME,
+        message: ok ? '✔ اتنزلت نسخة كاملة' : 'التنزيل ماكملش',
+        detail: ok ? '' : (result.skipped === 'pending-uploads' ? 'فيه عمليات على الجهاز لسه ماترفعتش — لازم تترفع الأول.' : (result.message || 'اتأكد إن النت شغال')),
+      });
+      if (ok) contentView.webContents.reload();
+    }
+  }
   if (response === 2) {
     const confirm = await dialog.showMessageBox(mainWindow, {
       type: 'warning',

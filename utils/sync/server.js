@@ -3,6 +3,8 @@
 //   GET  /api/sync/ping             اختبار الاتصال + وقت السيرفر
 //   POST /api/sync/pull             تنزيل التغييرات (أو نسخة كاملة)
 //   POST /api/sync/ids              قايمة الـ ids في جداول معينة (لاكتشاف الصفوف المحذوفة)
+//   POST /api/sync/rows             صفوف معينة بالـ id (الناقصة عند الجهاز بس)
+//   POST /api/sync/columns          قيم أعمدة جديدة اتضافت للجدول (بدل تنزيل الجدول كله)
 // وكمان middleware بيخلي الجهاز ينفذ أي عملية باسم اليوزر اللي عملها على الجهاز (X-Sync-Device-Token)،
 // وكل عملية ليها رقم مميز (X-Sync-Op-Id) بيتسجل في sync_applied_ops عشان مستحيل تتنفذ مرتين.
 //
@@ -185,8 +187,19 @@ async function handlePull(sequelize, req, res) {
     const tableFull = full || forceFull.has(table);
     if (ddlChanged) entry.ddl = info.ddl;
 
+    // schema: الجهاز الجديد بيعرف يضيف الأعمدة الجديدة عنده بنفسه (schemaDiff) — بنبعتله شكل الجدول
+    // + التغييرات بس بدل الجدول كله. الأجهزة القديمة بتفضل تاخد الجدول كامل زي الأول
+    const canSchemaDiff = body.schemaDiff === true && ddlChanged && known.ddlHash && !tableFull && since && info.idColumn && info.hasUpdatedAt;
     if (!tableFull && !ddlChanged && known.fingerprint === fingerprint) {
       entry.mode = 'skip';
+    } else if (canSchemaDiff) {
+      entry.mode = 'schema';
+      const [rows] = await db.query({
+        sql: `SELECT * FROM ${quoteId(table)} WHERE updatedAt >= ?`,
+        values: [utcNowString(since)],
+        rowsAsArray: true,
+      });
+      entry.rows = encodeRows(rows);
     } else if (!tableFull && !ddlChanged && since && info.idColumn && info.hasUpdatedAt) {
       entry.mode = 'delta';
       const [rows] = await db.query({
@@ -215,6 +228,50 @@ async function handleIds(sequelize, req, res) {
     out[table] = rows.map(row => Number(row[0]));
   }
   res.json({ tables: out });
+}
+
+// صفوف معينة بالـ id (لما الجهاز يلاقي صفوف ناقصة عنده: بينزلها هي بس بدل الجدول كله)
+const MAX_ROWS_PER_REQUEST = 5000;
+async function handleRows(sequelize, req, res) {
+  const db = getPool(sequelize);
+  const table = String((req.body && req.body.table) || '');
+  if (!(await listSyncTables(db)).includes(table)) return res.status(400).json({ success: false, message: 'جدول غير معروف' });
+  const info = await describeTable(db, table);
+  if (!info.idColumn) return res.status(400).json({ success: false, message: 'الجدول ده مالوش id' });
+  const ids = [...new Set(((req.body && req.body.ids) || []).map(Number).filter(Number.isInteger))].slice(0, MAX_ROWS_PER_REQUEST);
+  const [rows] = ids.length
+    ? await db.query({ sql: `SELECT * FROM ${quoteId(table)} WHERE id IN (?)`, values: [ids], rowsAsArray: true })
+    : [[]];
+  res.json({ success: true, columns: info.columns, rows: encodeRows(rows) });
+}
+
+// قيم أعمدة جديدة (اتضافت للجدول على السيرفر) للصفوف اللي قيمتها مش الافتراضية بس
+async function handleColumns(sequelize, req, res) {
+  const db = getPool(sequelize);
+  const table = String((req.body && req.body.table) || '');
+  if (!(await listSyncTables(db)).includes(table)) return res.status(400).json({ success: false, message: 'جدول غير معروف' });
+  const [columns] = await db.query(`SHOW COLUMNS FROM ${quoteId(table)}`);
+  const byName = new Map(columns.map(c => [c.Field, c]));
+  if (!byName.has('id')) return res.status(400).json({ success: false, message: 'الجدول ده مالوش id' });
+  const wanted = [...new Set((req.body && req.body.columns) || [])].filter(name => byName.has(name) && name !== 'id');
+  if (!wanted.length) return res.json({ success: true, columns: ['id'], rows: [] });
+  const conditions = [];
+  const values = [];
+  for (const name of wanted) {
+    const def = byName.get(name).Default;
+    if (def === null || def === undefined || /^null$/i.test(String(def))) conditions.push(`${quoteId(name)} IS NOT NULL`);
+    else if (/\(/.test(String(def))) conditions.push('1 = 1'); // افتراضي محسوب (زي current_timestamp): نبعت الكل
+    else {
+      conditions.push(`NOT (${quoteId(name)} <=> ?)`);
+      values.push(String(def).replace(/^'(.*)'$/s, '$1'));
+    }
+  }
+  const [rows] = await db.query({
+    sql: `SELECT ${['id', ...wanted].map(quoteId).join(', ')} FROM ${quoteId(table)} WHERE ${conditions.join(' OR ')}`,
+    values,
+    rowsAsArray: true,
+  });
+  res.json({ success: true, columns: ['id', ...wanted], rows: encodeRows(rows) });
 }
 
 // ===== تنفيذ العمليات اللي جاية من الأجهزة =====
@@ -431,6 +488,24 @@ function install(app, { sequelize, User, bcrypt, onMobileStaffLogin }) {
       await handleIds(sequelize, req, res);
     } catch (error) {
       console.error('Sync ids error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/sync/rows', requireDevice(sequelize), async (req, res) => {
+    try {
+      await handleRows(sequelize, req, res);
+    } catch (error) {
+      console.error('Sync rows error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post('/api/sync/columns', requireDevice(sequelize), async (req, res) => {
+    try {
+      await handleColumns(sequelize, req, res);
+    } catch (error) {
+      console.error('Sync columns error:', error);
       res.status(500).json({ success: false, message: error.message });
     }
   });

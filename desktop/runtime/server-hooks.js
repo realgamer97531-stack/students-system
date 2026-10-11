@@ -84,9 +84,12 @@ async function handleControl(req, res) {
     if (req.method === 'GET' && path === '/status') return res.json(await engine.status());
     if (req.method === 'POST' && path === '/pull') {
       const full = req.query.full === '1';
-      const result = await engine.pull({ full });
+      const verify = req.query.verify === '1';
+      const result = await engine.pull({ full, verify });
       return res.json({ success: !result.skipped, ...result });
     }
+    // زرار "جرب الاتصال": بيختبر الاتصال بالسيرفر بس
+    if (req.method === 'POST' && path === '/ping') return res.json({ success: true, online: await engine.ping(), lastError: engine.state.lastError });
     if (req.method === 'POST' && path === '/push') return res.json({ success: true, ...(await engine.push({ force: true })) });
     if (req.method === 'GET' && path === '/problems') return res.json({ success: true, problems: await store.listProblems() });
     const dismiss = /^\/problems\/(\d+)\/dismiss$/.exec(path);

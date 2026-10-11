@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('desktop', {
   onLoadingMessage: listen('loading-message'),
   getStatus: () => ipcRenderer.invoke('status:get'),
   pull: () => ipcRenderer.invoke('sync:pull'),
+  ping: () => ipcRenderer.invoke('sync:ping'),
   push: () => ipcRenderer.invoke('sync:push'),
   nav: action => ipcRenderer.invoke('nav', action),
   updateAction: () => ipcRenderer.invoke('update:action'),
