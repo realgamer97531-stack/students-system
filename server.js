@@ -2905,8 +2905,15 @@ async function handleSessionReportCallExport(req, res, scope) {
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (session.status === 'cancelled') return res.status(400).json({ error: 'Cancelled sessions cannot be sent' });
 
-    const students = await getSessionReportCallStudents(session, scope);
-    if (!students.length) return res.status(400).json({ error: `No ${scope} students found` });
+    const allStudents = await getSessionReportCallStudents(session, scope);
+    // student_ids: الطلاب اللي ظاهرين بعد الفلتر في صفحة التقرير. بنصفّي بيها القايمة الأصلية بس
+    // (مستحيل تضيف طالب مش من الحاضرين/الغايبين في الحصة دي)
+    const requestedIds = Array.isArray(req.body && req.body.student_ids)
+      ? new Set(req.body.student_ids.map(Number).filter(Number.isInteger))
+      : null;
+    const students = requestedIds ? allStudents.filter(student => requestedIds.has(Number(student.id))) : allStudents;
+    if (!students.length) return res.status(400).json({ error: requestedIds ? 'مفيش طلاب من المعروضين في القايمة دي' : `No ${scope} students found` });
+    const filterLabel = typeof (req.body && req.body.filter_label) === 'string' ? req.body.filter_label.trim().slice(0, 200) : '';
 
     const studentIds = students.map(student => student.id).filter(Boolean);
     const enrichedStudents = await Student.findAll({
@@ -2942,7 +2949,11 @@ async function handleSessionReportCallExport(req, res, scope) {
     }
 
     const result = await sendStudentsToCallCenter(
-      buildCallCenterSessionName({ session, scope: scope === 'present' ? 'Present' : 'Absent' }),
+      buildCallCenterSessionName({
+        session,
+        scope: scope === 'present' ? 'Present' : 'Absent',
+        filters: requestedIds ? { Selected: `${students.length} of ${allStudents.length}`, Filter: filterLabel } : {},
+      }),
       studentsWithDetails.map(item => callCenterStudent(item.student, {
         ...item.details,
         mainSessionId: session.id,

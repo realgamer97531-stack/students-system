@@ -159,6 +159,14 @@
           </div>
         </div>
         <div class="small text-muted mt-2"><span class="ar-only">المعروض:</span><span class="en-only" style="display:none;">Showing:</span> <strong id="attendedVisibleCount"><%= attendedRows.length %></strong> / <%= attendedRows.length %></div>
+        <% if (callCenterIntegrationEnabled) { %>
+          <div class="mt-2" id="filteredSendBox" hidden>
+            <button type="button" class="btn btn-sm btn-success" id="sendFilteredToCallCenter" data-url="/sessions/<%= session.id %>/report/send-present">
+              ☎️ <span class="ar-only">إرسال المعروضين بس للاتصال</span><span class="en-only" style="display:none;">Send only the shown students to Call Center</span> (<span id="filteredSendCount">0</span>)
+            </button>
+            <span id="filteredSendStatus" class="small text-muted ms-2"></span>
+          </div>
+        <% } %>
       </div>
     </div>
     <div class="table-responsive bg-white rounded shadow-sm p-3">
@@ -182,7 +190,8 @@
         </thead>
         <tbody>
           <% attendedRows.forEach(row => { %>
-            <tr data-student-search="<%= `${row.student.student_code} ${row.student.name} ${row.student.phone} ${row.student.parent_phone}` %>"
+            <tr data-student-id="<%= row.student.id %>"
+                data-student-search="<%= `${row.student.student_code} ${row.student.name} ${row.student.phone} ${row.student.parent_phone}` %>"
                 data-center="<%= row.location === 'أونلاين' ? 'online' : (row.isOtherCenter ? 'other' : 'own') %>"
                 data-home-center="<%= row.homeCenterId %>"
                 data-hw="<%= row.homeworkStatus ? (['complete','incomplete','no_steps'].includes(row.homeworkStatus) ? row.homeworkStatus : 'not_done') : 'none' %>"
@@ -543,7 +552,43 @@
 
       emptyRow.hidden = visibleRows !== 0;
       if (visibleCount) visibleCount.textContent = visibleRows;
+      // زرار "إرسال المعروضين بس" بيظهر لما يكون فيه فلتر أو بحث
+      const filtered = !!query || active.some(([, value]) => value);
+      if (filteredBox) filteredBox.hidden = !(filtered && visibleRows > 0);
+      if (filteredCount) filteredCount.textContent = visibleRows;
     };
+
+    const filteredBox = document.getElementById('filteredSendBox');
+    const filteredCount = document.getElementById('filteredSendCount');
+    const filteredButton = document.getElementById('sendFilteredToCallCenter');
+    if (filteredButton) filteredButton.addEventListener('click', async () => {
+      const shown = rows.filter(row => !row.hidden);
+      const ids = shown.map(row => Number(row.dataset.studentId)).filter(Boolean);
+      if (!ids.length) return;
+      if (!confirm('هيتبعت ' + ids.length + ' طالب بس (المعروضين بعد الفلتر) من ' + rows.length + ' للاتصال. متأكد؟')) return;
+      const label = filterSelects
+        .filter(s => s.value)
+        .map(s => s.options[s.selectedIndex].text.replace(/\s*\(\d+\)\s*$/, '').replace(/^↳\s*/, '').trim())
+        .concat(searchInput.value.trim() ? ['بحث: ' + searchInput.value.trim()] : [])
+        .join(' + ');
+      const status = document.getElementById('filteredSendStatus');
+      filteredButton.disabled = true;
+      if (status) status.textContent = ' جاري الإرسال...';
+      try {
+        const response = await fetch(filteredButton.dataset.url, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_ids: ids, filter_label: label }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'تعذر الإرسال');
+        if (status) status.textContent = ' تم إنشاء جلسة اتصال رقم ' + result.sessionId + ' (' + result.imported + ' طالب)';
+      } catch (error) {
+        if (status) status.textContent = ' فشل الإرسال: ' + error.message;
+      } finally {
+        filteredButton.disabled = false;
+      }
+    });
 
     searchInput.addEventListener('input', applyFilters);
     filterSelects.forEach(s => s.addEventListener('change', applyFilters));
