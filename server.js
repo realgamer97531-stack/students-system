@@ -4572,6 +4572,20 @@ function choosePreferredAttendanceRecord(current, candidate, ownSessionIds) {
   return current;
 }
 
+// الحصص اللي أي صلاحية عليها بتفتح الفيديو ده: حصصه المرتبطة + أي حصة بنفس المادة ورقم الحصة
+// (هي نفسها اللي صفحة التحكم في الفيديو بتعرض الوقت منها). video لازم يكون معاه Session و VideoSessions.Session
+async function videoGrantSessionIds(video, extraSessionIds = []) {
+  const linked = [video.Session, ...(video.VideoSessions || []).map(row => row.Session)].filter(Boolean);
+  const pairs = new Map();
+  linked.forEach(session => {
+    if (session.SubjectId && session.lesson_number !== null && session.lesson_number !== undefined) {
+      pairs.set(`${session.SubjectId}|${session.lesson_number}`, { SubjectId: session.SubjectId, lesson_number: session.lesson_number });
+    }
+  });
+  const sameLesson = pairs.size > 0 ? await Session.findAll({ where: { [Op.or]: [...pairs.values()] }, attributes: ['id'] }) : [];
+  return [...new Set([...extraSessionIds, ...linked.map(session => session.id), ...sameLesson.map(session => session.id)])];
+}
+
 async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
   const where = { StudentId: studentId };
   if (sessionId !== null) {
@@ -5762,6 +5776,26 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
 
     const subjectNameById = new Map(subjects.map(s => [s.id, s.name]));
 
+    // الصلاحية بتتدور عليها في نفس الحصص اللي صفحة الأدمن بتشوفها: كل الحصص المرتبطة بالفيديو
+    // + أي حصة بنفس المادة ورقم الحصة. قبل كده لو الوقت الإضافي اتسجل على حصة سنتر تاني/أونلاين
+    // كان بيبان عند الأدمن "متاح" والطالب شايفه "انتهت المدة".
+    const lessonKeyOf = s => `${s.SubjectId}|${s.lesson_number}`;
+    const linkedLessonPairs = new Map();
+    linkedSessionsForVideos.forEach(s => {
+      if (s.SubjectId && s.lesson_number !== null && s.lesson_number !== undefined) {
+        linkedLessonPairs.set(lessonKeyOf(s), { SubjectId: s.SubjectId, lesson_number: s.lesson_number });
+      }
+    });
+    const sameLessonSessions = linkedLessonPairs.size > 0
+      ? await Session.findAll({ where: { [Op.or]: [...linkedLessonPairs.values()] }, attributes: ['id', 'SubjectId', 'lesson_number'] })
+      : [];
+    const sessionIdsByLessonKey = new Map();
+    sameLessonSessions.forEach(s => {
+      const key = lessonKeyOf(s);
+      if (!sessionIdsByLessonKey.has(key)) sessionIdsByLessonKey.set(key, []);
+      sessionIdsByLessonKey.get(key).push(s.id);
+    });
+
     const lessons = videos.map(v => {
       const linkedVideoSessions = (linkedSessionIdsByVideoId.get(v.id) || [])
         .map(sessionId => linkedSessionById.get(sessionId))
@@ -5772,7 +5806,12 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       const linkedExamSession = linkedVideoSessions.find(candidate => candidate.exam_url || candidate.exam_video_url);
 
       const equivalentSessionIds = session ? (sessionIdsByLesson.get(session.lesson_number) || [session.id]) : [];
-      const lessonGrants = equivalentSessionIds.map(sessionId => grantBySessionId[sessionId]).filter(Boolean);
+      const grantSessionIds = new Set(equivalentSessionIds);
+      linkedVideoSessions.forEach(linked => {
+        grantSessionIds.add(linked.id);
+        (sessionIdsByLessonKey.get(lessonKeyOf(linked)) || []).forEach(id => grantSessionIds.add(id));
+      });
+      const lessonGrants = [...grantSessionIds].map(sessionId => grantBySessionId[sessionId]).filter(Boolean);
       const activeGrant = lessonGrants.find(candidate => isGrantActive(candidate, session));
       const grant = activeGrant || lessonGrants[0];
       const attended = session && attendedLessonNumbers.has(session.lesson_number);
@@ -5905,12 +5944,17 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     await cleanupStaleVideoAccessGrants(student.id, session.id);
     // ممكن يبقى للطالب أكتر من صلاحية لنفس الحصة (مثلاً قديمة منتهية في سنتر تاني + واحدة اتمدّت):
     // الشغالة هي اللي بتكسب، مش أول واحدة بتطلع من قاعدة البيانات
-    const lessonGrants = await VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
+    // وبندوّر في نفس الحصص اللي صفحة الأدمن بتشوفها (كل حصص الفيديو + نفس رقم الحصة)
+    const equivalentSessionIdSet = new Set(equivalentSessionIds);
+    const grantSessionIds = await videoGrantSessionIds(video, equivalentSessionIds);
+    const lessonGrants = await VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: grantSessionIds } });
+    const attendedAnyLinked = attendanceExists || !!(await Attendance.findOne({ where: { StudentId: student.id, SessionId: grantSessionIds }, attributes: ['id'] }));
     const validGrants = [];
     for (const candidate of lessonGrants) {
-      const isValidGrant = candidate.method === 'paid' || candidate.method === 'admin_free' || candidate.method === 'admin_paid' || (candidate.method === 'attended' && attendanceExists);
+      const isValidGrant = candidate.method === 'paid' || candidate.method === 'admin_free' || candidate.method === 'admin_paid' || (candidate.method === 'attended' && attendedAnyLinked);
       if (isValidGrant) validGrants.push(candidate);
-      else await VideoAccessGrant.destroy({ where: { id: candidate.id } });
+      // المسح القديم زي ما هو: بس للحصص المكافئة لحصة الطالب
+      else if (equivalentSessionIdSet.has(candidate.SessionId)) await VideoAccessGrant.destroy({ where: { id: candidate.id } });
     }
     let grant = validGrants.find(candidate => isGrantActive(candidate, session)) || validGrants[0] || null;
 
@@ -6101,9 +6145,10 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
         attributes: ['id'],
       });
       const equivalentSessionIds = equivalentSessions.map(equivalentSession => equivalentSession.id);
+      const grantSessionIds = await videoGrantSessionIds(video, equivalentSessionIds);
       const [lessonGrants, attendanceExists] = await Promise.all([
-        VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: equivalentSessionIds } }),
-        Attendance.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds }, attributes: ['id'] }),
+        VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: grantSessionIds } }),
+        Attendance.findOne({ where: { StudentId: student.id, SessionId: grantSessionIds }, attributes: ['id'] }),
       ]);
       const validGrants = lessonGrants.filter(candidate =>
         candidate.method === 'paid' ||
@@ -6931,13 +6976,20 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   const sessionId = allowedSessionIds.has(requestedSessionId) ? requestedSessionId : video.SessionId;
   const session = await Session.findByPk(sessionId);
   // extend_hours: "زوّد ساعات" — من آخر الإتاحة لو لسه شغالة، أو من دلوقتي لو كانت خلصت
-  const extendHours = Math.max(0, Number.parseInt(req.body.extend_hours, 10) || 0);
-  const durationHours = extendHours || Math.max(1, Number.parseInt(access_duration_hours, 10) || Number(session?.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS);
+  // من صفحة الموقع: +24 بيزوّد الرقم في الخانة بس، والحفظ بيبعت المدة الجديدة + اللي كانت مكتوبة (previous_hours)
+  // → الفرق هو الساعات الزيادة
+  const typedHours = Number.parseInt(access_duration_hours, 10);
+  const previousHours = Number.parseInt(req.body.previous_hours, 10);
+  const addedHours = typedHours > 0 && previousHours > 0 && typedHours > previousHours ? typedHours - previousHours : 0;
+  const extendHours = Math.max(0, Number.parseInt(req.body.extend_hours, 10) || 0) || addedHours;
+  const durationHours = Math.max(1, typedHours || Number(session?.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS);
+  // طالب لسه معندوش صلاحية: من الموقع بياخد الرقم المكتوب كله، ومن الموبايل (extend_hours بس) الساعات دي
+  const newGrantHours = typedHours > 0 ? durationHours : (extendHours || durationHours);
   const HOUR = 60 * 60 * 1000;
 
   const [grant, created] = await VideoAccessGrant.findOrCreate({
     where: { StudentId: req.params.studentId, SessionId: sessionId },
-    defaults: { method: 'admin_free', max_views: 999, access_duration_hours: durationHours, ...createAccessWindow(durationHours) },
+    defaults: { method: 'admin_free', max_views: 999, access_duration_hours: newGrantHours, ...createAccessWindow(newGrantHours) },
   });
 
   let expiresAt = created ? grant.access_expires_at : null;

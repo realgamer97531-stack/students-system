@@ -441,10 +441,17 @@ void main() {
     await tester.ensureVisible(studentMenu);
     await tester.tap(studentMenu);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('زوّد 24 ساعة'));
+    await tester.tap(find.text('زوّد وقت...'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('الإتاحة خلصت'), findsOneWidget);
+    await tester.tap(find.text('+24'));
+    await tester.pumpAndSettle();
+    expect(find.text('48 ساعة'), findsOneWidget);
+    expect(videoOps, isEmpty); // +24 مش بيحفظ لوحده
+    await tester.tap(find.text('حفظ'));
     await tester.pumpAndSettle();
     expect(videoOps, hasLength(1));
-    expect(jsonDecode(videoOps.last.body), allOf(containsPair('extend_hours', 24), containsPair('session_id', 12)));
+    expect(jsonDecode(videoOps.last.body), allOf(containsPair('extend_hours', 48), containsPair('session_id', 12)));
     expect(videoOps.last.headers['X-Sync-Op-Id'], isNotEmpty);
     expect(find.textContaining('⛔ انتهت'), findsNothing);
     expect(find.textContaining('متاح لحد'), findsOneWidget);

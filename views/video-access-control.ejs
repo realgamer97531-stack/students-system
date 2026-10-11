@@ -289,12 +289,13 @@
                 <td>
                   <form action="/admin/videos/<%= video.id %>/grant/<%= student.id %>" method="POST" class="row g-1 align-items-center">
                     <input type="hidden" name="session_id" value="<%= grant ? grant.SessionId : video.SessionId %>">
-                    <input type="hidden" name="extend_hours" value="">
+                    <% const shownHours = grant && grant.access_duration_hours ? grant.access_duration_hours : (video.Session.access_duration_hours || 72); %>
+                    <input type="hidden" name="previous_hours" value="<%= grant ? shownHours : '' %>">
                     <div class="col-auto">
-                      <input type="number" name="access_duration_hours" class="form-control form-control-sm" style="width:110px;" value="<%= grant && grant.access_duration_hours ? grant.access_duration_hours : (video.Session.access_duration_hours || 72) %>" min="1" title="مدة الإتاحة بالساعات">
+                      <input type="number" name="access_duration_hours" class="form-control form-control-sm" style="width:110px;" value="<%= shownHours %>" min="1" title="مدة الإتاحة بالساعات — الساعات اللي بتزودها بتتضاف على آخر الإتاحة (أو من دلوقتي لو كانت خلصت)">
                     </div>
                     <div class="col-auto">
-                      <button type="button" class="btn btn-sm btn-outline-success add-24-hours" title="زوّد 24 ساعة (من آخر الإتاحة، أو من دلوقتي لو كانت خلصت)">+24 <span class="ar-only">ساعة</span><span class="en-only" style="display:none;">Hours</span></button>
+                      <button type="button" class="btn btn-sm btn-outline-success add-24-hours" title="زوّد 24 ساعة في الخانة — اضغط حفظ لما تخلص">+24 <span class="ar-only">ساعة</span><span class="en-only" style="display:none;">Hours</span></button>
                     </div>
                     <div class="col-auto">
                       <button class="btn btn-sm btn-outline-primary"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
@@ -329,12 +330,12 @@
     });
   });
 
-  // +24: بيزوّد 24 ساعة على الإتاحة الحالية (أو من دلوقتي لو كانت خلصت) ويحفظ على طول
+  // +24: بيزوّد 24 ساعة في الخانة بس (تقدر تدوس كذا مرة)، والحفظ لما تدوس حفظ.
+  // السيرفر بيضيف الفرق على آخر الإتاحة، أو من دلوقتي لو كانت خلصت
   document.querySelectorAll('.add-24-hours').forEach(button => {
     button.addEventListener('click', function () {
-      this.form.querySelector('input[name="extend_hours"]').value = '24';
-      this.disabled = true;
-      this.form.submit();
+      const input = this.form.querySelector('input[name="access_duration_hours"]');
+      input.value = Math.max(1, Number.parseInt(input.value, 10) || 0) + 24;
     });
   });
 </script>

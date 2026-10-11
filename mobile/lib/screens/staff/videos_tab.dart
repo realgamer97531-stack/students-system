@@ -272,7 +272,10 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
     return {'session_id': grant?['sessionId'] ?? _video['mainSessionId']};
   }
 
-  Future<void> _extend(Map<String, dynamic> s, int hours) async {
+  /// زيادة وقت: +24 بيزود العداد بس، ومفيش حاجة بتتبعت غير لما يدوس حفظ
+  Future<void> _extend(Map<String, dynamic> s) async {
+    final hours = await showDialog<int>(context: context, builder: (_) => _ExtendDialog(student: s));
+    if (hours == null || hours <= 0) return;
     await _send('extend:${s['id']}', '$_base/grant/${s['id']}', {..._grantBody(s), 'extend_hours': hours, 'response_format': 'json'},
         done: '✅ اتزود $hours ساعة لـ ${s['name']}');
   }
@@ -345,14 +348,12 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
         trailing: PopupMenuButton<String>(
           enabled: !_busy,
           onSelected: (v) {
-            if (v == '24') _extend(s, 24);
-            if (v == '48') _extend(s, 48);
+            if (v == 'extend') _extend(s);
             if (v == 'hours') _setHours(s);
             if (v == 'remove') _removeStudent(s);
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(value: '24', child: Text('زوّد 24 ساعة')),
-            const PopupMenuItem(value: '48', child: Text('زوّد 48 ساعة')),
+            const PopupMenuItem(value: 'extend', child: Text('زوّد وقت...')),
             const PopupMenuItem(value: 'hours', child: Text('حدد مدة الإتاحة...')),
             if (s['individual'] == true) const PopupMenuItem(value: 'remove', child: Text('إلغاء الوصول الفردي', style: TextStyle(color: AppColors.danger))),
           ],
@@ -511,6 +512,49 @@ class _TextDialogState extends State<_TextDialog> {
           FilledButton(onPressed: () => Navigator.pop(context, _c.text.trim()), child: const Text('حفظ')),
         ],
       );
+}
+
+/// بيرجع عدد الساعات اللي هتتزود (null = رجوع). +24/−24 بيغيروا العداد بس
+class _ExtendDialog extends StatefulWidget {
+  const _ExtendDialog({required this.student});
+  final Map<String, dynamic> student;
+  @override
+  State<_ExtendDialog> createState() => _ExtendDialogState();
+}
+
+class _ExtendDialogState extends State<_ExtendDialog> {
+  int _hours = 24;
+
+  @override
+  Widget build(BuildContext context) {
+    final grant = widget.student['grant'] as Map?;
+    final ended = grant == null || grant['ended'] == true;
+    final now = DateTime.now();
+    final expires = grant?['expiresAt'] == null ? null : DateTime.tryParse('${grant!['expiresAt']}')?.toLocal();
+    final base = ended || expires == null || expires.isBefore(now) ? now : expires;
+    final until = base.add(Duration(hours: _hours));
+    return AlertDialog(
+      title: Text('زوّد وقت لـ ${widget.student['name']}'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(ended ? 'الإتاحة خلصت — الوقت هيتحسب من دلوقتي' : 'هيتضاف على آخر الإتاحة الحالية', style: const TextStyle(color: AppColors.muted)),
+        const SizedBox(height: 14),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: const Size(64, 44)), onPressed: _hours > 24 ? () => setState(() => _hours -= 24) : null, child: const Text('−24')),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('$_hours ساعة', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+          ),
+          FilledButton.tonal(style: FilledButton.styleFrom(minimumSize: const Size(64, 44)), onPressed: () => setState(() => _hours += 24), child: const Text('+24')),
+        ]),
+        const SizedBox(height: 12),
+        Text('هيبقى متاح لحد ${fmtDate(until.toIso8601String(), withTime: true)}', textAlign: TextAlign.center),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('رجوع')),
+        FilledButton(onPressed: () => Navigator.pop(context, _hours), child: const Text('حفظ')),
+      ],
+    );
+  }
 }
 
 class _SettingsSheet extends StatefulWidget {
