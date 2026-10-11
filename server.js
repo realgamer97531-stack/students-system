@@ -115,9 +115,15 @@ function createAccessWindow(hours) {
   };
 }
 
-async function extendGrantWindows(sessionIds, hours) {
+// previousHoursBySession: مدة كل حصة قبل التعديل. أي طالب مدته مختلفة عنها (اتمدّ له لوحده)
+// بيفضل زي ما هو — الإعداد العام مش بيمسح الوقت الإضافي اللي اتدّى لطالب معين.
+async function extendGrantWindows(sessionIds, hours, previousHoursBySession = null) {
   const grants = await VideoAccessGrant.findAll({ where: { SessionId: sessionIds } });
   for (const grant of grants) {
+    if (previousHoursBySession && grant.access_duration_hours) {
+      const previousHours = previousHoursBySession.get(grant.SessionId);
+      if (previousHours && Number(grant.access_duration_hours) !== Number(previousHours)) continue;
+    }
     const { startedAt } = getGrantAccessWindow(grant);
     const effectiveStart = startedAt || new Date();
     await grant.update({
@@ -5502,11 +5508,19 @@ async function isStudentInOnlineCenter(student) {
   return isOnlineCenterName(center && center.name);
 }
 
+// سعر الحصة العادي للمادة (نفس قاعدة التسجيل): أي Senior 1 = 80، وأي مادة تانية 90
+function normalSessionPriceForSubject(subjectName) {
+  return /senior\s*1/i.test(String(subjectName || '')) ? 80 : 90;
+}
+
+// السعر اللي الأدمن بيحطه هو سعر الطالب العادي، وكل طالب بيدفع بنفس النسبة من سعر حصته:
+// مثلاً العادي 90 والحصة 180 (200%) → اللي حصته 50 بيدفع 100
 function videoSessionPriceFor(student, session, subjectName, studentIsOnline) {
   const customPrice = studentIsOnline ? session.video_price_online : session.video_price_center;
   if (customPrice !== null && customPrice !== undefined && customPrice !== '') {
-    const total = Math.max(0, Number(customPrice) || 0);
-    return { total, base: total, surcharge: 0, rule: null, custom: true };
+    const ratio = Math.max(0, Number(customPrice) || 0) / normalSessionPriceForSubject(subjectName);
+    const total = Math.round((Number(student.price_per_session) || 0) * ratio);
+    return { total, base: total, surcharge: 0, rule: null, custom: true, ratio };
   }
   const base = Number(student.price_per_session) || 0;
   const rule = findSurchargeRule(subjectName, session.lesson_number);
@@ -5889,23 +5903,22 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     });
     const attendanceExists = attendanceRecords.length > 0;
     await cleanupStaleVideoAccessGrants(student.id, session.id);
-    let grant = await VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
-
-    if (grant && grant.method === 'attended' && !attendanceExists) {
-      await VideoAccessGrant.destroy({ where: { id: grant.id } });
-      grant = null;
+    // ممكن يبقى للطالب أكتر من صلاحية لنفس الحصة (مثلاً قديمة منتهية في سنتر تاني + واحدة اتمدّت):
+    // الشغالة هي اللي بتكسب، مش أول واحدة بتطلع من قاعدة البيانات
+    const lessonGrants = await VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: equivalentSessionIds } });
+    const validGrants = [];
+    for (const candidate of lessonGrants) {
+      const isValidGrant = candidate.method === 'paid' || candidate.method === 'admin_free' || candidate.method === 'admin_paid' || (candidate.method === 'attended' && attendanceExists);
+      if (isValidGrant) validGrants.push(candidate);
+      else await VideoAccessGrant.destroy({ where: { id: candidate.id } });
     }
+    let grant = validGrants.find(candidate => isGrantActive(candidate, session)) || validGrants[0] || null;
 
     if (grant) {
-      const isValidGrant = grant.method === 'paid' || grant.method === 'admin_free' || grant.method === 'admin_paid' || (grant.method === 'attended' && attendanceExists);
-      if (!isValidGrant) {
-        await VideoAccessGrant.destroy({ where: { id: grant.id } });
-        grant = null;
-      } else if (!isGrantActive(grant, session)) {
+      if (!isGrantActive(grant, session)) {
         return res.json({ success: false, expired: true, message: 'انتهت مدة إتاحة هذه الحصة' });
-      } else {
-        return res.json({ success: true, unlimited: true, accessExpiresAt: getGrantAccessWindow(grant, session).expiresAt });
       }
+      return res.json({ success: true, unlimited: true, accessExpiresAt: getGrantAccessWindow(grant, session).expiresAt });
     }
 
     // تحقق من الوصول الفردي (student-specific access)
@@ -6088,17 +6101,19 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
         attributes: ['id'],
       });
       const equivalentSessionIds = equivalentSessions.map(equivalentSession => equivalentSession.id);
-      const [grant, attendanceExists] = await Promise.all([
-        VideoAccessGrant.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds } }),
+      const [lessonGrants, attendanceExists] = await Promise.all([
+        VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: equivalentSessionIds } }),
         Attendance.findOne({ where: { StudentId: student.id, SessionId: equivalentSessionIds }, attributes: ['id'] }),
       ]);
-      const isValidGrant = !!(grant && (
-        grant.method === 'paid' ||
-        grant.method === 'admin_free' ||
-        grant.method === 'admin_paid' ||
-        (grant.method === 'attended' && attendanceExists)
-      ));
-      if (!isValidGrant || !isGrantActive(grant, session)) {
+      const validGrants = lessonGrants.filter(candidate =>
+        candidate.method === 'paid' ||
+        candidate.method === 'admin_free' ||
+        candidate.method === 'admin_paid' ||
+        (candidate.method === 'attended' && attendanceExists)
+      );
+      // لو فيه أكتر من صلاحية، الشغالة هي اللي بتتحسب (مش أول واحدة)
+      const grant = validGrants.find(candidate => isGrantActive(candidate, session)) || validGrants[0] || lessonGrants[0];
+      if (!validGrants.length || !isGrantActive(grant, session)) {
         return res.status(403).json({ success: false, expired: !!grant, message: grant ? 'انتهت مدة إتاحة هذه الحصة' : 'غير مسموح' });
       }
     }
@@ -6517,9 +6532,10 @@ app.post('/admin/videos/delete/:id', requirePermissionOrAdmin('admin_videos'), a
   }
 });
 
-app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  const video = await Video.findOne({ where: { id: req.params.id }, include: [Session] });
-  if (!video) return res.status(404).send('❌ غير موجود');
+// بيانات صفحة التحكم في الفيديو (الموقع + برنامج الموبايل بيستخدموا نفس الحسبة)
+async function loadVideoAccessData(videoId) {
+  const video = await Video.findOne({ where: { id: videoId }, include: [Session] });
+  if (!video) return null;
 
   const videoSessions = await VideoSession.findAll({
     where: { VideoId: video.id },
@@ -6583,11 +6599,13 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
   });
   const grantsMap = {};
   students.forEach(student => {
-    grantsMap[student.id] = grants.find(grant =>
-      grant.StudentId === student.id &&
-      grant.Session?.SubjectId === student.SubjectId &&
-      grant.Session?.CenterId === student.CenterId,
-    ) || grants.find(grant => grant.StudentId === student.id);
+    const own = grants.filter(grant => grant.StudentId === student.id);
+    const sameGroup = grant => grant.Session?.SubjectId === student.SubjectId && grant.Session?.CenterId === student.CenterId;
+    // الصلاحية الشغالة الأول (هي اللي الطالب بيتفتحله بيها)، وبعدين بتاعة مجموعته
+    grantsMap[student.id] = own.find(grant => isGrantActive(grant, video.Session) && sameGroup(grant))
+      || own.find(grant => isGrantActive(grant, video.Session))
+      || own.find(sameGroup)
+      || own[0];
   });
 
   const allSessions = await Session.findAll({
@@ -6595,20 +6613,117 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
     order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']],
   });
 
+  return { video, students, grantsMap, manualAccessMap, videoSessions, allSessions, normalPrice: await videoNormalPrice(video) };
+}
+
+app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  const data = await loadVideoAccessData(req.params.id);
+  if (!data) return res.status(404).send('❌ غير موجود');
   res.render('video-access-control', {
-    video,
-    students,
-    grantsMap,
-    manualAccessMap,
-    videoSessions,
-    allSessions,
+    ...data,
     priceMessage: typeof req.query.price_msg === 'string' ? req.query.price_msg.slice(0, 300) : null,
   });
+});
+
+// ===== إدارة الفيديوهات من برنامج الموبايل (قراءة بس — التعديلات بتروح لنفس صفحات الموقع) =====
+function sessionLabelForApp(session) {
+  if (!session) return '';
+  return `${session.Subject?.name || ''} - ${session.Center?.name || ''} - حصة ${session.lesson_number ?? '-'}`;
+}
+
+app.get('/api/staff/videos', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const videos = await Video.findAll({
+      attributes: ['id', 'title', 'SessionId', 'createdAt'],
+      include: [
+        { model: Session, required: false, attributes: ['id', 'lesson_number', 'is_free_for_all', 'video_price_center', 'video_price_online'], include: [{ model: Center, attributes: ['name'] }, { model: Subject, attributes: ['name'] }] },
+        { model: VideoSession, required: false, attributes: ['SessionId'] },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    const partCounts = new Map((await VideoPart.findAll({
+      attributes: ['VideoId', [sequelize.fn('COUNT', sequelize.col('id')), 'n']],
+      group: ['VideoId'],
+      raw: true,
+    })).map(row => [row.VideoId, Number(row.n) || 0]));
+    res.json({
+      success: true,
+      videos: videos.map(video => ({
+        id: video.id,
+        title: video.title,
+        createdAt: video.createdAt,
+        session: sessionLabelForApp(video.Session),
+        lessonNumber: video.Session ? video.Session.lesson_number : null,
+        linkedSessions: new Set([video.SessionId, ...(video.VideoSessions || []).map(row => row.SessionId)].filter(Boolean)).size,
+        parts: partCounts.get(video.id) || 0,
+        free: !!(video.Session && video.Session.is_free_for_all),
+        customPrice: !!(video.Session && (video.Session.video_price_center !== null || video.Session.video_price_online !== null)),
+      })),
+    });
+  } catch (error) {
+    console.error('Staff videos list failed:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.get('/api/staff/videos/:id', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const data = await loadVideoAccessData(req.params.id);
+    if (!data) return res.status(404).json({ success: false, message: 'الفيديو غير موجود' });
+    const { video, students, grantsMap, manualAccessMap, videoSessions, allSessions, normalPrice } = data;
+    const main = video.Session || {};
+    const linked = new Map();
+    if (video.Session) linked.set(video.Session.id, { id: video.Session.id, main: true });
+    videoSessions.forEach(row => { if (row.Session && !linked.has(row.Session.id)) linked.set(row.Session.id, { id: row.Session.id, main: false, session: row.Session }); });
+    const sessionById = new Map(allSessions.map(session => [session.id, session]));
+    const now = Date.now();
+    res.json({
+      success: true,
+      video: { id: video.id, title: video.title, mainSessionId: video.SessionId },
+      settings: {
+        isFreeForAll: !!main.is_free_for_all,
+        viewsIfAttended: main.views_if_attended ?? 2,
+        viewsIfPaid: main.views_if_paid ?? 3,
+        accessDurationHours: main.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS,
+        examUrl: main.exam_url || '',
+        examVideoUrl: main.exam_video_url || '',
+      },
+      price: { center: main.video_price_center ?? null, online: main.video_price_online ?? null, normalPrice },
+      sessions: [...linked.values()].map(row => ({
+        id: row.id,
+        main: row.main,
+        label: sessionLabelForApp(row.session || sessionById.get(row.id)),
+      })),
+      students: students.map(student => {
+        const grant = grantsMap[student.id];
+        const window = grant ? getGrantAccessWindow(grant, video.Session) : null;
+        return {
+          id: student.id,
+          code: student.student_code,
+          name: student.name,
+          group: `${student.Subject?.name || ''} - ${student.Center?.name || ''}`,
+          individual: !!manualAccessMap[student.id],
+          grant: grant ? {
+            method: grant.method,
+            sessionId: grant.SessionId,
+            durationHours: grant.access_duration_hours || null,
+            expiresAt: window && window.expiresAt,
+            ended: !!(window && window.expiresAt && window.expiresAt.getTime() <= now),
+          } : null,
+        };
+      }),
+      sessionOptions: allSessions.slice(0, 400).map(session => ({ id: session.id, label: sessionLabelForApp(session), date: session.session_date })),
+    });
+  } catch (error) {
+    console.error('Staff video details failed:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   const { is_free_for_all, views_if_attended, views_if_paid, access_duration_hours, exam_url, exam_video_url } = req.body;
   const video = await Video.findByPk(req.params.id);
+  if (!video) return res.status(404).send('❌ الفيديو غير موجود');
   const cleanExamUrl = typeof exam_url === 'string' ? exam_url.trim() : '';
   const cleanExamVideoUrl = typeof exam_video_url === 'string' ? exam_video_url.trim() : '';
   const durationHours = Math.max(1, Number.parseInt(access_duration_hours, 10) || DEFAULT_ACCESS_DURATION_HOURS);
@@ -6617,6 +6732,8 @@ app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_v
     attributes: ['SessionId'],
   })).map(row => row.SessionId);
   const sessionIds = [...new Set([video.SessionId, ...linkedSessionIds].filter(Boolean))];
+  const previousHoursBySession = new Map((await Session.findAll({ where: { id: sessionIds }, attributes: ['id', 'access_duration_hours'] }))
+    .map(session => [session.id, Number(session.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS]));
   await Session.update({
     is_free_for_all: is_free_for_all === 'on',
     views_if_attended,
@@ -6625,7 +6742,7 @@ app.post('/admin/videos/:id/session-settings', requirePermissionOrAdmin('admin_v
     ...(cleanExamUrl ? { exam_url: cleanExamUrl } : {}),
     ...(cleanExamVideoUrl ? { exam_video_url: cleanExamVideoUrl } : {}),
   }, { where: { id: sessionIds } });
-  await extendGrantWindows([...new Set(sessionIds)], durationHours);
+  await extendGrantWindows([...new Set(sessionIds)], durationHours, previousHoursBySession);
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
 
@@ -6641,6 +6758,12 @@ function parseVideoPriceInput(body) {
   const price = Number(raw);
   if (!Number.isFinite(price) || price < 0) return { scope, error: 'السعر لازم يكون رقم أكبر من أو يساوي صفر' };
   return { scope, price };
+}
+
+// السعر العادي لمادة الفيديو (أساس النسبة)
+async function videoNormalPrice(video) {
+  const session = video.SessionId ? await Session.findByPk(video.SessionId, { attributes: ['id', 'SubjectId'], include: [{ model: Subject, attributes: ['name'] }] }) : null;
+  return normalSessionPriceForSubject(session && session.Subject && session.Subject.name);
 }
 
 async function videoSessionIdsFor(video, transaction = null) {
@@ -6725,7 +6848,8 @@ app.get('/admin/videos/:id/price-preview', requirePermissionOrAdmin('admin_video
     if (!input.scope) return res.status(400).json({ success: false, message: 'اختار السعر يطبق على مين' });
     if (input.error) return res.status(400).json({ success: false, message: input.error });
     const { rows } = await planVideoPriceChange(video, input);
-    res.json({ success: true, ...summarizeVideoPricePlan(rows) });
+    const normalPrice = await videoNormalPrice(video);
+    res.json({ success: true, normalPrice, percent: input.price === null ? null : Math.round((input.price / normalPrice) * 1000) / 10, ...summarizeVideoPricePlan(rows) });
   } catch (error) {
     console.error('Video price preview failed:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -6806,23 +6930,40 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   const requestedSessionId = Number.parseInt(req.body.session_id, 10);
   const sessionId = allowedSessionIds.has(requestedSessionId) ? requestedSessionId : video.SessionId;
   const session = await Session.findByPk(sessionId);
-  const durationHours = Math.max(1, Number.parseInt(access_duration_hours, 10) || Number(session?.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS);
+  // extend_hours: "زوّد ساعات" — من آخر الإتاحة لو لسه شغالة، أو من دلوقتي لو كانت خلصت
+  const extendHours = Math.max(0, Number.parseInt(req.body.extend_hours, 10) || 0);
+  const durationHours = extendHours || Math.max(1, Number.parseInt(access_duration_hours, 10) || Number(session?.access_duration_hours) || DEFAULT_ACCESS_DURATION_HOURS);
+  const HOUR = 60 * 60 * 1000;
 
   const [grant, created] = await VideoAccessGrant.findOrCreate({
     where: { StudentId: req.params.studentId, SessionId: sessionId },
     defaults: { method: 'admin_free', max_views: 999, access_duration_hours: durationHours, ...createAccessWindow(durationHours) },
   });
 
+  let expiresAt = created ? grant.access_expires_at : null;
   if (!created) {
-    const { startedAt } = getGrantAccessWindow(grant, session);
-    const effectiveStart = startedAt || new Date();
+    const now = new Date();
+    const window = getGrantAccessWindow(grant, session);
+    let startedAt = window.startedAt || now;
+    if (extendHours) {
+      const base = window.expiresAt && window.expiresAt > now ? window.expiresAt : now;
+      expiresAt = new Date(base.getTime() + extendHours * HOUR);
+    } else {
+      // المدة الكلية من أول ما فتح. لو كده كانت هتفضل منتهية، بتبدأ من دلوقتي
+      expiresAt = new Date(startedAt.getTime() + durationHours * HOUR);
+      if (expiresAt <= now) {
+        startedAt = now;
+        expiresAt = new Date(now.getTime() + durationHours * HOUR);
+      }
+    }
     await VideoAccessGrant.update({
-      access_duration_hours: durationHours,
-      access_started_at: effectiveStart,
-      access_expires_at: new Date(effectiveStart.getTime() + durationHours * 60 * 60 * 1000),
+      access_duration_hours: Math.max(1, Math.round((expiresAt - startedAt) / HOUR)),
+      access_started_at: startedAt,
+      access_expires_at: expiresAt,
     }, { where: { id: grant.id } });
   }
 
+  if (req.body.response_format === 'json') return res.json({ success: true, expiresAt });
   res.redirect('/admin/videos/' + req.params.id + '/access');
 });
 

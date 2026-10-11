@@ -88,6 +88,15 @@ class StaffApi {
     return _deviceJson(() => client.get(_uri('/api/sync/mobile/student/$studentId'), headers: headers));
   }
 
+  /// قراءة JSON من صفحة في السيستم باسم الموظف (بنفس صلاحياته على الموقع)
+  static Future<Map<String, dynamic>> getJson(String path, {required int userId}) async {
+    final headers = await _deviceHeaders();
+    final context = base64Encode(utf8.encode(jsonEncode({'userId': userId, 'clientTime': DateTime.now().millisecondsSinceEpoch})));
+    final response = await Net.raw(() => client.get(_uri(path), headers: {...headers, 'X-Sync-Context': context}));
+    if (response.statusCode == 403) throw ApiException('مش عندك صلاحية للصفحة دي', status: 403);
+    return _deviceJson(() async => response);
+  }
+
   /// صورة QR بتاعة الطالب (SVG بنفس تصميم السيستم)
   static Future<String> studentQrSvg(int studentId, {required int userId}) async {
     final headers = await _deviceHeaders();

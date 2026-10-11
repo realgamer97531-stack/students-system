@@ -375,6 +375,97 @@ void main() {
     expect(jsonDecode(payments.last.body), containsPair('amount', 100));
     expect(find.text('350 ج'), findsOneWidget);
 
+    // إدارة الفيديوهات: القايمة ← فيديو ← +24 ساعة لطالب منتهي ← تغيير السعر بالمعاينة
+    final videoOps = <http.Request>[];
+    var ended = true;
+    server.routes['/api/staff/videos'] = (r) {
+      expect(r.headers['X-Sync-Context'], isNotEmpty);
+      return json(jsonEncode({
+        'success': true,
+        'videos': [
+          {'id': 7, 'title': 'شرح الحصة الخامسة', 'session': 'Senior 2 Physics - سنتر الاختبار - حصة 5', 'lessonNumber': 5, 'linkedSessions': 2, 'parts': 3, 'free': false, 'customPrice': false},
+        ],
+      }));
+    };
+    server.routes['/api/staff/videos/7'] = (r) => json(jsonEncode({
+          'success': true,
+          'video': {'id': 7, 'title': 'شرح الحصة الخامسة', 'mainSessionId': 12},
+          'settings': {'isFreeForAll': false, 'viewsIfAttended': 2, 'viewsIfPaid': 3, 'accessDurationHours': 72, 'examUrl': '', 'examVideoUrl': ''},
+          'price': {'center': null, 'online': null, 'normalPrice': 90},
+          'sessions': [
+            {'id': 12, 'main': true, 'label': 'Senior 2 Physics - سنتر الاختبار - حصة 5'},
+            {'id': 13, 'main': false, 'label': 'Senior 2 Physics - أونلاين - حصة 5'},
+          ],
+          'students': [
+            {
+              'id': 1, 'code': 'STU-00001', 'name': 'طالب واحد', 'group': 'Senior 2 Physics - سنتر الاختبار', 'individual': false,
+              'grant': {'method': 'paid', 'sessionId': 12, 'durationHours': 72, 'expiresAt': ended ? '2026-10-01T10:00:00.000Z' : '2026-10-20T10:00:00.000Z', 'ended': ended},
+            },
+          ],
+          'sessionOptions': [
+            {'id': 11, 'label': 'Senior 2 Physics - سنتر الاختبار - حصة 1', 'date': '2026-10-06'},
+          ],
+        }));
+    http.Response videoOk(http.Request r) {
+      videoOps.add(r);
+      return json(jsonEncode({'envelope': true, 'ok': true, 'status': 200, 'body': '{"success":true}'}));
+    }
+
+    server.routes['/admin/videos/7/grant/1'] = (r) {
+      ended = false;
+      return videoOk(r);
+    };
+    server.routes['/admin/videos/7/price-preview'] = (r) {
+      expect(r.url.queryParameters, {'price': '180', 'scope': 'both'});
+      return json(jsonEncode({
+        'success': true, 'normalPrice': 90, 'percent': 200, 'buyers': 1,
+        'refund': {'count': 0, 'total': 0}, 'charge': {'count': 1, 'total': 50}, 'unchanged': 0, 'unknown': 0,
+        'students': [{'name': 'طالب واحد', 'code': 'STU-00001', 'online': false, 'paid': 50, 'newPrice': 100, 'diff': -50}],
+      }));
+    };
+    server.routes['/admin/videos/7/price'] = videoOk;
+
+    await tester.tap(find.text('الفيديوهات'));
+    await tester.pumpAndSettle();
+    expect(find.text('شرح الحصة الخامسة'), findsOneWidget);
+    await tester.tap(find.text('شرح الحصة الخامسة'));
+    await tester.pumpAndSettle();
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/17_staff_video.png'));
+    final videoPage = find.descendant(of: find.byType(CustomScrollView), matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(find.textContaining('⛔ انتهت'), 300, scrollable: videoPage);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('⛔ انتهت'), findsOneWidget);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/18_staff_video_students.png'));
+
+    final studentMenu = find.descendant(of: find.widgetWithText(Card, 'طالب واحد'), matching: find.byType(PopupMenuButton<String>));
+    await tester.ensureVisible(studentMenu);
+    await tester.tap(studentMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('زوّد 24 ساعة'));
+    await tester.pumpAndSettle();
+    expect(videoOps, hasLength(1));
+    expect(jsonDecode(videoOps.last.body), allOf(containsPair('extend_hours', 24), containsPair('session_id', 12)));
+    expect(videoOps.last.headers['X-Sync-Op-Id'], isNotEmpty);
+    expect(find.textContaining('⛔ انتهت'), findsNothing);
+    expect(find.textContaining('متاح لحد'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('تغيير'));
+    await tester.tap(find.text('تغيير'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '180');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('200% من السعر العادي'), findsOneWidget);
+    expect(find.textContaining('هيدفع 100 ج'), findsOneWidget);
+    await tester.tap(find.text('الاتنين'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('متابعة'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 هيتخصم منهم فرق'), findsOneWidget);
+    await tester.tap(find.text('للي هيشتري بعد كده بس'));
+    await tester.pumpAndSettle();
+    expect(videoOps, hasLength(2));
+    expect(jsonDecode(videoOps.last.body), allOf(containsPair('price', '180'), containsPair('scope', 'both'), containsPair('apply_existing', 'no')));
+
     // تنظيف التايمرز
     await tester.pumpWidget(const SizedBox());
   });
