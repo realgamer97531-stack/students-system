@@ -96,16 +96,16 @@
 </form>
 
 <div class="table-responsive card sessions-table-card">
-  <table class="table align-middle mb-0">
+  <table class="table align-middle mb-0 sf-collapsible" data-sf-table="sessions">
     <thead>
       <tr>
         <th><span class="ar-only">السيريال</span><span class="en-only" style="display:none;">Serial</span></th>
         <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
         <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
         <th class="text-center"><span class="ar-only">الرقم النسبي</span><span class="en-only" style="display:none;">Lesson #</span></th>
-        <th class="text-center"><span class="ar-only">الأسبوع</span><span class="en-only" style="display:none;">Week</span></th>
+        <th class="text-center sf-x"><span class="ar-only">الأسبوع</span><span class="en-only" style="display:none;">Week</span></th>
         <th><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
-        <th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th>
+        <th class="sf-x"><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th>
         <th></th>
       </tr>
     </thead>
@@ -118,13 +118,13 @@
       <% sessions.forEach(s => { %>
         <% const isRunning = String(s.id) === String(activeSessionId); %>
         <tr class="<%= isRunning ? 'table-success-adaptive' : '' %>">
-          <td><span class="session-serial"><%= s.serial_number %></span></td>
+          <td><span class="session-serial"><%= s.serial_number %></span><% if (s.status === 'cancelled') { %> <span class="badge badge-status-cancelled sf-x-hint" title="ملغية / Cancelled">⛔</span><% } %></td>
           <td><%- sf.subject(s.Subject, 'N/A') %></td>
           <td><%- sf.center(s.Center, 'N/A') %></td>
           <td class="text-center"><span class="session-num"><%= s.lesson_number %></span></td>
-          <td class="text-center"><%= s.week_number ?? '—' %></td>
+          <td class="text-center sf-x"><%= s.week_number ?? '—' %></td>
           <td class="text-nowrap"><%= s.session_date %></td>
-          <td>
+          <td class="sf-x">
             <% if (s.status === 'cancelled') { %>
               <span class="badge badge-status-cancelled">
                 <span class="ar-only">⛔ ملغية</span>

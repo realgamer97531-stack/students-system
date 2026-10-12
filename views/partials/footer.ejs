@@ -94,7 +94,46 @@
       select.style.setProperty('--sf-sel-color', color || 'transparent');
     }
 
+    // Foldable columns: <table class="sf-collapsible" data-sf-table="name"> + .sf-x on the extra <th>/<td>.
+    // An arrow at the end of the header shows/hides them; the choice is remembered per table on this device.
+    function sfSetupCollapsibleTable(table) {
+      var extra = table.tHead ? table.tHead.querySelectorAll('th.sf-x').length : 0;
+      if (!extra || table.dataset.sfColsReady) return;
+      table.dataset.sfColsReady = '1';
+      var key = 'sfCols:' + (table.dataset.sfTable || location.pathname);
+      var en = sfLang() === 'en';
+      var th = document.createElement('th');
+      th.className = 'sf-xtoggle-cell';
+      th.innerHTML = '<button type="button" class="sf-xtoggle"><i class="bi bi-chevron-double-left"></i><span></span></button>';
+      table.tHead.rows[0].appendChild(th);
+      Array.prototype.forEach.call(table.tBodies, function (body) {
+        Array.prototype.forEach.call(body.rows, function (row) {
+          if (row.cells.length === 1 && row.cells[0].colSpan > 1) { row.cells[0].colSpan += 1; return; }
+          var td = document.createElement('td');
+          td.className = 'sf-xtoggle-cell';
+          row.appendChild(td);
+        });
+      });
+      var button = th.querySelector('button');
+      var label = button.querySelector('span');
+      function apply(open) {
+        table.classList.toggle('sf-cols-open', open);
+        label.textContent = open ? (en ? 'Less' : 'أقل') : (en ? '+' + extra + ' more' : '+' + extra + ' أعمدة');
+        button.title = open ? (en ? 'Hide extra columns' : 'اخفي الأعمدة الزيادة') : (en ? 'Show the hidden columns' : 'اعرض باقي البيانات');
+      }
+      var open = false;
+      try { open = localStorage.getItem(key) === '1'; } catch (e) {}
+      apply(open);
+      button.addEventListener('click', function (event) {
+        event.stopPropagation(); // rows may be clickable links
+        open = !table.classList.contains('sf-cols-open');
+        apply(open);
+        try { localStorage.setItem(key, open ? '1' : '0'); } catch (e) {}
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('table.sf-collapsible').forEach(sfSetupCollapsibleTable);
       document.querySelectorAll('select[name="session_id"], select[name="session_ids"], select.session-select').forEach(function (select) {
         if (select.dataset.noSelect2 === '1') return;
         initializeSessionSelect(select);

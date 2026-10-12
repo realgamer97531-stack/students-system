@@ -1,26 +1,100 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-4">🎬 <span class="ar-only">إدارة فيديوهات الحصص</span><span class="en-only" style="display:none;">Manage Session Videos</span></h3>
+<style>
+  .vl-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .vl-head h3 { margin: 0; }
+  .vl-count { font-size: 0.85rem; color: var(--sf-muted); font-weight: 600; }
+  .vl-panel .card-body { padding: 1.1rem 1.25rem; }
+  .vl-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 14px; }
+  .vl-toolbar .vl-search { flex: 1 1 220px; min-width: 180px; }
+  .vl-toolbar .form-select { width: auto; min-width: 150px; }
+  .vl-view { display: inline-flex; border: 1px solid var(--sf-input-border); border-radius: 11px; overflow: hidden; }
+  .vl-view button { border: none; background: transparent; color: var(--sf-muted); padding: 6px 12px; font-size: 1rem; line-height: 1; }
+  .vl-view button.active { background: var(--sf-primary); color: #fff; }
 
-<div class="card mb-4">
-  <div class="card-body">
-    <h5 class="mb-3 fw-bold"><span class="ar-only">إنشاء درس جديد مرتبط بحصة</span><span class="en-only" style="display:none;">Create New Lesson Linked to a Session</span></h5>
-    <form action="/admin/videos/create" method="POST" class="row g-2">
-      <div class="col-md-4">
-        <select name="session_ids" class="form-select session-select" multiple required style="height:auto;">
-  <% allSessions.forEach(s => { %>
-    <option value="<%= s.id %>" <%- sf.sessionOption(s) %>><%= sf.sessionText(s) %></option>
-  <% }) %>
-</select>
-<small class="text-muted"><span class="ar-only">اضغط Ctrl للاختيار من أكثر من حصة في نفس الوقت</span><span class="en-only" style="display:none;">Press Ctrl to select multiple sessions at once</span></small>
-      </div>
-      <div class="col-md-6">
-        <input type="text" name="title" class="form-control" placeholder="اسم الدرس (مثال: التفاضل - الجزء الأول)" required>
-      </div>
-      <div class="col-md-2">
-        <button type="submit" class="btn btn-primary w-100"><span class="ar-only">إنشاء</span><span class="en-only" style="display:none;">Create</span></button>
-      </div>
-    </form>
+  /* one markup, two layouts: every form works the same in both */
+  .vl-list.vl-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .vl-list.vl-cards .vl-rowhead { display: none; }
+  .vl-cards .vl-item {
+    background: var(--sf-card-bg); border-radius: var(--sf-radius); box-shadow: var(--sf-shadow);
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; transition: box-shadow .2s;
+  }
+  .vl-cards .vl-item:hover { box-shadow: var(--sf-shadow-md); }
+  .vl-cards .vl-actions { margin-top: auto; }
+
+  .vl-list.vl-rows { background: var(--sf-card-bg); border-radius: var(--sf-radius); box-shadow: var(--sf-shadow); overflow: hidden; }
+  .vl-rows .vl-rowhead, .vl-rows .vl-item {
+    display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr) 190px 220px;
+    gap: 14px; align-items: center; padding: 10px 16px;
+  }
+  .vl-rows .vl-rowhead { background: var(--sf-table-header-bg); color: var(--sf-muted); font-size: 0.78rem; font-weight: 700; }
+  .vl-rows .vl-item { border-top: 1px solid var(--sf-input-border); }
+  .vl-rows .vl-item:hover { background: color-mix(in srgb, var(--sf-primary) 4%, var(--sf-card-bg)); }
+  .vl-rows .vl-sessions { flex-direction: row; flex-wrap: wrap; }
+  @media (max-width: 992px) {
+    .vl-rows .vl-rowhead { display: none; }
+    .vl-rows .vl-item { grid-template-columns: 1fr; gap: 8px; }
+  }
+
+  .vl-title { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+  .vl-title form { display: flex; gap: 6px; align-items: flex-start; margin: 0; }
+  .vl-title form.vl-title-form { flex: 1; min-width: 0; }
+  .vl-title textarea { resize: none; overflow: hidden; line-height: 1.5; font-weight: 700; border-color: transparent; background: transparent; padding-inline: 6px; }
+  .vl-title textarea:hover, .vl-title textarea:focus { border-color: var(--sf-input-border); background: var(--sf-card-bg); }
+  .vl-title .vl-save { display: none; }
+  .vl-title form.dirty .vl-save { display: inline-flex; }
+  .vl-sessions { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+  .vl-exam { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .vl-link { display: inline-flex; align-items: center; border-radius: 999px; overflow: hidden; border: 1px solid var(--sf-input-border); font-size: 0.78rem; font-weight: 700; }
+  .vl-link a { padding: 3px 10px; }
+  .vl-link.exam a { background: var(--sf-warning-soft-bg); color: var(--sf-warning-soft-text); }
+  .vl-link.answer a { background: var(--sf-info-soft-bg); color: var(--sf-info-soft-text); }
+  .vl-link form { display: inline-flex; margin: 0; }
+  .vl-link button { border: none; background: var(--sf-card-bg); color: var(--sf-danger); padding: 3px 8px; font-size: 0.75rem; }
+  .vl-link button:hover { background: var(--sf-danger-soft-bg); }
+  .vl-actions { display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
+  .vl-actions .btn { white-space: nowrap; }
+  .vl-cards .vl-actions .btn { flex: 1; }
+  .vl-del { border: none; background: none; color: var(--sf-muted); padding: 4px 6px; border-radius: 8px; }
+  .vl-del:hover { background: var(--sf-danger-soft-bg); color: var(--sf-danger); }
+</style>
+
+<div class="vl-head">
+  <div>
+    <h3>🎬 <span class="ar-only">إدارة فيديوهات الحصص</span><span class="en-only" style="display:none;">Manage Session Videos</span></h3>
+    <div class="vl-count"><span class="ar-only"><%= videos.length %> درس</span><span class="en-only" style="display:none;"><%= videos.length %> lessons</span></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#createPanel" aria-expanded="false" aria-controls="createPanel">
+      ➕ <span class="ar-only">درس جديد</span><span class="en-only" style="display:none;">New lesson</span>
+    </button>
+    <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#examPanel" aria-expanded="false" aria-controls="examPanel">
+      🔗 <span class="ar-only">روابط الاختبار</span><span class="en-only" style="display:none;">Exam links</span>
+    </button>
+  </div>
+</div>
+
+<div class="collapse" id="createPanel">
+  <div class="card mb-3 vl-panel">
+    <div class="card-body">
+      <h6 class="mb-3 fw-bold"><span class="ar-only">إنشاء درس جديد مرتبط بحصة</span><span class="en-only" style="display:none;">Create New Lesson Linked to a Session</span></h6>
+      <form action="/admin/videos/create" method="POST" class="row g-2">
+        <div class="col-md-5">
+          <select name="session_ids" class="form-select session-select" multiple required style="height:auto;" placeholder="اختار حصة أو أكتر">
+            <% allSessions.forEach(s => { %>
+              <option value="<%= s.id %>" <%- sf.sessionOption(s) %>><%= sf.sessionText(s) %></option>
+            <% }) %>
+          </select>
+          <small class="text-muted"><span class="ar-only">تقدر تختار أكتر من حصة</span><span class="en-only" style="display:none;">You can pick more than one session</span></small>
+        </div>
+        <div class="col-md-5">
+          <input type="text" name="title" class="form-control" placeholder="اسم الدرس (مثال: التفاضل - الجزء الأول)" required>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary w-100"><span class="ar-only">إنشاء</span><span class="en-only" style="display:none;">Create</span></button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -28,50 +102,52 @@
   const examSubjects = new Map();
   (examTargets || []).forEach(t => { if (!examSubjects.has(t.subjectId)) examSubjects.set(t.subjectId, t.subjectName); });
 %>
-<div class="card mb-4">
-  <div class="card-body">
-    <h5 class="mb-3 fw-bold">🔗 <span class="ar-only">روابط الاختبار</span><span class="en-only" style="display:none;">Exam Links</span></h5>
-    <form action="/admin/videos/exam-links" method="POST" id="examLinksForm" class="row g-2 align-items-end">
-      <div class="col-md-4">
-        <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
-        <select name="subject_id" id="examSubject" class="form-select" required onchange="refreshExamForm()">
-          <option value="">-- اختر المادة --</option>
-          <% [...examSubjects.entries()].forEach(([id, name]) => { %>
-            <option value="<%= id %>"><%= name %></option>
-          <% }) %>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label small"><span class="ar-only">رقم الحصة</span><span class="en-only" style="display:none;">Session Number</span></label>
-        <select name="lesson_number" id="examLesson" class="form-select" required onchange="refreshExamForm(true)">
-          <option value="">-- اختر رقم الحصة --</option>
-        </select>
-      </div>
-      <div class="col-12">
-        <label class="form-label small mb-1"><span class="ar-only">السناتر (لو مختارتش أي سنتر الرابط هيظهر لكل سناتر المادة)</span><span class="en-only" style="display:none;">Centers (none selected = all centers of this subject)</span></label>
-        <div id="examCenters" class="d-flex flex-wrap gap-3 border rounded p-2 small text-muted">
-          <span>اختر المادة ورقم الحصة الأول</span>
+<div class="collapse" id="examPanel">
+  <div class="card mb-3 vl-panel">
+    <div class="card-body">
+      <h6 class="mb-3 fw-bold">🔗 <span class="ar-only">روابط الاختبار</span><span class="en-only" style="display:none;">Exam Links</span></h6>
+      <form action="/admin/videos/exam-links" method="POST" id="examLinksForm" class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
+          <select name="subject_id" id="examSubject" class="form-select" required onchange="refreshExamForm()">
+            <option value="">-- اختر المادة --</option>
+            <% [...examSubjects.entries()].forEach(([id, name]) => { %>
+              <option value="<%= id %>" <%- sf.colorAttr('subject', { id, name }) %>><%= name %></option>
+            <% }) %>
+          </select>
         </div>
-      </div>
-      <div class="col-md-5">
-        <label class="form-label small"><span class="ar-only">رابط الاختبار</span><span class="en-only" style="display:none;">Exam Link</span></label>
-        <input type="url" name="exam_url" class="form-control" placeholder="https://example.com/quiz">
-      </div>
-      <div class="col-md-5">
-        <label class="form-label small"><span class="ar-only">رابط فيديو إجابة الاختبار</span><span class="en-only" style="display:none;">Exam Answer Video Link</span></label>
-        <input type="url" name="exam_video_url" class="form-control" placeholder="https://vimeo.com/...">
-      </div>
-      <div class="col-md-2">
-        <button type="submit" name="action" value="save" class="btn btn-warning w-100"><span class="ar-only">حفظ روابط الاختبار</span><span class="en-only" style="display:none;">Save Exam Links</span></button>
-      </div>
-      <div class="col-12 d-flex flex-wrap gap-3 align-items-center small">
-        <label class="mb-0"><input type="checkbox" name="delete_exam_url" value="1"> <span class="ar-only">رابط الاختبار</span><span class="en-only" style="display:none;">Exam link</span></label>
-        <label class="mb-0"><input type="checkbox" name="delete_exam_video_url" value="1"> <span class="ar-only">فيديو الإجابة</span><span class="en-only" style="display:none;">Answer video</span></label>
-        <button type="submit" name="action" value="delete" formnovalidate class="btn btn-sm btn-outline-danger" onclick="return confirmExamDelete()"><span class="ar-only">حذف المحدد من السناتر المختارة</span><span class="en-only" style="display:none;">Delete checked for selected centers</span></button>
-      </div>
-    </form>
-    <div id="examCurrentLinks" class="small mt-2"></div>
-    <p class="text-muted small mt-2 mb-0"><span class="ar-only">الرابط بيتحط لكل حصص المادة اللي بالرقم ده في السناتر المختارة (أو كل السناتر لو مختارتش)، وبيظهر للطلاب في كارت الاختبار جوه الأسبوع.</span><span class="en-only" style="display:none;">The link is applied to every session of this subject with this number in the selected centers (or all centers if none selected), and appears to students as the exam card inside the week.</span></p>
+        <div class="col-md-3">
+          <label class="form-label small"><span class="ar-only">رقم الحصة</span><span class="en-only" style="display:none;">Session Number</span></label>
+          <select name="lesson_number" id="examLesson" class="form-select" required onchange="refreshExamForm(true)">
+            <option value="">-- اختر رقم الحصة --</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1"><span class="ar-only">السناتر (لو مختارتش أي سنتر الرابط هيظهر لكل سناتر المادة)</span><span class="en-only" style="display:none;">Centers (none selected = all centers of this subject)</span></label>
+          <div id="examCenters" class="d-flex flex-wrap gap-3 border rounded p-2 small text-muted">
+            <span>اختر المادة ورقم الحصة الأول</span>
+          </div>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label small"><span class="ar-only">رابط الاختبار</span><span class="en-only" style="display:none;">Exam Link</span></label>
+          <input type="url" name="exam_url" class="form-control" placeholder="https://example.com/quiz">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label small"><span class="ar-only">رابط فيديو إجابة الاختبار</span><span class="en-only" style="display:none;">Exam Answer Video Link</span></label>
+          <input type="url" name="exam_video_url" class="form-control" placeholder="https://vimeo.com/...">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" name="action" value="save" class="btn btn-warning w-100"><span class="ar-only">حفظ روابط الاختبار</span><span class="en-only" style="display:none;">Save Exam Links</span></button>
+        </div>
+        <div class="col-12 d-flex flex-wrap gap-3 align-items-center small">
+          <label class="mb-0"><input type="checkbox" name="delete_exam_url" value="1"> <span class="ar-only">رابط الاختبار</span><span class="en-only" style="display:none;">Exam link</span></label>
+          <label class="mb-0"><input type="checkbox" name="delete_exam_video_url" value="1"> <span class="ar-only">فيديو الإجابة</span><span class="en-only" style="display:none;">Answer video</span></label>
+          <button type="submit" name="action" value="delete" formnovalidate class="btn btn-sm btn-outline-danger" onclick="return confirmExamDelete()"><span class="ar-only">حذف المحدد من السناتر المختارة</span><span class="en-only" style="display:none;">Delete checked for selected centers</span></button>
+        </div>
+      </form>
+      <div id="examCurrentLinks" class="small mt-2"></div>
+      <p class="text-muted small mt-2 mb-0"><span class="ar-only">الرابط بيتحط لكل حصص المادة اللي بالرقم ده في السناتر المختارة (أو كل السناتر لو مختارتش)، وبيظهر للطلاب في كارت الاختبار جوه الأسبوع.</span><span class="en-only" style="display:none;">The link is applied to every session of this subject with this number in the selected centers (or all centers if none selected), and appears to students as the exam card inside the week.</span></p>
+    </div>
   </div>
 </div>
 
@@ -147,117 +223,134 @@
 %>
 
 <div class="card mb-3">
-  <div class="card-body d-flex flex-wrap gap-3 align-items-end">
-    <div>
-      <label class="form-label small mb-1"><span class="ar-only">فلترة حسب السنتر</span><span class="en-only" style="display:none;">Filter by Center</span></label>
-      <select id="filterCenter" class="form-select form-select-sm" onchange="applyVideoFilters()">
-        <option value=""><span class="ar-only">كل السناتر</span><span class="en-only" style="display:none;">All Centers</span></option>
-        <% [...centersMap.entries()].forEach(([id, name]) => { %>
-          <option value="<%= id %>"><%= name %></option>
-        <% }) %>
-      </select>
-    </div>
-    <div>
-      <label class="form-label small mb-1"><span class="ar-only">فلترة حسب المادة</span><span class="en-only" style="display:none;">Filter by Subject</span></label>
-      <select id="filterSubject" class="form-select form-select-sm" onchange="applyVideoFilters()">
-        <option value=""><span class="ar-only">كل المواد</span><span class="en-only" style="display:none;">All Subjects</span></option>
-        <% [...subjectsMap.entries()].forEach(([id, name]) => { %>
-          <option value="<%= id %>"><%= name %></option>
-        <% }) %>
-      </select>
+  <div class="vl-toolbar">
+    <input type="search" id="filterTitle" class="form-control form-control-sm vl-search" placeholder="🔍 دور باسم الدرس..." oninput="applyVideoFilters()">
+    <select id="filterCenter" class="form-select form-select-sm" onchange="applyVideoFilters()" title="السنتر">
+      <option value=""><span class="ar-only">كل السناتر</span><span class="en-only" style="display:none;">All Centers</span></option>
+      <% [...centersMap.entries()].forEach(([id, name]) => { %>
+        <option value="<%= id %>" <%- sf.colorAttr('center', { id, name }) %>><%= name %></option>
+      <% }) %>
+    </select>
+    <select id="filterSubject" class="form-select form-select-sm" onchange="applyVideoFilters()" title="المادة">
+      <option value=""><span class="ar-only">كل المواد</span><span class="en-only" style="display:none;">All Subjects</span></option>
+      <% [...subjectsMap.entries()].forEach(([id, name]) => { %>
+        <option value="<%= id %>" <%- sf.colorAttr('subject', { id, name }) %>><%= name %></option>
+      <% }) %>
+    </select>
+    <span class="vl-count ms-auto" id="shownCount"></span>
+    <div class="vl-view" role="group" aria-label="طريقة العرض / View">
+      <button type="button" data-view="cards" title="كروت / Cards"><i class="bi bi-grid-3x2-gap"></i></button>
+      <button type="button" data-view="rows" title="صفوف / Rows"><i class="bi bi-list-ul"></i></button>
     </div>
   </div>
 </div>
 
-<h5 class="mb-3 fw-bold"><span class="ar-only">الدروس الموجودة</span><span class="en-only" style="display:none;">Existing Lessons</span></h5>
-<div class="row g-3" id="videosContainer">
+<div class="vl-list vl-cards" id="videosContainer">
+  <div class="vl-rowhead">
+    <div><span class="ar-only">الدرس</span><span class="en-only" style="display:none;">Lesson</span></div>
+    <div><span class="ar-only">الحصص المرتبطة</span><span class="en-only" style="display:none;">Linked sessions</span></div>
+    <div><span class="ar-only">الاختبار</span><span class="en-only" style="display:none;">Exam</span></div>
+    <div></div>
+  </div>
   <% videos.forEach(v => { %>
     <% const linkedSessions = [v.Session, ...(v.VideoSessions || []).map(videoSession => videoSession.Session)].filter(Boolean); %>
     <% const cardCenterIds = [...new Set(linkedSessions.map(s => s.Center?.id).filter(Boolean))].join(','); %>
     <% const cardSubjectIds = [...new Set(linkedSessions.map(s => s.Subject?.id).filter(Boolean))].join(','); %>
-    <div class="col-md-4 video-card-col" data-centers="<%= cardCenterIds %>" data-subjects="<%= cardSubjectIds %>">
-      <div class="card h-100">
-        <div class="card-body d-flex flex-column justify-content-between">
-          <div>
-            <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
-              <form action="/admin/videos/<%= v.id %>/update-title" method="POST" class="d-flex align-items-start gap-2 flex-grow-1" style="min-width:0;">
-                <textarea name="title" rows="1" class="form-control form-control-sm video-title-input fw-bold" style="resize:none;overflow:hidden;line-height:1.5;" required><%= v.title %></textarea>
-                <button type="submit" class="btn btn-sm btn-outline-primary" title="تحديث اسم الفيديو"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
-              </form>
-              <form action="/admin/videos/delete/<%= v.id %>" method="POST" onsubmit="return confirm('متأكد من حذف الدرس بالكامل؟ سيُحذف كل ما يتعلق به (فيديوهات، صلاحيات مشاهدة).')">
-                <button type="submit" class="btn btn-sm btn-outline-danger border-0 py-1 px-2" title="حذف الدرس بالكامل">🗑️</button>
-              </form>
-            </div>
-            <p class="text-muted small mb-3">
-              <% if (linkedSessions.length) { %>
-                <div class="d-flex flex-column align-items-start gap-1">
-                <% linkedSessions.forEach(session => { %>
-                  <%- sf.session(session) %>
-                <% }) %>
-                </div>
-              <% } else { %>
-                <span class="ar-only">لا توجد حصص مرتبطة</span><span class="en-only" style="display:none;">No Linked Sessions</span>
-              <% } %>
-            </p>
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <a href="/admin/videos/<%= v.id %>" class="btn btn-sm btn-outline-primary flex-grow-1"><span class="ar-only">إدارة الفيديوهات</span><span class="en-only" style="display:none;">Manage Videos</span></a>
-            <a href="/admin/videos/<%= v.id %>/access" class="btn btn-sm btn-outline-secondary flex-grow-1"><span class="ar-only">التحكم</span><span class="en-only" style="display:none;">Control</span></a>
-          </div>
-
-          <% const examSession = linkedSessions.find(session => session.exam_url || session.exam_video_url); %>
-          <% const examUrl = examSession?.exam_url || ''; %>
-          <% const examVideoUrl = examSession?.exam_video_url || ''; %>
-          <% if (examUrl) { %>
-            <div class="mt-2">
-              <a href="<%= examUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning w-100">🔗 <span class="ar-only">فتح رابط الامتحان</span><span class="en-only" style="display:none;">Open Exam Link</span></a>
-              <form action="/admin/videos/session/exam/delete" method="POST" class="mt-1" onsubmit="return confirm('حذف رابط الاختبار؟')">
-                <input type="hidden" name="video_id" value="<%= v.id %>">
-                <input type="hidden" name="field" value="exam_url">
-                <button type="submit" class="btn btn-sm btn-outline-danger w-100"><span class="ar-only">حذف رابط الاختبار</span><span class="en-only" style="display:none;">Delete Exam Link</span></button>
-              </form>
-            </div>
-          <% } %>
-          <% if (examVideoUrl) { %>
-            <div class="mt-2">
-              <a href="<%= examVideoUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-info w-100">▶ <span class="ar-only">فتح فيديو إجابة الاختبار</span><span class="en-only" style="display:none;">Open Exam Answer Video</span></a>
-              <form action="/admin/videos/session/exam/delete" method="POST" class="mt-1" onsubmit="return confirm('حذف فيديو إجابة الاختبار؟')">
-                <input type="hidden" name="video_id" value="<%= v.id %>">
-                <input type="hidden" name="field" value="exam_video_url">
-                <button type="submit" class="btn btn-sm btn-outline-danger w-100"><span class="ar-only">حذف فيديو الإجابة</span><span class="en-only" style="display:none;">Delete Answer Video</span></button>
-              </form>
-            </div>
-          <% } %>
-          <% if (!examUrl && !examVideoUrl) { %>
-            <div class="mt-2 small text-muted"><span class="ar-only">لا توجد روابط اختبار لهذه الحصة</span><span class="en-only" style="display:none;">No exam links for this session</span></div>
-          <% } %>
-        </div>
+    <% const examSession = linkedSessions.find(session => session.exam_url || session.exam_video_url); %>
+    <% const examUrl = examSession?.exam_url || ''; %>
+    <% const examVideoUrl = examSession?.exam_video_url || ''; %>
+    <div class="vl-item video-card-col" data-centers="<%= cardCenterIds %>" data-subjects="<%= cardSubjectIds %>" data-title="<%= String(v.title || '').toLowerCase() %>">
+      <div class="vl-title">
+        <form action="/admin/videos/<%= v.id %>/update-title" method="POST" class="vl-title-form">
+          <textarea name="title" rows="1" class="form-control form-control-sm video-title-input" required title="اضغط عشان تعدل الاسم"><%= v.title %></textarea>
+          <button type="submit" class="btn btn-sm btn-primary vl-save" title="تحديث اسم الفيديو"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
+        </form>
+        <form action="/admin/videos/delete/<%= v.id %>" method="POST" onsubmit="return confirm('متأكد من حذف الدرس بالكامل؟ سيُحذف كل ما يتعلق به (فيديوهات، صلاحيات مشاهدة).')">
+          <button type="submit" class="vl-del" title="حذف الدرس بالكامل"><i class="bi bi-trash3"></i></button>
+        </form>
+      </div>
+      <div class="vl-sessions">
+        <% if (linkedSessions.length) { %>
+          <% linkedSessions.forEach(session => { %><%- sf.session(session) %><% }) %>
+        <% } else { %>
+          <span class="small text-muted"><span class="ar-only">لا توجد حصص مرتبطة</span><span class="en-only" style="display:none;">No Linked Sessions</span></span>
+        <% } %>
+      </div>
+      <div class="vl-exam">
+        <% if (examUrl) { %>
+          <span class="vl-link exam">
+            <a href="<%= examUrl %>" target="_blank" rel="noopener noreferrer">🔗 <span class="ar-only">الاختبار</span><span class="en-only" style="display:none;">Exam</span></a>
+            <form action="/admin/videos/session/exam/delete" method="POST" onsubmit="return confirm('حذف رابط الاختبار؟')">
+              <input type="hidden" name="video_id" value="<%= v.id %>">
+              <input type="hidden" name="field" value="exam_url">
+              <button type="submit" title="حذف رابط الاختبار">✕</button>
+            </form>
+          </span>
+        <% } %>
+        <% if (examVideoUrl) { %>
+          <span class="vl-link answer">
+            <a href="<%= examVideoUrl %>" target="_blank" rel="noopener noreferrer">▶ <span class="ar-only">فيديو الإجابة</span><span class="en-only" style="display:none;">Answer video</span></a>
+            <form action="/admin/videos/session/exam/delete" method="POST" onsubmit="return confirm('حذف فيديو إجابة الاختبار؟')">
+              <input type="hidden" name="video_id" value="<%= v.id %>">
+              <input type="hidden" name="field" value="exam_video_url">
+              <button type="submit" title="حذف فيديو الإجابة">✕</button>
+            </form>
+          </span>
+        <% } %>
+        <% if (!examUrl && !examVideoUrl) { %>
+          <span class="small text-muted"><span class="ar-only">مفيش روابط اختبار</span><span class="en-only" style="display:none;">No exam links</span></span>
+        <% } %>
+      </div>
+      <div class="vl-actions">
+        <a href="/admin/videos/<%= v.id %>" class="btn btn-sm btn-outline-primary">🎞️ <span class="ar-only">الفيديوهات</span><span class="en-only" style="display:none;">Videos</span></a>
+        <a href="/admin/videos/<%= v.id %>/access" class="btn btn-sm btn-outline-secondary">🔐 <span class="ar-only">التحكم</span><span class="en-only" style="display:none;">Control</span></a>
       </div>
     </div>
   <% }) %>
 </div>
-<p id="noVideosMsg" class="text-muted text-center mt-3" style="display:none;"><span class="ar-only">لا توجد دروس مطابقة لهذا الفلتر</span><span class="en-only" style="display:none;">No lessons match this filter</span></p>
+<p id="noVideosMsg" class="text-muted text-center mt-3" style="display:none;"><span class="ar-only">لا توجد دروس مطابقة</span><span class="en-only" style="display:none;">No lessons match</span></p>
 
 <script>
   function applyVideoFilters() {
     const center = document.getElementById('filterCenter').value;
     const subject = document.getElementById('filterSubject').value;
+    const q = document.getElementById('filterTitle').value.trim().toLowerCase();
+    const items = document.querySelectorAll('.video-card-col');
     let visibleCount = 0;
-    document.querySelectorAll('.video-card-col').forEach(col => {
+    items.forEach(col => {
       const centers = col.dataset.centers ? col.dataset.centers.split(',') : [];
       const subjects = col.dataset.subjects ? col.dataset.subjects.split(',') : [];
-      const centerMatch = !center || centers.includes(center);
-      const subjectMatch = !subject || subjects.includes(subject);
-      const visible = centerMatch && subjectMatch;
+      const visible = (!center || centers.includes(center)) && (!subject || subjects.includes(subject)) && (!q || (col.dataset.title || '').includes(q));
       col.style.display = visible ? '' : 'none';
       if (visible) visibleCount++;
     });
     document.getElementById('noVideosMsg').style.display = visibleCount === 0 ? 'block' : 'none';
+    const en = (localStorage.getItem('language') || 'ar') === 'en';
+    document.getElementById('shownCount').textContent = visibleCount === items.length ? '' : (en ? `Showing ${visibleCount} of ${items.length}` : `ظاهر ${visibleCount} من ${items.length}`);
   }
+
+  // كروت ولا صفوف — الاختيار بيتحفظ على الجهاز
+  (function () {
+    const list = document.getElementById('videosContainer');
+    const buttons = document.querySelectorAll('.vl-view button');
+    function setView(view) {
+      const rows = view === 'rows';
+      list.classList.toggle('vl-cards', !rows);
+      list.classList.toggle('vl-rows', rows);
+      buttons.forEach(b => b.classList.toggle('active', b.dataset.view === (rows ? 'rows' : 'cards')));
+      try { localStorage.setItem('videosView', rows ? 'rows' : 'cards'); } catch (e) {}
+      if (typeof refitTitles === 'function') setTimeout(refitTitles, 0);
+    }
+    buttons.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+    if ((localStorage.getItem('language') || 'ar') === 'en') document.getElementById('filterTitle').placeholder = '🔍 Search lesson name...';
+    let saved = 'cards';
+    try { saved = localStorage.getItem('videosView') || 'cards'; } catch (e) {}
+    setView(saved);
+  })();
 </script>
 
 <script>
-  // اسم الفيديو بيظهر كامل: الخانة بتطول على قد الاسم، وEnter بيحفظ زي الأول
+  // اسم الفيديو بيظهر كامل: الخانة بتطول على قد الاسم، وEnter بيحفظ زي الأول. زرار "حفظ" بيظهر بس لما تعدل
   document.querySelectorAll('.video-title-input').forEach(function (box) {
     function fit() {
       if (!box.offsetParent) return; // الكارت مستخبي (فلتر): هيتظبط لما يظهر
@@ -265,7 +358,10 @@
       box.style.height = box.scrollHeight + 2 + 'px';
     }
     box._fitTitle = fit;
-    box.addEventListener('input', fit);
+    box.addEventListener('input', function () {
+      fit();
+      box.form.classList.toggle('dirty', box.value !== box.defaultValue);
+    });
     box.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); box.form.requestSubmit ? box.form.requestSubmit() : box.form.submit(); }
     });

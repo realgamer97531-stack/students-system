@@ -514,6 +514,30 @@
     [dir="rtl"] .sf-color-select { background-position: right 0.75rem center, left 0.75rem center !important; padding-right: 2.1rem !important; }
     [dir="ltr"] .sf-color-select { background-position: left 0.75rem center, right 0.75rem center !important; padding-left: 2.1rem !important; }
 
+    /* Tables with foldable columns: cells marked .sf-x stay hidden until the arrow in the header opens them */
+    .sf-collapsible:not(.sf-cols-open) .sf-x { display: none !important; }
+    .table.sf-collapsible { overflow: visible; } /* overflow:hidden would stop the pinned arrow column from sticking */
+    .sf-collapsible.sf-cols-open .sf-x-hint { display: none !important; }
+    .sf-collapsible .sf-x { animation: sf-col-in 0.25s var(--sf-ease); }
+    @keyframes sf-col-in { from { opacity: 0; } to { opacity: 1; } }
+    .sf-collapsible th.sf-xtoggle-cell, .sf-collapsible td.sf-xtoggle-cell { width: 1%; padding-inline: 6px !important; }
+    /* the arrow column stays pinned to the edge, so "less" is reachable even when the open table scrolls sideways */
+    .sf-collapsible th.sf-xtoggle-cell, .sf-collapsible td.sf-xtoggle-cell { position: sticky; inset-inline-end: 0; z-index: 2; background: var(--sf-card-bg) !important; }
+    .sf-collapsible thead th.sf-xtoggle-cell { background: var(--sf-table-header-bg) !important; z-index: 3; }
+    .sf-collapsible.sf-cols-open td.sf-xtoggle-cell, .sf-collapsible.sf-cols-open th.sf-xtoggle-cell { box-shadow: 8px 0 12px -10px rgba(0,0,0,0.25) !important; }
+    [dir="ltr"] .sf-collapsible.sf-cols-open td.sf-xtoggle-cell, [dir="ltr"] .sf-collapsible.sf-cols-open th.sf-xtoggle-cell { box-shadow: -8px 0 12px -10px rgba(0,0,0,0.25) !important; }
+    .sf-xtoggle {
+      display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+      border: 1px solid var(--sf-input-border); background: var(--sf-card-bg); color: var(--sf-primary);
+      border-radius: 999px; padding: 3px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;
+      transition: background 0.15s var(--sf-ease);
+    }
+    .sf-xtoggle:hover { background: var(--sf-primary-light); }
+    .sf-xtoggle i { font-size: 0.8rem; transition: transform 0.2s var(--sf-ease); }
+    [dir="ltr"] .sf-xtoggle i { transform: scaleX(-1); }
+    .sf-cols-open .sf-xtoggle i { transform: scaleX(-1); }
+    [dir="ltr"] .sf-cols-open .sf-xtoggle i { transform: none; }
+
     /* Modern list groups */
     .list-group { border-radius: 14px; overflow: hidden; }
     .list-group-item { padding: 0.8rem 1rem; border-inline: none; transition: background 0.15s var(--sf-ease); }
