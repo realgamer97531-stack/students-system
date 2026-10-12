@@ -1,6 +1,17 @@
 <%- include('partials/header') %>
+<% const pf = typeof prefill !== 'undefined' && prefill ? prefill : { centerIds: [] }; %>
+<style>
+  .center-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .center-pick { position: relative; cursor: pointer; margin: 0; }
+  .center-pick input { position: absolute; opacity: 0; pointer-events: none; }
+  .center-pick .sf-chip { padding: 6px 14px; font-size: 0.85rem; opacity: 0.55; transition: opacity .15s, box-shadow .15s; }
+  .center-pick input:checked + .sf-chip { opacity: 1; box-shadow: 0 0 0 2px var(--c); }
+  .center-pick input:focus-visible + .sf-chip { outline: 2px solid var(--sf-primary); outline-offset: 2px; }
+  .center-preview { display: flex; flex-direction: column; gap: 4px; }
+  .center-preview > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 10px; background: var(--sf-panel-bg); font-size: 0.82rem; }
+</style>
   <div class="container py-5">
-    <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+    <div class="card shadow-sm mx-auto" style="max-width: 640px;">
       <div class="card-body p-4">
         <h3 class="mb-4 text-center"><span class="ar-only">بدء حصة</span><span class="en-only" style="display:none;">Start Session</span></h3>
 
@@ -20,122 +31,145 @@
             <select name="subject_id" class="form-select" required>
               <option value=""><span class="ar-only">-- اختر المادة --</span><span class="en-only" style="display:none;">-- Choose Subject --</span></option>
               <% subjects.forEach(subj => { %>
-                <option value="<%= subj.id %>" <%- sf.colorAttr('subject', subj) %>><%= subj.name %></option>
+                <option value="<%= subj.id %>" <%- sf.colorAttr('subject', subj) %> <%= pf.subjectId === subj.id ? 'selected' : '' %>><%= subj.name %></option>
               <% }) %>
             </select>
           </div>
 
           <div class="mb-3">
-            <label class="form-label"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
-            <select name="center_id" class="form-select" required>
-              <option value=""><span class="ar-only">-- اختر السنتر --</span><span class="en-only" style="display:none;">-- Choose Center --</span></option>
+            <label class="form-label mb-1"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
+            <div class="small text-muted mb-2"><span class="ar-only">اختار سنتر أو أكتر — لو اخترت أكتر من سنتر هتتعمل نفس الحصة (نفس الرقم النسبي) في كلهم مرة واحدة.</span><span class="en-only" style="display:none;">Pick one or more centers — with several, the same session (same relative number) is created in all of them at once.</span></div>
+            <div class="center-picks" id="centerPicks">
               <% centers.forEach(center => { %>
-                <option value="<%= center.id %>" <%- sf.colorAttr('center', center) %>><%= center.name %></option>
+                <label class="center-pick">
+                  <input type="checkbox" name="center_ids" value="<%= center.id %>" <%= pf.centerIds.includes(center.id) ? 'checked' : '' %>>
+                  <%- sf.center(center) %>
+                </label>
               <% }) %>
-            </select>
+            </div>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-3" id="modeBox">
             <label class="form-label"><span class="ar-only">نوع الحصة</span><span class="en-only" style="display:none;">Session Type</span></label>
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="mode" id="modeNew" value="new" checked>
+              <input class="form-check-input" type="radio" name="mode" id="modeNew" value="new" <%= pf.lessonNumber ? '' : 'checked' %>>
               <label class="form-check-label" for="modeNew">
                 <span class="ar-only">الحصة الجاية تلقائي (بعد آخر حصة لنفس السنتر والمادة — من غير ما تكتب رقم)</span>
                 <span class="en-only" style="display:none;">Next session automatically (after the last one for this center and subject)</span>
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="mode" id="modeRepeat" value="repeat">
+              <input class="form-check-input" type="radio" name="mode" id="modeRepeat" value="repeat" <%= pf.lessonNumber ? 'checked' : '' %>>
               <label class="form-check-label" for="modeRepeat">
-                <span class="ar-only">تكرار حصة سابقة في سنتر تاني (أنا أحدد رقمها)</span>
-                <span class="en-only" style="display:none;">Repeat a previous session in another center (I specify its number)</span>
+                <span class="ar-only">أنا أحدد رقمها (تكرار حصة في سنتر تاني، أو كذا سنتر مرة واحدة)</span>
+                <span class="en-only" style="display:none;">I set the number (repeat a session in another center, or several centers at once)</span>
               </label>
             </div>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label"><span class="ar-only">رقم الأسبوع</span><span class="en-only" style="display:none;">Week Number</span></label>
-            <select name="week_number" class="form-select">
-              <option value=""><span class="ar-only">-- اختر الأسبوع (اختياري) --</span><span class="en-only" style="display:none;">-- Choose Week (optional) --</span></option>
-              <option value="1"><span class="ar-only">الأسبوع 1</span><span class="en-only" style="display:none;">Week 1</span></option>
-              <option value="2"><span class="ar-only">الأسبوع 2</span><span class="en-only" style="display:none;">Week 2</span></option>
-              <option value="3"><span class="ar-only">الأسبوع 3</span><span class="en-only" style="display:none;">Week 3</span></option>
-              <option value="4"><span class="ar-only">الأسبوع 4</span><span class="en-only" style="display:none;">Week 4</span></option>
-              <option value="5"><span class="ar-only">الأسبوع 5</span><span class="en-only" style="display:none;">Week 5</span></option>
-              <option value="6"><span class="ar-only">الأسبوع 6</span><span class="en-only" style="display:none;">Week 6</span></option>
-              <option value="7"><span class="ar-only">الأسبوع 7</span><span class="en-only" style="display:none;">Week 7</span></option>
-              <option value="8"><span class="ar-only">الأسبوع 8</span><span class="en-only" style="display:none;">Week 8</span></option>
-              <option value="9"><span class="ar-only">الأسبوع 9</span><span class="en-only" style="display:none;">Week 9</span></option>
-              <option value="10"><span class="ar-only">الأسبوع 10</span><span class="en-only" style="display:none;">Week 10</span></option>
-            </select>
-          </div>
-
           <div class="mb-3" id="lessonNumberBox" style="display: none;">
             <label class="form-label"><span class="ar-only">رقم الحصة النسبي (مثلاً 3)</span><span class="en-only" style="display:none;">Relative Session Number (e.g. 3)</span></label>
-            <input type="number" name="lesson_number" id="lessonNumberInput" class="form-control" min="1">
+            <input type="number" name="lesson_number" id="lessonNumberInput" class="form-control" min="1" value="<%= pf.lessonNumber || '' %>">
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label"><span class="ar-only">رقم الأسبوع</span><span class="en-only" style="display:none;">Week Number</span></label>
+              <select name="week_number" class="form-select">
+                <option value=""><span class="ar-only">-- اختر الأسبوع (اختياري) --</span><span class="en-only" style="display:none;">-- Choose Week (optional) --</span></option>
+                <% const maxWeek = Math.max(20, pf.weekNumber || 0); %>
+                <% for (let w = 1; w <= maxWeek; w += 1) { %>
+                  <option value="<%= w %>" <%= pf.weekNumber === w ? 'selected' : '' %>><span class="ar-only">الأسبوع <%= w %></span><span class="en-only" style="display:none;">Week <%= w %></span></option>
+                <% } %>
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label"><span class="ar-only">تاريخ الحصة</span><span class="en-only" style="display:none;">Session date</span></label>
+              <input type="date" name="session_date" class="form-control" value="<%= pf.sessionDate || '' %>">
+              <div class="form-text"><span class="ar-only">فاضي = النهارده</span><span class="en-only" style="display:none;">Empty = today</span></div>
+            </div>
           </div>
 
           <div id="nextPreview" class="alert alert-info py-2 small" style="display:none"></div>
 
-          <button type="submit" class="btn btn-success w-100"><span class="ar-only">بدء الحصة</span><span class="en-only" style="display:none;">Start Session</span></button>
+          <button type="submit" class="btn btn-success w-100" id="startSubmit"><span class="ar-only">بدء الحصة</span><span class="en-only" style="display:none;">Start Session</span></button>
         </form>
       </div>
     </div>
   </div>
 
   <script>
-    const modeRepeat = document.getElementById('modeRepeat');
-    const modeNew = document.getElementById('modeNew');
-    const lessonNumberBox = document.getElementById('lessonNumberBox');
-
-    function toggleBox() {
-      lessonNumberBox.style.display = modeRepeat.checked ? 'block' : 'none';
-    }
-    modeRepeat.addEventListener('change', toggleBox);
-    modeNew.addEventListener('change', toggleBox);
-
-    // معاينة: آخر حصة لنفس السنتر والمادة، والرقم اللي هيتعمل — ولو الرقم ده موجود نقول ونقترح التفعيل
     (function () {
       const form = document.getElementById('startSessionForm');
       const subject = form.querySelector('[name="subject_id"]');
-      const center = form.querySelector('[name="center_id"]');
+      const modeRepeat = document.getElementById('modeRepeat');
+      const modeNew = document.getElementById('modeNew');
+      const lessonNumberBox = document.getElementById('lessonNumberBox');
       const lessonInput = document.getElementById('lessonNumberInput');
       const box = document.getElementById('nextPreview');
+      const submit = document.getElementById('startSubmit');
+      const en = (localStorage.getItem('language') || 'ar') === 'en';
+      const centerInputs = () => [...form.querySelectorAll('input[name="center_ids"]')];
+      const checkedCenters = () => centerInputs().filter(input => input.checked);
+      const centerName = (input) => input.closest('label').textContent.trim();
       let timer = null;
-      let lastResult = null;
+      let results = [];
+
+      function esc(v) { const d = document.createElement('div'); d.textContent = v; return d.innerHTML; }
+
+      // أكتر من سنتر = لازم رقم واحد محدد للكل
+      function syncMode() {
+        const many = checkedCenters().length > 1;
+        if (many) modeRepeat.checked = true;
+        modeNew.disabled = many;
+        lessonNumberBox.style.display = modeRepeat.checked ? 'block' : 'none';
+        lessonInput.required = modeRepeat.checked;
+        const count = checkedCenters().length;
+        submit.innerHTML = count > 1
+          ? (en ? `Start session in ${count} centers` : `بدء الحصة في ${count} سناتر`)
+          : (en ? 'Start Session' : 'بدء الحصة');
+      }
+
       async function refresh() {
-        if (!subject.value || !center.value) { box.style.display = 'none'; lastResult = null; return; }
-        const params = new URLSearchParams({ center_id: center.value, subject_id: subject.value });
-        if (modeRepeat.checked && lessonInput.value) params.set('lesson_number', lessonInput.value);
+        const centers = checkedCenters();
+        if (!subject.value || !centers.length) { box.style.display = 'none'; results = []; return; }
+        const lesson = modeRepeat.checked ? lessonInput.value : '';
         try {
-          const res = await fetch('/sessions/next-number?' + params.toString(), { headers: { Accept: 'application/json' } });
-          const data = await res.json();
-          if (!data.success) return;
-          lastResult = data;
-          let html = '';
-          if (!data.hasSeries) {
-            box.className = 'alert alert-danger py-2 small';
-            html = '❌ مفيش أساس سيريال للسنتر والمادة دول — لازم يتعرّف الأول.';
-          } else if (modeRepeat.checked) {
-            if (data.existing) {
-              box.className = 'alert alert-warning py-2 small';
-              html = '⚠️ حصة ' + data.existing.lesson_number + ' موجودة بالفعل هنا (سيريال ' + data.existing.serial_number + (data.existing.session_date ? '، ' + data.existing.session_date : '') + '). '
-                + '<button type="button" class="btn btn-sm btn-warning fw-bold ms-1" data-activate="' + data.existing.id + '">✅ فعّلها</button>';
-            } else {
-              box.className = 'alert alert-info py-2 small';
-              html = lessonInput.value ? '✔️ رقم ' + lessonInput.value + ' مش موجود قبل كده — هيتعمل جديد.' : 'اكتب رقم الحصة.';
-            }
-          } else {
-            box.className = 'alert alert-info py-2 small';
-            html = (data.last ? 'آخر حصة هنا: <b>' + data.last.lesson_number + '</b> (سيريال ' + data.last.serial_number + '). ' : 'مفيش حصص قبل كده للسنتر والمادة دول. ')
-              + 'الحصة الجديدة هتبقى رقم <b>' + data.next + '</b>.';
+          results = await Promise.all(centers.map(async (input) => {
+            const params = new URLSearchParams({ center_id: input.value, subject_id: subject.value });
+            if (lesson) params.set('lesson_number', lesson);
+            const res = await fetch('/sessions/next-number?' + params.toString(), { headers: { Accept: 'application/json' } });
+            const data = await res.json();
+            return { input, name: centerName(input), data };
+          }));
+          // أول مرة في وضع "أنا أحدد": لو الخانة فاضية نقترح الرقم الجاي لأول سنتر
+          if (modeRepeat.checked && !lessonInput.value && results[0] && results[0].data.success) {
+            lessonInput.value = results[0].data.next;
+            return refresh();
           }
-          box.innerHTML = html;
+          const lines = results.map(({ input, name, data }) => {
+            if (!data.success) return '';
+            let text;
+            if (!data.hasSeries) text = '❌ ' + (en ? 'no serial base — cannot be created' : 'مفيش أساس سيريال — مش هتتعمل');
+            else if (modeRepeat.checked) {
+              text = data.existing
+                ? `⚠️ ${en ? 'lesson' : 'حصة'} ${esc(data.existing.lesson_number)} ${en ? 'already exists (serial' : 'موجودة بالفعل (سيريال'} ${esc(data.existing.serial_number)}) <button type="button" class="btn btn-sm btn-warning py-0" data-activate="${data.existing.id}">✅ ${en ? 'activate' : 'فعّلها'}</button>`
+                : (lessonInput.value ? `✔️ ${en ? 'lesson' : 'حصة'} ${esc(lessonInput.value)} ${en ? 'will be created' : 'هتتعمل'}` : (en ? 'type the number' : 'اكتب الرقم'));
+            } else {
+              text = (data.last ? `${en ? 'last' : 'آخر حصة'}: <b>${esc(data.last.lesson_number)}</b> — ` : '') + `${en ? 'new' : 'الجديدة'}: <b>${esc(data.next)}</b>`;
+            }
+            return `<div><span class="fw-bold">${esc(name)}</span><span>${text}</span></div>`;
+          }).join('');
+          box.className = 'alert alert-info py-2 small';
+          box.innerHTML = `<div class="center-preview">${lines}</div>`;
           box.style.display = '';
         } catch (e) { box.style.display = 'none'; }
       }
       function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 250); }
-      [subject, center, modeRepeat, modeNew].forEach((el) => el.addEventListener('change', schedule));
+
+      centerInputs().forEach((input) => input.addEventListener('change', () => { syncMode(); schedule(); }));
+      [subject, modeRepeat, modeNew].forEach((el) => el.addEventListener('change', () => { syncMode(); schedule(); }));
+      if (window.jQuery) jQuery(subject).on('change', () => { syncMode(); schedule(); });
       lessonInput.addEventListener('input', schedule);
       box.addEventListener('click', (e) => {
         const id = e.target && e.target.getAttribute('data-activate');
@@ -145,11 +179,22 @@
         document.body.appendChild(f); f.submit();
       });
       form.addEventListener('submit', (e) => {
-        if (modeRepeat.checked && lastResult && lastResult.existing && String(lastResult.existing.lesson_number) === lessonInput.value) {
+        const centers = checkedCenters();
+        if (!centers.length) { e.preventDefault(); alert(en ? 'Pick at least one center' : 'اختار سنتر واحد على الأقل'); return; }
+        const existing = results.filter(r => r.data && r.data.existing && modeRepeat.checked && String(r.data.existing.lesson_number) === lessonInput.value);
+        if (centers.length === 1 && existing.length) {
           e.preventDefault();
           alert('الحصة دي موجودة بالفعل — اضغط "فعّلها" بدل ما تعمل واحدة جديدة.');
+          return;
+        }
+        if (centers.length > 1) {
+          const names = centers.map(centerName).join('، ');
+          const skip = existing.length ? `\n(${existing.map(r => r.name).join('، ')} ${en ? 'already have it and will be skipped' : 'عندهم الحصة دي وهيتسابوا'})` : '';
+          if (!confirm((en ? `Create lesson ${lessonInput.value} in: ` : `تعمل حصة ${lessonInput.value} في: `) + names + '؟' + skip)) e.preventDefault();
         }
       });
+      syncMode();
+      schedule();
     })();
   </script>
 <%- include('partials/footer') %>

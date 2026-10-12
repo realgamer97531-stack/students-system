@@ -298,7 +298,14 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
   String _status(Map<String, dynamic> s) {
     final grant = s['grant'] as Map?;
     if (grant == null) return _settings['isFreeForAll'] == true ? 'open' : 'none';
+    if (grant['notStarted'] == true) return 'waiting'; // فتح الدرس وهو فاضي: العد هيبدأ أول ما يفتح الفيديو
     return grant['ended'] == true ? 'ended' : 'active';
+  }
+
+  // "العد لسه مبدأش" بيتحسب ضمن "متاح" في الفلتر
+  String _filterKey(Map<String, dynamic> s) {
+    final status = _status(s);
+    return status == 'waiting' ? 'active' : status;
   }
 
   // ===== الشاشة =====
@@ -334,6 +341,7 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
       'active' => ('متاح لحد ${fmtDate(grant!['expiresAt'], withTime: true)}', AppColors.successSoft, AppColors.successText),
       'ended' => ('⛔ انتهت ${fmtDate(grant!['expiresAt'], withTime: true)}', AppColors.dangerSoft, AppColors.dangerText),
       'open' => ('مفتوح للكل', AppColors.successSoft, AppColors.successText),
+      'waiting' => ('⏳ العد لسه مبدأش (${grant!['durationHours'] ?? _settings['accessDurationHours']} ساعة من أول فتح)', AppColors.warningSoft, AppColors.warningText),
       _ => ('لسه مفتحش', AppColors.neutralSoft, AppColors.muted),
     };
     return Card(
@@ -393,10 +401,10 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
     final allStudents = _list('students');
     final counts = <String, int>{};
     for (final s in allStudents) {
-      counts[_status(s)] = (counts[_status(s)] ?? 0) + 1;
+      counts[_filterKey(s)] = (counts[_filterKey(s)] ?? 0) + 1;
     }
     final students = allStudents.where((s) {
-      if (_studentFilter != 'all' && _status(s) != _studentFilter) return false;
+      if (_studentFilter != 'all' && _filterKey(s) != _studentFilter) return false;
       return q.isEmpty || '${s['name']} ${s['code']}'.toLowerCase().contains(q);
     }).toList();
 

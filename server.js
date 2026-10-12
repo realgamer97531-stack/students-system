@@ -87,6 +87,7 @@ const centerLedgerPath = process.env.CENTER_LEDGER_PATH || path.join(__dirname, 
 
 const VideoSession = require('./models/VideoSession');
 const VideoStudentAccess = require('./models/VideoStudentAccess');
+const VideoStudentBlock = require('./models/VideoStudentBlock');
 
 // نظام بث الفيديوهات الجديد - قسم منفصل تمامًا عن نظام الفيديوهات القديم أعلاه (لا يُستخدم في أي مكان آخر)
 const VideoBroadcast = require('./models/VideoBroadcast');
@@ -114,6 +115,52 @@ function createAccessWindow(hours) {
     access_started_at: startedAt,
     access_expires_at: new Date(startedAt.getTime() + Number(hours) * 60 * 60 * 1000),
   };
+}
+
+// ===== ساعة كل فيديو =====
+// كل فيديو ليه ساعته: الصلاحية الجديدة بتتسجل على الفيديو (VideoId). الصلاحيات القديمة (VideoId فاضي)
+// بتفضل شغالة للفيديوهات اللي كانت موجودة وقت ما اتعملت بس — فيديو اتضاف بعدها بياخد ساعة جديدة
+// (من غير دفع تاني لو الطالب كان دفع/حضر الحصة دي).
+function grantStartTime(grant) {
+  const startedAt = grant.access_started_at || grant.createdAt;
+  return startedAt ? new Date(startedAt).getTime() : 0;
+}
+
+function grantAppliesToVideo(grant, video) {
+  if (grant.VideoId) return Number(grant.VideoId) === Number(video.id);
+  if (!video || !video.createdAt || !grant.createdAt) return true;
+  return new Date(video.createdAt).getTime() <= new Date(grant.createdAt).getTime() + 60 * 1000;
+}
+
+// الطالب فتح الدرس والفيديو لسه مفيهوش ولا جزء (أو فتحه قبل ما أول جزء يتضاف): العد مبدأش فعليًا.
+// firstPartAt = وقت إضافة أول جزء للفيديو (null = مفيش أجزاء لسه)
+function grantWaitingForContent(grant, firstPartAt) {
+  if (!firstPartAt) return true;
+  return grantStartTime(grant) < new Date(firstPartAt).getTime();
+}
+
+function grantUsable(grant, session, firstPartAt) {
+  return grantWaitingForContent(grant, firstPartAt) || isGrantActive(grant, session);
+}
+
+// العد بيبدأ من دلوقتي (أول فتح والفيديو فيه محتوى)
+async function restartGrantWindow(grant, session) {
+  const hours = Number(grant.access_duration_hours || session?.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS);
+  const window = createAccessWindow(hours);
+  await VideoAccessGrant.update({ ...window, access_duration_hours: hours }, { where: { id: grant.id } });
+  grant.set({ ...window, access_duration_hours: hours });
+}
+
+async function firstPartTimesByVideo(videoIds) {
+  const ids = [...new Set((videoIds || []).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const rows = await VideoPart.findAll({
+    where: { VideoId: ids },
+    attributes: ['VideoId', [sequelize.fn('MIN', sequelize.col('createdAt')), 'firstAt']],
+    group: ['VideoId'],
+    raw: true,
+  });
+  return new Map(rows.map(row => [Number(row.VideoId), row.firstAt ? new Date(row.firstAt) : null]));
 }
 
 // previousHoursBySession: مدة كل حصة قبل التعديل. أي طالب مدته مختلفة عنها (اتمدّ له لوحده)
@@ -977,31 +1024,7 @@ app.get('/_health', (req, res) => {
   });
 });
 
-// تجهيز رفع الفيديوهات وحفظها في فولدر public/uploads/videos
-const videoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, 'public', 'uploads', 'videos');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}_${file.originalname}`);
-  },
-});
-const videoUpload = multer({ storage: videoStorage, limits: { fileSize: 500 * 1024 * 1024 } }); // حد أقصى 500 ميجا
-
-// تجهيز رفع صور الحصص وحفظها في فولدر public/uploads/session-images
-const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, 'public', 'uploads', 'session-images');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}_${file.originalname}`);
-  },
-});
-const imageUpload = multer({ storage: imageStorage, limits: { fileSize: 10 * 1024 * 1024 } });
+// الفيديوهات والصور لينكات بس — مفيش رفع ملفات على السيرفر
 
 // إعداد نظام الجلسات (تسجيل الدخول)
 app.use(session({
@@ -2523,7 +2546,14 @@ app.get('/sessions/new', requirePermission('sessions_create'), async (req, res) 
   const subjects = await Subject.findAll();
   const duplicateId = Number.parseInt(req.query.duplicate, 10);
   const duplicate = Number.isInteger(duplicateId) ? await Session.findByPk(duplicateId, { include: [Center, Subject] }) : null;
-  res.render('start-session', { centers, subjects, duplicate, describeSession });
+  const prefill = {
+    subjectId: Number.parseInt(req.query.subject_id, 10) || null,
+    centerIds: [].concat(req.query.center_id || [], req.query.center_ids || []).map(Number).filter(Boolean),
+    lessonNumber: Number.parseInt(req.query.lesson_number, 10) || null,
+    weekNumber: Number.parseInt(req.query.week_number, 10) || null,
+    sessionDate: cleanSessionDate(req.query.session_date),
+  };
+  res.render('start-session', { centers, subjects, duplicate, describeSession, prefill });
 });
 
 // معاينة: آخر حصة لنفس السنتر والمادة والرقم اللي الحصة الجاية هتاخده (+ هل رقم معين موجود قبل كده)
@@ -2552,9 +2582,67 @@ app.get('/sessions/next-number', requirePermission('sessions_create'), async (re
   }
 });
 
+// تاريخ الحصة (اختياري): YYYY-MM-DD بس
+function cleanSessionDate(value) {
+  const text = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
+
+// كذا سنتر مرة واحدة بنفس الرقم النسبي (نفس المادة). اللي موجود قبل كده أو ملوش أساس سيريال بيتساب ويتقال
+async function createSessionsForCenters(req, res, centerIds) {
+  const subjectId = Number.parseInt(req.body.subject_id, 10);
+  const lessonNumber = Number.parseInt(req.body.lesson_number, 10);
+  const back = (message) => (req.body.response_format === 'json'
+    ? res.status(400).json({ success: false, message })
+    : res.redirect(`/sessions?created_msg=${encodeURIComponent(message)}`));
+  if (!subjectId) return back('❌ اختار المادة');
+  if (!lessonNumber || lessonNumber < 1) return back('❌ لازم تكتب رقم حصة صحيح لما تختار أكتر من سنتر');
+  const weekNumber = req.body.week_number !== undefined && req.body.week_number !== null && req.body.week_number !== '' ? Number(req.body.week_number) : null;
+  const sessionDate = cleanSessionDate(req.body.session_date);
+
+  const created = [];
+  const skipped = [];
+  for (const centerId of centerIds) {
+    const center = await Center.findByPk(centerId, { attributes: ['id', 'name'] });
+    if (!center) continue;
+    const series = await CenterSubjectSeries.findOne({ where: { CenterId: centerId, SubjectId: subjectId } });
+    if (!series) { skipped.push(`${center.name}: مفيش أساس سيريال`); continue; }
+    const duplicate = await findSameLessonSession(centerId, subjectId, lessonNumber);
+    if (duplicate) { skipped.push(`${center.name}: حصة ${lessonNumber} موجودة بالفعل (سيريال ${duplicate.serial_number})`); continue; }
+    const session = await Session.create({
+      lesson_number: lessonNumber,
+      week_number: weekNumber,
+      serial_number: series.base_number + lessonNumber,
+      CenterId: centerId,
+      SubjectId: subjectId,
+      ...(sessionDate ? { session_date: sessionDate } : {}),
+    });
+    created.push({ session, center });
+  }
+
+  if (created.length) req.session.activeSessionId = created[0].session.id;
+  const message = [
+    created.length ? `✅ اتعملت حصة ${lessonNumber} في ${created.length} سنتر: ${created.map(row => `${row.center.name} (سيريال ${row.session.serial_number})`).join('، ')}` : '❌ متعملتش ولا حصة',
+    skipped.length ? `⚠️ اتسابت: ${skipped.join('، ')}` : '',
+  ].filter(Boolean).join(' — ');
+  if (req.body.response_format === 'json') {
+    return res.status(created.length ? 200 : 400).json({
+      success: created.length > 0,
+      message,
+      sessions: created.map(row => ({ id: row.session.id, lesson_number: row.session.lesson_number, serial_number: row.session.serial_number, CenterId: row.session.CenterId, SubjectId: row.session.SubjectId })),
+    });
+  }
+  res.redirect(`/sessions?created_msg=${encodeURIComponent(message)}`);
+}
+
 app.post('/sessions', async (req, res) => {
   try {
+    // center_ids (كذا سنتر) جديد؛ center_id لوحده زي الأول (الموبايل والإصدارات القديمة)
+    const centerIds = [...new Set([].concat(req.body.center_ids || []).map(Number).filter(Boolean))];
+    if (centerIds.length > 1) return createSessionsForCenters(req, res, centerIds);
+    if (centerIds.length === 1 && !req.body.center_id) req.body.center_id = centerIds[0];
     const { subject_id, center_id, mode, lesson_number, week_number } = req.body;
+    const sessionDate = cleanSessionDate(req.body.session_date);
 
     const series = await CenterSubjectSeries.findOne({
       where: { CenterId: center_id, SubjectId: subject_id },
@@ -2607,6 +2695,7 @@ app.post('/sessions', async (req, res) => {
       serial_number: serialNumber,
       CenterId: center_id,
       SubjectId: subject_id,
+      ...(sessionDate ? { session_date: sessionDate } : {}),
     });
 
     const fullSession = await Session.findOne({
@@ -2642,6 +2731,67 @@ app.post('/sessions', async (req, res) => {
 });
 
 // عرض كل الحصص + اختيار الشغالة
+// ===== اقتراح الحصص الجاية من الجدول =====
+function ymdLocal(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+// الأسبوع بيبدأ السبت (0=أحد ... 6=سبت)
+function weekStartLocal(dateText) {
+  const date = new Date(`${String(dateText).slice(0, 10)}T12:00:00`);
+  const back = (date.getDay() + 1) % 7;
+  date.setDate(date.getDate() - back);
+  return ymdLocal(date);
+}
+
+// الحصص اللي في الجدول النهارده وبكرة وبعده ولسه متعملتش: الرقم النسبي الجاي + الأسبوع (زي اللي قبلها، +1 لو أسبوع جديد)
+async function scheduleSuggestions(days = 3) {
+  const entries = await ScheduleEntry.findAll({ where: { is_active: true }, include: [Subject, Center] });
+  if (!entries.length) return [];
+  const today = new Date();
+  const candidates = [];
+  for (let offset = 0; offset < days; offset += 1) {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset, 12);
+    const ymd = ymdLocal(date);
+    entries
+      .filter(entry => entry.day_of_week === date.getDay() && entry.Subject && entry.Center)
+      .filter(entry => !entry.end_date || String(entry.end_date).slice(0, 10) >= ymd)
+      .forEach(entry => candidates.push({ entry, date: ymd, offset }));
+  }
+  candidates.sort((a, b) => (a.date === b.date ? String(a.entry.start_time).localeCompare(String(b.entry.start_time)) : a.date.localeCompare(b.date)));
+
+  const seenPairs = new Set();
+  const out = [];
+  for (const { entry, date, offset } of candidates) {
+    const pair = `${entry.CenterId}|${entry.SubjectId}`;
+    if (seenPairs.has(pair)) continue; // الرقم الجاي بيتحسب من آخر حصة، فبنقترح أقرب ميعاد بس
+    const existingThatDay = await Session.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId, session_date: date }, attributes: ['id', 'lesson_number', 'serial_number'] });
+    if (existingThatDay) { seenPairs.add(pair); continue; }
+    seenPairs.add(pair);
+    const [lessonNumber, previous, series] = await Promise.all([
+      nextLessonNumberFor(entry.CenterId, entry.SubjectId),
+      Session.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId }, order: [['lesson_number', 'DESC'], ['id', 'DESC']], attributes: ['id', 'lesson_number', 'week_number', 'session_date', 'serial_number'] }),
+      CenterSubjectSeries.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId } }),
+    ]);
+    let weekNumber = null;
+    if (previous && previous.week_number != null) {
+      weekNumber = Number(previous.week_number) + (previous.session_date && weekStartLocal(previous.session_date) === weekStartLocal(date) ? 0 : 1);
+    }
+    out.push({
+      entryId: entry.id,
+      date,
+      offset,
+      time: String(entry.start_time || '').slice(0, 5),
+      subject: entry.Subject,
+      center: entry.Center,
+      lessonNumber,
+      weekNumber,
+      previous,
+      hasSeries: Boolean(series),
+    });
+  }
+  return out;
+}
+
 app.get('/sessions', requirePermission('sessions_view'), async (req, res) => {
   const centerId = Number.parseInt(req.query.center_id, 10);
   const subjectId = Number.parseInt(req.query.subject_id, 10);
@@ -2668,6 +2818,8 @@ app.get('/sessions', requirePermission('sessions_view'), async (req, res) => {
     selectedCenterId: Number.isInteger(centerId) && centerId > 0 ? centerId : '',
     selectedSubjectId: Number.isInteger(subjectId) && subjectId > 0 ? subjectId : '',
     activeSessionId: req.session.activeSessionId,
+    suggestions: await scheduleSuggestions().catch((error) => { console.error('Schedule suggestions failed:', error.message); return []; }),
+    createdMessage: typeof req.query.created_msg === 'string' ? req.query.created_msg.slice(0, 600) : null,
   });
 });
 
@@ -5680,6 +5832,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
     ])];
 
     const individualVideoIds = individualAccesses.map(a => a.VideoId);
+    const individualVideoIdSet = new Set(individualVideoIds.map(Number));
 
     // دمج الاتنين بدون تكرار
     const allAccessibleVideoIds = allVideoAccess
@@ -5779,8 +5932,10 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       cleanedGrants.push(grant);
     }
 
-    const grantBySessionId = {};
-    cleanedGrants.forEach(g => { if (g.SessionId) grantBySessionId[g.SessionId] = g; });
+    // ممكن يبقى للحصة أكتر من صلاحية (واحدة لكل فيديو)
+    const grantsBySessionId = {};
+    cleanedGrants.forEach(g => { if (g.SessionId) (grantsBySessionId[g.SessionId] = grantsBySessionId[g.SessionId] || []).push(g); });
+    const firstPartAtByVideo = await firstPartTimesByVideo(videos.map(video => video.id));
 
     const homeworkBySessionId = new Map();
     for (const assignment of homeworkAssignments) {
@@ -5868,9 +6023,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         grantSessionIds.add(linked.id);
         (sessionIdsByLessonKey.get(lessonKeyOf(linked)) || []).forEach(id => grantSessionIds.add(id));
       });
-      const lessonGrants = [...grantSessionIds].map(sessionId => grantBySessionId[sessionId]).filter(Boolean);
-      const activeGrant = lessonGrants.find(candidate => isGrantActive(candidate, session));
-      const grant = activeGrant || lessonGrants[0];
+      const lessonGrants = [...grantSessionIds].flatMap(sessionId => grantsBySessionId[sessionId] || []);
+      const grant = lessonGrants[0];
       const attended = session && attendedLessonNumbers.has(session.lesson_number);
       let status, viewsUsed = 0, maxViews = 0;
       let unlimited = false;
@@ -5885,17 +6039,27 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         const validGrants = lessonGrants.filter(candidate =>
           candidate.method === 'paid' || candidate.method === 'admin_free' || candidate.method === 'admin_paid' || (candidate.method === 'attended' && attended)
         );
-        const validActiveGrant = validGrants.find(candidate => isGrantActive(candidate, session));
-        if (validActiveGrant) {
+        // ساعة الفيديو ده بس — والعد مبيبدأش غير لما الطالب يفتحه وفيه فيديوهات فعلًا
+        const firstPartAt = firstPartAtByVideo.get(v.id) || null;
+        const videoGrants = validGrants.filter(candidate => grantAppliesToVideo(candidate, v));
+        const usableGrant = videoGrants.find(candidate => grantUsable(candidate, session, firstPartAt));
+        if (usableGrant) {
           status = 'granted';
           unlimited = true;
-          accessExpiresAt = getGrantAccessWindow(validActiveGrant, session).expiresAt.toISOString();
-        } else if (validGrants.length > 0) {
+          accessExpiresAt = grantWaitingForContent(usableGrant, firstPartAt)
+            ? null
+            : getGrantAccessWindow(usableGrant, session).expiresAt.toISOString();
+        } else if (videoGrants.length > 0) {
           status = 'expired';
+        } else if (validGrants.length > 0 || individualVideoIdSet.has(Number(v.id))) {
+          // دفع/حضر الحصة دي من فيديو تاني (أو الأدمن ضافه للفيديو): مفتوح وساعته بتبدأ أول ما يفتحه
+          status = 'granted';
+          unlimited = true;
         } else {
           status = 'locked';
         }
-      } else if (attended) {
+      } else if (attended || individualVideoIdSet.has(Number(v.id))) {
+        // حضر الحصة، أو الأدمن ضافه للفيديو ده بالذات (وصول فردي ببلاش)
         status = 'granted';
         unlimited = true;
       } else {
@@ -5942,7 +6106,9 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       };
     }).filter(Boolean);
 
-    res.json({ success: true, lessons });
+    // الفيديوهات اللي الطالب ده اتشال منها بالذات
+    const blockedVideoIds = await blockedVideoIdsFor(student.id);
+    res.json({ success: true, lessons: blockedVideoIds.size ? lessons.filter(lesson => !blockedVideoIds.has(Number(lesson.videoId))) : lessons });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
@@ -5964,6 +6130,9 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       ],
     });
     if (!video) return res.status(404).json({ success: false, message: 'الدرس غير موجود' });
+    if ((await blockedVideoIdsFor(student.id)).has(Number(video.id))) {
+      return res.status(403).json({ success: false, message: 'الدرس ده مش متاح ليك' });
+    }
 
     const linkedSessions = [
       video.Session,
@@ -6013,9 +6182,33 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       // المسح القديم زي ما هو: بس للحصص المكافئة لحصة الطالب
       else if (equivalentSessionIdSet.has(candidate.SessionId)) await VideoAccessGrant.destroy({ where: { id: candidate.id } });
     }
-    let grant = validGrants.find(candidate => isGrantActive(candidate, session)) || validGrants[0] || null;
+    // كل فيديو ليه ساعته: الصلاحية بتاعة الفيديو ده (أو صلاحية قديمة كان الفيديو موجود وقتها)
+    const firstPartAt = (await firstPartTimesByVideo([video.id])).get(Number(video.id)) || null;
+    const videoGrants = validGrants.filter(candidate => grantAppliesToVideo(candidate, video));
+    let grant = videoGrants.find(candidate => grantUsable(candidate, session, firstPartAt)) || videoGrants[0] || null;
+
+    // دفع/حضر/اتفتحله الحصة دي قبل كده من فيديو تاني: الفيديو ده بياخد ساعة جديدة من غير دفع تاني
+    if (!grant && validGrants.length > 0) {
+      const source = validGrants[0];
+      const hours = Number(session.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS);
+      grant = await VideoAccessGrant.create({
+        StudentId: student.id,
+        SessionId: source.SessionId,
+        VideoId: video.id,
+        method: source.method,
+        max_views: source.max_views || 999,
+        views_used: 1,
+        access_duration_hours: hours,
+        ...createAccessWindow(hours),
+      });
+    }
 
     if (grant) {
+      if (grantWaitingForContent(grant, firstPartAt)) {
+        // الطالب فتح الدرس قبل ما يتحط فيه فيديو: العد يبدأ من أول فتح والفيديو فيه محتوى
+        if (!firstPartAt) return res.json({ success: true, unlimited: true });
+        await restartGrantWindow(grant, session);
+      }
       if (!isGrantActive(grant, session)) {
         return res.json({ success: false, expired: true, message: 'انتهت مدة إتاحة هذه الحصة' });
       }
@@ -6027,6 +6220,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       grant = await VideoAccessGrant.create({
         StudentId: student.id,
         SessionId: session.id,
+        VideoId: video.id,
         method: 'admin_free',
         max_views: 999,
         views_used: 1,
@@ -6046,6 +6240,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
       grant = await VideoAccessGrant.create({
         StudentId: student.id,
         SessionId: session.id,
+        VideoId: video.id,
         method: 'attended',
         max_views: session.views_if_attended,
         views_used: 1,
@@ -6097,6 +6292,7 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     grant = await VideoAccessGrant.create({
       StudentId: student.id,
       SessionId: session.id,
+      VideoId: video.id,
       method: 'paid',
       max_views: session.views_if_paid,
       views_used: 1,
@@ -6181,6 +6377,9 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
       ],
     });
     if (!video) return res.status(404).json({ success: false });
+    if ((await blockedVideoIdsFor(student.id)).has(Number(video.id))) {
+      return res.status(403).json({ success: false, message: 'الدرس ده مش متاح ليك' });
+    }
 
     const linkedSessions = [
       video.Session,
@@ -6213,10 +6412,29 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
         candidate.method === 'admin_paid' ||
         (candidate.method === 'attended' && attendanceExists)
       );
-      // لو فيه أكتر من صلاحية، الشغالة هي اللي بتتحسب (مش أول واحدة)
-      const grant = validGrants.find(candidate => isGrantActive(candidate, session)) || validGrants[0] || lessonGrants[0];
-      if (!validGrants.length || !isGrantActive(grant, session)) {
-        return res.status(403).json({ success: false, expired: !!grant, message: grant ? 'انتهت مدة إتاحة هذه الحصة' : 'غير مسموح' });
+      // ساعة الفيديو ده بس (نفس قواعد زرار الفتح)
+      const firstPartAt = (await firstPartTimesByVideo([video.id])).get(Number(video.id)) || null;
+      const videoGrants = validGrants.filter(candidate => grantAppliesToVideo(candidate, video));
+      let grant = videoGrants.find(candidate => grantUsable(candidate, session, firstPartAt)) || videoGrants[0] || null;
+      // مستحق من فيديو تاني لنفس الحصة (دفع/حضر): الفيديو ده بياخد ساعته من دلوقتي
+      if (!grant && validGrants.length > 0) {
+        const source = validGrants[0];
+        const hours = Number(session.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS);
+        grant = await VideoAccessGrant.create({
+          StudentId: student.id,
+          SessionId: source.SessionId,
+          VideoId: video.id,
+          method: source.method,
+          max_views: source.max_views || 999,
+          views_used: 1,
+          access_duration_hours: hours,
+          ...createAccessWindow(hours),
+        });
+      }
+      if (grant && grantWaitingForContent(grant, firstPartAt) && firstPartAt) await restartGrantWindow(grant, session);
+      if (!grant || !grantUsable(grant, session, firstPartAt)) {
+        const expired = !!grant;
+        return res.status(403).json({ success: false, expired, message: expired ? 'انتهت مدة إتاحة هذه الحصة' : 'غير مسموح' });
       }
     }
 
@@ -6419,7 +6637,7 @@ app.post('/admin/videos/:id/update-title', requirePermissionOrAdmin('admin_video
   }
 });
 
-app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), imageUpload.single('session_image'), async (req, res) => {
+app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   let transaction;
   try {
     const { title } = req.body;
@@ -6441,9 +6659,6 @@ app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), image
     if (!firstSession) return res.status(404).send('❌ الحصة غير موجودة');
 
     transaction = await sequelize.transaction();
-    if (req.file) {
-      await Session.update({ image_path: `/uploads/session-images/${req.file.filename}` }, { where: { id: firstSession.id }, transaction });
-    }
 
     const video = await Video.create({ title, SubjectId: firstSession.SubjectId, SessionId: firstSession.id }, { transaction });
 
@@ -6456,7 +6671,8 @@ app.post('/admin/videos/create', requirePermissionOrAdmin('admin_videos'), image
     await transaction.commit();
     transaction = null;
 
-    res.redirect('/admin/videos');
+    // على صفحة الدرس الجديد على طول عشان تحط لينكات الفيديوهات
+    res.redirect('/admin/videos/' + video.id + '#addParts');
   } catch (error) {
     if (transaction) await transaction.rollback();
     console.error(error);
@@ -6486,29 +6702,98 @@ app.post('/admin/videos/:videoId/remove-session/:sessionId', requirePermissionOr
 });
 
 // إضافة وصول فردي لطالب بكوده
+// رسالة للصفحة اللي الطلب جه منها (صفحة التحكم أو صفحة الفيديوهات)، والموبايل/JSON بياخد status عادي
+function backWithAccessMessage(req, res, videoId, message, status = 200) {
+  const wantsJson = req.headers['x-sync-device-token'] || (req.headers.accept || '').includes('application/json') || req.body?.response_format === 'json';
+  if (wantsJson) return res.status(status).json({ success: status < 400, message });
+  const from = String(req.get('referer') || '');
+  const base = /\/admin\/videos\/\d+\/access/.test(from) || !/\/admin\/videos\/\d+(?:[?#]|$)/.test(from)
+    ? `/admin/videos/${videoId}/access`
+    : `/admin/videos/${videoId}`;
+  res.redirect(`${base}?access_msg=${encodeURIComponent(message)}#students`);
+}
+
+// الطالب ده بياخد الفيديو من مجموعته (نفس المادة والسنتر بتاع حصة من حصص الفيديو)؟
+async function studentInVideoGroup(video, student) {
+  const sessionIds = [video.SessionId, ...(await VideoSession.findAll({ where: { VideoId: video.id }, attributes: ['SessionId'], raw: true })).map(row => row.SessionId)].filter(Boolean);
+  if (!sessionIds.length) return false;
+  return !!(await Session.findOne({ where: { id: sessionIds, SubjectId: student.SubjectId, CenterId: student.CenterId }, attributes: ['id'] }));
+}
+
+// شيل الوصول فعلًا: الوصول الفردي + ساعة الفيديو ده، ولو الطالب من مجموعة الفيديو بيتمنع منه
+async function removeStudentFromVideo(video, student) {
+  await VideoStudentAccess.destroy({ where: { VideoId: video.id, StudentId: student.id } });
+  await VideoAccessGrant.destroy({ where: { VideoId: video.id, StudentId: student.id } });
+  if (await studentInVideoGroup(video, student)) {
+    await VideoStudentBlock.findOrCreate({ where: { VideoId: video.id, StudentId: student.id } });
+    return 'blocked';
+  }
+  return 'removed';
+}
+
+async function blockedVideoIdsFor(studentId) {
+  const rows = await VideoStudentBlock.findAll({ where: { StudentId: studentId }, attributes: ['VideoId'], raw: true });
+  return new Set(rows.map(row => Number(row.VideoId)));
+}
+
 app.post('/admin/videos/:id/add-student-access', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
-    const { student_code } = req.body;
-    const student = await Student.findOne({ where: { student_code: student_code.trim().toUpperCase() } });
-    if (!student) return res.status(404).send('❌ الطالب غير موجود');
-    await VideoStudentAccess.findOrCreate({ where: { VideoId: req.params.id, StudentId: student.id } });
-    res.redirect('/admin/videos/' + req.params.id + '/access');
+    const video = await Video.findByPk(req.params.id, { attributes: ['id'] });
+    if (!video) return res.status(404).send('❌ الفيديو غير موجود');
+    const code = String(req.body.student_code || '').trim();
+    if (!code) return backWithAccessMessage(req, res, video.id, '❌ اكتب كود الطالب', 400);
+    // نفس طريقة السكان: "15" أو "STU-15" أو الكود كامل
+    const student = await findStudentByCode(code);
+    if (!student) return backWithAccessMessage(req, res, video.id, `❌ مفيش طالب بالكود ${code}`, 404);
+    const wasBlocked = await VideoStudentBlock.destroy({ where: { VideoId: video.id, StudentId: student.id } });
+    const [, created] = await VideoStudentAccess.findOrCreate({ where: { VideoId: video.id, StudentId: student.id } });
+    const message = created || wasBlocked
+      ? `✅ ${student.name} (${student.student_code}) بقى عنده الفيديو`
+      : `ℹ️ ${student.name} عنده الفيديو بالفعل`;
+    backWithAccessMessage(req, res, video.id, message);
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
   }
 });
 
-// حذف وصول فردي بالطالب (صفحة التحكم في الوصول)
+// شيل طالب من الفيديو (صفحة التحكم في الوصول): وصول فردي أو من مجموعته
 app.post('/admin/videos/:videoId/remove-student-access-by-student/:studentId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  await VideoStudentAccess.destroy({ where: { VideoId: req.params.videoId, StudentId: req.params.studentId } });
-  res.redirect('/admin/videos/' + req.params.videoId + '/access');
+  try {
+    const video = await Video.findByPk(req.params.videoId, { attributes: ['id', 'SessionId'] });
+    const student = await Student.findByPk(req.params.studentId, { attributes: ['id', 'name', 'SubjectId', 'CenterId'] });
+    if (!video || !student) return res.status(404).send('❌ غير موجود');
+    const result = await removeStudentFromVideo(video, student);
+    backWithAccessMessage(req, res, video.id, result === 'blocked'
+      ? `🚫 ${student.name} اتشال من الفيديو ده (حتى لو مجموعته عندها الفيديو)`
+      : `🗑️ اتشال الوصول الفردي لـ ${student.name}`);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
 });
 
-// حذف وصول فردي
+// حذف وصول فردي (صفحة الفيديو)
 app.post('/admin/videos/:videoId/remove-student-access/:accessId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
-  await VideoStudentAccess.destroy({ where: { id: req.params.accessId } });
-  res.redirect('/admin/videos/' + req.params.videoId + '/access');
+  try {
+    const access = await VideoStudentAccess.findByPk(req.params.accessId);
+    const video = await Video.findByPk(req.params.videoId, { attributes: ['id', 'SessionId'] });
+    if (access && video) {
+      const student = await Student.findByPk(access.StudentId, { attributes: ['id', 'name', 'SubjectId', 'CenterId'] });
+      await VideoStudentAccess.destroy({ where: { id: access.id } });
+      if (student) await VideoAccessGrant.destroy({ where: { VideoId: video.id, StudentId: student.id, method: 'admin_free' } });
+    }
+    res.redirect('/admin/videos/' + req.params.videoId);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('❌ ' + e.message);
+  }
+});
+
+// رجّع طالب اتشال من الفيديو
+app.post('/admin/videos/:videoId/unblock-student/:studentId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  await VideoStudentBlock.destroy({ where: { VideoId: req.params.videoId, StudentId: req.params.studentId } });
+  backWithAccessMessage(req, res, req.params.videoId, '✅ الطالب رجعله الفيديو');
 });
 
 
@@ -6539,7 +6824,11 @@ app.get('/admin/videos/:id', requirePermissionOrAdmin('admin_videos'), async (re
     order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']],
   });
 
-  res.render('manage-video-parts', { video, videoParts, videoSessions, studentAccesses, allSessions });
+  res.render('manage-video-parts', {
+    video, videoParts, videoSessions, studentAccesses, allSessions,
+    accessMessage: typeof req.query.access_msg === 'string' ? req.query.access_msg.slice(0, 300) : null,
+    partsMessage: typeof req.query.parts_msg === 'string' ? req.query.parts_msg.slice(0, 300) : null,
+  });
 });
 
 app.post('/admin/videos/:id/questions-display', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
@@ -6558,22 +6847,65 @@ app.post('/admin/videos/:id/questions-display', requirePermissionOrAdmin('admin_
   }
 });
 
-app.post('/admin/videos/:id/add-part', requirePermissionOrAdmin('admin_videos'), videoUpload.single('video_file'), async (req, res) => {
+app.post('/admin/videos/:id/add-part', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
-    const { category, order_index, source_type, video_url, duration_seconds } = req.body;
-    const partData = { category, order_index, source_type, duration_seconds, VideoId: req.params.id };
+    const { category, order_index, duration_seconds } = req.body;
+    const video_url = String(req.body.video_url || '').trim();
+    if (!video_url) return res.status(400).send('❌ لازم تكتب لينك الفيديو');
 
-    if (source_type === 'upload' && req.file) {
-      partData.file_path = `/uploads/videos/${req.file.filename}`;
-    } else {
-      partData.video_url = video_url;
-    }
-
-    await VideoPart.create(partData);
+    await VideoPart.create({ category, order_index, source_type: 'link', video_url, duration_seconds, VideoId: req.params.id });
     res.redirect('/admin/videos/' + req.params.id);
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+// إضافة كذا لينك مرة واحدة بالترتيب (من غير ما نكتب رقم كل جزء ونحفظ ونستنى التحميل كل مرة)
+// body: { category, parts: [{ url, duration_seconds }], start_order? } — الترقيم بيكمل بعد آخر جزء في النوع ده
+app.post('/admin/videos/:id/add-parts', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  let transaction;
+  try {
+    const video = await Video.findByPk(req.params.id, { attributes: ['id'] });
+    if (!video) return res.status(404).json({ success: false, message: '❌ الدرس غير موجود' });
+    const category = String(req.body.category || '');
+    if (!['explanation', 'questions', 'homework_solution'].includes(category)) {
+      return res.status(400).json({ success: false, message: '❌ اختار نوع الفيديو' });
+    }
+    const rawParts = Array.isArray(req.body.parts) ? req.body.parts : [];
+    const parts = rawParts
+      .map(part => ({ url: String(part && part.url || '').trim(), duration: Math.max(0, Number.parseInt(part && part.duration_seconds, 10) || 0) }))
+      .filter(part => part.url);
+    if (!parts.length) return res.status(400).json({ success: false, message: '❌ حط لينك واحد على الأقل' });
+    if (parts.length > 100) return res.status(400).json({ success: false, message: '❌ أقصى عدد 100 لينك مرة واحدة' });
+    const tooLong = parts.findIndex(part => part.url.length > 255);
+    if (tooLong >= 0) return res.status(400).json({ success: false, message: `❌ اللينك رقم ${tooLong + 1} طويل جدًا (أكتر من 255 حرف)` });
+
+    transaction = await sequelize.transaction();
+    const maxOrder = Number(await VideoPart.max('order_index', { where: { VideoId: video.id, category }, transaction })) || 0;
+    const requestedStart = Number.parseInt(req.body.start_order, 10);
+    const start = requestedStart > 0 ? requestedStart : maxOrder + 1;
+    const created = [];
+    for (let i = 0; i < parts.length; i += 1) {
+      created.push(await VideoPart.create({
+        category,
+        order_index: start + i,
+        source_type: 'link',
+        video_url: parts[i].url,
+        duration_seconds: parts[i].duration,
+        VideoId: video.id,
+      }, { transaction }));
+    }
+    await transaction.commit();
+    res.json({
+      success: true,
+      message: `✅ اتضاف ${created.length} فيديو (أجزاء ${start}${created.length > 1 ? ' → ' + (start + created.length - 1) : ''})`,
+      parts: created.map(part => ({ id: part.id, order: part.order_index, url: part.video_url, duration: part.duration_seconds })),
+    });
+  } catch (error) {
+    if (transaction) await transaction.rollback().catch(() => {});
+    console.error('Bulk add parts failed:', error);
+    res.status(500).json({ success: false, message: '❌ حصلت مشكلة: ' + error.message });
   }
 });
 
@@ -6584,20 +6916,22 @@ app.post('/admin/videos/part/:id/delete', requirePermissionOrAdmin('admin_videos
   res.redirect('/admin/videos/' + videoId);
 });
 
-app.post('/admin/videos/part/:id/update', requirePermissionOrAdmin('admin_videos'), videoUpload.single('video_file'), async (req, res) => {
+app.post('/admin/videos/part/:id/update', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
     const part = await VideoPart.findByPk(req.params.id);
     if (!part) return res.status(404).send('❌ الجزء غير موجود');
 
-    const { category, order_index, source_type, video_url, duration_seconds } = req.body;
-    const updateData = { category, order_index, source_type, duration_seconds };
+    const { category, order_index, duration_seconds } = req.body;
+    const video_url = String(req.body.video_url || '').trim();
+    const updateData = { category, order_index, duration_seconds };
 
-    if (source_type === 'upload') {
-      if (req.file) updateData.file_path = `/uploads/videos/${req.file.filename}`;
-      updateData.video_url = null;
-    } else {
+    // لينك جديد بيحول الجزء للينك؛ من غير لينك الجزء القديم المرفوع بيفضل زي ما هو
+    if (video_url) {
+      updateData.source_type = 'link';
       updateData.video_url = video_url;
       updateData.file_path = null;
+    } else if (part.source_type !== 'upload') {
+      return res.status(400).send('❌ لازم تكتب لينك الفيديو');
     }
 
     await part.update(updateData);
@@ -6700,8 +7034,10 @@ async function loadVideoAccessData(videoId) {
     include: [{ model: Session, attributes: ['id', 'SubjectId', 'CenterId'] }],
   });
   const grantsMap = {};
+  const firstPartAt = (await firstPartTimesByVideo([video.id])).get(Number(video.id)) || null;
   students.forEach(student => {
-    const own = grants.filter(grant => grant.StudentId === student.id);
+    // ساعة الفيديو ده بس: صلاحيته هو، أو صلاحية قديمة كان الفيديو موجود وقتها
+    const own = grants.filter(grant => grant.StudentId === student.id && grantAppliesToVideo(grant, video));
     const sameGroup = grant => grant.Session?.SubjectId === student.SubjectId && grant.Session?.CenterId === student.CenterId;
     // الصلاحية الشغالة الأول (هي اللي الطالب بيتفتحله بيها)، وبعدين بتاعة مجموعته
     grantsMap[student.id] = own.find(grant => isGrantActive(grant, video.Session) && sameGroup(grant))
@@ -6715,7 +7051,17 @@ async function loadVideoAccessData(videoId) {
     order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']],
   });
 
-  return { video, students, grantsMap, manualAccessMap, videoSessions, allSessions, normalPrice: await videoNormalPrice(video) };
+  // صلاحيات لسه العد فيها مبدأش (الطالب فتح الدرس وهو فاضي): هتبدأ أول ما يفتحه وفيه فيديو
+  const waitingMap = {};
+  Object.entries(grantsMap).forEach(([studentId, grant]) => { if (grant && grantWaitingForContent(grant, firstPartAt)) waitingMap[studentId] = true; });
+
+  const blockedStudents = (await VideoStudentBlock.findAll({ where: { VideoId: video.id }, raw: true })).map(row => row.StudentId);
+  const blocked = blockedStudents.length
+    ? await Student.findAll({ where: { id: blockedStudents }, attributes: ['id', 'name', 'student_code'], order: [['name', 'ASC']] })
+    : [];
+  const blockedIds = new Set(blocked.map(student => student.id));
+
+  return { video, students: students.filter(student => !blockedIds.has(student.id)), blocked, grantsMap, waitingMap, manualAccessMap, videoSessions, allSessions, normalPrice: await videoNormalPrice(video) };
 }
 
 app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
@@ -6724,6 +7070,7 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
   res.render('video-access-control', {
     ...data,
     priceMessage: typeof req.query.price_msg === 'string' ? req.query.price_msg.slice(0, 300) : null,
+    accessMessage: typeof req.query.access_msg === 'string' ? req.query.access_msg.slice(0, 300) : null,
   });
 });
 
@@ -6772,7 +7119,7 @@ app.get('/api/staff/videos/:id', requirePermissionOrAdmin('admin_videos'), async
   try {
     const data = await loadVideoAccessData(req.params.id);
     if (!data) return res.status(404).json({ success: false, message: 'الفيديو غير موجود' });
-    const { video, students, grantsMap, manualAccessMap, videoSessions, allSessions, normalPrice } = data;
+    const { video, students, grantsMap, waitingMap, manualAccessMap, videoSessions, allSessions, normalPrice } = data;
     const main = video.Session || {};
     const linked = new Map();
     if (video.Session) linked.set(video.Session.id, { id: video.Session.id, main: true });
@@ -6798,7 +7145,8 @@ app.get('/api/staff/videos/:id', requirePermissionOrAdmin('admin_videos'), async
       })),
       students: students.map(student => {
         const grant = grantsMap[student.id];
-        const window = grant ? getGrantAccessWindow(grant, video.Session) : null;
+        const waiting = !!waitingMap[student.id];
+        const window = grant && !waiting ? getGrantAccessWindow(grant, video.Session) : null;
         return {
           id: student.id,
           code: student.student_code,
@@ -6811,6 +7159,7 @@ app.get('/api/staff/videos/:id', requirePermissionOrAdmin('admin_videos'), async
             durationHours: grant.access_duration_hours || null,
             expiresAt: window && window.expiresAt,
             ended: !!(window && window.expiresAt && window.expiresAt.getTime() <= now),
+            notStarted: waiting, // العد هيبدأ أول ما يفتح الفيديو
           } : null,
         };
       }),
@@ -7044,13 +7393,31 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   const newGrantHours = typedHours > 0 ? durationHours : (extendHours || durationHours);
   const HOUR = 60 * 60 * 1000;
 
-  const [grant, created] = await VideoAccessGrant.findOrCreate({
-    where: { StudentId: req.params.studentId, SessionId: sessionId },
-    defaults: { method: 'admin_free', max_views: 999, access_duration_hours: newGrantHours, ...createAccessWindow(newGrantHours) },
-  });
+  // ساعة الفيديو ده: صلاحيته هو (أو صلاحية قديمة كان موجود وقتها) على أي حصة من حصصه
+  const video2 = await Video.findOne({ where: { id: video.id }, include: [Session, { model: VideoSession, include: [Session] }] });
+  const grantSessionIds = await videoGrantSessionIds(video2, [...allowedSessionIds]);
+  const studentGrants = (await VideoAccessGrant.findAll({ where: { StudentId: req.params.studentId, SessionId: grantSessionIds } }))
+    .filter(candidate => grantAppliesToVideo(candidate, video));
+  const firstPartAt = (await firstPartTimesByVideo([video.id])).get(Number(video.id)) || null;
+  let grant = studentGrants.find(candidate => Number(candidate.VideoId) === Number(video.id))
+    || studentGrants.find(candidate => grantUsable(candidate, session, firstPartAt))
+    || studentGrants[0]
+    || null;
+  const created = !grant;
+  if (created) {
+    grant = await VideoAccessGrant.create({
+      StudentId: req.params.studentId, SessionId: sessionId, VideoId: video.id,
+      method: 'admin_free', max_views: 999, access_duration_hours: newGrantHours, ...createAccessWindow(newGrantHours),
+    });
+  }
 
   let expiresAt = created ? grant.access_expires_at : null;
-  if (!created) {
+  if (!created && grantWaitingForContent(grant, firstPartAt)) {
+    // العد لسه مبدأش (فتح الدرس وهو فاضي): بنغير المدة بس، والعد يبدأ أول ما يفتح الفيديو
+    const hours = extendHours ? Number(grant.access_duration_hours || durationHours) + extendHours : durationHours;
+    await VideoAccessGrant.update({ access_duration_hours: Math.max(1, hours) }, { where: { id: grant.id } });
+    expiresAt = null;
+  } else if (!created) {
     const now = new Date();
     const window = getGrantAccessWindow(grant, session);
     let startedAt = window.startedAt || now;

@@ -35,6 +35,12 @@ const VideoAccessGrant = sequelize.define('VideoAccessGrant', {
     allowNull: true,
     defaultValue: null,
   },
+  // الفيديو اللي الصلاحية دي ليه (كل فيديو ليه ساعته). الصلاحيات القديمة null
+  VideoId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+  },
 }, {
   tableName: 'videoaccessgrants',
 });

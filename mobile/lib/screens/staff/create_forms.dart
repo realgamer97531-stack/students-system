@@ -298,11 +298,15 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
   final _form = GlobalKey<FormState>();
   final _lesson = TextEditingController();
   final _op = OnlineOp();
-  int? _center;
+  // سنتر أو أكتر: أكتر من سنتر = نفس الرقم النسبي في كلهم مرة واحدة
+  final Set<int> _centers = {};
   int? _subject;
   int? _week;
   bool _repeat = false;
   bool _saving = false;
+  bool _centersError = false;
+
+  bool get _many => _centers.length > 1;
 
   @override
   void dispose() {
@@ -311,16 +315,19 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
   }
 
   Future<void> _save() async {
-    if (!_form.currentState!.validate()) return;
+    setState(() => _centersError = _centers.isEmpty);
+    if (!_form.currentState!.validate() || _centers.isEmpty) return;
+    final repeat = _repeat || _many;
     setState(() => _saving = true);
     final res = await _op.send(
       context,
       '/sessions',
       {
-        'center_id': _center,
+        // center_id لوحده للسيرفرات القديمة لو سنتر واحد
+        if (_many) 'center_ids': _centers.toList() else 'center_id': _centers.first,
         'subject_id': _subject,
-        'mode': _repeat ? 'repeat' : 'new',
-        if (_repeat) 'lesson_number': _lesson.text.trim(),
+        'mode': repeat ? 'repeat' : 'new',
+        if (repeat) 'lesson_number': _lesson.text.trim(),
         'week_number': _week ?? '',
       },
       user: widget.user,
@@ -352,7 +359,8 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
       toast(context, res.message, error: true);
       return;
     }
-    final id = ((res.data['session'] as Map?)?['id'] as num?)?.toInt();
+    final id = ((res.data['session'] as Map?)?['id'] as num?)?.toInt()
+        ?? (((res.data['sessions'] as List?)?.firstOrNull as Map?)?['id'] as num?)?.toInt();
     await StaffStore.refreshSnapshot();
     if (!mounted) return;
     toast(context, res.message.isEmpty ? '✅ اتعملت الحصة' : res.message);
@@ -375,17 +383,40 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                     const SizedBox(height: 12),
                     _intDropdown('المادة', snap.subjects, _subject, (v) => setState(() => _subject = v)),
                     const SizedBox(height: 12),
-                    _intDropdown('السنتر', snap.centers, _center, (v) => setState(() => _center = v)),
+                    const Text('السنتر (اختار واحد أو أكتر)', style: TextStyle(color: AppColors.muted)),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final entry in snap.centers.entries)
+                        FilterChip(
+                          label: Text(entry.value),
+                          selected: _centers.contains(entry.key),
+                          showCheckmark: true,
+                          selectedColor: Color.lerp(Colors.white, Color(snap.centerColors[entry.key] ?? 0xFF94A3B8), 0.3),
+                          side: BorderSide(color: Color(snap.centerColors[entry.key] ?? 0xFF94A3B8).withValues(alpha: 0.6)),
+                          onSelected: (on) => setState(() {
+                            on ? _centers.add(entry.key) : _centers.remove(entry.key);
+                            _centersError = false;
+                          }),
+                        ),
+                    ]),
+                    if (_centersError)
+                      const Padding(padding: EdgeInsets.only(top: 6), child: Text('اختار سنتر واحد على الأقل', style: TextStyle(color: AppColors.danger, fontSize: 12.5))),
+                    if (_many)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text('هتتعمل نفس الحصة (نفس الرقم) في ${_centers.length} سناتر مرة واحدة', style: const TextStyle(color: AppColors.primary, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                      ),
                     const SizedBox(height: 8),
-                    RadioGroup<bool>(
-                      groupValue: _repeat,
-                      onChanged: (v) => setState(() => _repeat = v ?? false),
-                      child: const Column(children: [
-                        RadioListTile<bool>(contentPadding: EdgeInsets.zero, value: false, title: Text('الحصة الجاية تلقائي (بعد آخر حصة لنفس السنتر والمادة)')),
-                        RadioListTile<bool>(contentPadding: EdgeInsets.zero, value: true, title: Text('تكرار حصة سابقة في سنتر تاني (أنا أحدد رقمها)')),
-                      ]),
-                    ),
-                    if (_repeat) ...[
+                    if (!_many)
+                      RadioGroup<bool>(
+                        groupValue: _repeat,
+                        onChanged: (v) => setState(() => _repeat = v ?? false),
+                        child: const Column(children: [
+                          RadioListTile<bool>(contentPadding: EdgeInsets.zero, value: false, title: Text('الحصة الجاية تلقائي (بعد آخر حصة لنفس السنتر والمادة)')),
+                          RadioListTile<bool>(contentPadding: EdgeInsets.zero, value: true, title: Text('تكرار حصة سابقة في سنتر تاني (أنا أحدد رقمها)')),
+                        ]),
+                      ),
+                    if (_repeat || _many) ...[
                       TextFormField(
                         controller: _lesson,
                         keyboardType: TextInputType.number,
@@ -399,7 +430,7 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                       decoration: const InputDecoration(labelText: 'رقم الأسبوع (اختياري)'),
                       items: [
                         const DropdownMenuItem(value: null, child: Text('من غير أسبوع')),
-                        for (var w = 1; w <= 10; w++) DropdownMenuItem(value: w, child: Text('الأسبوع $w')),
+                        for (var w = 1; w <= 20; w++) DropdownMenuItem(value: w, child: Text('الأسبوع $w')),
                       ],
                       onChanged: (v) => setState(() => _week = v),
                     ),
@@ -409,7 +440,7 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                       icon: _saving
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.play_arrow),
-                      label: const Text('بدء الحصة'),
+                      label: Text(_many ? 'بدء الحصة في ${_centers.length} سناتر' : 'بدء الحصة'),
                     ),
                     const SizedBox(height: 6),
                     const Text('بدء حصة محتاج نت.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 12.5)),

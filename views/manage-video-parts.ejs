@@ -27,62 +27,180 @@
   </div>
 </div>
 
-<div class="card shadow-sm mb-4">
+<%
+  const nextOrderByCategory = {};
+  ['explanation', 'questions', 'homework_solution'].forEach(cat => {
+    const orders = videoParts.filter(p => p.category === cat).map(p => Number(p.order_index) || 0);
+    nextOrderByCategory[cat] = (orders.length ? Math.max(...orders) : 0) + 1;
+  });
+%>
+<style>
+  .bulk-links textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; direction: ltr; text-align: left; min-height: 120px; }
+  .bulk-preview { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+  .bulk-preview .row-ok, .bulk-preview .row-bad {
+    display: flex; gap: 8px; align-items: center; padding: 4px 10px; border-radius: 10px; font-size: 0.8rem;
+    background: var(--sf-panel-bg); border: 1px solid var(--sf-input-border); min-width: 0;
+  }
+  .bulk-preview .row-bad { background: var(--sf-danger-soft-bg); color: var(--sf-danger-soft-text); }
+  .bulk-preview .num { font-weight: 800; white-space: nowrap; }
+  .bulk-preview .url { direction: ltr; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .bulk-preview .dur { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--sf-muted); }
+</style>
+<div class="card shadow-sm mb-4 bulk-links" id="addParts">
   <div class="card-body">
-    <h6 class="mb-3"><span class="ar-only">إضافة فيديو جديد لهذا الدرس</span><span class="en-only" style="display:none;">Add New Video to This Lesson</span></h6>
-    <form action="/admin/videos/<%= video.id %>/add-part" method="POST" enctype="multipart/form-data" class="row g-2" onsubmit="return combineDuration()">
-      <div class="col-md-3">
-        <select name="category" class="form-select" required>
-          <option value="explanation"><span class="ar-only">فيديو الشرح</span><span class="en-only" style="display:none;">Explanation Video</span></option>
-          <option value="questions"><span class="ar-only">فيديو الأسئلة</span><span class="en-only" style="display:none;">Questions Video</span></option>
-          <option value="homework_solution"><span class="ar-only">فيديو حل الواجب</span><span class="en-only" style="display:none;">Homework Solution Video</span></option>
+    <h6 class="mb-1"><span class="ar-only">➕ إضافة فيديوهات للدرس (كذا لينك مرة واحدة)</span><span class="en-only" style="display:none;">➕ Add videos to this lesson (many links at once)</span></h6>
+    <p class="small text-muted mb-3">
+      <span class="ar-only">حط كل لينك في سطر بالترتيب. لو عايز مدة لكل لينك اكتبها بعده في نفس السطر (مثال: <code dir="ltr">https://... 25:30</code> أو <code dir="ltr">1:05:00</code>)، ولو مكتبتش هتاخد المدة اللي تحت.</span>
+      <span class="en-only" style="display:none;">One link per line, in order. To give each link its own duration put it after the link on the same line (e.g. <code>https://... 25:30</code> or <code>1:05:00</code>); otherwise the duration below is used.</span>
+    </p>
+    <% if (typeof partsMessage !== 'undefined' && partsMessage) { %>
+      <div class="alert alert-success py-2"><%= partsMessage %></div>
+    <% } %>
+    <form id="bulkPartsForm" class="row g-3" onsubmit="return submitBulkParts(event)">
+      <div class="col-md-4">
+        <label class="form-label small mb-1"><span class="ar-only">النوع</span><span class="en-only" style="display:none;">Type</span></label>
+        <select id="bulkCategory" class="form-select">
+          <option value="explanation"><span class="ar-only">📖 فيديو الشرح</span><span class="en-only" style="display:none;">📖 Explanation</span></option>
+          <option value="questions"><span class="ar-only">❓ فيديو الأسئلة</span><span class="en-only" style="display:none;">❓ Questions</span></option>
+          <option value="homework_solution"><span class="ar-only">✅ فيديو حل الواجب</span><span class="en-only" style="display:none;">✅ Homework solution</span></option>
         </select>
       </div>
-      <div class="col-md-2">
-        <input type="number" name="order_index" class="form-control" placeholder="الترتيب" value="1" min="1" required>
-      </div>
-      <div class="col-md-2">
-        <select name="source_type" id="sourceType" class="form-select" onchange="toggleSource()">
-          <option value="link"><span class="ar-only">لينك</span><span class="en-only" style="display:none;">Link</span></option>
-          <option value="upload"><span class="ar-only">رفع ملف</span><span class="en-only" style="display:none;">Upload File</span></option>
-        </select>
-      </div>
-      <div class="col-md-3" id="linkInputBox">
-        <input type="text" name="video_url" class="form-control" placeholder="لينك الفيديو">
-      </div>
-      <div class="col-md-3" id="uploadInputBox" style="display:none;">
-        <input type="file" name="video_file" class="form-control" accept="video/*">
-      </div>
       <div class="col-md-3">
-        <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">مدة الفيديو</span><span class="en-only" style="display:none;">Video Duration</span></label>
-        <div class="d-flex gap-1">
-          <div>
-            <input type="number" id="durHours" class="form-control" placeholder="ساعة" min="0" value="0" style="width:75px;">
-            <span class="small text-muted d-block text-center"><span class="ar-only">ساعة</span><span class="en-only" style="display:none;">Hour</span></span>
-          </div>
-          <div>
-            <input type="number" id="durMinutes" class="form-control" placeholder="دقيقة" min="0" max="59" value="0" style="width:75px;">
-            <span class="small text-muted d-block text-center"><span class="ar-only">دقيقة</span><span class="en-only" style="display:none;">Minute</span></span>
-          </div>
-          <div>
-            <input type="number" id="durSeconds" class="form-control" placeholder="ثانية" min="0" max="59" value="0" style="width:75px;">
-            <span class="small text-muted d-block text-center"><span class="ar-only">ثانية</span><span class="en-only" style="display:none;">Second</span></span>
-          </div>
+        <label class="form-label small mb-1"><span class="ar-only">يبدأ من جزء رقم</span><span class="en-only" style="display:none;">Start at part #</span></label>
+        <input type="number" id="bulkStart" class="form-control" min="1">
+      </div>
+      <div class="col-md-5">
+        <label class="form-label small mb-1"><span class="ar-only">المدة لأي لينك من غير مدة</span><span class="en-only" style="display:none;">Duration for links without one</span></label>
+        <div class="d-flex gap-1 align-items-center">
+          <input type="number" id="durHours" class="form-control" placeholder="ساعة" min="0" value="0" style="width:72px;" title="ساعة">
+          <span>:</span>
+          <input type="number" id="durMinutes" class="form-control" placeholder="دقيقة" min="0" max="59" value="0" style="width:72px;" title="دقيقة">
+          <span>:</span>
+          <input type="number" id="durSeconds" class="form-control" placeholder="ثانية" min="0" max="59" value="0" style="width:72px;" title="ثانية">
         </div>
-        <input type="hidden" name="duration_seconds" id="durationSecondsHidden" required>
       </div>
-      <div class="col-md-2">
-        <button type="submit" class="btn btn-success w-100"><span class="ar-only">إضافة</span><span class="en-only" style="display:none;">Add</span></button>
+      <div class="col-12">
+        <textarea id="bulkLinks" class="form-control" rows="5" placeholder="https://youtu.be/xxxx 25:30&#10;https://vimeo.com/yyyy&#10;https://drive.google.com/... 1:02:10"></textarea>
+      </div>
+      <div class="col-12">
+        <div id="bulkPreview" class="bulk-preview"></div>
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+        <button type="submit" id="bulkSubmit" class="btn btn-success" disabled>
+          <span class="ar-only">💾 احفظ كل اللينكات</span><span class="en-only" style="display:none;">💾 Save all links</span>
+        </button>
+        <span id="bulkStatus" class="small"></span>
       </div>
     </form>
-    <p class="text-muted small mt-2">💡 <span class="ar-only">لو فيه أكتر من لينك لنفس النوع، ضيفهم بترتيب مختلف (1, 2, 3...).</span><span class="en-only" style="display:none;">If there's more than one link for the same type, add them with a different order (1, 2, 3...).</span></p>
   </div>
 </div>
+
+<script>
+  (function () {
+    const NEXT_ORDER = <%- JSON.stringify(nextOrderByCategory) %>;
+    const form = document.getElementById('bulkPartsForm');
+    const category = document.getElementById('bulkCategory');
+    const start = document.getElementById('bulkStart');
+    const links = document.getElementById('bulkLinks');
+    const preview = document.getElementById('bulkPreview');
+    const submit = document.getElementById('bulkSubmit');
+    const status = document.getElementById('bulkStatus');
+    const en = (localStorage.getItem('language') || 'ar') === 'en';
+    let startTouched = false;
+
+    function esc(v) { const d = document.createElement('div'); d.textContent = v; return d.innerHTML; }
+    function fmt(sec) {
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(s).padStart(2, '0');
+    }
+    // "25:30" / "1:05:00" / "25" (دقايق)
+    function parseDuration(text) {
+      if (!text) return null;
+      const parts = text.split(':').map(x => x.trim());
+      if (parts.some(x => !/^\d+$/.test(x))) return NaN;
+      const n = parts.map(Number);
+      if (n.length === 1) return n[0] * 60;
+      if (n.length === 2) return n[0] * 60 + n[1];
+      if (n.length === 3) return n[0] * 3600 + n[1] * 60 + n[2];
+      return NaN;
+    }
+    function defaultDuration() {
+      const h = parseInt(document.getElementById('durHours').value, 10) || 0;
+      const m = parseInt(document.getElementById('durMinutes').value, 10) || 0;
+      const s = parseInt(document.getElementById('durSeconds').value, 10) || 0;
+      return h * 3600 + m * 60 + s;
+    }
+    function parseLines() {
+      const fallback = defaultDuration();
+      return links.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+        const bits = line.split(/[\s|]+/).filter(Boolean);
+        const url = bits[0] || '';
+        const own = parseDuration(bits.slice(1).join(''));
+        let error = '';
+        if (!/^https?:\/\/\S+$/i.test(url)) error = en ? 'not a link' : 'ده مش لينك';
+        else if (url.length > 255) error = en ? 'link too long' : 'اللينك طويل جدًا';
+        else if (Number.isNaN(own)) error = en ? 'bad duration' : 'المدة مش مظبوطة';
+        const duration = own == null ? fallback : own;
+        if (!error && !(duration > 0)) error = en ? 'needs a duration' : 'محتاج مدة';
+        return { url, duration, error };
+      });
+    }
+    function render() {
+      if (!startTouched) start.value = NEXT_ORDER[category.value] || 1;
+      const rows = parseLines();
+      const first = parseInt(start.value, 10) || 1;
+      preview.innerHTML = rows.map((row, i) => `<div class="${row.error ? 'row-bad' : 'row-ok'}">
+          <span class="num">${en ? 'Part' : 'جزء'} ${first + i}</span>
+          <span class="url">${esc(row.url)}</span>
+          <span class="dur">${row.error ? '⚠️ ' + esc(row.error) : '⏱ ' + fmt(row.duration)}</span>
+        </div>`).join('');
+      const bad = rows.filter(row => row.error).length;
+      submit.disabled = !rows.length || bad > 0;
+      status.className = 'small ' + (bad ? 'text-danger' : 'text-muted');
+      status.textContent = !rows.length ? '' : bad
+        ? (en ? `${bad} line(s) need fixing` : `${bad} سطر محتاج يتصلح`)
+        : (en ? `${rows.length} video(s) ready` : `${rows.length} فيديو جاهز للحفظ`);
+    }
+    window.submitBulkParts = async function (event) {
+      event.preventDefault();
+      const rows = parseLines();
+      if (!rows.length || rows.some(row => row.error)) return false;
+      submit.disabled = true;
+      status.className = 'small text-muted';
+      status.textContent = en ? 'Saving…' : 'بيحفظ...';
+      try {
+        const response = await fetch('/admin/videos/<%= video.id %>/add-parts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            category: category.value,
+            start_order: parseInt(start.value, 10) || null,
+            parts: rows.map(row => ({ url: row.url, duration_seconds: row.duration })),
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) throw new Error(data.message || ('HTTP ' + response.status));
+        // تحميل واحد بس في الآخر عشان القايمة تحت تتحدث
+        location.href = '/admin/videos/<%= video.id %>?parts_msg=' + encodeURIComponent(data.message) + '#cat-' + category.value;
+      } catch (error) {
+        status.className = 'small text-danger';
+        status.textContent = error.message;
+        submit.disabled = false;
+      }
+      return false;
+    };
+    category.addEventListener('change', () => { startTouched = false; render(); });
+    start.addEventListener('input', () => { startTouched = true; render(); });
+    links.addEventListener('input', render);
+    ['durHours', 'durMinutes', 'durSeconds'].forEach(id => document.getElementById(id).addEventListener('input', render));
+    render();
+  })();
+</script>
 
 <% ['explanation', 'questions', 'homework_solution'].forEach(cat => { %>
   <% const labels = { explanation: '📖 فيديو الشرح', questions: '❓ فيديو الأسئلة', homework_solution: '✅ فيديو حل الواجب' }; %>
   <% const labelsEn = { explanation: 'Explanation Video', questions: 'Questions Video', homework_solution: 'Homework Solution Video' }; %>
-  <div class="card shadow-sm mb-3">
+  <div class="card shadow-sm mb-3" id="cat-<%= cat %>">
     <div class="card-body">
       <h6 class="mb-3"><span class="ar-only"><%= labels[cat] %></span><span class="en-only" style="display:none;"><%= labelsEn[cat] %></span></h6>
       <% const parts = videoParts.filter(p => p.category === cat); %>
@@ -115,27 +233,16 @@
             </tr>
             <tr id="editRow<%= p.id %>" style="display:none;">
               <td colspan="4">
-                <form action="/admin/videos/part/<%= p.id %>/update" method="POST" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return combineEditDuration('<%= p.id %>')">
+                <form action="/admin/videos/part/<%= p.id %>/update" method="POST" class="row g-2 align-items-end" onsubmit="return combineEditDuration('<%= p.id %>')">
                   <input type="hidden" name="category" value="<%= p.category %>">
                   <div class="col-md-2">
                     <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">الترتيب</span><span class="en-only" style="display:none;">Order</span></label>
                     <input type="number" name="order_index" class="form-control" value="<%= p.order_index %>" min="1" required>
                   </div>
-                  <div class="col-md-2">
-                    <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">النوع</span><span class="en-only" style="display:none;">Type</span></label>
-                    <select name="source_type" id="editSourceType<%= p.id %>" class="form-select" onchange="toggleEditSource('<%= p.id %>')">
-                      <option value="link" <%= p.source_type === 'link' ? 'selected' : '' %>><span class="ar-only">لينك</span><span class="en-only" style="display:none;">Link</span></option>
-                      <option value="upload" <%= p.source_type === 'upload' ? 'selected' : '' %>><span class="ar-only">رفع ملف</span><span class="en-only" style="display:none;">Upload File</span></option>
-                    </select>
-                  </div>
-                  <div class="col-md-3" id="editLinkBox<%= p.id %>" style="<%= p.source_type === 'upload' ? 'display:none;' : '' %>">
+                  <div class="col-md-5" id="editLinkBox<%= p.id %>">
                     <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">لينك الفيديو</span><span class="en-only" style="display:none;">Video Link</span></label>
-                    <input type="text" name="video_url" class="form-control" placeholder="لينك الفيديو" value="<%= p.source_type === 'link' ? p.video_url : '' %>">
-                  </div>
-                  <div class="col-md-3" id="editUploadBox<%= p.id %>" style="<%= p.source_type === 'upload' ? '' : 'display:none;' %>">
-                    <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">ملف جديد (اختياري)</span><span class="en-only" style="display:none;">New File (optional)</span></label>
-                    <input type="file" name="video_file" class="form-control" accept="video/*">
-                    <% if (p.source_type === 'upload') { %><p class="small text-muted mb-0 mt-1"><span class="ar-only">اترك فاضي للاحتفاظ بالملف الحالي</span><span class="en-only" style="display:none;">Leave empty to keep the current file</span></p><% } %>
+                    <input type="text" name="video_url" class="form-control" placeholder="لينك الفيديو" value="<%= p.source_type === 'link' ? p.video_url : '' %>" <%= p.source_type === 'upload' ? '' : 'required' %>>
+                    <% if (p.source_type === 'upload') { %><p class="small text-muted mb-0 mt-1"><span class="ar-only">ده ملف مرفوع قديم — حط لينك بداله</span><span class="en-only" style="display:none;">Old uploaded file — replace it with a link</span></p><% } %>
                   </div>
                   <div class="col-md-3">
                     <label class="form-label small text-muted mb-1 d-block"><span class="ar-only">مدة الفيديو</span><span class="en-only" style="display:none;">Video Duration</span></label>
@@ -206,7 +313,11 @@
 
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <h6 class="mb-3">👤 <span class="ar-only">وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</span><span class="en-only" style="display:none;">Individual Access for Specific Students (Outside Allowed Groups)</span></h6>
+    <h6 class="mb-3" id="students">👤 <span class="ar-only">وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</span><span class="en-only" style="display:none;">Individual Access for Specific Students (Outside Allowed Groups)</span></h6>
+    <% if (typeof accessMessage !== 'undefined' && accessMessage) { %>
+      <div class="alert <%= /^❌/.test(accessMessage) ? 'alert-danger' : 'alert-success' %> py-2"><%= accessMessage %></div>
+    <% } %>
+    <p class="small text-muted mb-2"><span class="ar-only">لشيل الفيديو من طالب في مجموعة الحصة نفسها استخدم صفحة "التحكم".</span><span class="en-only" style="display:none;">To remove the video from a student in the session's own group, use the "Control" page.</span> <a href="/admin/videos/<%= video.id %>/access#students">🔐 <span class="ar-only">التحكم</span><span class="en-only" style="display:none;">Control</span></a></p>
 
     <% if (studentAccesses.length === 0) { %>
       <p class="text-muted small mb-3"><span class="ar-only">لا يوجد طلاب بوصول فردي</span><span class="en-only" style="display:none;">No students with individual access</span></p>
@@ -239,21 +350,16 @@
       </div>
     <% } %>
 
-    <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex gap-2">
-      <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:200px;"
-        placeholder="كود الطالب (STU-XXXXX)" required>
-      <button class="btn btn-sm btn-success">+ <span class="ar-only">إضافة طالب</span><span class="en-only" style="display:none;">Add Student</span></button>
+    <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex flex-wrap gap-2 align-items-center">
+      <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:220px;"
+        placeholder="كود الطالب (مثال: 15 أو STU-00015)" required>
+      <button class="btn btn-sm btn-success">+ <span class="ar-only">إضافة طالب للفيديو</span><span class="en-only" style="display:none;">Add student to video</span></button>
+      <span class="small text-muted"><span class="ar-only">أي طالب، حتى لو من مجموعة تانية — بيفتحله الفيديو ببلاش</span><span class="en-only" style="display:none;">Any student, even from another group — opens for free</span></span>
     </form>
   </div>
 </div>
 
 <script>
-  function toggleSource() {
-    const type = document.getElementById('sourceType').value;
-    document.getElementById('linkInputBox').style.display = type === 'link' ? 'block' : 'none';
-    document.getElementById('uploadInputBox').style.display = type === 'upload' ? 'block' : 'none';
-  }
-
   function combineDuration() {
     const h = parseInt(document.getElementById('durHours').value, 10) || 0;
     const m = parseInt(document.getElementById('durMinutes').value, 10) || 0;
@@ -270,12 +376,6 @@
   function toggleEditRow(partId) {
     const row = document.getElementById('editRow' + partId);
     row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
-  }
-
-  function toggleEditSource(partId) {
-    const type = document.getElementById('editSourceType' + partId).value;
-    document.getElementById('editLinkBox' + partId).style.display = type === 'link' ? 'block' : 'none';
-    document.getElementById('editUploadBox' + partId).style.display = type === 'upload' ? 'block' : 'none';
   }
 
   function combineEditDuration(partId) {

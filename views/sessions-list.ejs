@@ -26,6 +26,17 @@
     font-weight: 800; font-variant-numeric: tabular-nums;
   }
   .sessions-table-card td { white-space: nowrap; }
+  .schedule-suggest { border-inline-start: 4px solid var(--sf-accent) !important; }
+  .suggest-row {
+    display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    padding: 8px 10px; border-radius: 12px; background: var(--sf-panel-bg);
+  }
+  .suggest-when { display: flex; flex-direction: column; line-height: 1.3; }
+  .suggest-what { display: flex; align-items: center; gap: 8px; }
+  @media (max-width: 768px) {
+    .suggest-row { grid-template-columns: 1fr; gap: 6px; }
+    .suggest-row .sf-actions { justify-content: flex-start; flex-wrap: wrap; }
+  }
   .badge-status-active {
     background-color: rgba(16, 185, 129, 0.15) !important;
     color: #10b981 !important;
@@ -51,6 +62,64 @@
     <span class="en-only" style="display:none;">+ New Session</span>
   </a>
 </div>
+
+<% if (typeof createdMessage !== 'undefined' && createdMessage) { %>
+  <div class="alert <%= /^❌/.test(createdMessage) ? 'alert-danger' : 'alert-success' %>"><%= createdMessage %></div>
+<% } %>
+
+<% if (typeof suggestions !== 'undefined' && suggestions.length) { %>
+  <%
+    const dayNames = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+    const dayNamesEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const whenAr = (s) => s.offset === 0 ? 'النهارده' : s.offset === 1 ? 'بكرة' : dayNames[new Date(s.date + 'T12:00:00').getDay()];
+    const whenEn = (s) => s.offset === 0 ? 'Today' : s.offset === 1 ? 'Tomorrow' : dayNamesEn[new Date(s.date + 'T12:00:00').getDay()];
+    const canCreateSessions = userRole === 'admin' || (Array.isArray(userPermissions) && userPermissions.includes('sessions_create'));
+    const plain = (v) => String(v == null ? '' : v).replace(/['"\\<>]/g, '');
+  %>
+  <div class="card mb-3 schedule-suggest">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+        <h6 class="mb-0">📅 <span class="ar-only">حصص جاية من الجدول — تعملها؟</span><span class="en-only" style="display:none;">Coming up from the schedule — create them?</span></h6>
+        <a href="/schedule" class="small"><span class="ar-only">الجدول</span><span class="en-only" style="display:none;">Schedule</span> ›</a>
+      </div>
+      <div class="d-flex flex-column gap-2">
+        <% suggestions.forEach(s => { %>
+          <div class="suggest-row">
+            <div class="suggest-when">
+              <b><span class="ar-only"><%= whenAr(s) %></span><span class="en-only" style="display:none;"><%= whenEn(s) %></span></b>
+              <span class="text-muted small"><%= s.time %> · <bdi dir="ltr"><%= s.date %></bdi></span>
+            </div>
+            <div class="sf-chip-row"><%- sf.subject(s.subject) %><%- sf.center(s.center) %></div>
+            <div class="suggest-what">
+              <span class="session-num"><%= s.lessonNumber %></span>
+              <span class="small">
+                <span class="ar-only">حصة <%= s.lessonNumber %><%= s.weekNumber ? ' · أسبوع ' + s.weekNumber : '' %></span>
+                <span class="en-only" style="display:none;">Lesson <%= s.lessonNumber %><%= s.weekNumber ? ' · Week ' + s.weekNumber : '' %></span>
+                <% if (s.previous) { %><span class="text-muted d-block" style="font-size:0.72rem;"><span class="ar-only">اللي قبلها: حصة <%= s.previous.lesson_number %><%= s.previous.week_number != null ? ' · أسبوع ' + s.previous.week_number : '' %></span><span class="en-only" style="display:none;">Previous: L<%= s.previous.lesson_number %><%= s.previous.week_number != null ? ' · W' + s.previous.week_number : '' %></span></span><% } %>
+              </span>
+            </div>
+            <div class="sf-actions">
+              <% if (!s.hasSeries) { %>
+                <span class="badge bg-danger"><span class="ar-only">مفيش أساس سيريال</span><span class="en-only" style="display:none;">No serial base</span></span>
+              <% } else if (canCreateSessions) { %>
+                <form action="/sessions" method="POST" onsubmit="return confirm('تعمل حصة <%= s.lessonNumber %> (<%= plain(s.subject.name) %> - <%= plain(s.center.name) %>)؟')">
+                  <input type="hidden" name="subject_id" value="<%= s.subject.id %>">
+                  <input type="hidden" name="center_id" value="<%= s.center.id %>">
+                  <input type="hidden" name="mode" value="repeat">
+                  <input type="hidden" name="lesson_number" value="<%= s.lessonNumber %>">
+                  <input type="hidden" name="week_number" value="<%= s.weekNumber || '' %>">
+                  <input type="hidden" name="session_date" value="<%= s.date %>">
+                  <button class="btn btn-sm btn-success">✅ <span class="ar-only">اعملها</span><span class="en-only" style="display:none;">Create</span></button>
+                </form>
+                <a class="btn btn-sm btn-outline-secondary" href="/sessions/new?<%= new URLSearchParams({ subject_id: s.subject.id, center_id: s.center.id, lesson_number: s.lessonNumber, week_number: s.weekNumber || '', session_date: s.date }).toString() %>">✏️ <span class="ar-only">عدّل وأنشئ</span><span class="en-only" style="display:none;">Edit first</span></a>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+<% } %>
 
 <form method="GET" action="/sessions" class="card p-3 mb-3">
   <div class="row g-2 align-items-end">

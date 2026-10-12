@@ -247,9 +247,16 @@
   </div>
 </div>
 
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm mb-3" id="students">
   <div class="card-body">
-    <h6 class="mb-3">👤 <span class="ar-only">وصول فردي لطلاب بعينهم (خارج المجموعات المسموح بها)</span><span class="en-only" style="display:none;">Individual Access for Specific Students (Outside Allowed Groups)</span></h6>
+    <h6 class="mb-1">👥 <span class="ar-only">الطلاب اللي عندهم الفيديو</span><span class="en-only" style="display:none;">Students who have this video</span></h6>
+    <p class="small text-muted mb-3">
+      <span class="ar-only">طلاب مجموعات الحصص المرتبطة + اللي اتضافوا بالكود. "شيل" بيشيل الفيديو من الطالب ده بس حتى لو مجموعته عندها الفيديو.</span>
+      <span class="en-only" style="display:none;">Students of the linked sessions' groups + students added by code. "Remove" takes the video away from that student only, even if their group has it.</span>
+    </p>
+    <% if (typeof accessMessage !== 'undefined' && accessMessage) { %>
+      <div class="alert <%= /^❌/.test(accessMessage) ? 'alert-danger' : 'alert-success' %> py-2"><%= accessMessage %></div>
+    <% } %>
 
     <div class="mb-3">
       <input id="studentSearch" type="text" class="form-control" placeholder="🔍 بحث بالاسم أو الكود">
@@ -278,8 +285,9 @@
               <% const grantStart = grant && (grant.access_started_at || grant.createdAt); %>
               <% const grantHours = grant && (grant.access_duration_hours || video.Session.access_duration_hours || 72); %>
               <% const grantExpiry = grantStart ? new Date(grant.access_expires_at || new Date(grantStart).getTime() + grantHours * 60 * 60 * 1000) : null; %>
-              <% const grantEnded = !!(grantExpiry && grantExpiry.getTime() <= Date.now()); %>
-              <% const remaining = grant ? (grantEnded ? '⛔ انتهت ' + grantExpiry.toLocaleString('ar-EG') : 'غير محدود حتى ' + (grantExpiry ? grantExpiry.toLocaleString('ar-EG') : 'أول فتح')) : (video.Session.is_free_for_all ? 'غير محدود' : 'لم يتم فتح بعد'); %>
+              <% const grantWaiting = !!(typeof waitingMap !== 'undefined' && waitingMap[student.id]); %>
+              <% const grantEnded = !grantWaiting && !!(grantExpiry && grantExpiry.getTime() <= Date.now()); %>
+              <% const remaining = grantWaiting ? '⏳ العد لسه مبدأش — هيبدأ أول ما يفتح الفيديو (' + grantHours + ' ساعة)' : grant ? (grantEnded ? '⛔ انتهت ' + grantExpiry.toLocaleString('ar-EG') : 'غير محدود حتى ' + (grantExpiry ? grantExpiry.toLocaleString('ar-EG') : 'أول فتح')) : (video.Session.is_free_for_all ? 'غير محدود' : 'لم يتم فتح بعد'); %>
               <tr data-search="<%= (student.name + ' ' + student.student_code).toLowerCase() %>">
                 <td><%= student.student_code %></td>
                 <td><%= student.name %></td>
@@ -303,8 +311,9 @@
                   </form>
                 </td>
                 <td>
-                  <form action="/admin/videos/<%= video.id %>/remove-student-access-by-student/<%= student.id %>" method="POST">
-                    <button class="btn btn-sm btn-outline-danger"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
+                  <form action="/admin/videos/<%= video.id %>/remove-student-access-by-student/<%= student.id %>" method="POST"
+                    onsubmit="return confirm('شيل الفيديو ده من <%= String(student.name).replace(/['\\]/g, '') %>؟')">
+                    <button class="btn btn-sm btn-outline-danger" title="شيل الفيديو من الطالب ده">🚫 <span class="ar-only">شيل</span><span class="en-only" style="display:none;">Remove</span></button>
                   </form>
                 </td>
               </tr>
@@ -314,11 +323,26 @@
       </div>
     <% } %>
 
-    <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex gap-2">
-      <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:200px;"
-        placeholder="كود الطالب (STU-XXXXX)" required>
-      <button class="btn btn-sm btn-success">+ <span class="ar-only">إضافة طالب</span><span class="en-only" style="display:none;">Add Student</span></button>
+    <form action="/admin/videos/<%= video.id %>/add-student-access" method="POST" class="d-flex flex-wrap gap-2 align-items-center">
+      <input type="text" name="student_code" class="form-control form-control-sm" style="max-width:220px;"
+        placeholder="كود الطالب (مثال: 15 أو STU-00015)" required>
+      <button class="btn btn-sm btn-success">+ <span class="ar-only">إضافة طالب للفيديو</span><span class="en-only" style="display:none;">Add student to video</span></button>
+      <span class="small text-muted"><span class="ar-only">أي طالب، حتى لو من مجموعة تانية — بيفتحله الفيديو ببلاش</span><span class="en-only" style="display:none;">Any student, even from another group — opens for free</span></span>
     </form>
+
+    <% if (typeof blocked !== 'undefined' && blocked.length) { %>
+      <div class="mt-3 p-2 rounded soft-panel">
+        <div class="small fw-bold mb-2">🚫 <span class="ar-only">اتشالوا من الفيديو ده (<%= blocked.length %>)</span><span class="en-only" style="display:none;">Removed from this video (<%= blocked.length %>)</span></div>
+        <div class="d-flex flex-wrap gap-2">
+          <% blocked.forEach(student => { %>
+            <form action="/admin/videos/<%= video.id %>/unblock-student/<%= student.id %>" method="POST" class="d-inline-flex align-items-center gap-1 border rounded-pill px-2 py-1 small">
+              <span><%= student.name %> <span class="text-muted">(<%= student.student_code %>)</span></span>
+              <button class="btn btn-sm btn-link p-0 ms-1" title="رجّعله الفيديو">↩️ <span class="ar-only">رجّعه</span><span class="en-only" style="display:none;">Allow</span></button>
+            </form>
+          <% }) %>
+        </div>
+      </div>
+    <% } %>
   </div>
 </div>
 
