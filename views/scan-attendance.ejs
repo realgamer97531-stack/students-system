@@ -221,8 +221,20 @@
     document.getElementById('manualCode').closest('.input-group').style.display = 'none';
 
     resultBox.innerHTML = '';
-    document.getElementById('summaryStudentName').textContent =
-      `${data.student.name} (${data.student.code}) - الرصيد: ${data.student.balance} ج`;
+    // الاسم + الرصيد + سعر الحصة بتاع الطالب ده (لو الرصيد مش مكفي الحصة بيتلوّن أحمر)
+    const nameBox = document.getElementById('summaryStudentName');
+    const balance = Number(data.student.balance) || 0;
+    const price = data.student.pricePerSession;
+    const hasPrice = price !== null && price !== undefined && price !== '';
+    const short = hasPrice && balance < Number(price);
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    nameBox.innerHTML = `${esc(data.student.name)} (${esc(data.student.code)})
+      <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+        <span class="badge ${short ? 'bg-danger' : 'bg-success'}" style="font-size:0.9rem;">💰 <span class="ar-only">الرصيد:</span><span class="en-only" style="display:none;">Balance:</span> ${esc(balance)} ج</span>
+        ${hasPrice ? `<span class="badge bg-primary" style="font-size:0.9rem;">🎟️ <span class="ar-only">سعر الحصة:</span><span class="en-only" style="display:none;">Session price:</span> ${esc(price)} ج</span>` : ''}
+      </div>
+      ${short ? '<div class="small text-danger mt-1"><span class="ar-only">⚠️ الرصيد مش مكفي الحصة</span><span class="en-only" style="display:none;">⚠️ Balance does not cover the session</span></div>' : ''}`;
+    if (typeof applyLanguageDisplay === 'function') applyLanguageDisplay();
 
     const noteBox = document.getElementById('adminNoteBox');
     if (data.student.adminNote) {
