@@ -517,6 +517,14 @@
     /* Tables with foldable columns: cells marked .sf-x stay hidden until the arrow in the header opens them */
     .sf-collapsible:not(.sf-cols-open) .sf-x { display: none !important; }
     .table.sf-collapsible { overflow: visible; } /* overflow:hidden would stop the pinned arrow column from sticking */
+    /* slimmer rows on foldable tables, and even tighter once every column is open so it all fits on screen */
+    .table.sf-collapsible > :not(caption) > * > * { padding: 0.5rem 0.6rem; }
+    .table.sf-collapsible .sf-chip { font-size: 0.74rem; padding: 1px 8px; gap: 5px; }
+    .table.sf-collapsible .btn-sm { padding: 0.22rem 0.55rem; font-size: 0.78rem; border-radius: 8px; }
+    .table.sf-collapsible .sf-icon-btn { width: 28px; height: 28px; }
+    .table.sf-collapsible .badge { font-size: 0.7rem; padding: 0.3em 0.55em; }
+    .table.sf-collapsible.sf-cols-open > :not(caption) > * > * { padding: 0.4rem 0.4rem; font-size: 0.78rem; }
+    .table.sf-collapsible.sf-cols-open thead th { white-space: normal; line-height: 1.25; font-size: 0.72rem; }
     .sf-collapsible.sf-cols-open .sf-x-hint { display: none !important; }
     .sf-collapsible .sf-x { animation: sf-col-in 0.25s var(--sf-ease); }
     @keyframes sf-col-in { from { opacity: 0; } to { opacity: 1; } }
@@ -533,6 +541,8 @@
       transition: background 0.15s var(--sf-ease);
     }
     .sf-xtoggle:hover { background: var(--sf-primary-light); }
+    .sf-cols-open .sf-xtoggle { padding: 3px 7px; }
+    .sf-cols-open .sf-xtoggle span { display: none; } /* open: arrow only, so the squeezed table keeps its room */
     .sf-xtoggle i { font-size: 0.8rem; transition: transform 0.2s var(--sf-ease); }
     [dir="ltr"] .sf-xtoggle i { transform: scaleX(-1); }
     .sf-cols-open .sf-xtoggle i { transform: scaleX(-1); }
