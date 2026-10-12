@@ -18,6 +18,14 @@
     border-radius: 8px;
     font-weight: 600;
   }
+  .session-serial { font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.3px; }
+  .session-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 30px; height: 30px; padding: 0 8px; border-radius: 10px;
+    background: var(--sf-panel-bg); border: 1px solid var(--sf-input-border);
+    font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  .sessions-table-card td { white-space: nowrap; }
   .badge-status-active {
     background-color: rgba(16, 185, 129, 0.15) !important;
     color: #10b981 !important;
@@ -54,7 +62,7 @@
       <select id="centerFilter" name="center_id" class="form-select">
         <option value="">كل السناتر</option>
         <% centers.forEach(center => { %>
-          <option value="<%= center.id %>" <%= String(selectedCenterId) === String(center.id) ? 'selected' : '' %>>
+          <option value="<%= center.id %>" <%- sf.colorAttr('center', center) %> <%= String(selectedCenterId) === String(center.id) ? 'selected' : '' %>>
             <%= center.name %>
           </option>
         <% }) %>
@@ -68,7 +76,7 @@
       <select id="subjectFilter" name="subject_id" class="form-select">
         <option value="">كل المواد</option>
         <% subjects.forEach(subject => { %>
-          <option value="<%= subject.id %>" <%= String(selectedSubjectId) === String(subject.id) ? 'selected' : '' %>>
+          <option value="<%= subject.id %>" <%- sf.colorAttr('subject', subject) %> <%= String(selectedSubjectId) === String(subject.id) ? 'selected' : '' %>>
             <%= subject.name %>
           </option>
         <% }) %>
@@ -87,29 +95,35 @@
   </div>
 </form>
 
-<div class="table-responsive card p-3">
-  <table class="table table-hover align-middle">
+<div class="table-responsive card sessions-table-card">
+  <table class="table align-middle mb-0">
     <thead>
       <tr>
         <th><span class="ar-only">السيريال</span><span class="en-only" style="display:none;">Serial</span></th>
         <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
         <th><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></th>
-        <th><span class="ar-only">الرقم النسبي</span><span class="en-only" style="display:none;">Lesson #</span></th>
-        <th><span class="ar-only">الأسبوع</span><span class="en-only" style="display:none;">Week</span></th>
+        <th class="text-center"><span class="ar-only">الرقم النسبي</span><span class="en-only" style="display:none;">Lesson #</span></th>
+        <th class="text-center"><span class="ar-only">الأسبوع</span><span class="en-only" style="display:none;">Week</span></th>
         <th><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
         <th><span class="ar-only">الحالة</span><span class="en-only" style="display:none;">Status</span></th>
         <th></th>
       </tr>
     </thead>
     <tbody>
+      <% if (!sessions.length) { %>
+        <tr><td colspan="8" class="text-center text-muted py-5">
+          <span class="ar-only">مفيش حصص بالفلتر ده</span><span class="en-only" style="display:none;">No sessions match this filter</span>
+        </td></tr>
+      <% } %>
       <% sessions.forEach(s => { %>
-        <tr class="<%= String(s.id) === String(activeSessionId) ? 'table-success-adaptive' : '' %>">
-          <td><strong><%= s.serial_number %></strong></td>
-          <td><%= s.Subject ? s.Subject.name : 'N/A' %></td>
-          <td><%= s.Center ? s.Center.name : 'N/A' %></td>
-          <td><%= s.lesson_number %></td>
-          <td><%= s.week_number ?? '—' %></td>
-          <td><%= s.session_date %></td>
+        <% const isRunning = String(s.id) === String(activeSessionId); %>
+        <tr class="<%= isRunning ? 'table-success-adaptive' : '' %>">
+          <td><span class="session-serial"><%= s.serial_number %></span></td>
+          <td><%- sf.subject(s.Subject, 'N/A') %></td>
+          <td><%- sf.center(s.Center, 'N/A') %></td>
+          <td class="text-center"><span class="session-num"><%= s.lesson_number %></span></td>
+          <td class="text-center"><%= s.week_number ?? '—' %></td>
+          <td class="text-nowrap"><%= s.session_date %></td>
           <td>
             <% if (s.status === 'cancelled') { %>
               <span class="badge badge-status-cancelled">
@@ -123,61 +137,74 @@
               </span>
             <% } %>
           </td>
-          <td class="text-nowrap">
-            <% if (String(s.id) === String(activeSessionId)) { %>
-              <span class="badge bg-primary">
-                <span class="ar-only">✓ الشغالة دلوقتي</span>
-                <span class="en-only" style="display:none;">✓ Running</span>
-              </span>
-            <% } else { %>
-              <form action="/sessions/<%= s.id %>/activate" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-sm btn-outline-primary">
-                  <span class="ar-only">تفعيل</span>
-                  <span class="en-only" style="display:none;">Activate</span>
-                </button>
-              </form>
-            <% } %>
-            <a href="/sessions/<%= s.id %>/report" class="btn btn-sm btn-outline-dark">
-              <span class="ar-only">📊 تقرير</span>
-              <span class="en-only" style="display:none;">📊 Report</span>
-            </a>
-
-            <% if (userRole === 'admin') { %>
-              <% if (s.status === 'cancelled') { %>
-                <form action="/sessions/<%= s.id %>/restore" method="POST" class="d-inline">
-                  <button type="submit" class="btn btn-sm btn-outline-success">
-                    <span class="ar-only">إلغاء الإلغاء</span>
-                    <span class="en-only" style="display:none;">Restore</span>
+          <td>
+            <div class="sf-actions">
+              <% if (isRunning) { %>
+                <span class="badge bg-primary">
+                  <span class="ar-only">✓ الشغالة دلوقتي</span>
+                  <span class="en-only" style="display:none;">✓ Running</span>
+                </span>
+              <% } else { %>
+                <form action="/sessions/<%= s.id %>/activate" method="POST">
+                  <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <span class="ar-only">تفعيل</span>
+                    <span class="en-only" style="display:none;">Activate</span>
                   </button>
                 </form>
-              <% } else { %>
-                <button type="button" class="btn btn-sm btn-outline-danger"
-                  onclick="openCancelModal(<%= s.id %>, '<%= s.lesson_number %>', '<%= s.Subject ? s.Subject.name : "N/A" %>')">
-                  <span class="ar-only">🚫 إلغاء</span>
-                  <span class="en-only" style="display:none;">🚫 Cancel</span>
-                </button>
               <% } %>
+              <a href="/sessions/<%= s.id %>/report" class="btn btn-sm btn-outline-secondary">
+                <span class="ar-only">📊 تقرير</span>
+                <span class="en-only" style="display:none;">📊 Report</span>
+              </a>
 
-              <button type="button" class="btn btn-sm btn-outline-secondary"
-                onclick="openEditModal(<%= s.id %>, '<%= s.session_date %>', <%= s.lesson_number %>)">
-                <span class="ar-only">✏️ تعديل</span>
-                <span class="en-only" style="display:none;">✏️ Edit</span>
-              </button>
-
-              <button type="button" class="btn btn-sm btn-outline-info"
-                onclick="openWeekEditModal(<%= s.id %>, <%= s.week_number == null ? 'null' : s.week_number %>)">
-                <span class="ar-only">📅 تعديل الأسبوع</span>
-                <span class="en-only" style="display:none;">📅 Edit Week</span>
-              </button>
-
-              <form action="/sessions/<%= s.id %>/delete" method="POST" class="d-inline"
-                onsubmit="return confirmSessionDelete(this, '<%= s.Center ? s.Center.name : "N/A" %>')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">
-                  <span class="ar-only">🗑️ حذف</span>
-                  <span class="en-only" style="display:none;">🗑️ Delete</span>
-                </button>
-              </form>
-            <% } %>
+              <% if (userRole === 'admin') { %>
+                <div class="dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-secondary sf-icon-btn" data-bs-toggle="dropdown"
+                    data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" title="المزيد / More">
+                    <i class="bi bi-three-dots-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <button type="button" class="dropdown-item"
+                        onclick="openEditModal(<%= s.id %>, '<%= s.session_date %>', <%= s.lesson_number %>)">
+                        ✏️ <span class="ar-only">تعديل</span><span class="en-only" style="display:none;">Edit</span>
+                      </button>
+                    </li>
+                    <li>
+                      <button type="button" class="dropdown-item"
+                        onclick="openWeekEditModal(<%= s.id %>, <%= s.week_number == null ? 'null' : s.week_number %>)">
+                        📅 <span class="ar-only">تعديل الأسبوع</span><span class="en-only" style="display:none;">Edit Week</span>
+                      </button>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <% if (s.status === 'cancelled') { %>
+                      <li>
+                        <form action="/sessions/<%= s.id %>/restore" method="POST">
+                          <button type="submit" class="dropdown-item text-success">
+                            ↩️ <span class="ar-only">إلغاء الإلغاء</span><span class="en-only" style="display:none;">Restore</span>
+                          </button>
+                        </form>
+                      </li>
+                    <% } else { %>
+                      <li>
+                        <button type="button" class="dropdown-item text-danger"
+                          onclick="openCancelModal(<%= s.id %>, '<%= s.lesson_number %>', '<%= s.Subject ? s.Subject.name : "N/A" %>')">
+                          🚫 <span class="ar-only">إلغاء الحصة</span><span class="en-only" style="display:none;">Cancel</span>
+                        </button>
+                      </li>
+                    <% } %>
+                    <li>
+                      <form action="/sessions/<%= s.id %>/delete" method="POST"
+                        onsubmit="return confirmSessionDelete(this, '<%= s.Center ? s.Center.name : "N/A" %>')">
+                        <button type="submit" class="dropdown-item text-danger">
+                          🗑️ <span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span>
+                        </button>
+                      </form>
+                    </li>
+                  </ul>
+                </div>
+              <% } %>
+            </div>
           </td>
         </tr>
       <% }) %>

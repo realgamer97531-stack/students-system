@@ -3,7 +3,7 @@
 <div class="d-flex justify-content-between mb-4">
   <div>
     <h3 class="mb-1">💰 <span class="ar-only">التقرير المالي المفصل</span><span class="en-only" style="display:none;">Detailed Financial Report</span></h3>
-    <p class="text-muted small"><%= session.Subject.name %> - <%= session.Center.name %> - <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= session.lesson_number %></p>
+    <p class="text-muted small"><%- sf.session(session) %></p>
   </div>
   <a href="/sessions/<%= session.id %>/report" class="btn btn-outline-secondary btn-sm">⬅ <span class="ar-only">رجوع للتقرير</span><span class="en-only" style="display:none;">Back to Report</span></a>
 </div>

@@ -89,13 +89,13 @@
           <select id="filterSubject" name="subject_id" class="form-select form-select-sm" style="width:180px;">
             <option value=""><span class="ar-only">-- تصفية بالمادة --</span><span class="en-only" style="display:none;">-- Filter by Subject --</span></option>
             <% subjects.forEach(sub => { %>
-              <option value="<%= sub.id %>" <%= selectedSubjectId == sub.id ? 'selected' : '' %>><%= sub.name %></option>
+              <option value="<%= sub.id %>" <%- sf.colorAttr('subject', sub) %> <%= selectedSubjectId == sub.id ? 'selected' : '' %>><%= sub.name %></option>
             <% }) %>
           </select>
           <select id="filterCenter" name="center_id" class="form-select form-select-sm" style="width:180px;">
             <option value=""><span class="ar-only">-- تصفية بالسنتر --</span><span class="en-only" style="display:none;">-- Filter by Center --</span></option>
             <% centers.forEach(center => { %>
-              <option value="<%= center.id %>" <%= selectedCenterId == center.id ? 'selected' : '' %>><%= center.name %></option>
+              <option value="<%= center.id %>" <%- sf.colorAttr('center', center) %> <%= selectedCenterId == center.id ? 'selected' : '' %>><%= center.name %></option>
             <% }) %>
           </select>
           <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyFollowUpFilters()"><span class="ar-only">تطبيق التصفية</span><span class="en-only" style="display:none;">Apply Filter</span></button>

@@ -68,6 +68,7 @@ const {
   buildSqlDump, runBackup, listBackups, getDownloadUrl, getLastResult, BACKUP_FOLDER,
 } = require('./utils/dailyBackup');
 const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
+const entityColors = require('./utils/entityColors');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
 const syncServer = require('./utils/sync/server');
 // برنامج الديسكتوب (أوفلاين) بيشغل نفس السيرفر ده على الجهاز مع DESKTOP_MODE=1
@@ -1335,6 +1336,27 @@ app.use((req, res, next) => {
   next();
 });
 
+// ألوان السناتر والمواد متاحة في كل صفحة EJS: sf.center(c) / sf.subject(s) / sf.session(session) / sf.sessionOption(session)
+// + تصليح الـ <option> اللي فيها عربي وإنجليزي (كانت بتظهر اللغتين لازقين في بعض)
+app.use(async (req, res, next) => {
+  const render = res.render.bind(res);
+  res.render = (view, options, callback) => {
+    if (typeof options === 'function') { callback = options; options = undefined; }
+    render(view, options, (err, html) => {
+      if (err) return callback ? callback(err) : req.next(err);
+      const fixed = entityColors.fixBilingualOptions(html);
+      if (callback) return callback(null, fixed);
+      res.send(fixed);
+    });
+  };
+  try {
+    res.locals.sf = entityColors.makeHelpers(await entityColors.getColorMaps(sequelize));
+  } catch (error) {
+    res.locals.sf = entityColors.makeHelpers({ center: { byId: new Map(), byName: new Map(), list: [] }, subject: { byId: new Map(), byName: new Map(), list: [] } });
+  }
+  next();
+});
+
 function splitSqlStatements(sql) {
   const statements = [];
   let current = '';
@@ -1424,7 +1446,31 @@ app.get('/settings', requireAdmin, async (req, res) => {
   const data = await loadSettingsSessions();
   if (req.query.lesson_changed) data.successMessage = String(req.query.lesson_changed);
   if (req.query.lesson_error) data.errorMessage = String(req.query.lesson_error);
+  if (req.query.colors_saved) data.successMessage = '✅ اتحفظت الألوان';
   res.render('settings', data);
+});
+
+// ألوان السناتر والمواد (فاضي = لون تلقائي)
+app.post('/settings/colors', requireAdmin, async (req, res) => {
+  try {
+    const pick = (prefix) => {
+      const out = {};
+      for (const [key, value] of Object.entries(req.body || {})) {
+        const m = /^(center|subject)_(\d+)$/.exec(key);
+        if (!m || m[1] !== prefix) continue;
+        const auto = req.body[`${prefix}_auto_${m[2]}`];
+        out[m[2]] = auto === '1' || auto === 'on' ? '' : String(value || '');
+      }
+      return out;
+    };
+    await entityColors.saveColors(sequelize, 'center', pick('center'));
+    await entityColors.saveColors(sequelize, 'subject', pick('subject'));
+    if (req.headers.accept && req.headers.accept.includes('application/json')) return res.json({ ok: true });
+    res.redirect('/settings?colors_saved=1#colors-tool');
+  } catch (error) {
+    console.error('Failed to save colors:', error);
+    res.redirect(`/settings?lesson_error=${encodeURIComponent('❌ ' + error.message)}#colors-tool`);
+  }
 });
 
 // تغيير الرقم النسبي لحصة من الإعدادات (نفس قواعد تعديل الحصة: السيريال بيتحسب من جديد وممنوع التكرار)
@@ -10854,6 +10900,7 @@ async function startServer() {
     await ensureHomeworkAssignmentLinkColumns();
     await ensureUserProfilePhotoColumn();
     await ensureStudentOfferColumn();
+    await entityColors.ensureColorColumns(sequelize);
     await ensureBookletReservationSchema(sequelize);
     await ensureLessonAccessSchema(sequelize);
     await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
@@ -10917,6 +10964,7 @@ async function startServer() {
           await ensureVideoQuestionsDisplayColumn();
           await ensureUserProfilePhotoColumn();
           await ensureStudentOfferColumn();
+          await entityColors.ensureColorColumns(sequelize);
           await ensureBookletReservationSchema(sequelize);
           await ensureLessonAccessSchema(sequelize);
           await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));

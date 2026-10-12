@@ -1,13 +1,13 @@
 <div class="alert alert-light border d-flex align-items-center gap-2 mb-3 flex-wrap">
   <strong class="small">الحصة الشغالة على جهازك دلوقتي:</strong>
   <form action="/sessions/switch" method="POST" class="d-flex gap-2 flex-grow-1">
-    <select name="session_id" class="form-select session-select" style="max-width: 350px;">
-      <% recentSessions.forEach(s => { %>
-        <option value="<%= s.id %>" <%= String(s.id) === String(currentSessionId) ? 'selected' : '' %>>
-          <%= s.Subject.name %> - <%= s.Center.name %> (سيريال <%= s.serial_number %>)
-        </option>
-      <% }) %>
-    </select>
+    <div style="min-width: 260px; max-width: 420px; flex: 1;">
+      <select name="session_id" class="form-select session-select">
+        <% recentSessions.forEach(s => { %>
+          <option value="<%= s.id %>" <%- sf.sessionOption(s) %> <%= String(s.id) === String(currentSessionId) ? 'selected' : '' %>><%= sf.sessionText(s) %></option>
+        <% }) %>
+      </select>
+    </div>
     <input type="hidden" name="redirect_to" value="<%= currentPath %>">
     <button type="submit" class="btn btn-sm btn-outline-primary">تبديل</button>
   </form>

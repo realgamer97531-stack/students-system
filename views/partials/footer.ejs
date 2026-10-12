@@ -11,109 +11,101 @@
       document.getElementById('sidebarOverlay').classList.toggle('show');
     }
 
-    // Initialize Session Dropdowns with Select2
-    document.addEventListener('DOMContentLoaded', function() {
-      // Initialize all session select elements
-      const sessionSelects = document.querySelectorAll('select[name="session_id"], select[name="session_ids"]');
-      
-      sessionSelects.forEach(function(select) {
-        // Get current theme
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        
-        $(select).select2({
-          theme: 'bootstrap-5',
-          language: 'ar',
-          dir: 'rtl',
-          allowClear: !select.required, // Allow clear only if not required
-          placeholder: select.getAttribute('placeholder') || 'ابحث أو اختر...',
-          minimumResultsForSearch: 0, // Show search even with few options
-          width: '100%',
-          dropdownParent: $(select).closest('form').length ? $(select).closest('form') : undefined,
-          templateResult: formatSessionOption,
-          templateSelection: formatSessionSelection,
-          matcher: customMatcher,
-          sorter: customSorter,
-          escapeMarkup: function(markup) { return markup; } // Don't escape HTML
-        });
-
-        // Handle theme changes
-        const observer = new MutationObserver(function(mutations) {
-          mutations.forEach(function(mutation) {
-            if (mutation.attributeName === 'data-theme') {
-              $(select).select2('destroy');
-              const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
-              initializeSessionSelect(select, isDarkMode);
-            }
-          });
-        });
-
-        observer.observe(document.documentElement, { attributes: true });
+    // ===== Session dropdowns (Select2) =====
+    // Options rendered with sf.sessionOption(s) carry data-* (subject/center/colors/lesson...), so every
+    // row is drawn the same way: a two-color dot, the lesson number, the subject + center pills, serial/date.
+    function sfEsc(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
       });
-    });
-
-    // Format session options in dropdown with better styling
+    }
+    function sfLang() { try { return localStorage.getItem('language') || 'ar'; } catch (e) { return 'ar'; } }
+    function sfSessionData(state) {
+      var el = state && state.element;
+      if (!el || !el.dataset || el.dataset.sfSession !== '1') return null;
+      return el.dataset;
+    }
+    function sfChip(name, color) {
+      return name ? '<span class="sf-chip" style="--c:' + sfEsc(color) + '"><i class="sf-dot"></i>' + sfEsc(name) + '</span>' : '';
+    }
+    function sfLessonLabel(d) {
+      if (!d.sfLesson) return '';
+      return (sfLang() === 'en' ? 'Lesson ' : 'حصة ') + sfEsc(d.sfLesson);
+    }
     function formatSessionOption(state) {
-      if (!state.id) return state.text;
-      
-      const text = state.text;
-      // Parse the option text to extract parts
-      const parts = text.split('(');
-      const mainText = parts[0].trim();
-      const details = parts.length > 1 ? '(' + parts.slice(1).join('(') : '';
-      
-      return $('<span class="session-option-text">' + mainText + '</span>' + 
-               (details ? '<span class="session-option-details ms-2 small text-muted" style="float: left;">' + details + '</span>' : ''));
+      if (!state.id) return sfEsc(state.text);
+      var d = sfSessionData(state);
+      if (!d) return sfEsc(String(state.text || '').replace(/\s+/g, ' ').trim());
+      var en = sfLang() === 'en';
+      var meta = [];
+      if (d.sfSerial) meta.push((en ? 'Serial ' : 'سيريال ') + sfEsc(d.sfSerial));
+      if (d.sfDate) meta.push('<bdi dir="ltr">' + sfEsc(d.sfDate) + '</bdi>');
+      return '<div class="sf-opt' + (d.sfStatus === 'cancelled' ? ' sf-opt-cancelled' : '') + '">' +
+        '<i class="sf-mix-dot" style="--c1:' + sfEsc(d.sfC1) + ';--c2:' + sfEsc(d.sfC2) + '"></i>' +
+        '<div class="sf-opt-body">' +
+          '<div class="sf-opt-top"><span class="sf-opt-lesson">' + sfLessonLabel(d) + '</span>' +
+            sfChip(d.sfSubject, d.sfC1) + sfChip(d.sfCenter, d.sfC2) +
+            (d.sfStatus === 'cancelled' ? '<span class="sf-opt-badge">' + (en ? 'Cancelled' : 'ملغية') + '</span>' : '') +
+          '</div>' +
+          (meta.length ? '<div class="sf-opt-meta">' + meta.join(' • ') + '</div>' : '') +
+        '</div></div>';
     }
-
-    // Format selected session text
     function formatSessionSelection(state) {
-      if (!state.id) return state.text;
-      const text = state.text;
-      const parts = text.split('(');
-      const mainText = parts[0].trim();
-      return mainText;
+      if (!state.id) return sfEsc(state.text);
+      var d = sfSessionData(state);
+      if (!d) return sfEsc(String(state.text || '').split('(')[0].replace(/\s+/g, ' ').trim());
+      var bits = [d.sfSubject, d.sfCenter].filter(Boolean).map(sfEsc).join('<i class="sf-mix-sep">·</i>');
+      var lesson = sfLessonLabel(d);
+      return '<span class="sf-mix" style="--c1:' + sfEsc(d.sfC1) + ';--c2:' + sfEsc(d.sfC2) + '"><i class="sf-mix-dot"></i>' +
+        (lesson ? '<b class="sf-mix-lesson">' + lesson + '</b>' : '') + '<span class="sf-mix-text">' + bits + '</span></span>';
     }
-
-    // Custom matcher for better search (search in all parts)
+    // search in the visible text and in subject/center/lesson/serial/date
     function customMatcher(params, data) {
-      if (!params.term) return data;
-      
-      const term = params.term.toLowerCase();
-      const text = data.text.toLowerCase();
-      
-      if (text.indexOf(term) > -1) {
-        return data;
-      }
-      
-      return null;
+      var term = String(params.term || '').trim().toLowerCase();
+      if (!term) return data;
+      var d = sfSessionData(data) || {};
+      var hay = [data.text, d.sfSubject, d.sfCenter, d.sfLesson, d.sfSerial, d.sfDate].join(' ').toLowerCase();
+      return term.split(/\s+/).every(function (t) { return hay.indexOf(t) > -1; }) ? data : null;
     }
-
-    // Custom sorter to show exact matches first
-    function customSorter(results) {
-      return results.sort(function(a, b) {
-        const aText = a.text.toLowerCase();
-        const bText = b.text.toLowerCase();
-        return aText.localeCompare(bText, 'ar');
-      });
-    }
-
-    // Function to reinitialize Select2 for individual select
-    function initializeSessionSelect(select, isDark) {
-      $(select).select2({
+    function initializeSessionSelect(select) {
+      var $select = $(select);
+      if ($select.hasClass('select2-hidden-accessible')) $select.select2('destroy');
+      var $modal = $select.closest('.modal');
+      $select.select2({
         theme: 'bootstrap-5',
-        language: 'ar',
-        dir: 'rtl',
-        allowClear: !select.required,
-        placeholder: select.getAttribute('placeholder') || 'ابحث أو اختر...',
+        dir: document.documentElement.getAttribute('dir') || 'rtl',
+        allowClear: !select.required && !select.multiple,
+        placeholder: select.getAttribute('placeholder') || (sfLang() === 'en' ? 'Search or pick…' : 'ابحث أو اختر...'),
         minimumResultsForSearch: 0,
         width: '100%',
+        // only inside a modal (focus trap); otherwise attach to <body> so it never overlaps the page layout
+        dropdownParent: $modal.length ? $modal : $(document.body),
         templateResult: formatSessionOption,
         templateSelection: formatSessionSelection,
         matcher: customMatcher,
-        sorter: customSorter,
-        escapeMarkup: function(markup) { return markup; }
+        escapeMarkup: function (markup) { return markup; } // every piece above is escaped with sfEsc
       });
     }
+
+    // Native selects whose options have data-sf-color (centers / subjects) show the picked color as a dot
+    function sfPaintColorSelect(select) {
+      var opt = select.options[select.selectedIndex];
+      var color = opt && opt.getAttribute('data-sf-color');
+      select.style.setProperty('--sf-sel-color', color || 'transparent');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('select[name="session_id"], select[name="session_ids"], select.session-select').forEach(function (select) {
+        if (select.dataset.noSelect2 === '1') return;
+        initializeSessionSelect(select);
+      });
+      document.querySelectorAll('select').forEach(function (select) {
+        if (!select.querySelector('option[data-sf-color]')) return;
+        select.classList.add('sf-color-select');
+        sfPaintColorSelect(select);
+        select.addEventListener('change', function () { sfPaintColorSelect(select); });
+      });
+    });
   </script>
 </body>
 </html>

@@ -127,7 +127,7 @@
                 <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
                 <select name="subject_id" class="form-select form-select-sm" required>
                   <% subjects.forEach(subj => { %>
-                    <option value="<%= subj.id %>" <%= subj.id === student.SubjectId ? 'selected' : '' %>>
+                    <option value="<%= subj.id %>" <%- sf.colorAttr('subject', subj) %> <%= subj.id === student.SubjectId ? 'selected' : '' %>>
                       <%= subj.name %>
                     </option>
                   <% }) %>
@@ -137,7 +137,7 @@
                 <label class="form-label small"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
                 <select name="center_id" class="form-select form-select-sm" required>
                   <% centers.forEach(center => { %>
-                    <option value="<%= center.id %>" <%= center.id === student.CenterId ? 'selected' : '' %>>
+                    <option value="<%= center.id %>" <%- sf.colorAttr('center', center) %> <%= center.id === student.CenterId ? 'selected' : '' %>>
                       <%= center.name %>
                     </option>
                   <% }) %>

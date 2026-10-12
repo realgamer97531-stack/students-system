@@ -224,12 +224,21 @@ class _SessionPicker extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('الحصة الشغالة', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                    Text(
-                      session != null
-                          ? snap!.sessionLabel(session)
-                          : (ctx.activeSession.value != null ? 'حصة رقم ${ctx.activeSession.value}' : 'اضغط هنا واختار الحصة'),
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
+                    if (session != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                          Text('حصة ${session['lesson_number'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                          ColorChip(snap!.subjects[(session['SubjectId'] as num?)?.toInt()] ?? '', snap.subjectColor(session)),
+                          ColorChip(snap.centers[(session['CenterId'] as num?)?.toInt()] ?? '', snap.centerColor(session)),
+                          if (session['status'] == 'cancelled') const Pill('ملغية', AppColors.dangerSoft, AppColors.danger, fontSize: 11),
+                        ]),
+                      )
+                    else
+                      Text(
+                        ctx.activeSession.value != null ? 'حصة رقم ${ctx.activeSession.value}' : 'اضغط هنا واختار الحصة',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                   ]),
                 ),
                 Icon(online ? Icons.cloud_done_outlined : Icons.cloud_off_outlined, color: online ? AppColors.successText : AppColors.warningText),
@@ -317,11 +326,19 @@ class _SessionListState extends State<_SessionList> {
                         itemBuilder: (_, i) {
                           final s = sessions[i];
                           final id = (s['id'] as num).toInt();
+                          final date = '${s['session_date'] ?? ''}';
                           return ListTile(
                             selected: id == widget.selected,
-                            leading: CircleAvatar(child: Text('${s['lesson_number'] ?? ''}')),
-                            title: Text(snap.sessionLabel(s)),
-                            subtitle: Text('سيريال ${s['serial_number'] ?? '-'}'),
+                            leading: SessionMixBadge(subjectColor: snap.subjectColor(s), centerColor: snap.centerColor(s), label: '${s['lesson_number'] ?? ''}'),
+                            title: Wrap(spacing: 6, runSpacing: 4, children: [
+                              ColorChip(snap.subjects[(s['SubjectId'] as num?)?.toInt()] ?? '', snap.subjectColor(s)),
+                              ColorChip(snap.centers[(s['CenterId'] as num?)?.toInt()] ?? '', snap.centerColor(s)),
+                              if (s['status'] == 'cancelled') const Pill('ملغية', AppColors.dangerSoft, AppColors.danger, fontSize: 11),
+                            ]),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text('حصة ${s['lesson_number'] ?? ''} • سيريال ${s['serial_number'] ?? '-'}${date.isNotEmpty ? ' • $date' : ''}'),
+                            ),
                             onTap: () => Navigator.pop(context, id),
                           );
                         },

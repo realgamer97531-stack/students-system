@@ -5,8 +5,7 @@
   <div class="card-body p-4 text-center">
     <h4 class="mb-3"><span class="ar-only">تصحيح الواجب</span><span class="en-only" style="display:none;">Grade Homework</span></h4>
     <p class="text-muted">
-      <span class="ar-only">الحصة:</span><span class="en-only" style="display:none;">Session:</span> <strong><%= activeSession.Subject.name %></strong> -
-      <strong><%= activeSession.Center.name %></strong>
+      <span class="ar-only">الحصة:</span><span class="en-only" style="display:none;">Session:</span> <%- sf.subject(activeSession.Subject) %> <%- sf.center(activeSession.Center) %>
     </p>
 
     <div id="connectionStatus" class="alert alert-success small py-2 mb-3">🟢 <span class="ar-only">متصل بالسيرفر</span><span class="en-only" style="display:none;">Connected to server</span></div>

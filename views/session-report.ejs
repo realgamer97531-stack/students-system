@@ -9,7 +9,7 @@
 %>
 
 <h3 class="mb-3">
-  <span class="ar-only">تقرير حصة:</span><span class="en-only" style="display:none;">Session Report:</span> <%= session.Subject.name %> - <%= session.Center.name %>
+  <span class="ar-only">تقرير حصة:</span><span class="en-only" style="display:none;">Session Report:</span> <%- sf.subject(session.Subject) %> <%- sf.center(session.Center) %>
   (<span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <%= session.serial_number %> / <span class="ar-only">رقم نسبي</span><span class="en-only" style="display:none;">Relative No.</span> <%= session.lesson_number %>)
 </h3>
 

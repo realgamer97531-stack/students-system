@@ -96,8 +96,7 @@
                     <% if (s.parent_phone) { %><div class="dh-muted" dir="ltr">ولي الأمر: <%= s.parent_phone %></div><% } %>
                   </td>
                   <td data-label="السنتر / المادة">
-                    <div><%= a.centerName || '-' %></div>
-                    <% if (a.subjectName) { %><div class="dh-muted"><%= a.subjectName %></div><% } %>
+                    <div class="sf-chip-row"><%- sf.center(a.centerName || null) %><% if (a.subjectName) { %><%- sf.subject(a.subjectName) %><% } %></div>
                   </td>
                   <td data-label="الرصيد وقت الحذف"><%= s.balance !== null && s.balance !== undefined ? s.balance + ' ج' : '-' %></td>
                   <td data-label="اتحذف بواسطة"><%= a.deleted_by_name || '-' %></td>

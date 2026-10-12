@@ -55,7 +55,7 @@
                 <span class="badge bg-warning text-dark"><span class="ar-only">مدفوع</span><span class="en-only" style="display:none;">Paid</span></span>
               <% } %>
             </td>
-            <td class="small"><%= describeBroadcastSession(row) %></td>
+            <td class="small"><% if (row.access_type === 'paid' && row.Session) { %><%- sf.session(row.Session) %><% } else { %><%= describeBroadcastSession(row) %><% } %></td>
             <td><%= row.access_type === 'paid' ? (row.price + ' ج') : '-' %></td>
             <td class="small"><%= describeBroadcastPages(row) %></td>
             <td><%= row.priority %></td>

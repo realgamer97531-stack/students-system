@@ -319,45 +319,68 @@
     .btn-outline-primary, .btn-outline-secondary, .btn-outline-danger { background: transparent; }
     .btn-sm { border-radius: 8px; }
 
-    /* GLOBAL SYSTEM-WIDE ADAPTIVE TABLE FIX */
-    .table { 
-      border-radius: var(--sf-radius); 
+    /* GLOBAL SYSTEM-WIDE MODERN TABLES: no cell grid, soft row separators, rounded frame */
+    .table {
+      --sf-row-line: color-mix(in srgb, var(--sf-input-border) 75%, transparent);
+      border-collapse: separate !important;
+      border-spacing: 0;
+      border-radius: 14px;
       overflow: hidden;
       border: 1px solid var(--sf-input-border) !important;
       background: var(--sf-card-bg) !important;
       color: var(--sf-text) !important;
+      margin-bottom: 0.5rem;
     }
+    .table > :not(caption) > * > * { border-width: 0; box-shadow: none !important; }
     .table thead th {
       background: var(--sf-table-header-bg) !important;
-      color: var(--sf-text) !important;
+      color: var(--sf-muted) !important;
       font-weight: 700;
-      font-size: 0.85rem;
-      border: 1px solid var(--sf-input-border) !important;
+      font-size: 0.78rem;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      padding: 0.8rem 0.9rem;
+      border: none !important;
+      border-bottom: 1px solid var(--sf-input-border) !important;
       position: sticky;
       top: 0;
       z-index: 1;
     }
     .table tbody tr {
       background: var(--sf-card-bg) !important;
-      border-bottom: 1px solid var(--sf-input-border) !important;
       transition: background 0.15s var(--sf-ease);
     }
     .table tbody tr:hover {
-      background: var(--sf-table-header-bg) !important;
+      background: color-mix(in srgb, var(--sf-primary) 5%, var(--sf-card-bg)) !important;
     }
-    .table td { 
-      font-size: 0.88rem; 
-      vertical-align: middle; 
+    .table td {
+      font-size: 0.88rem;
+      vertical-align: middle;
       color: var(--sf-text) !important;
-      border: 1px solid var(--sf-input-border) !important;
+      padding: 0.75rem 0.9rem;
+      border: none !important;
+      border-bottom: 1px solid var(--sf-row-line) !important;
       background: transparent !important;
     }
-    
-    /* Global subtle dimming for columns that hold auxiliary data */
-    .table td:nth-child(1),
-    .table td:not(:nth-child(2)) {
-      color: var(--sf-muted) !important;
+    .table tbody tr:last-child > td { border-bottom: none !important; }
+    .table.table-sm td, .table.table-sm th { padding: 0.5rem 0.65rem; }
+    .table.table-bordered td, .table.table-bordered th { border-inline-start: 1px solid var(--sf-row-line) !important; }
+    .table.table-bordered td:first-child, .table.table-bordered th:first-child { border-inline-start: none !important; }
+    .table.table-striped > tbody > tr:nth-of-type(odd) { background: color-mix(in srgb, var(--sf-table-header-bg) 45%, var(--sf-card-bg)) !important; }
+    /* row highlight classes pages use for status (were flattened before) */
+    .table tbody tr.table-success { background: var(--sf-success-soft-bg) !important; }
+    .table tbody tr.table-danger { background: var(--sf-danger-soft-bg) !important; }
+    .table tbody tr.table-warning { background: var(--sf-warning-soft-bg) !important; }
+    .table tbody tr.table-info { background: var(--sf-info-soft-bg) !important; }
+    .table tbody tr.table-secondary { background: var(--sf-neutral-soft-bg) !important; }
+
+    /* a table directly inside a card: let the card be the frame */
+    .card > .table, .card > .table-responsive > .table, .card-body > .table-responsive > .table, .table-responsive.card > .table { border: none !important; border-radius: 0; }
+    .table-responsive {
+      border-radius: var(--sf-radius);
+      scrollbar-width: thin;
     }
+    .table-responsive.card { padding: 0 !important; overflow-x: auto; }
 
     /* System link behavior handling color dynamics */
     .table td a {
@@ -420,6 +443,103 @@
     .soft-info { background-color: var(--sf-info-soft-bg) !important; color: var(--sf-info-soft-text) !important; }
     .soft-neutral { background-color: var(--sf-neutral-soft-bg) !important; color: var(--sf-neutral-soft-text) !important; }
     .soft-panel { background-color: var(--sf-panel-bg) !important; color: var(--sf-text) !important; }
+
+    /* ===== Center / subject colors =====
+       .sf-chip  = one center or subject: an oval filled with a soft wash of its color
+       .sf-mix   = a session (subject + center): a gentle blend of both colors */
+    .sf-chip {
+      --c: #94A3B8;
+      display: inline-flex; align-items: center; gap: 6px;
+      max-width: 100%;
+      padding: 3px 11px 3px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem; font-weight: 700; line-height: 1.55;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      vertical-align: middle;
+      background: color-mix(in srgb, var(--c) 17%, var(--sf-card-bg));
+      color: color-mix(in srgb, var(--c) 58%, #0B0A14) !important;
+      border: 1px solid color-mix(in srgb, var(--c) 36%, transparent);
+    }
+    [data-theme="dark"] .sf-chip {
+      background: color-mix(in srgb, var(--c) 24%, var(--sf-card-bg));
+      color: color-mix(in srgb, var(--c) 52%, #FFFFFF) !important;
+      border-color: color-mix(in srgb, var(--c) 45%, transparent);
+    }
+    .sf-dot, .sf-mix-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block;
+      background: var(--c);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 22%, transparent);
+    }
+    .sf-mix {
+      --c1: #94A3B8; --c2: #94A3B8;
+      display: inline-flex; align-items: center; gap: 7px;
+      max-width: 100%;
+      padding: 3px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem; font-weight: 600; line-height: 1.55;
+      white-space: nowrap; vertical-align: middle;
+      color: var(--sf-text) !important;
+      /* 60/40 blend so neither color shouts; each side keeps a light wash of its own color */
+      background: linear-gradient(90deg,
+        color-mix(in srgb, var(--c1) 16%, var(--sf-card-bg)) 0%,
+        color-mix(in srgb, color-mix(in srgb, var(--c1) 60%, var(--c2)) 14%, var(--sf-card-bg)) 50%,
+        color-mix(in srgb, var(--c2) 16%, var(--sf-card-bg)) 100%);
+      border: 1px solid color-mix(in srgb, color-mix(in srgb, var(--c1) 50%, var(--c2)) 32%, transparent);
+    }
+    [dir="rtl"] .sf-mix {
+      background: linear-gradient(270deg,
+        color-mix(in srgb, var(--c1) 16%, var(--sf-card-bg)) 0%,
+        color-mix(in srgb, color-mix(in srgb, var(--c1) 60%, var(--c2)) 14%, var(--sf-card-bg)) 50%,
+        color-mix(in srgb, var(--c2) 16%, var(--sf-card-bg)) 100%);
+    }
+    [data-theme="dark"] .sf-mix { filter: saturate(1.15) brightness(1.08); }
+    .sf-mix-dot {
+      width: 10px; height: 10px;
+      background: conic-gradient(var(--c1) 0 50%, var(--c2) 50% 100%);
+      box-shadow: 0 0 0 2px color-mix(in srgb, color-mix(in srgb, var(--c1) 50%, var(--c2)) 22%, transparent);
+    }
+    .sf-mix-text { overflow: hidden; text-overflow: ellipsis; }
+    .sf-mix-sep { font-style: normal; opacity: 0.45; margin: 0 5px; }
+    .sf-mix-lesson { font-weight: 800; }
+    .sf-chip-row { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+    /* A native <select> whose options carry data-sf-color shows the chosen item's color as a dot */
+    .sf-color-select {
+      background-image:
+        radial-gradient(circle at center, var(--sf-sel-color, transparent) 0 5px, transparent 5.5px),
+        var(--bs-form-select-bg-img) !important;
+      background-repeat: no-repeat !important;
+      background-size: 14px 14px, 16px 12px !important;
+    }
+    [dir="rtl"] .sf-color-select { background-position: right 0.75rem center, left 0.75rem center !important; padding-right: 2.1rem !important; }
+    [dir="ltr"] .sf-color-select { background-position: left 0.75rem center, right 0.75rem center !important; padding-left: 2.1rem !important; }
+
+    /* Modern list groups */
+    .list-group { border-radius: 14px; overflow: hidden; }
+    .list-group-item { padding: 0.8rem 1rem; border-inline: none; transition: background 0.15s var(--sf-ease); }
+    .list-group-flush > .list-group-item { border-inline: none; }
+
+    /* Row action toolbars: compact, never spill over neighbouring cells */
+    .sf-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: nowrap; }
+    .sf-actions form { margin: 0; display: inline-flex; }
+    .sf-actions .btn { white-space: nowrap; }
+    .sf-icon-btn { width: 34px; height: 34px; padding: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; border-radius: 10px !important; }
+    .dropdown-menu {
+      border: 1px solid var(--sf-input-border);
+      border-radius: 12px;
+      box-shadow: var(--sf-shadow-lg);
+      padding: 6px;
+      background: var(--sf-card-bg);
+      min-width: 12rem;
+    }
+    .dropdown-item {
+      border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.88rem; font-weight: 600;
+      color: var(--sf-text); display: flex; align-items: center; gap: 8px;
+      width: 100%; background: none; border: none; text-align: start;
+    }
+    .dropdown-item:hover, .dropdown-item:focus { background: var(--sf-primary-light); color: var(--sf-primary); }
+    .dropdown-item.text-danger:hover { background: var(--sf-danger-soft-bg); color: var(--sf-danger) !important; }
+    .dropdown-divider { border-color: var(--sf-input-border); margin: 4px 0; }
 
     a { text-decoration: none; transition: opacity 0.15s var(--sf-ease); }
     a:hover { text-decoration: none; opacity: 0.8; }
@@ -624,8 +744,17 @@ span.text-muted {
     document.addEventListener('DOMContentLoaded', function() {
       initializeTheme();
       applyLanguageDisplay();
+      applyOptionLanguage();
       highlightActiveNavLink();
     });
+
+    // dropdown options can't hold the ar/en spans: the server writes the Arabic text + data-sf-en, we switch here
+    function applyOptionLanguage() {
+      if ((localStorage.getItem('language') || 'ar') !== 'en') return;
+      document.querySelectorAll('option[data-sf-en]').forEach(function (opt) {
+        if (opt.getAttribute('data-sf-en')) opt.textContent = opt.getAttribute('data-sf-en');
+      });
+    }
 
     // Purely cosmetic: highlight the sidebar link matching the current URL
     function highlightActiveNavLink() {
@@ -642,11 +771,69 @@ span.text-muted {
   <style id="select2-styles">
     /* Select2 Custom Styling for Session Dropdowns */
     .select2-container--bootstrap-5 .select2-selection--single {
-      height: calc(1.5em + 0.75rem + 2px) !important;
+      height: auto !important;
+      min-height: 42px;
+      display: flex !important;
+      align-items: center;
+      padding: 0.35rem 0.85rem !important;
+      padding-inline-end: 3.6rem !important; /* room for the arrow and the clear × (both positioned by the theme) */
       border: 1px solid var(--sf-input-border) !important;
-      border-radius: 0.375rem !important;
+      border-radius: var(--sf-radius-sm) !important;
       background-color: var(--sf-card-bg) !important;
       transition: border-color 0.15s var(--sf-ease), box-shadow 0.15s var(--sf-ease);
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+      padding: 0 !important;
+      display: flex !important;
+      align-items: center;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      flex: 1;
+    }
+    /* the clear × sits next to the arrow, on the arrow's side, in both directions */
+    [dir="rtl"] .select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear { right: auto !important; left: 2.25rem !important; }
+    [dir="rtl"] .select2-container--bootstrap-5 .select2-selection--single { background-position: left 0.75rem center !important; }
+    [dir="ltr"] .select2-container--bootstrap-5 .select2-selection--single { background-position: right 0.75rem center !important; }
+    [dir="ltr"] .select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear { left: auto !important; right: 2.25rem !important; }
+    .select2-container--bootstrap-5 .select2-selection--multiple {
+      min-height: 42px;
+      border: 1px solid var(--sf-input-border) !important;
+      border-radius: var(--sf-radius-sm) !important;
+      background-color: var(--sf-card-bg) !important;
+      padding: 4px 6px !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
+      display: flex !important; flex-wrap: wrap; gap: 5px; padding: 0 !important; margin: 0 !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+      display: inline-flex !important; align-items: center; gap: 4px;
+      margin: 0 !important; padding: 0 4px 0 0 !important;
+      border: none !important; background: transparent !important;
+      max-width: 100%;
+    }
+    .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove {
+      position: static !important; margin: 0 !important; order: 2;
+      width: 18px; height: 18px; border-radius: 50%;
+      background-color: var(--sf-neutral-soft-bg) !important; background-size: 8px !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--multiple .select2-search__field { min-height: 30px; margin: 0 !important; }
+
+    /* Session rows inside dropdowns: two tidy lines, nothing floats over anything */
+    .sf-opt { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 2px 0; }
+    .sf-opt-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+    .sf-opt-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+    .sf-opt-lesson { font-weight: 800; font-size: 0.9rem; white-space: nowrap; }
+    .sf-opt-meta { font-size: 0.75rem; color: var(--sf-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sf-opt .sf-chip { font-size: 0.74rem; padding: 1px 9px; }
+    .sf-opt-cancelled { opacity: 0.55; }
+    .sf-opt-badge { font-size: 0.68rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--sf-danger-soft-bg); color: var(--sf-danger-soft-text); }
+    .select2-container--bootstrap-5 .select2-results > .select2-results__options { max-height: 340px; }
+    .select2-container--bootstrap-5 .select2-results__option { border-bottom: 1px solid var(--sf-input-border); }
+    .select2-container--bootstrap-5 .select2-results__option:last-child { border-bottom: none; }
+    .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
+      border-radius: var(--sf-radius-sm) !important; border: 1px solid var(--sf-input-border) !important;
+      padding: 0.45rem 0.75rem !important; background: var(--sf-card-bg) !important;
     }
 
     .select2-container--bootstrap-5.select2-container--focus .select2-selection--single,
@@ -667,7 +854,9 @@ span.text-muted {
 
     .select2-container--bootstrap-5 .select2-dropdown {
       border: 1px solid var(--sf-input-border) !important;
-      border-radius: 0.375rem !important;
+      border-radius: var(--sf-radius-sm) !important;
+      overflow: hidden;
+      z-index: 1060;
       background-color: var(--sf-card-bg) !important;
       box-shadow: 0 10px 28px rgba(30, 27, 75, 0.12) !important;
     }
@@ -680,8 +869,8 @@ span.text-muted {
     }
 
     .select2-container--bootstrap-5 .select2-results__option--highlighted {
-      background-color: var(--sf-primary) !important;
-      color: white !important;
+      background-color: var(--sf-primary-light) !important;
+      color: var(--sf-text) !important;
     }
 
     .select2-container--bootstrap-5 .select2-results__option--selected {
@@ -717,7 +906,7 @@ span.text-muted {
     }
 
     [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted {
-      background-color: #4F46E5 !important;
+      background-color: rgba(99, 102, 241, 0.2) !important;
     }
 
     [data-theme="dark"] .select2-search__field {

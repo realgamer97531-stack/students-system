@@ -2,8 +2,8 @@
   <div class="container py-5 text-center">
     <div class="card shadow-sm mx-auto p-4" style="max-width: 450px;">
       <h3 class="text-success mb-3">✅ <span class="ar-only">الحصة بدأت</span><span class="en-only" style="display:none;">Session Started</span></h3>
-      <p><span class="ar-only">السنتر:</span><span class="en-only" style="display:none;">Center:</span> <strong><%= session.Center.name %></strong></p>
-      <p><span class="ar-only">المادة:</span><span class="en-only" style="display:none;">Subject:</span> <strong><%= session.Subject.name %></strong></p>
+      <p><span class="ar-only">السنتر:</span><span class="en-only" style="display:none;">Center:</span> <%- sf.center(session.Center) %></p>
+      <p><span class="ar-only">المادة:</span><span class="en-only" style="display:none;">Subject:</span> <%- sf.subject(session.Subject) %></p>
       <p><span class="ar-only">رقم الحصة النسبي:</span><span class="en-only" style="display:none;">Relative Session Number:</span> <strong><%= session.lesson_number %></strong></p>
       <p><span class="ar-only">السيريال النهائي:</span><span class="en-only" style="display:none;">Final Serial:</span> <strong class="text-primary fs-4"><%= session.serial_number %></strong></p>
 

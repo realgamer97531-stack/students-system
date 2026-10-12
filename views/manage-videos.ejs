@@ -9,9 +9,7 @@
       <div class="col-md-4">
         <select name="session_ids" class="form-select session-select" multiple required style="height:auto;">
   <% allSessions.forEach(s => { %>
-    <option value="<%= s.id %>">
-      <%= s.Subject.name %> - <%= s.Center.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= s.lesson_number %> | <span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <%= s.serial_number %>)
-    </option>
+    <option value="<%= s.id %>" <%- sf.sessionOption(s) %>><%= sf.sessionText(s) %></option>
   <% }) %>
 </select>
 <small class="text-muted"><span class="ar-only">اضغط Ctrl للاختيار من أكثر من حصة في نفس الوقت</span><span class="en-only" style="display:none;">Press Ctrl to select multiple sessions at once</span></small>
@@ -192,9 +190,11 @@
             </div>
             <p class="text-muted small mb-3">
               <% if (linkedSessions.length) { %>
+                <div class="d-flex flex-column align-items-start gap-1">
                 <% linkedSessions.forEach(session => { %>
-                  <%= session.Subject?.name %> - <%= session.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= session.lesson_number %>)<br>
+                  <%- sf.session(session) %>
                 <% }) %>
+                </div>
               <% } else { %>
                 <span class="ar-only">لا توجد حصص مرتبطة</span><span class="en-only" style="display:none;">No Linked Sessions</span>
               <% } %>

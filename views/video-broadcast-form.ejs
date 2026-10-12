@@ -79,12 +79,10 @@
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label"><span class="ar-only">الحصة المرتبطة</span><span class="en-only" style="display:none;">Linked Session</span></label>
-                <select name="SessionId" class="form-select">
+                <select name="SessionId" class="form-select session-select">
                   <option value=""><span class="ar-only">-- اختر الحصة --</span><span class="en-only" style="display:none;">-- Choose Session --</span></option>
                   <% sessions.forEach(s => { %>
-                    <option value="<%= s.id %>" <%= (isEdit && broadcast.SessionId === s.id) ? 'selected' : '' %>>
-                      <%= (s.Subject ? s.Subject.name : '') %> - <span class="ar-only">حصة رقم</span><span class="en-only" style="display:none;">Session #</span> <%= s.lesson_number %> - <%= s.session_date %> (<%= s.Center ? s.Center.name : '' %>)
-                    </option>
+                    <option value="<%= s.id %>" <%- sf.sessionOption(s) %> <%= (isEdit && broadcast.SessionId === s.id) ? 'selected' : '' %>><%= sf.sessionText(s, { serial: false }) %> <%= s.session_date || '' %></option>
                   <% }) %>
                 </select>
                 <small class="text-muted"><span class="ar-only">الطالب هيدفع سعر الفيديو من رصيده، ويُسجَّل ضمن كشف حساب هذه الحصة.</span><span class="en-only" style="display:none;">The student will pay the video's price from their balance, and it will be recorded in this session's account statement.</span></small>

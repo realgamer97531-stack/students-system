@@ -45,14 +45,35 @@ String normalizeStudentCode(String input) {
   return text;
 }
 
+/// نفس باليتة الموقع (utils/entityColors.js): لو السنتر/المادة ملهاش لون محفوظ
+const _entityPalette = [
+  0xFF6366F1, 0xFF14B8A6, 0xFFF59E0B, 0xFFEC4899, 0xFF0EA5E9, 0xFF22C55E,
+  0xFF8B5CF6, 0xFFF97316, 0xFFEF4444, 0xFF06B6D4, 0xFF84CC16, 0xFFD946EF,
+];
+
+int autoEntityColor(String kind, int? id) {
+  if (id == null || id <= 0) return 0xFF94A3B8;
+  final offset = kind == 'subject' ? 4 : 0;
+  return _entityPalette[(id - 1 + offset) % _entityPalette.length];
+}
+
+int? parseHexColor(dynamic value) {
+  final m = RegExp(r'^#?([0-9a-fA-F]{6})$').firstMatch('${value ?? ''}'.trim());
+  return m == null ? null : 0xFF000000 | int.parse(m.group(1)!, radix: 16);
+}
+
 /// نسخة صغيرة من السيستم على الموبايل عشان المسح يشتغل من غير نت
 class Snapshot {
   Snapshot(this.raw) {
     for (final c in (raw['centers'] as List? ?? [])) {
-      centers[_int(c['id'])!] = '${c['name']}';
+      final id = _int(c['id'])!;
+      centers[id] = '${c['name']}';
+      centerColors[id] = parseHexColor(c['color']) ?? autoEntityColor('center', id);
     }
     for (final s in (raw['subjects'] as List? ?? [])) {
-      subjects[_int(s['id'])!] = '${s['name']}';
+      final id = _int(s['id'])!;
+      subjects[id] = '${s['name']}';
+      subjectColors[id] = parseHexColor(s['color']) ?? autoEntityColor('subject', id);
     }
     sessions = (raw['sessions'] as List? ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
     for (final row in (raw['students'] as List? ?? [])) {
@@ -75,6 +96,9 @@ class Snapshot {
   final Map<String, dynamic> raw;
   final Map<int, String> centers = {};
   final Map<int, String> subjects = {};
+  /// لون كل سنتر/مادة (ARGB) — نفس ألوان الموقع
+  final Map<int, int> centerColors = {};
+  final Map<int, int> subjectColors = {};
   late final List<Map<String, dynamic>> sessions;
   final Map<String, SnapStudent> byCode = {};
   final List<SnapStudent> students = [];
@@ -88,6 +112,9 @@ class Snapshot {
     final raw = rawCode.trim();
     return byCode[raw] ?? byCode[normalizeStudentCode(raw)];
   }
+
+  int centerColor(Map<String, dynamic> s) => centerColors[_int(s['CenterId'])] ?? autoEntityColor('center', _int(s['CenterId']));
+  int subjectColor(Map<String, dynamic> s) => subjectColors[_int(s['SubjectId'])] ?? autoEntityColor('subject', _int(s['SubjectId']));
 
   String sessionLabel(Map<String, dynamic> s) {
     final date = '${s['session_date'] ?? ''}';

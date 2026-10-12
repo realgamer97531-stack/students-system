@@ -109,6 +109,81 @@
         <pre class="small mb-0" style="max-height: 360px; overflow: auto; white-space: pre-wrap;"><%= sessionToolsOutput %></pre>
       </div>
       <% } %>
+      <div class="card mb-4 shadow-sm" id="colors-tool">
+        <div class="card-body">
+          <h5 class="mb-1">🎨 <span class="ar-only">ألوان السناتر والمواد</span><span class="en-only" style="display:none;">Center &amp; subject colors</span></h5>
+          <p class="text-muted small mb-3">
+            <span class="ar-only">كل سنتر ومادة ليه لون بيظهر في كل القوايم. الحصة بتظهر بخليط هادي من لون المادة ولون السنتر. "تلقائي" = لون ثابت بيختاره السيستم.</span>
+            <span class="en-only" style="display:none;">Each center and subject gets a color shown in every list. A session shows a soft blend of its subject and center colors. "Auto" = a fixed color picked by the system.</span>
+          </p>
+          <form action="/settings/colors" method="POST" id="colorsForm">
+            <div class="row g-4">
+              <% [['center', sf.centers, 'السناتر', 'Centers'], ['subject', sf.subjects, 'المواد', 'Subjects']].forEach(([kind, list, arTitle, enTitle]) => { %>
+                <div class="col-lg-6">
+                  <h6 class="small fw-bold text-muted mb-2"><span class="ar-only"><%= arTitle %></span><span class="en-only" style="display:none;"><%= enTitle %></span></h6>
+                  <% if (!list.length) { %><div class="text-muted small">—</div><% } %>
+                  <div class="list-group">
+                    <% list.forEach(item => { %>
+                      <div class="list-group-item d-flex align-items-center gap-2 color-row" data-kind="<%= kind %>" data-id="<%= item.id %>">
+                        <span class="sf-chip color-preview flex-shrink-1" style="--c:<%= item.color %>"><i class="sf-dot"></i><%= item.name %></span>
+                        <span class="ms-auto"></span>
+                        <input type="color" class="form-control form-control-color color-input" name="<%= kind %>_<%= item.id %>" value="<%= item.color %>" title="اختار اللون / Pick a color" data-auto-value="<%= item.auto %>">
+                        <div class="form-check form-switch mb-0 text-nowrap">
+                          <input class="form-check-input color-auto" type="checkbox" name="<%= kind %>_auto_<%= item.id %>" value="1" id="auto_<%= kind %>_<%= item.id %>" <%= item.saved ? '' : 'checked' %>>
+                          <label class="form-check-label small" for="auto_<%= kind %>_<%= item.id %>"><span class="ar-only">تلقائي</span><span class="en-only" style="display:none;">Auto</span></label>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-3 p-3 rounded soft-panel">
+              <span class="small fw-bold text-muted"><span class="ar-only">شكل الحصة:</span><span class="en-only" style="display:none;">Session preview:</span></span>
+              <select id="mixSubject" class="form-select form-select-sm" style="width:auto">
+                <% sf.subjects.forEach(item => { %><option value="<%= item.id %>"><%= item.name %></option><% }) %>
+              </select>
+              <select id="mixCenter" class="form-select form-select-sm" style="width:auto">
+                <% sf.centers.forEach(item => { %><option value="<%= item.id %>"><%= item.name %></option><% }) %>
+              </select>
+              <span id="mixPreview"></span>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">💾 <span class="ar-only">احفظ الألوان</span><span class="en-only" style="display:none;">Save colors</span></button>
+          </form>
+        </div>
+      </div>
+      <script>
+        (function () {
+          const rows = document.querySelectorAll('#colorsForm .color-row');
+          function rowColor(row) { return row.querySelector('.color-input').value; }
+          function paint(row) { row.querySelector('.color-preview').style.setProperty('--c', rowColor(row)); }
+          function find(kind, id) { return document.querySelector('#colorsForm .color-row[data-kind="' + kind + '"][data-id="' + id + '"]'); }
+          function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+          function mix() {
+            const sId = document.getElementById('mixSubject').value;
+            const cId = document.getElementById('mixCenter').value;
+            const sRow = find('subject', sId), cRow = find('center', cId);
+            const out = document.getElementById('mixPreview');
+            if (!sRow || !cRow) { out.innerHTML = ''; return; }
+            const sName = sRow.querySelector('.color-preview').textContent.trim();
+            const cName = cRow.querySelector('.color-preview').textContent.trim();
+            out.innerHTML = '<span class="sf-mix" style="--c1:' + rowColor(sRow) + ';--c2:' + rowColor(cRow) + '"><i class="sf-mix-dot"></i><b class="sf-mix-lesson">حصة 1</b><span class="sf-mix-text">' + esc(sName) + '<i class="sf-mix-sep">·</i>' + esc(cName) + '</span></span>';
+          }
+          rows.forEach(function (row) {
+            const input = row.querySelector('.color-input');
+            const auto = row.querySelector('.color-auto');
+            input.addEventListener('input', function () { auto.checked = false; paint(row); mix(); });
+            auto.addEventListener('change', function () {
+              if (auto.checked) input.value = input.dataset.autoValue || input.value;
+              paint(row); mix();
+            });
+          });
+          document.getElementById('mixSubject').addEventListener('change', mix);
+          document.getElementById('mixCenter').addEventListener('change', mix);
+          mix();
+        })();
+      </script>
+
       <div class="card mb-4 shadow-sm">
         <div class="card-body">
           <h5 class="mb-2">🛠️ أدوات الحصة</h5>
@@ -139,6 +214,7 @@
           id: s.id, lesson: s.lesson_number, serial: s.serial_number, date: s.session_date, cancelled: s.status === 'cancelled',
           centerId: s.CenterId, subjectId: s.SubjectId,
           center: s.Center ? s.Center.name : '', subject: s.Subject ? s.Subject.name : '',
+          c1: sf.color('subject', s.Subject || s.SubjectId), c2: sf.color('center', s.Center || s.CenterId),
         }));
         const lessonToolCenters = typeof settingsCenters !== 'undefined' ? settingsCenters : [];
         const lessonToolSubjects = typeof settingsSubjects !== 'undefined' ? settingsSubjects : [];
@@ -190,10 +266,13 @@
           const hint = document.getElementById('lnHint');
           const form = document.getElementById('lessonNumberForm');
           function current() { return sessions.find(s => String(s.id) === select.value); }
+          function attr(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
           function fill() {
             const list = sessions.filter(s => (!center.value || String(s.centerId) === center.value) && (!subject.value || String(s.subjectId) === subject.value));
             select.innerHTML = '<option value="">' + (list.length ? 'اختار الحصة' : 'مفيش حصص') + '</option>' + list.map(s =>
-              '<option value="' + s.id + '">حصة ' + s.lesson + ' | ' + s.subject + ' | ' + s.center + ' | سيريال ' + s.serial + ' | ' + (s.date || '') + (s.cancelled ? ' | ملغاة' : '') + '</option>').join('');
+              '<option value="' + s.id + '" data-sf-session="1" data-sf-subject="' + attr(s.subject) + '" data-sf-center="' + attr(s.center) + '" data-sf-c1="' + attr(s.c1) + '" data-sf-c2="' + attr(s.c2) +
+              '" data-sf-lesson="' + attr(s.lesson) + '" data-sf-serial="' + attr(s.serial) + '" data-sf-date="' + attr(s.date || '') + '" data-sf-status="' + (s.cancelled ? 'cancelled' : '') + '">' +
+              attr('حصة ' + s.lesson + ' | ' + s.subject + ' | ' + s.center + ' | سيريال ' + s.serial + ' | ' + (s.date || '') + (s.cancelled ? ' | ملغاة' : '')) + '</option>').join('');
             check();
           }
           function check() {
@@ -209,6 +288,8 @@
           center.addEventListener('change', fill);
           subject.addEventListener('change', fill);
           select.addEventListener('change', check);
+          // the session list is a Select2 dropdown: it fires jQuery's change, not the native one
+          document.addEventListener('DOMContentLoaded', function () { if (window.jQuery) jQuery(select).on('select2:select select2:clear', check); });
           number.addEventListener('input', check);
           form.addEventListener('submit', (e) => {
             const s = current();

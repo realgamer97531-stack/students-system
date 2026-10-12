@@ -12,7 +12,7 @@
       <div class="col-md-2">
         <select name="subject_id" class="form-select" required>
           <option value="">-- <span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span> --</option>
-          <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+          <% subjects.forEach(s => { %><option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %>><%= s.name %></option><% }) %>
         </select>
       </div>
       <div class="col-md-2">
@@ -45,7 +45,7 @@
               <%- b.is_active ? '<span class="ar-only">نشط</span><span class="en-only" style="display:none;">Active</span>' : '<span class="ar-only">متوقف</span><span class="en-only" style="display:none;">Inactive</span>' %>
             </span>
           </div>
-          <p class="small text-muted mb-2">📚 <%= b.Subject.name %></p>
+          <p class="mb-2"><%- sf.subject(b.Subject) %></p>
 
           <div class="row g-1 mb-2 text-center">
             <div class="col-4">

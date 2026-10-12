@@ -68,10 +68,10 @@
         <div class="col-md-4">
           <div class="p-3 rounded today-session-card">
             <div class="d-flex justify-content-between align-items-center mb-1">
-              <strong class="small" style="color: var(--sf-text);"><%= entry.Subject.name %></strong>
+              <%- sf.subject(entry.Subject) %>
               <span class="badge bg-primary"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></span>
             </div>
-            <p class="small text-muted mb-2"><%= entry.Center.name %> | <%= entry.duration_minutes || 'N/A' %> <span class="ar-only">دقيقة</span><span class="en-only" style="display:none;">min</span></p>
+            <p class="small text-muted mb-2 mt-2"><%- sf.center(entry.Center) %> &nbsp;<%= entry.duration_minutes || 'N/A' %> <span class="ar-only">دقيقة</span><span class="en-only" style="display:none;">min</span></p>
           </div>
         </div>
         <% } %>
@@ -105,8 +105,8 @@
                     <% if (entry && entry.Subject && entry.Center) { %>
                     <div class="mb-2 p-2 rounded <%= entry.is_active ? 'grid-entry-active' : 'grid-entry-inactive' %>">
                       <div class="small fw-bold"><%= entry.start_time ? entry.start_time.slice(0,5) : 'N/A' %></div>
-                      <div class="small fw-semibold"><%= entry.Subject.name %></div>
-                      <div class="small opacity-75"><%= entry.Center.name %></div>
+                      <div class="my-1"><%- sf.subject(entry.Subject) %></div>
+                      <div><%- sf.center(entry.Center) %></div>
                       <% if (entry.end_date && entry.end_date !== 'Invalid Date') { %>
                         <div class="small opacity-75"><span class="ar-only">حتى:</span><span class="en-only" style="display:none;">Until:</span> <%= entry.end_date %></div>
                         <%
@@ -181,7 +181,7 @@
             <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
             <select name="subject_id" class="form-select" required>
               <% if (subjects && subjects.length > 0) { %>
-                <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+                <% subjects.forEach(s => { %><option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %>><%= s.name %></option><% }) %>
               <% } else { %>
                 <option disabled><span class="ar-only">لا توجد مواد متاحة</span><span class="en-only" style="display:none;">No subjects available</span></option>
               <% } %>
@@ -191,7 +191,7 @@
             <label class="form-label small"><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></label>
             <select name="center_id" class="form-select" required>
               <% if (centers && centers.length > 0) { %>
-                <% centers.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+                <% centers.forEach(c => { %><option value="<%= c.id %>" <%- sf.colorAttr('center', c) %>><%= c.name %></option><% }) %>
               <% } else { %>
                 <option disabled><span class="ar-only">لا توجد سنترات متاحة</span><span class="en-only" style="display:none;">No centers available</span></option>
               <% } %>

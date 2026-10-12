@@ -36,10 +36,7 @@
             <span class="en-only" style="display:none;">-- No Session Link --</span>
           </option>
           <% allSessions.forEach(s => { %>
-            <option value="<%= s.id %>" data-subject="<%= s.SubjectId %>">
-              <span class="ar-only">حصة <%= s.lesson_number %> - <%= s.Center.name %> (<%= s.serial_number %>)</span>
-              <span class="en-only" style="display:none;">Lesson <%= s.lesson_number %> - <%= s.Center.name %> (<%= s.serial_number %>)</span>
-            </option>
+            <option value="<%= s.id %>" data-subject="<%= s.SubjectId %>" <%- sf.sessionOption(s) %>><%= sf.sessionText(s) %></option>
           <% }) %>
         </select>
       </div>

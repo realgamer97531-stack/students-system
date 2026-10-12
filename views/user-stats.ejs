@@ -128,8 +128,8 @@
           <% assistantAttendances.forEach(aa => { %>
             <tr>
               <td><span class="ar-only"><%= aa.Session ? `حصة ${aa.Session.lesson_number}` : '-' %></span><span class="en-only" style="display:none;"><%= aa.Session ? `Session ${aa.Session.lesson_number}` : '-' %></span></td>
-              <td><small><%= aa.Session?.Subject?.name || '-' %></small></td>
-              <td><small><%= aa.Session?.Center?.name || '-' %></small></td>
+              <td><%- sf.subject(aa.Session?.Subject) %></td>
+              <td><%- sf.center(aa.Session?.Center) %></td>
               <td>
                 <% if (aa.check_in) { %>
                   <span class="small"><%= new Date(aa.check_in).toLocaleString('ar-EG', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) %></span>

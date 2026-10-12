@@ -7,7 +7,7 @@
   <div class="col-md-3">
     <select name="center_id" class="form-select">
       <option value=""><span class="ar-only">-- كل السناتر --</span><span class="en-only" style="display:none;">-- All Centers --</span></option>
-      <% centers.forEach(c => { %><option value="<%= c.id %>" <%= String(filters.center_id)===String(c.id)?'selected':'' %>><%= c.name %></option><% }) %>
+      <% centers.forEach(c => { %><option value="<%= c.id %>" <%- sf.colorAttr('center', c) %> <%= String(filters.center_id)===String(c.id)?'selected':'' %>><%= c.name %></option><% }) %>
     </select>
   </div>
   <div class="col-md-3"><button class="btn btn-primary w-100"><span class="ar-only">احسب</span><span class="en-only" style="display:none;">Calculate</span></button></div>

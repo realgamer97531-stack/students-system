@@ -5,9 +5,7 @@
   <div class="card-body p-4 text-center">
     <h4 class="mb-3"><span class="ar-only">تسجيل حضور</span><span class="en-only" style="display:none;">Record Attendance</span></h4>
     <p class="text-muted">
-      <span class="ar-only">الحصة الشغالة:</span><span class="en-only" style="display:none;">Active Session:</span> <strong><%= activeSession.Subject.name %></strong>
-      -
-      <strong><%= activeSession.Center.name %></strong>
+      <span class="ar-only">الحصة الشغالة:</span><span class="en-only" style="display:none;">Active Session:</span> <%- sf.subject(activeSession.Subject) %> <%- sf.center(activeSession.Center) %>
       (<span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <%= activeSession.serial_number %>)
     </p>
 
@@ -536,13 +534,13 @@
           <div class="mb-2">
             <select name="subject_id" id="quickSubjectSelect" class="form-select" required>
               <option value=""><span class="ar-only">-- المادة --</span><span class="en-only" style="display:none;">-- Subject --</span></option>
-              <% allSubjects.forEach(s => { %><option value="<%= s.id %>" data-price="<%= s.default_price %>"><%= s.name %></option><% }) %>
+              <% allSubjects.forEach(s => { %><option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %> data-price="<%= s.default_price %>"><%= s.name %></option><% }) %>
             </select>
           </div>
           <div class="mb-2">
             <select name="center_id" class="form-select" required>
               <option value=""><span class="ar-only">-- السنتر --</span><span class="en-only" style="display:none;">-- Center --</span></option>
-              <% allCenters.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+              <% allCenters.forEach(c => { %><option value="<%= c.id %>" <%- sf.colorAttr('center', c) %>><%= c.name %></option><% }) %>
             </select>
           </div>
           <div class="mb-2">

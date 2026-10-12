@@ -20,7 +20,7 @@
             <select name="subject_id" class="form-select" required>
               <option value=""><span class="ar-only">-- اختر المادة --</span><span class="en-only" style="display:none;">-- Choose Subject --</span></option>
               <% subjects.forEach(subj => { %>
-                <option value="<%= subj.id %>"><%= subj.name %></option>
+                <option value="<%= subj.id %>" <%- sf.colorAttr('subject', subj) %>><%= subj.name %></option>
               <% }) %>
             </select>
           </div>
@@ -30,7 +30,7 @@
             <select name="center_id" class="form-select" required>
               <option value=""><span class="ar-only">-- اختر السنتر --</span><span class="en-only" style="display:none;">-- Choose Center --</span></option>
               <% centers.forEach(center => { %>
-                <option value="<%= center.id %>"><%= center.name %></option>
+                <option value="<%= center.id %>" <%- sf.colorAttr('center', center) %>><%= center.name %></option>
               <% }) %>
             </select>
           </div>

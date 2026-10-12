@@ -18,7 +18,7 @@
         <select name="subject_id" class="form-select">
           <option value=""><span class="ar-only">كل المواد</span><span class="en-only" style="display:none;">All Subjects</span></option>
           <% subjects.forEach(s => { %>
-            <option value="<%= s.id %>" <%= filters?.subject_id == s.id ? 'selected' : '' %>><%= s.name %></option>
+            <option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %> <%= filters?.subject_id == s.id ? 'selected' : '' %>><%= s.name %></option>
           <% }) %>
         </select>
       </div>
@@ -27,7 +27,7 @@
         <select name="center_id" class="form-select">
           <option value=""><span class="ar-only">كل السنتر</span><span class="en-only" style="display:none;">All Centers</span></option>
           <% centers.forEach(c => { %>
-            <option value="<%= c.id %>" <%= filters?.center_id == c.id ? 'selected' : '' %>><%= c.name %></option>
+            <option value="<%= c.id %>" <%- sf.colorAttr('center', c) %> <%= filters?.center_id == c.id ? 'selected' : '' %>><%= c.name %></option>
           <% }) %>
         </select>
       </div>
@@ -36,7 +36,7 @@
         <select name="session_id" class="form-select session-select">
           <option value=""><span class="ar-only">كل الحصص</span><span class="en-only" style="display:none;">All Sessions</span></option>
           <% sessions.forEach(s => { %>
-            <option value="<%= s.id %>" <%= filters?.session_id == s.id ? 'selected' : '' %>><%= s.Subject.name %> - <%= s.Center.name %> - <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= s.lesson_number %></option>
+            <option value="<%= s.id %>" <%- sf.sessionOption(s) %> <%= filters?.session_id == s.id ? 'selected' : '' %>><%= sf.sessionText(s, { serial: false }) %></option>
           <% }) %>
         </select>
       </div>
@@ -64,12 +64,12 @@
       <div class="col-md-3">
         <select name="subject_id" class="form-select">
           <option value="">-- <span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span> --</option>
-          <% subjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+          <% subjects.forEach(s => { %><option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %>><%= s.name %></option><% }) %>
         </select>
       </div>
       <div class="col-md-4">
         <select name="session_ids" class="form-select session-select" multiple style="height:auto;">
-          <% sessions.forEach(s => { %><option value="<%= s.id %>"><%= s.Subject.name %> - <%= s.Center.name %> - <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= s.lesson_number %></option><% }) %>
+          <% sessions.forEach(s => { %><option value="<%= s.id %>" <%- sf.sessionOption(s) %>><%= sf.sessionText(s, { serial: false }) %></option><% }) %>
         </select>
         <small class="text-muted"><span class="ar-only">اختر واحدة أو أكثر لربط الواجب بعدة حصص</span><span class="en-only" style="display:none;">Choose one or more to link the homework to multiple sessions</span></small>
       </div>
@@ -131,11 +131,11 @@
           <p class="small text-muted mb-2"><%= a.description || '' %></p>
           <p class="small text-muted mb-3">
             📅 <%= a.start_date %> → <%= a.end_date %><br>
-            <% if (a.Subject) { %>📚 <%= a.Subject.name %><br><% } %>
-            <% if (a.Session) { %>🔗 <span class="ar-only">الحصة الرئيسية:</span><span class="en-only" style="display:none;">Main Session:</span> <%= a.Session.Subject.name %> - <%= a.Session.Center.name %> - <span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= a.Session.lesson_number %><br><% } %>
+            <% if (a.Subject) { %>📚 <%- sf.subject(a.Subject) %><br><% } %>
+            <% if (a.Session) { %>🔗 <span class="ar-only">الحصة الرئيسية:</span><span class="en-only" style="display:none;">Main Session:</span> <%- sf.session(a.Session) %><br><% } %>
             <% const linkedSessions = (a.LinkedSessions || []).filter(s => String(s.id) !== String(a.SessionId)); %>
             <% if (linkedSessions.length) { %>
-              🔗 <span class="ar-only">حصص مرتبطة:</span><span class="en-only" style="display:none;">Linked Sessions:</span> <%= linkedSessions.map(s => `${s.Subject.name} - ${s.Center.name} (حصة ${s.lesson_number})`).join('، ') %>
+              🔗 <span class="ar-only">حصص مرتبطة:</span><span class="en-only" style="display:none;">Linked Sessions:</span> <span class="sf-chip-row"><% linkedSessions.forEach(s => { %><%- sf.session(s) %><% }) %></span>
             <% } %>
           </p>
         </div>
@@ -180,7 +180,7 @@
             <label class="form-label small"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
             <select name="subject_id" class="form-select">
               <option value="">--</option>
-              <% subjects.forEach(s => { %><option value="<%= s.id %>" <%= String(a.SubjectId) === String(s.id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
+              <% subjects.forEach(s => { %><option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %> <%= String(a.SubjectId) === String(s.id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
             </select>
           </div>
           <div class="col-md-6">
@@ -191,8 +191,8 @@
           </div>
           <div class="col-12">
             <label class="form-label small"><span class="ar-only">الحصص</span><span class="en-only" style="display:none;">Sessions</span></label>
-            <select name="session_ids" class="form-select" multiple size="6">
-              <% sessionOptions.forEach(s => { %><option value="<%= s.id %>" <%= selectedIds.has(String(s.id)) ? 'selected' : '' %>><%= s.Subject ? s.Subject.name : '' %> - <%= s.Center ? s.Center.name : '' %> - حصة <%= s.lesson_number %></option><% }) %>
+            <select name="session_ids" class="form-select session-select" multiple size="6">
+              <% sessionOptions.forEach(s => { %><option value="<%= s.id %>" <%- sf.sessionOption(s) %> <%= selectedIds.has(String(s.id)) ? 'selected' : '' %>><%= sf.sessionText(s, { serial: false }) %></option><% }) %>
             </select>
             <small class="text-muted"><span class="ar-only">اضغط Ctrl لاختيار أكثر من حصة</span><span class="en-only" style="display:none;">Hold Ctrl to select multiple sessions</span></small>
           </div>

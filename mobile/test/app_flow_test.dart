@@ -262,9 +262,10 @@ void main() {
     // اختيار الحصة
     await tester.tap(find.text('اضغط هنا واختار الحصة').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('حصة 2 — سنتر الاختبار'));
+    await tester.tap(find.textContaining('حصة 2 • سيريال 102'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('حصة 2 — سنتر الاختبار'), findsWidgets);
+    expect(find.text('حصة 2'), findsWidgets); // شريط الحصة الشغالة: رقم الحصة + بيضاوي المادة والسنتر
+    expect(find.text('سنتر الاختبار'), findsWidgets);
 
     // النت فصل: الحضور بيتحفظ
     server.offline = true;

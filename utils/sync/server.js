@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const mysql = require('mysql2/promise');
 const syncContext = require('./context');
 const { judgeOutcome } = require('./outcome');
+const entityColors = require('../entityColors');
 
 // جداول مش بتنزل على الأجهزة
 const EXCLUDED_TABLES = new Set(['sync_devices', 'sync_applied_ops', 'deleted_student_archive', 'mobile_app_users']);
@@ -570,11 +571,14 @@ function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin 
           ? db.query({ sql: 'SELECT StudentId, SessionId, status FROM homeworkchecks WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
           : [[]],
       ]);
+      // لون كل سنتر/مادة (المحفوظ أو التلقائي) عشان التطبيق يلوّن القوايم زي الموقع
+      const colorMaps = await entityColors.getColorMaps(sequelize);
+      const withColor = (kind, rows) => rows.map(row => ({ ...row, color: (colorMaps[kind].byId.get(Number(row.id)) || {}).color || entityColors.autoColor(kind, row.id) }));
       res.json({
         success: true,
         serverTime: utcNowString(),
-        centers,
-        subjects,
+        centers: withColor('center', centers),
+        subjects: withColor('subject', subjects),
         sessions,
         studentColumns: ['id', 'code', 'name', 'subjectId', 'centerId', 'balance', 'price', 'blocked', 'note', 'phone', 'parentPhone', 'points'],
         students,

@@ -65,6 +65,59 @@ class Pill extends StatelessWidget {
       );
 }
 
+/// بيضاوي ملوّن لسنتر أو مادة (نفس شكل الموقع: خلفية هادية من اللون + نقطة باللون نفسه)
+class ColorChip extends StatelessWidget {
+  const ColorChip(this.text, this.color, {super.key, this.fontSize = 12});
+  final String text;
+  final int color;
+  final double fontSize;
+  @override
+  Widget build(BuildContext context) {
+    final c = Color(color);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: Color.lerp(Colors.white, c, 0.17),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: c.withValues(alpha: 0.36)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Color.lerp(c, const Color(0xFF0B0A14), 0.42), fontSize: fontSize, fontWeight: FontWeight.w700)),
+        ),
+      ]),
+    );
+  }
+}
+
+/// دايرة الحصة: نصها لون المادة ونصها لون السنتر (خليط هادي)، وجواها رقم الحصة
+class SessionMixBadge extends StatelessWidget {
+  const SessionMixBadge({super.key, required this.subjectColor, required this.centerColor, required this.label, this.size = 40});
+  final int subjectColor, centerColor;
+  final String label;
+  final double size;
+  @override
+  Widget build(BuildContext context) {
+    final a = Color(subjectColor), b = Color(centerColor);
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(colors: [Color.lerp(Colors.white, a, 0.28)!, Color.lerp(Colors.white, b, 0.28)!]),
+        border: Border.all(color: Color.lerp(a, b, 0.5)!.withValues(alpha: 0.45), width: 1.5),
+      ),
+      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.text)),
+    );
+  }
+}
+
 /// شريط صغير بيقول إن البيانات المعروضة محفوظة من آخر مرة (مفيش نت)
 class OfflineBanner extends StatelessWidget {
   const OfflineBanner({super.key, required this.savedAt, this.message});

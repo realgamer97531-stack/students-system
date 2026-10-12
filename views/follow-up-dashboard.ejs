@@ -5,19 +5,17 @@
     <h3 class="mb-1">🎯 <span class="ar-only">لوحة متابعة الطلاب</span><span class="en-only" style="display:none;">Student Follow-up Dashboard</span></h3>
     <p class="text-muted small mb-0">
       <%= filters.show_all ? (students.length + ' طالب') : (students.length + ' طالب مُسند إليك') %>
-      <% if (selectedSession) { %> | <span class="ar-only">حصة رقم</span><span class="en-only" style="display:none;">Session #</span> <%= selectedSession.lesson_number %> - <%= selectedSession.Subject?.name %> - <%= selectedSession.Center?.name %><% } %>
+      <% if (selectedSession) { %> | <%- sf.session(selectedSession) %><% } %>
     </p>
   </div>
 
   <!-- اختيار الحصة -->
   <div class="d-flex gap-2 align-items-center flex-wrap">
     <form method="GET" class="d-flex gap-2 flex-wrap">
-      <select name="session_id" class="form-select session-select" style="max-width: 350px;">
+      <select name="session_id" class="form-select session-select" style="min-width: 300px; max-width: 420px;">
         <option value=""><span class="ar-only">-- اختر الحصة --</span><span class="en-only" style="display:none;">-- Select Session --</span></option>
         <% sessions.forEach(s => { %>
-          <option value="<%= s.id %>" <%= String(s.id) === String(filters.session_id) ? 'selected':'' %>>
-            <%= s.Subject?.name %> - <%= s.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= s.lesson_number %>)
-          </option>
+          <option value="<%= s.id %>" <%- sf.sessionOption(s) %> <%= String(s.id) === String(filters.session_id) ? 'selected':'' %>><%= sf.sessionText(s, { serial: false }) %></option>
         <% }) %>
       </select>
     </form>
@@ -104,7 +102,7 @@
         <select name="center_id" class="form-select form-select-sm">
           <option value=""><span class="ar-only">الكل</span><span class="en-only" style="display:none;">All</span></option>
           <% (centers || []).forEach(c => { %>
-            <option value="<%= c.id %>" <%= String(c.id) === String(filters.center_id) ? 'selected':'' %>><%= c.name %></option>
+            <option value="<%= c.id %>" <%- sf.colorAttr('center', c) %> <%= String(c.id) === String(filters.center_id) ? 'selected':'' %>><%= c.name %></option>
           <% }) %>
         </select>
       </div>
@@ -113,7 +111,7 @@
         <select name="subject_id" class="form-select form-select-sm">
           <option value=""><span class="ar-only">الكل</span><span class="en-only" style="display:none;">All</span></option>
           <% (subjects || []).forEach(s => { %>
-            <option value="<%= s.id %>" <%= String(s.id) === String(filters.subject_id) ? 'selected':'' %>><%= s.name %></option>
+            <option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %> <%= String(s.id) === String(filters.subject_id) ? 'selected':'' %>><%= s.name %></option>
           <% }) %>
         </select>
       </div>
@@ -183,7 +181,7 @@
             <div class="p-2 rounded" style="background:var(--sf-primary-light);">
               <div class="small fw-bold"><%= s.name %></div>
               <div style="font-size:0.7rem;color:var(--sf-muted);"><%= s.student_code %></div>
-              <div style="font-size:0.7rem;color:var(--sf-muted);"><%= s.Center?.name %> | <%= s.Subject?.name %></div>
+              <div class="sf-chip-row mt-1"><%- sf.center(s.Center) %><%- sf.subject(s.Subject) %></div>
               <a href="/follow-up-dashboard/student/<%= s.id %>" class="btn btn-sm mt-1" style="font-size:0.65rem;padding:2px 8px;background:var(--sf-primary);color:#fff;"><span class="ar-only">عرض الملف</span><span class="en-only" style="display:none;">View Profile</span></a>
             </div>
           </div>
@@ -219,7 +217,7 @@
               <td>
                 <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="fw-bold d-block"><%= row.student.name %><% if (row.student.is_blocked) { %> <span class="badge bg-danger">🚫 محظور</span><% } %></a>
                 <span class="text-muted" style="font-size:0.7rem;"><%= row.student.student_code %></span><br>
-                <span class="text-muted" style="font-size:0.65rem;"><%= row.student.Center?.name %> | <%= row.student.Subject?.name %></span>
+                <span class="sf-chip-row mt-1"><%- sf.center(row.student.Center) %><%- sf.subject(row.student.Subject) %></span>
               </td>
               <td><%= row.student.phone || '-' %></td>
               <td><%= row.student.parent_phone || '-' %></td>
@@ -297,7 +295,7 @@
           <div class="p-2 rounded" style="background:var(--sf-danger-soft-bg);">
             <div class="small fw-bold"><%= row.student.name %><% if (row.student.is_blocked) { %> <span class="badge bg-danger">🚫 محظور</span><% } %></div>
             <div style="font-size:0.7rem;color:var(--sf-muted);"><%= row.student.student_code %></div>
-            <div style="font-size:0.7rem;color:var(--sf-muted);"><%= row.student.Center?.name %></div>
+            <div class="mt-1"><%- sf.center(row.student.Center) %></div>
             <a href="/follow-up-dashboard/student/<%= row.student.id %>" class="btn btn-sm mt-1" style="font-size:0.65rem;padding:2px 8px;background:var(--sf-danger-soft-text);color:#fff;"><span class="ar-only">عرض الملف</span><span class="en-only" style="display:none;">View Profile</span></a>
           </div>
         </div>

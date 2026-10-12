@@ -223,8 +223,8 @@
         <span class="text-muted small"><span class="ar-only">لا توجد حصص مرتبطة (الفيديو مرئي للجميع!)</span><span class="en-only" style="display:none;">No linked sessions (the video is visible to everyone!)</span></span>
       <% } %>
       <% videoSessions.forEach(vs => { %>
-        <div class="d-flex align-items-center gap-1 p-2 rounded" style="background:var(--sf-primary-light);font-size:0.8rem;">
-          <span><strong><%= vs.Session?.Subject?.name %></strong> - <%= vs.Session?.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= vs.Session?.lesson_number %>)</span>
+        <div class="d-flex align-items-center gap-1">
+          <%- sf.session(vs.Session) %>
           <form action="/admin/videos/<%= video.id %>/remove-session/<%= vs.SessionId %>" method="POST">
             <button class="btn btn-sm" style="padding:1px 6px;background:var(--sf-danger-soft-bg);color:var(--sf-danger-soft-text);font-size:0.65rem;">✕</button>
           </form>
@@ -238,7 +238,7 @@
         <% allSessions.forEach(s => { %>
           <% const alreadyAdded = videoSessions.some(vs => vs.SessionId === s.id); %>
           <% if (!alreadyAdded) { %>
-            <option value="<%= s.id %>"><%= s.Subject?.name %> - <%= s.Center?.name %> (<span class="ar-only">حصة</span><span class="en-only" style="display:none;">Session</span> <%= s.lesson_number %> | <span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <%= s.serial_number %>)</option>
+            <option value="<%= s.id %>" <%- sf.sessionOption(s) %>><%= sf.sessionText(s) %></option>
           <% } %>
         <% }) %>
       </select>
@@ -283,7 +283,7 @@
               <tr data-search="<%= (student.name + ' ' + student.student_code).toLowerCase() %>">
                 <td><%= student.student_code %></td>
                 <td><%= student.name %></td>
-                <td class="small text-muted"><%= student.Subject?.name %> - <%= student.Center?.name %></td>
+                <td><span class="sf-chip-row"><%- sf.subject(student.Subject) %><%- sf.center(student.Center) %></span></td>
                 <td><%= accessSource %><%= grant ? ' (' + grant.method + ')' : '' %></td>
                 <td class="<%= grantEnded ? 'text-danger fw-bold' : '' %>"><%= remaining %></td>
                 <td>

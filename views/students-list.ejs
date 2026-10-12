@@ -239,8 +239,8 @@
           <td><span class="student-name"><%= student.name %></span></td>
           <td><%= student.phone %></td>
           <td><%= student.parent_phone %></td>
-          <td><%= student.Subject ? student.Subject.name : '-' %></td>
-          <td><%= student.Center ? student.Center.name : '-' %></td>
+          <td><%- sf.subject(student.Subject) %></td>
+          <td><%- sf.center(student.Center) %></td>
           <td><%= student.price_per_session %> ج</td>
           <td><%= typeof bookletPaidTotals !== 'undefined' ? (bookletPaidTotals[student.id] || 0) + ' ج' : '0 ج' %></td>
           <td><%= student.balance %> ج</td>
