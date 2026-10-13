@@ -1,0 +1,208 @@
+<%- include('partials/header') %>
+<%
+  const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const p = preview;
+%>
+
+<style>
+  .mc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .mc-stat { background: var(--sf-panel-bg); border: 1px solid var(--sf-input-border); border-radius: var(--sf-radius-sm); padding: 12px; text-align: center; }
+  .mc-stat b { display: block; font-size: 1.6rem; color: var(--sf-primary); }
+  .mc-arrow { font-size: 1.3rem; color: var(--sf-muted); }
+  .mc-list { max-height: 260px; overflow: auto; }
+  .mc-pill { display: inline-block; border-radius: 999px; padding: 1px 9px; margin: 2px; font-size: 0.82rem; background: var(--sf-neutral-soft-bg); color: var(--sf-neutral-soft-text); }
+  .mc-pill-bad { background: var(--sf-danger-soft-bg); color: var(--sf-danger-soft-text); font-weight: 700; }
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h3 class="mb-0">🔀 نقل مادة من سنتر لسنتر تاني</h3>
+  <a href="/settings" class="btn btn-sm btn-outline-secondary">⬅ الإعدادات</a>
+</div>
+
+<% if (successMessage) { %><div class="alert alert-success"><%= successMessage %></div><% } %>
+<% if (errorMessage) { %><div class="alert alert-danger"><%= errorMessage %></div><% } %>
+<% if (desktopMode) { %>
+  <div class="alert alert-warning">⚠️ الأداة دي بتتنفذ من الموقع أونلاين بس. هنا تقدر تعمل معاينة بس.</div>
+<% } %>
+
+<div class="card mb-4 shadow-sm">
+  <div class="card-body">
+    <p class="text-muted small">
+      بينقل <b>طلاب</b> المادة دي و<b>حصصها</b> (بكل الحضور والواجبات والدرجات والفيديوهات المرتبطة بيها) من السنتر القديم للسنتر الجديد.
+      الأول بتشوف معاينة كاملة ومفيش أي حاجة بتتغير. وقبل التنفيذ بتتعمل نسخة احتياطية كاملة، وكل عملية ينفع تتراجع عنها.
+      أرقام السيريال وأكواد الطلاب والأرصدة مش بتتغير.
+    </p>
+    <form method="GET" action="/settings/move-center" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">من سنتر</label>
+        <select name="from" class="form-select" required>
+          <option value="">-- السنتر القديم --</option>
+          <% centers.forEach(c => { %><option value="<%= c.id %>" <%- sf.colorAttr('center', c) %> <%= String(query.from) === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">المادة</label>
+        <select name="subject" class="form-select" required>
+          <option value="">-- المادة --</option>
+          <% subjects.forEach(s => { %><option value="<%= s.id %>" <%- sf.colorAttr('subject', s) %> <%= String(query.subject) === String(s.id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">إلى سنتر</label>
+        <select name="to" class="form-select" required>
+          <option value="">-- السنتر الجديد --</option>
+          <% centers.forEach(c => { %><option value="<%= c.id %>" <%- sf.colorAttr('center', c) %> <%= String(query.to) === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="schedule" value="1" id="mcSchedule" <%= query.schedule === '1' ? 'checked' : '' %>>
+          <label class="form-check-label small" for="mcSchedule">انقل مواعيد الجدول الأسبوعي كمان</label>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">👁 معاينة (من غير أي تغيير)</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (p) { %>
+<div class="card mb-4 shadow-sm border-primary">
+  <div class="card-body">
+    <h5 class="mb-3 d-flex flex-wrap align-items-center gap-2">
+      المعاينة: <%- sf.subject(p.subject) %> <%- sf.center(p.from) %> <span class="mc-arrow">⬅</span> <%- sf.center(p.to) %>
+    </h5>
+
+    <div class="mc-stats mb-3">
+      <div class="mc-stat"><b><%= p.students.length %></b>طالب هيتنقل</div>
+      <div class="mc-stat"><b><%= p.sessions.length %></b>حصة هتتنقل</div>
+      <div class="mc-stat"><b><%= p.willMoveSchedule ? p.scheduleEntries.length : 0 %></b>موعد في الجدول</div>
+      <div class="mc-stat"><b><%= p.targetStudentsCount %></b>طالب موجود أصلًا في <%= p.to.name %></div>
+    </div>
+
+    <% if (p.conflicts.length) { %>
+      <div class="alert alert-danger">
+        <b>⛔ مينفعش النقل:</b> فيه <%= p.conflicts.length %> حصة بنفس الرقم النسبي موجودة بالفعل في <%= p.to.name %> لنفس المادة.
+        لو اتنقلت هيبقى فيه حصتين بنفس الرقم في نفس السنتر. لازم تتحل الأول (مثلًا تغيير الرقم النسبي من الإعدادات)، أو قولّي وأنا أرتبها معاك.
+        <div class="mt-2">
+          <% p.conflicts.forEach(c => { %>
+            <div class="small">حصة <b><%= c.moving.lesson_number %></b>: في <%= p.from.name %> (سيريال <%= c.moving.serial_number %>، <%= c.moving.session_date %>) ↔ في <%= p.to.name %> (سيريال <%= c.existing.serial_number %>، <%= c.existing.session_date %>)</div>
+          <% }) %>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (p.nextBefore !== p.nextAfter) { %>
+      <div class="alert alert-warning small">
+        ⚠️ رقم الحصة الجاية في <%= p.to.name %> (<%= p.subject.name %>) هيبقى <b><%= p.nextAfter %></b> بدل <b><%= p.nextBefore %></b>، لأن حصص <%= p.from.name %> أرقامها أعلى.
+      </div>
+    <% } %>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <h6>الحصص اللي هتتنقل من <%= p.from.name %></h6>
+        <div class="mc-list">
+          <% if (!p.sessions.length) { %><span class="text-muted small">مفيش</span><% } %>
+          <% const clashLessons = new Set(p.conflicts.map(c => c.moving.lesson_number)); %>
+          <% p.sessions.forEach(s => { %>
+            <span class="mc-pill <%= clashLessons.has(s.lesson_number) ? 'mc-pill-bad' : '' %>" title="سيريال <%= s.serial_number %> — <%= s.session_date %>">حصة <%= s.lesson_number %> · <bdi dir="ltr"><%= s.serial_number %></bdi><%= s.status === 'cancelled' ? ' · ملغية' : '' %></span>
+          <% }) %>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h6>الحصص الموجودة أصلًا في <%= p.to.name %></h6>
+        <div class="mc-list">
+          <% if (!p.targetSessions.length) { %><span class="text-muted small">مفيش</span><% } %>
+          <% p.targetSessions.forEach(s => { %>
+            <span class="mc-pill" title="سيريال <%= s.serial_number %> — <%= s.session_date %>">حصة <%= s.lesson_number %> · <bdi dir="ltr"><%= s.serial_number %></bdi></span>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <h6>مواعيد الجدول في <%= p.from.name %> <%= p.willMoveSchedule ? '(هتتنقل)' : '(مش هتتنقل)' %></h6>
+        <% if (!p.scheduleEntries.length) { %><span class="text-muted small">مفيش</span><% } %>
+        <% p.scheduleEntries.forEach(e => { %>
+          <span class="mc-pill"><%= DAYS[e.day_of_week] || e.day_of_week %> <bdi dir="ltr"><%= e.start_time %></bdi><%= e.is_active ? '' : ' (متوقف)' %></span>
+        <% }) %>
+      </div>
+      <div class="col-md-6">
+        <h6>مواعيد الجدول في <%= p.to.name %></h6>
+        <% if (!p.targetScheduleEntries.length) { %><span class="text-muted small">مفيش</span><% } %>
+        <% p.targetScheduleEntries.forEach(e => { %>
+          <span class="mc-pill"><%= DAYS[e.day_of_week] || e.day_of_week %> <bdi dir="ltr"><%= e.start_time %></bdi><%= e.is_active ? '' : ' (متوقف)' %></span>
+        <% }) %>
+        <% if (p.willMoveSchedule && p.targetScheduleEntries.length) { %>
+          <div class="small text-warning mt-1">⚠️ السنتر الجديد عنده مواعيد بالفعل — نقل المواعيد هيضيفها جنبهم.</div>
+        <% } %>
+      </div>
+
+      <div class="col-12">
+        <details>
+          <summary>أسماء الطلاب اللي هيتنقلوا (<%= p.students.length %>)</summary>
+          <div class="mc-list mt-2">
+            <% p.students.forEach(st => { %><span class="mc-pill"><%= st.student_code %> — <%= st.name %></span><% }) %>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <hr>
+    <% if (p.conflicts.length) { %>
+      <button class="btn btn-secondary" disabled>⛔ التنفيذ مقفول بسبب الحصص المتكررة</button>
+    <% } else if (p.nothingToMove) { %>
+      <div class="text-muted">مفيش حاجة تتنقل.</div>
+    <% } else if (desktopMode) { %>
+      <button class="btn btn-secondary" disabled>التنفيذ من الموقع أونلاين بس</button>
+    <% } else { %>
+      <form method="POST" action="/settings/move-center/execute" class="row g-2 align-items-end" id="mcExecForm">
+        <input type="hidden" name="from" value="<%= p.from.id %>">
+        <input type="hidden" name="to" value="<%= p.to.id %>">
+        <input type="hidden" name="subject" value="<%= p.subject.id %>">
+        <input type="hidden" name="schedule" value="<%= p.moveSchedule ? '1' : '0' %>">
+        <input type="hidden" name="fingerprint" value="<%= p.fingerprint %>">
+        <div class="col-md-4">
+          <label class="form-label small">للتأكيد اكتب كلمة <b>نقل</b></label>
+          <input type="text" name="confirm_text" class="form-control" autocomplete="off" required>
+        </div>
+        <div class="col-md-8">
+          <button type="submit" class="btn btn-danger">🔀 نفّذ النقل (بعد نسخة احتياطية)</button>
+        </div>
+      </form>
+      <script>
+        document.getElementById('mcExecForm').addEventListener('submit', function (e) {
+          const msg = 'نقل <%= p.students.length %> طالب و<%= p.sessions.length %> حصة من <%= p.from.name %> إلى <%= p.to.name %> (<%= p.subject.name %>)؟';
+          if (!confirm(msg)) { e.preventDefault(); return; }
+          const btn = this.querySelector('button[type=submit]');
+          btn.disabled = true; btn.textContent = '⏳ جاري النسخ الاحتياطي والنقل... متقفلش الصفحة';
+        });
+      </script>
+    <% } %>
+  </div>
+</div>
+<% } %>
+
+<div class="card mb-4 shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">📜 عمليات النقل السابقة</h5>
+    <% if (!moves.length) { %><div class="text-muted small">مفيش عمليات لسه</div><% } %>
+    <% moves.forEach(m => {
+         const n = (t) => { try { return JSON.parse(t || '[]').length; } catch (e) { return 0; } };
+    %>
+      <div class="d-flex flex-wrap align-items-center gap-2 border-bottom py-2">
+        <b>#<%= m.id %></b>
+        <%- sf.subject(m.subject_id) %> <%- sf.center(m.from_center_id, m.from_center_name) %> <span class="mc-arrow">⬅</span> <%- sf.center(m.to_center_id, m.to_center_name) %>
+        <span class="small text-muted"><%= n(m.student_ids) %> طالب · <%= n(m.session_ids) %> حصة · <%= n(m.schedule_ids) %> موعد — <%= m.user_name || '' %> — <bdi dir="ltr"><%= m.createdAt ? new Date(m.createdAt).toISOString().slice(0, 16).replace('T', ' ') : '' %></bdi></span>
+        <% if (m.undone_at) { %>
+          <span class="badge bg-secondary">اتعمل تراجع<%= m.undone_by ? ' (' + m.undone_by + ')' : '' %></span>
+        <% } else if (!desktopMode) { %>
+          <form method="POST" action="/settings/move-center/<%= m.id %>/undo" class="ms-auto"
+            onsubmit="return confirm('ترجع نفس الطلاب والحصص دي للسنتر القديم (<%= m.from_center_name %>)؟');">
+            <button class="btn btn-sm btn-outline-warning">↩️ تراجع</button>
+          </form>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

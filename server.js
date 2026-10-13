@@ -69,6 +69,7 @@ const {
 } = require('./utils/dailyBackup');
 const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
 const entityColors = require('./utils/entityColors');
+const centerMove = require('./utils/centerMove');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
 const syncServer = require('./utils/sync/server');
 // برنامج الديسكتوب (أوفلاين) بيشغل نفس السيرفر ده على الجهاز مع DESKTOP_MODE=1
@@ -1512,6 +1513,95 @@ app.post('/settings/session-lesson-number', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error(error);
     back('lesson_error', '❌ ' + error.message);
+  }
+});
+
+// ===== نقل مادة من سنتر لسنتر (utils/centerMove.js) =====
+// معاينة الأول (من غير أي تعديل) → تأكيد → نسخة احتياطية كاملة → النقل في transaction واحدة → سجل ينفع نتراجع منه
+function centerMoveModels() {
+  return { Center, Subject, Student, Session, ScheduleEntry };
+}
+
+async function renderMoveCenterPage(req, res, extra = {}) {
+  const [centers, subjects, moves] = await Promise.all([
+    Center.findAll({ attributes: ['id', 'name'], order: [['name', 'ASC']] }),
+    Subject.findAll({ attributes: ['id', 'name'], order: [['name', 'ASC']] }),
+    centerMove.listMoves(sequelize),
+  ]);
+  res.render('move-center', {
+    centers, subjects, moves,
+    desktopMode: !!desktopRuntime,
+    query: req.query || {},
+    preview: null, successMessage: null, errorMessage: null,
+    ...extra,
+  });
+}
+
+app.get('/settings/move-center', requireAdmin, async (req, res) => {
+  try {
+    const extra = {};
+    if (req.query.done) extra.successMessage = String(req.query.done);
+    if (req.query.error) extra.errorMessage = String(req.query.error);
+    if (req.query.from && req.query.to && req.query.subject) {
+      const preview = await centerMove.buildPreview(centerMoveModels(), {
+        fromCenterId: req.query.from, toCenterId: req.query.to, subjectId: req.query.subject,
+        moveSchedule: req.query.schedule === '1',
+      });
+      if (preview.error) extra.errorMessage = '❌ ' + preview.error;
+      else extra.preview = preview;
+    }
+    await renderMoveCenterPage(req, res, extra);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+app.post('/settings/move-center/execute', requireAdmin, async (req, res) => {
+  const { from, to, subject } = req.body;
+  const schedule = req.body.schedule === '1' ? '1' : '0';
+  const back = (key, message) => res.redirect(`/settings/move-center?from=${encodeURIComponent(from || '')}&to=${encodeURIComponent(to || '')}&subject=${encodeURIComponent(subject || '')}&schedule=${schedule}&${key}=${encodeURIComponent(message)}`);
+  try {
+    if (desktopRuntime) return back('error', '❌ النقل بين السناتر بيتعمل من الموقع أونلاين بس، مش من برنامج الديسكتوب');
+    if (String(req.body.confirm_text || '').trim() !== 'نقل') return back('error', '❌ اكتب كلمة "نقل" في خانة التأكيد');
+
+    // نسخة احتياطية إجبارية — لو فشلت، النقل مش بيحصل
+    try {
+      await backupBeforeDestructiveAction('before-center-move');
+    } catch (backupError) {
+      return back('error', '❌ متنقلش حاجة: فشلت النسخة الاحتياطية قبل النقل (' + backupError.message + ')');
+    }
+
+    const result = await centerMove.executeMove(sequelize, centerMoveModels(), {
+      fromCenterId: from, toCenterId: to, subjectId: subject, moveSchedule: schedule === '1',
+    }, { fingerprint: String(req.body.fingerprint || ''), user: { id: req.session.userId, name: req.session.userName } });
+    if (result.error) return back('error', '❌ متنقلش حاجة: ' + result.error);
+
+    const { move, counts } = result;
+    console.log(`🔀 ${req.session.userName || 'admin'} نقل ${move.subject_name} من ${move.from_center_name} إلى ${move.to_center_name}: ${counts.students} طالب، ${counts.sessions} حصة، ${counts.schedule} موعد (عملية #${move.id})`);
+    res.redirect('/settings/move-center?done=' + encodeURIComponent(`✅ اتنقل ${move.subject_name} من ${move.from_center_name} إلى ${move.to_center_name}: ${counts.students} طالب، ${counts.sessions} حصة، ${counts.schedule} موعد في الجدول (عملية رقم ${move.id})`));
+  } catch (error) {
+    console.error('Center move failed:', error);
+    back('error', '❌ متنقلش حاجة (اتلغى كله): ' + error.message);
+  }
+});
+
+app.post('/settings/move-center/:id/undo', requireAdmin, async (req, res) => {
+  try {
+    if (desktopRuntime) return res.redirect('/settings/move-center?error=' + encodeURIComponent('❌ التراجع بيتعمل من الموقع أونلاين بس'));
+    try {
+      await backupBeforeDestructiveAction('before-center-move-undo');
+    } catch (backupError) {
+      return res.redirect('/settings/move-center?error=' + encodeURIComponent('❌ متعملش تراجع: فشلت النسخة الاحتياطية (' + backupError.message + ')'));
+    }
+    const result = await centerMove.undoMove(sequelize, centerMoveModels(), Number(req.params.id), { user: { name: req.session.userName } });
+    if (result.error) return res.redirect('/settings/move-center?error=' + encodeURIComponent('❌ ' + result.error));
+    const { move, counts } = result;
+    console.log(`↩️ ${req.session.userName || 'admin'} تراجع عن نقل #${move.id}: ${counts.students} طالب، ${counts.sessions} حصة، ${counts.schedule} موعد`);
+    res.redirect('/settings/move-center?done=' + encodeURIComponent(`↩️ اتعمل تراجع عن العملية رقم ${move.id}: رجع ${counts.students} طالب، ${counts.sessions} حصة، ${counts.schedule} موعد إلى ${move.from_center_name}`));
+  } catch (error) {
+    console.error('Center move undo failed:', error);
+    res.redirect('/settings/move-center?error=' + encodeURIComponent('❌ متعملش تراجع (اتلغى كله): ' + error.message));
   }
 });
 
