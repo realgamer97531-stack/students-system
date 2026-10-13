@@ -1,5 +1,38 @@
 <%- include('partials/header') %>
 
+<style>
+  .ex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .ex-card {
+    background: var(--sf-card-bg); border: 1px solid var(--sf-input-border); border-radius: var(--sf-radius);
+    box-shadow: var(--sf-shadow); padding: 16px; display: flex; flex-direction: column; gap: 12px;
+    border-top: 4px solid var(--ex-c, var(--sf-primary));
+  }
+  .ex-card.ex-flash { box-shadow: 0 0 0 3px var(--sf-accent), var(--sf-shadow-md); }
+  .ex-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .ex-name { font-weight: 700; font-size: 1.08rem; color: var(--sf-text); margin: 0; word-break: break-word; }
+  .ex-score {
+    flex-shrink: 0; text-align: center; border-radius: var(--sf-radius-sm); padding: 4px 12px;
+    background: var(--sf-primary-light); color: var(--sf-primary);
+  }
+  .ex-score b { display: block; font-size: 1.35rem; line-height: 1.1; }
+  .ex-score small { font-size: 0.7rem; opacity: 0.85; }
+  .ex-props { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; margin: 0; font-size: 0.9rem; }
+  .ex-props dt { color: var(--sf-muted); font-weight: 500; white-space: nowrap; }
+  .ex-props dd { margin: 0; color: var(--sf-text); min-width: 0; }
+  .ex-props dt i { width: 18px; display: inline-block; }
+  .ex-pill {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 10px; font-size: 0.82rem;
+    background: var(--sf-neutral-soft-bg); color: var(--sf-neutral-soft-text); font-weight: 600;
+  }
+  .ex-pill-free { background: var(--sf-info-soft-bg); color: var(--sf-info-soft-text); }
+  .ex-pill-warn { background: var(--sf-warning-soft-bg); color: var(--sf-warning-soft-text); }
+  .ex-pill-ok { background: var(--sf-success-soft-bg); color: var(--sf-success-soft-text); }
+  .ex-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--sf-input-border); }
+  .ex-actions .btn { flex: 1 1 auto; }
+  .ex-empty { text-align: center; color: var(--sf-muted); padding: 40px 10px; }
+  @media (max-width: 420px) { .ex-grid { grid-template-columns: 1fr; } }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h3>
     <span class="ar-only">الامتحانات</span>
@@ -15,7 +48,7 @@
     </h5>
     <form action="/exams" method="POST" class="row g-2">
       <div class="col-md-3">
-        <input type="text" name="name" class="form-control" 
+        <input type="text" name="name" class="form-control"
           placeholder="اسم الامتحان" title="Exam Name" required>
       </div>
       <div class="col-md-3">
@@ -60,56 +93,173 @@
   </div>
 </div>
 
-<div class="card mb-4">
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-striped table-hover align-middle mb-0">
-        <thead>
-          <tr>
-            <th><span class="ar-only">الامتحان</span><span class="en-only" style="display:none;">Exam</span></th>
-            <th><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></th>
-            <th><span class="ar-only">الحصة المرتبطة</span><span class="en-only" style="display:none;">Linked Session</span></th>
-            <th><span class="ar-only">الدرجة الكاملة</span><span class="en-only" style="display:none;">Max Score</span></th>
-            <th><span class="ar-only">التاريخ</span><span class="en-only" style="display:none;">Date</span></th>
-            <th style="width: 120px;"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% exams.forEach(exam => { %>
-            <tr>
-              <td class="fw-semibold"><%= exam.name %></td>
-              <td><%= exam.Subject.name %></td>
-              <td>
-                <% if (exam.Session) { %>
-                  <span class="ar-only">حصة <%= exam.Session.lesson_number %></span>
-                  <span class="en-only" style="display:none;">Lesson <%= exam.Session.lesson_number %></span>
-                <% } else { %>
-                  <span class="text-muted small">
-                    <span class="ar-only">مستقل</span>
-                    <span class="en-only" style="display:none;">Independent</span>
-                  </span>
-                <% } %>
-              </td>
-              <td><%= exam.max_score %></td>
-              <td><%= exam.exam_date %></td>
-              <td class="text-end">
-                <a href="/exams/<%= exam.id %>" class="btn btn-sm btn-outline-primary py-1 px-2">
-                  <span class="ar-only">رصد الدرجات</span>
-                  <span class="en-only" style="display:none;">Record Scores</span>
-                </a>
-                <form action="/exams/<%= exam.id %>/delete" method="POST" class="d-inline"
-                  onsubmit="return confirm('هل أنت متأكد من حذف هذا الامتحان وكل الدرجات المسجلة به؟');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2">
-                    <span class="ar-only">حذف</span>
-                    <span class="en-only" style="display:none;">Delete</span>
-                  </button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+<% if (notice === 'saved') { %>
+  <div class="alert alert-success py-2">
+    <span class="ar-only">✅ تم حفظ تعديلات الامتحان</span>
+    <span class="en-only" style="display:none;">✅ Exam changes saved</span>
+  </div>
+<% } %>
+
+<% if (exams.length === 0) { %>
+  <div class="card"><div class="ex-empty">
+    <span class="ar-only">لسه مفيش امتحانات</span>
+    <span class="en-only" style="display:none;">No exams yet</span>
+  </div></div>
+<% } %>
+
+<div class="ex-grid mb-4">
+  <% exams.forEach(exam => {
+       const s = exam.Session;
+       const stats = statsByExam[exam.id] || { count: 0, top: null };
+       const overMax = stats.top != null && stats.top > exam.max_score;
+  %>
+    <div class="ex-card" id="exam-<%= exam.id %>" style="--ex-c: <%= sf.color('subject', exam.Subject || exam.SubjectId) %>;">
+      <div class="ex-head">
+        <h5 class="ex-name"><%= exam.name %></h5>
+        <div class="ex-score" title="الدرجة النهائية / Max score">
+          <b><%= exam.max_score %></b>
+          <small><span class="ar-only">الدرجة النهائية</span><span class="en-only" style="display:none;">Max score</span></small>
+        </div>
+      </div>
+
+      <dl class="ex-props">
+        <dt><i class="bi bi-book"></i><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></dt>
+        <dd><%- sf.subject(exam.Subject || exam.SubjectId) %></dd>
+
+        <dt><i class="bi bi-link-45deg"></i><span class="ar-only">الحصة</span><span class="en-only" style="display:none;">Session</span></dt>
+        <dd>
+          <% if (s) { %>
+            <%- sf.session(s) %>
+          <% } else { %>
+            <span class="ex-pill ex-pill-free"><i class="bi bi-unlock"></i>
+              <span class="ar-only">مستقل (كل طلاب المادة)</span><span class="en-only" style="display:none;">Independent (all subject students)</span>
+            </span>
+          <% } %>
+        </dd>
+
+        <dt><i class="bi bi-building"></i><span class="ar-only">السنتر</span><span class="en-only" style="display:none;">Center</span></dt>
+        <dd>
+          <% if (s) { %>
+            <%- sf.center(s.Center || s.CenterId) %>
+          <% } else { %>
+            <span class="text-muted"><span class="ar-only">كل السناتر</span><span class="en-only" style="display:none;">All centers</span></span>
+          <% } %>
+        </dd>
+
+        <% if (s) { %>
+          <dt><i class="bi bi-hash"></i><span class="ar-only">رقم الحصة</span><span class="en-only" style="display:none;">Lesson</span></dt>
+          <dd><span class="ex-pill"><%= s.lesson_number %></span>
+            <% if (s.week_number != null) { %>
+              <span class="ex-pill"><span class="ar-only">أسبوع</span><span class="en-only" style="display:none;">Week</span> <%= s.week_number %></span>
+            <% } %>
+          </dd>
+
+          <dt><i class="bi bi-upc"></i><span class="ar-only">السيريال</span><span class="en-only" style="display:none;">Serial</span></dt>
+          <dd><span class="ex-pill"><bdi dir="ltr"><%= s.serial_number %></bdi></span></dd>
+
+          <dt><i class="bi bi-calendar-event"></i><span class="ar-only">تاريخ الحصة</span><span class="en-only" style="display:none;">Session date</span></dt>
+          <dd><bdi dir="ltr"><%= s.session_date %></bdi>
+            <% if (s.status === 'cancelled') { %>
+              <span class="ex-pill ex-pill-warn"><span class="ar-only">ملغية</span><span class="en-only" style="display:none;">Cancelled</span></span>
+            <% } %>
+          </dd>
+        <% } %>
+
+        <dt><i class="bi bi-calendar-check"></i><span class="ar-only">تاريخ الامتحان</span><span class="en-only" style="display:none;">Exam date</span></dt>
+        <dd><bdi dir="ltr"><%= exam.exam_date %></bdi></dd>
+
+        <dt><i class="bi bi-clipboard-data"></i><span class="ar-only">الدرجات</span><span class="en-only" style="display:none;">Scores</span></dt>
+        <dd>
+          <span class="ex-pill <%= stats.count ? 'ex-pill-ok' : '' %>">
+            <%= stats.count %> <span class="ar-only">طالب</span><span class="en-only" style="display:none;">students</span>
+          </span>
+          <% if (stats.top != null) { %>
+            <span class="ex-pill <%= overMax ? 'ex-pill-warn' : '' %>" title="<%= overMax ? 'أعلى درجة أكبر من الدرجة النهائية' : '' %>">
+              <span class="ar-only">أعلى</span><span class="en-only" style="display:none;">Top</span> <%= stats.top %>
+            </span>
+          <% } %>
+        </dd>
+      </dl>
+
+      <div class="ex-actions">
+        <a href="/exams/<%= exam.id %>" class="btn btn-sm btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span class="ar-only">رصد الدرجات</span><span class="en-only" style="display:none;">Record Scores</span>
+        </a>
+        <button type="button" class="btn btn-sm btn-outline-secondary js-edit-exam"
+          data-id="<%= exam.id %>"
+          data-name="<%= exam.name %>"
+          data-max="<%= exam.max_score %>"
+          data-date="<%= exam.exam_date %>"
+          data-subject="<%= exam.SubjectId %>"
+          data-session="<%= exam.SessionId || '' %>"
+          data-top="<%= stats.top == null ? '' : stats.top %>">
+          <i class="bi bi-gear"></i>
+          <span class="ar-only">تعديل</span><span class="en-only" style="display:none;">Edit</span>
+        </button>
+        <form action="/exams/<%= exam.id %>/delete" method="POST" class="d-inline"
+          onsubmit="return confirm('هل أنت متأكد من حذف هذا الامتحان وكل الدرجات المسجلة به؟');">
+          <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+            <i class="bi bi-trash"></i>
+            <span class="ar-only">حذف</span><span class="en-only" style="display:none;">Delete</span>
+          </button>
+        </form>
+      </div>
     </div>
+  <% }) %>
+</div>
+
+<!-- نافذة تعديل الامتحان -->
+<div class="modal fade" id="editExamModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="editExamForm" method="POST">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <span class="ar-only">تعديل الامتحان</span><span class="en-only" style="display:none;">Edit Exam</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label"><span class="ar-only">اسم الامتحان</span><span class="en-only" style="display:none;">Exam name</span></label>
+          <input type="text" name="name" id="editName" class="form-control" required>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label"><span class="ar-only">الدرجة النهائية</span><span class="en-only" style="display:none;">Max score</span></label>
+            <input type="number" name="max_score" id="editMax" class="form-control" min="0.5" step="0.5" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label"><span class="ar-only">تاريخ الامتحان</span><span class="en-only" style="display:none;">Exam date</span></label>
+            <input type="date" name="exam_date" id="editDate" class="form-control" required>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label"><span class="ar-only">الحصة المرتبطة</span><span class="en-only" style="display:none;">Linked session</span></label>
+          <select name="session_id" id="editSession" class="form-select session-select">
+            <option value="">
+              <span class="ar-only">-- بدون ربط (امتحان مستقل) --</span>
+              <span class="en-only" style="display:none;">-- No link (independent exam) --</span>
+            </option>
+            <% allSessions.forEach(s => { %>
+              <option value="<%= s.id %>" data-subject="<%= s.SubjectId %>" <%- sf.sessionOption(s) %>><%= sf.sessionText(s) %></option>
+            <% }) %>
+          </select>
+          <div class="form-text">
+            <span class="ar-only">حصص نفس مادة الامتحان بس. فك الربط = كل طلاب المادة يظهروا في رصد الدرجات. الدرجات المرصودة قبل كده مش هتتمسح.</span>
+            <span class="en-only" style="display:none;">Only sessions of the exam's subject. Unlinking shows all subject students when recording scores. Recorded scores are kept.</span>
+          </div>
+        </div>
+        <div class="alert alert-warning py-2 small mb-0 d-none" id="editMaxWarn">
+          <span class="ar-only">⚠️ في طلاب درجتهم أعلى من الدرجة النهائية الجديدة (أعلى درجة: <b class="js-top"></b>).</span>
+          <span class="en-only" style="display:none;">⚠️ Some recorded scores are above the new max score (top: <b class="js-top"></b>).</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
+        <button type="submit" class="btn btn-success"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -129,6 +279,58 @@
         sessionSelect.appendChild(opt);
       }
     });
+  });
+
+  // ===== تعديل الامتحان =====
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('editExamModal');
+    const modal = new bootstrap.Modal(modalEl);
+    const form = document.getElementById('editExamForm');
+    const editSession = document.getElementById('editSession');
+    const editMax = document.getElementById('editMax');
+    const warn = document.getElementById('editMaxWarn');
+    const editOptions = Array.from(editSession.options);
+    let topScore = null;
+
+    function checkMax() {
+      const max = Number(editMax.value);
+      const show = topScore != null && Number.isFinite(max) && max > 0 && topScore > max;
+      warn.classList.toggle('d-none', !show);
+      warn.querySelectorAll('.js-top').forEach(el => { el.textContent = topScore; });
+    }
+    editMax.addEventListener('input', checkMax);
+
+    document.querySelectorAll('.js-edit-exam').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const d = btn.dataset;
+        form.action = '/exams/' + d.id + '/edit';
+        document.getElementById('editName').value = d.name;
+        editMax.value = d.max;
+        document.getElementById('editDate').value = d.date;
+        topScore = d.top === '' ? null : Number(d.top);
+
+        // حصص مادة الامتحان بس
+        editSession.innerHTML = '';
+        editOptions.forEach(opt => {
+          if (!opt.value || opt.dataset.subject === d.subject) editSession.appendChild(opt);
+        });
+        editSession.value = d.session || '';
+        if (typeof initializeSessionSelect === 'function') initializeSessionSelect(editSession);
+        $(editSession).trigger('change');
+
+        checkMax();
+        modal.show();
+      });
+    });
+
+    // بعد الحفظ: نوصل للكارت اللي اتعدل ونعلّمه
+    const saved = new URLSearchParams(location.search).get('saved');
+    const card = saved && document.getElementById('exam-' + saved);
+    if (card) {
+      card.classList.add('ex-flash');
+      card.scrollIntoView({ block: 'center' });
+      setTimeout(() => card.classList.remove('ex-flash'), 2500);
+    }
   });
 </script>
 

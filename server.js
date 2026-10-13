@@ -4036,10 +4036,54 @@ app.post('/attendance/scan/force', requirePermission('attendance_scan'), async (
 // ===== Routes بتاعة الامتحانات =====
 
 app.get('/exams', requirePermission('exams'), async (req, res) => {
-  const exams = await Exam.findAll({ include: [Subject, Session], order: [['createdAt', 'DESC']] });
+  const exams = await Exam.findAll({
+    include: [Subject, { model: Session, include: [Center, Subject] }],
+    order: [['createdAt', 'DESC']],
+  });
   const subjects = await Subject.findAll();
   const allSessions = await Session.findAll({ include: [Center], order: [['lesson_number', 'ASC']] });
-  res.render('exams-list', { exams, subjects, allSessions });
+  // عدد الدرجات المرصودة وأعلى درجة لكل امتحان (عشان تحذير لو الدرجة النهائية الجديدة أقل منها)
+  const resultStats = await ExamResult.findAll({
+    attributes: [
+      'ExamId',
+      [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      [sequelize.fn('MAX', sequelize.col('score')), 'top'],
+    ],
+    group: ['ExamId'],
+    raw: true,
+  });
+  const statsByExam = {};
+  resultStats.forEach(r => { statsByExam[r.ExamId] = { count: Number(r.count) || 0, top: r.top == null ? null : Number(r.top) }; });
+  res.render('exams-list', { exams, subjects, allSessions, statsByExam, notice: req.query.saved ? 'saved' : null });
+});
+
+// تعديل الامتحان: الاسم + الدرجة النهائية + التاريخ + الحصة المرتبطة (أو فكها)
+app.post('/exams/:id/edit', requirePermission('exams'), async (req, res) => {
+  try {
+    const exam = await Exam.findByPk(req.params.id);
+    if (!exam) return res.status(404).send('❌ الامتحان غير موجود');
+
+    const name = String(req.body.name || '').trim();
+    const maxScore = Number(req.body.max_score);
+    const examDate = String(req.body.exam_date || '').trim();
+    const sessionId = req.body.session_id ? Number(req.body.session_id) : null;
+
+    if (!name) return res.status(400).send('❌ اسم الامتحان مطلوب');
+    if (!Number.isFinite(maxScore) || maxScore <= 0) return res.status(400).send('❌ الدرجة النهائية لازم تكون رقم أكبر من صفر');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(examDate)) return res.status(400).send('❌ التاريخ غير صحيح');
+
+    if (sessionId !== null) {
+      const session = await Session.findByPk(sessionId, { attributes: ['id', 'SubjectId'] });
+      if (!session) return res.status(400).send('❌ الحصة غير موجودة');
+      if (Number(session.SubjectId) !== Number(exam.SubjectId)) return res.status(400).send('❌ الحصة لازم تكون من نفس مادة الامتحان');
+    }
+
+    await exam.update({ name, max_score: maxScore, exam_date: examDate, SessionId: sessionId });
+    res.redirect('/exams?saved=' + exam.id);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
 });
 
 app.post('/exams', async (req, res) => {
@@ -4081,7 +4125,7 @@ app.post('/exams/:id/delete', requirePermission('exams'), async (req, res) => {
 // صفحة رصد الدرجات لامتحان معين
 app.get('/exams/:id', async (req, res) => {
   try {
-    const exam = await Exam.findOne({ where: { id: req.params.id }, include: [Subject, Session] });
+    const exam = await Exam.findOne({ where: { id: req.params.id }, include: [Subject, { model: Session, include: [Center, Subject] }] });
     if (!exam) return res.status(404).send('❌ الامتحان غير موجود');
 
     let students;

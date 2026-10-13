@@ -1,7 +1,22 @@
 <%- include('partials/header') %>
 
-<h3 class="mb-3"><%= exam.name %> (<%= exam.Subject.name %> - <span class="ar-only">من</span><span class="en-only" style="display:none;">out of</span> <%= exam.max_score %>)</h3>
-<% if (exam.SessionId) { %>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+  <h3 class="mb-0"><%= exam.name %></h3>
+  <a href="/exams" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-right"></i> <span class="ar-only">كل الامتحانات</span><span class="en-only" style="display:none;">All exams</span></a>
+</div>
+<div class="sf-chip-row mb-3">
+  <span class="badge bg-primary fs-6"><span class="ar-only">من</span><span class="en-only" style="display:none;">out of</span> <%= exam.max_score %></span>
+  <%- sf.subject(exam.Subject || exam.SubjectId) %>
+  <% if (exam.Session) { %>
+    <%- sf.session(exam.Session) %>
+    <span class="badge bg-light text-dark border"><span class="ar-only">سيريال</span><span class="en-only" style="display:none;">Serial</span> <bdi dir="ltr"><%= exam.Session.serial_number %></bdi></span>
+    <span class="badge bg-light text-dark border"><bdi dir="ltr"><%= exam.Session.session_date %></bdi></span>
+  <% } else { %>
+    <span class="badge bg-info text-dark"><span class="ar-only">مستقل</span><span class="en-only" style="display:none;">Independent</span></span>
+  <% } %>
+  <span class="badge bg-light text-dark border"><i class="bi bi-calendar-check"></i> <bdi dir="ltr"><%= exam.exam_date %></bdi></span>
+</div>
+<% if (exam.SessionId && exam.Session) { %>
   <p class="text-muted small">⚠️ <span class="ar-only">ظاهر هنا بس الطلاب اللي سجلوا حضورهم في حصة</span><span class="en-only" style="display:none;">Only students who actually attended session</span> <%= exam.Session.lesson_number %> <span class="ar-only">فعليًا.</span><span class="en-only" style="display:none;">are shown here.</span></p>
 <% } %>
 <input type="text" id="searchBox" class="form-control mb-3" placeholder="🔍 بحث بالاسم أو الكود...">
