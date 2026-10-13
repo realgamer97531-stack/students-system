@@ -1516,6 +1516,187 @@ app.post('/settings/session-lesson-number', requireAdmin, async (req, res) => {
   }
 });
 
+// ===== السناتر وأساس السيريال (CenterSubjectSeries) =====
+// السيريال = أساس (السنتر + المادة) + الرقم النسبي. كل أساس واخد مدى 1000 رقم (أساس+1 .. أساس+999)،
+// فممنوع أساس جديد يقرب من أساس تاني بأقل من 1000 أو يقع في مداه سيريال حصة موجودة.
+// الأساس الموجود مبيتعدلش (سيريالات الحصص القديمة هتبوظ) — بس ينفع نضيف أساس لمادة ملهاش.
+const SERIES_RANGE = 1000;
+
+async function loadCentersOverview() {
+  const [centers, subjects, series, maxSerial, studentCounts, sessionCounts] = await Promise.all([
+    Center.findAll({ attributes: ['id', 'name', 'createdAt'], order: [['id', 'ASC']] }),
+    Subject.findAll({ attributes: ['id', 'name'], order: [['name', 'ASC']] }),
+    CenterSubjectSeries.findAll({ attributes: ['id', 'base_number', 'CenterId', 'SubjectId'], raw: true }),
+    Session.max('serial_number'),
+    Student.findAll({ attributes: ['CenterId', 'SubjectId', [sequelize.fn('COUNT', sequelize.col('id')), 'n']], group: ['CenterId', 'SubjectId'], raw: true }),
+    Session.findAll({ attributes: ['CenterId', 'SubjectId', [sequelize.fn('COUNT', sequelize.col('id')), 'n'], [sequelize.fn('MAX', sequelize.col('lesson_number')), 'last']], group: ['CenterId', 'SubjectId'], raw: true }),
+  ]);
+  const key = (c, s) => `${c}:${s}`;
+  const studentsBy = new Map(studentCounts.map(r => [key(r.CenterId, r.SubjectId), Number(r.n) || 0]));
+  const sessionsBy = new Map(sessionCounts.map(r => [key(r.CenterId, r.SubjectId), { n: Number(r.n) || 0, last: Number(r.last) || 0 }]));
+  const seriesBy = new Map(series.map(r => [key(r.CenterId, r.SubjectId), r]));
+
+  // اقتراح أساسات فاضية: بعد أعلى أساس/سيريال موجود، مقربة لأقرب 1000
+  const highest = Math.max(0, ...series.map(r => Number(r.base_number) || 0), Number(maxSerial) || 0);
+  let next = (Math.floor(highest / SERIES_RANGE) + 1) * SERIES_RANGE;
+  const suggestions = {};
+  subjects.forEach(subject => { suggestions[subject.id] = next; next += SERIES_RANGE; });
+
+  return {
+    centers, subjects, suggestions,
+    cell: (centerId, subjectId) => ({
+      series: seriesBy.get(key(centerId, subjectId)) || null,
+      students: studentsBy.get(key(centerId, subjectId)) || 0,
+      sessions: sessionsBy.get(key(centerId, subjectId)) || { n: 0, last: 0 },
+    }),
+  };
+}
+
+// بيرجع رسالة خطأ لو الأساس مينفعش، أو null
+async function seriesBaseProblem(base, transaction, labels) {
+  if (!Number.isInteger(base) || base < 0) return 'أساس السيريال لازم يكون رقم صحيح';
+  const near = await CenterSubjectSeries.findOne({
+    where: { base_number: { [Op.gt]: base - SERIES_RANGE, [Op.lt]: base + SERIES_RANGE } },
+    transaction,
+  });
+  if (near) {
+    return `الأساس ${base} قريب جدًا من أساس ${near.base_number} (${labels.center(near.CenterId)} - ${labels.subject(near.SubjectId)}). لازم الفرق يكون ${SERIES_RANGE} على الأقل`;
+  }
+  const used = await Session.findOne({
+    where: { serial_number: { [Op.gt]: base, [Op.lt]: base + SERIES_RANGE } },
+    attributes: ['serial_number'],
+    transaction,
+  });
+  if (used) return `فيه حصة موجودة بسيريال ${used.serial_number} جوه مدى الأساس ${base}`;
+  return null;
+}
+
+// أساسات المواد من الفورم: base_<subjectId> (فاضي = المادة دي مش في السنتر ده)
+function readSeriesBases(body, subjects) {
+  const out = [];
+  for (const subject of subjects) {
+    const value = body[`base_${subject.id}`];
+    const raw = String(value == null ? '' : value).trim();
+    if (raw === '') continue;
+    out.push({ subject, base: /^\d+$/.test(raw) ? Number(raw) : NaN });
+  }
+  return out;
+}
+
+class UserFacingError extends Error {}
+
+// بيضيف الأساسات جوه الـ transaction، ولو فيه مشكلة بيرمي UserFacingError (فالـ transaction كلها بتتلغي)
+async function addSeriesBases(centerId, bases, transaction) {
+  const [centers, subjects] = await Promise.all([
+    Center.findAll({ attributes: ['id', 'name'], transaction }),
+    Subject.findAll({ attributes: ['id', 'name'], transaction }),
+  ]);
+  const nameOf = (list, id) => (list.find(r => r.id === id) || {}).name || `#${id}`;
+  const labels = { center: id => nameOf(centers, id), subject: id => nameOf(subjects, id) };
+
+  // الأساسات اللي في نفس الفورم لازم تبعد عن بعض كمان
+  const sorted = [...bases].sort((a, b) => a.base - b.base);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].base - sorted[i - 1].base < SERIES_RANGE) {
+      throw new UserFacingError(`أساس ${sorted[i - 1].subject.name} (${sorted[i - 1].base}) وأساس ${sorted[i].subject.name} (${sorted[i].base}) قريبين من بعض. لازم الفرق ${SERIES_RANGE} على الأقل`);
+    }
+  }
+  for (const { subject, base } of bases) {
+    const exists = await CenterSubjectSeries.findOne({ where: { CenterId: centerId, SubjectId: subject.id }, transaction });
+    if (exists) throw new UserFacingError(`${subject.name}: السنتر ده عنده أساس سيريال بالفعل (${exists.base_number})`);
+    const problem = await seriesBaseProblem(base, transaction, labels);
+    if (problem) throw new UserFacingError(`${subject.name}: ${problem}`);
+    await CenterSubjectSeries.create({ CenterId: centerId, SubjectId: subject.id, base_number: base }, { transaction });
+  }
+}
+
+app.get('/settings/centers', requireAdmin, async (req, res) => {
+  try {
+    let form = {};
+    try { form = req.query.form ? JSON.parse(String(req.query.form)) : {}; } catch (e) { form = {}; }
+    res.render('centers', {
+      ...(await loadCentersOverview()),
+      desktopMode: !!desktopRuntime,
+      successMessage: req.query.done ? String(req.query.done) : null,
+      errorMessage: req.query.error ? String(req.query.error) : null,
+      form,
+      seriesRange: SERIES_RANGE,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+// سنتر جديد + أساس السيريال لكل مادة هيدرّسها — كله مع بعض أو مفيش حاجة
+app.post('/settings/centers', requireAdmin, async (req, res) => {
+  const form = { name: req.body.name || '', color: req.body.color || '', bases: {} };
+  Object.keys(req.body).filter(k => /^base_\d+$/.test(k)).forEach(k => { form.bases[k] = req.body[k]; });
+  const fail = message => res.redirect('/settings/centers?error=' + encodeURIComponent('❌ ' + message) + '&form=' + encodeURIComponent(JSON.stringify(form)) + '#new-center');
+  try {
+    if (desktopRuntime) return fail('إضافة سنتر بتتعمل من الموقع أونلاين بس');
+    const name = String(req.body.name || '').trim().replace(/\s+/g, ' ');
+    if (!name) return fail('اكتب اسم السنتر');
+    if (name.length > 100) return fail('اسم السنتر طويل جدًا');
+
+    const subjects = await Subject.findAll({ attributes: ['id', 'name'] });
+    const bases = readSeriesBases(req.body, subjects);
+    if (bases.some(b => Number.isNaN(b.base))) return fail('أساس السيريال لازم يكون أرقام بس');
+    if (!bases.length) return fail('حدد أساس سيريال لمادة واحدة على الأقل (من غيره مينفعش تتعمل حصص في السنتر)');
+
+    let center;
+    try {
+      await sequelize.transaction(async (transaction) => {
+        const sameName = await Center.findOne({ where: { name }, transaction });
+        if (sameName) throw new UserFacingError(`فيه سنتر بنفس الاسم "${name}" بالفعل`);
+        center = await Center.create({ name }, { transaction });
+        await addSeriesBases(center.id, bases, transaction);
+      });
+    } catch (error) {
+      if (error instanceof UserFacingError) return fail(error.message);
+      throw error;
+    }
+
+    if (req.body.color) {
+      await entityColors.saveColors(sequelize, 'center', { [center.id]: String(req.body.color) }).catch(e => console.error('Center color save failed:', e.message));
+    } else {
+      entityColors.invalidate();
+    }
+    console.log(`🏢 ${req.session.userName || 'admin'} أضاف سنتر "${name}" (#${center.id}): ${bases.map(b => `${b.subject.name}=${b.base}`).join('، ')}`);
+    res.redirect('/settings/centers?done=' + encodeURIComponent(`✅ اتعمل سنتر "${name}" بأساس سيريال: ${bases.map(b => `${b.subject.name} ${b.base}`).join('، ')}`) + '#center-' + center.id);
+  } catch (error) {
+    console.error('Create center failed:', error);
+    fail(error.message);
+  }
+});
+
+// إضافة أساس سيريال لمادة جديدة في سنتر موجود (الأساس الموجود مبيتغيرش)
+app.post('/settings/centers/:id/series', requireAdmin, async (req, res) => {
+  const fail = message => res.redirect('/settings/centers?error=' + encodeURIComponent('❌ ' + message) + '#center-' + encodeURIComponent(req.params.id));
+  try {
+    if (desktopRuntime) return fail('التعديل ده بيتعمل من الموقع أونلاين بس');
+    const center = await Center.findByPk(req.params.id, { attributes: ['id', 'name'] });
+    if (!center) return fail('السنتر غير موجود');
+    const subject = await Subject.findByPk(req.body.subject_id, { attributes: ['id', 'name'] });
+    if (!subject) return fail('اختار المادة');
+    const raw = String(req.body.base_number || '').trim();
+    if (!/^\d+$/.test(raw)) return fail('أساس السيريال لازم يكون أرقام بس');
+    const base = Number(raw);
+
+    try {
+      await sequelize.transaction(transaction => addSeriesBases(center.id, [{ subject, base }], transaction));
+    } catch (error) {
+      if (error instanceof UserFacingError) return fail(error.message);
+      throw error;
+    }
+    console.log(`🔢 ${req.session.userName || 'admin'} أضاف أساس سيريال ${base} لـ ${center.name} - ${subject.name}`);
+    res.redirect('/settings/centers?done=' + encodeURIComponent(`✅ ${center.name} - ${subject.name}: أساس السيريال ${base} (أول حصة هتبقى سيريال ${base + 1})`) + '#center-' + center.id);
+  } catch (error) {
+    console.error('Add series failed:', error);
+    fail(error.message);
+  }
+});
+
 // ===== نقل مادة من سنتر لسنتر (utils/centerMove.js) =====
 // معاينة الأول (من غير أي تعديل) → تأكيد → نسخة احتياطية كاملة → النقل في transaction واحدة → سجل ينفع نتراجع منه
 function centerMoveModels() {

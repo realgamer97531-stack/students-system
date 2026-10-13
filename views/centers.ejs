@@ -1,0 +1,162 @@
+<%- include('partials/header') %>
+<%
+  const formBases = (form && form.bases) || {};
+  const knownBases = [];
+  centers.forEach(c => subjects.forEach(s => {
+    const x = cell(c.id, s.id);
+    if (x.series) knownBases.push({ base: Number(x.series.base_number), label: c.name + ' - ' + s.name });
+  }));
+%>
+
+<style>
+  .ct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .ct-card { background: var(--sf-card-bg); border: 1px solid var(--sf-input-border); border-radius: var(--sf-radius); box-shadow: var(--sf-shadow); padding: 16px; border-top: 4px solid var(--ct-c); }
+  .ct-card:target { box-shadow: 0 0 0 3px var(--sf-accent), var(--sf-shadow-md); }
+  .ct-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 0; border-bottom: 1px dashed var(--sf-input-border); }
+  .ct-row:last-child { border-bottom: 0; }
+  .ct-pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 0.82rem; background: var(--sf-neutral-soft-bg); color: var(--sf-neutral-soft-text); }
+  .ct-base { background: var(--sf-primary-light); color: var(--sf-primary); font-weight: 700; }
+  .ct-muted { color: var(--sf-muted); font-size: 0.82rem; }
+  .ct-add { display: flex; gap: 6px; align-items: center; }
+  .ct-add input { max-width: 110px; }
+  .ct-hint { font-size: 0.8rem; min-height: 1.1em; }
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h3 class="mb-0">🏢 السناتر وأساس السيريال</h3>
+  <a href="/settings" class="btn btn-sm btn-outline-secondary">⬅ الإعدادات</a>
+</div>
+
+<% if (successMessage) { %><div class="alert alert-success"><%= successMessage %></div><% } %>
+<% if (errorMessage) { %><div class="alert alert-danger"><%= errorMessage %></div><% } %>
+<% if (desktopMode) { %><div class="alert alert-warning">⚠️ إضافة السناتر بتتعمل من الموقع أونلاين بس.</div><% } %>
+
+<div class="card mb-4 shadow-sm" id="new-center">
+  <div class="card-body">
+    <h5 class="mb-1">➕ سنتر جديد</h5>
+    <p class="text-muted small mb-3">
+      سيريال الحصة = أساس السيريال + رقم الحصة (مثلًا أساس 9000 → حصة 3 = سيريال 9003).
+      اكتب أساس لكل مادة هتتدرس في السنتر ده وسيب الباقي فاضي (تقدر تضيفه بعدين).
+      كل أساس لازم يبعد <%= seriesRange %> على الأقل عن أي أساس تاني. الأرقام المقترحة فاضية ومش مستخدمة.
+    </p>
+    <form method="POST" action="/settings/centers" id="newCenterForm">
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">اسم السنتر</label>
+          <input type="text" name="name" class="form-control" maxlength="100" required value="<%= form.name || '' %>">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">اللون (اختياري)</label>
+          <input type="color" name="color" class="form-control form-control-color w-100" value="<%= form.color || '#6366F1' %>">
+        </div>
+      </div>
+      <div class="row g-2">
+        <% subjects.forEach(s => { const v = formBases['base_' + s.id]; %>
+          <div class="col-md-4 col-sm-6">
+            <label class="form-label d-flex justify-content-between align-items-center gap-2">
+              <span><%- sf.subject(s) %></span>
+              <button type="button" class="btn btn-link btn-sm p-0 js-suggest" data-target="base_<%= s.id %>" data-value="<%= suggestions[s.id] %>">استخدم <%= suggestions[s.id] %></button>
+            </label>
+            <input type="number" min="0" step="1" name="base_<%= s.id %>" class="form-control js-base" placeholder="فاضي = مش بتتدرس هنا" value="<%= v == null ? '' : v %>">
+            <div class="ct-hint"></div>
+          </div>
+        <% }) %>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2" <%= desktopMode ? 'disabled' : '' %>>💾 اعمل السنتر</button>
+    </form>
+  </div>
+</div>
+
+<div class="ct-grid mb-4">
+  <% centers.forEach(c => { const missing = subjects.filter(s => !cell(c.id, s.id).series); %>
+    <div class="ct-card" id="center-<%= c.id %>" style="--ct-c: <%= sf.color('center', c) %>;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0"><%- sf.center(c) %></h5>
+        <span class="ct-muted">#<%= c.id %></span>
+      </div>
+      <% subjects.forEach(s => { const x = cell(c.id, s.id); if (!x.series && !x.students && !x.sessions.n) return; %>
+        <div class="ct-row">
+          <%- sf.subject(s) %>
+          <% if (x.series) { const b = Number(x.series.base_number); %>
+            <span class="ct-pill ct-base" title="أساس السيريال">أساس <bdi dir="ltr"><%= b %></bdi></span>
+            <span class="ct-muted">سيريالات <bdi dir="ltr"><%= b + 1 %>–<%= b + seriesRange - 1 %></bdi></span>
+          <% } else { %>
+            <span class="ct-pill" style="background: var(--sf-danger-soft-bg); color: var(--sf-danger-soft-text);">مفيش أساس سيريال</span>
+          <% } %>
+          <span class="ct-pill"><%= x.students %> طالب</span>
+          <span class="ct-pill"><%= x.sessions.n %> حصة<%= x.sessions.last ? ' · آخر حصة ' + x.sessions.last : '' %></span>
+          <% if (x.series) { %>
+            <span class="ct-muted">الحصة الجاية: سيريال <bdi dir="ltr"><%= Number(x.series.base_number) + x.sessions.last + 1 %></bdi></span>
+          <% } %>
+        </div>
+      <% }) %>
+      <% if (missing.length && !desktopMode) { %>
+        <form method="POST" action="/settings/centers/<%= c.id %>/series" class="mt-2 js-add-series">
+          <div class="ct-muted mb-1">إضافة مادة للسنتر (بأساس سيريال جديد):</div>
+          <div class="ct-add">
+            <select name="subject_id" class="form-select form-select-sm" required>
+              <% missing.forEach(s => { %><option value="<%= s.id %>" data-suggest="<%= suggestions[s.id] %>"><%= s.name %></option><% }) %>
+            </select>
+            <input type="number" min="0" step="1" name="base_number" class="form-control form-control-sm js-base" required value="<%= suggestions[missing[0].id] %>">
+            <button class="btn btn-sm btn-outline-primary">إضافة</button>
+          </div>
+          <div class="ct-hint"></div>
+        </form>
+      <% } %>
+    </div>
+  <% }) %>
+</div>
+
+<script>
+  (function () {
+    const RANGE = <%= seriesRange %>;
+    const known = <%- JSON.stringify(knownBases).replace(/</g, '\\u003c') %>;
+    function problem(base, others) {
+      if (!Number.isInteger(base) || base < 0) return 'رقم غير صحيح';
+      const near = known.concat(others).find(k => Math.abs(k.base - base) < RANGE);
+      return near ? '❌ قريب من أساس ' + near.base + ' (' + near.label + ')' : null;
+    }
+    function check(input, others) {
+      const hint = input.closest('div[class*="col"], form').querySelector('.ct-hint');
+      if (!hint) return;
+      if (input.value === '') { hint.textContent = ''; return; }
+      const base = Number(input.value);
+      const p = problem(base, others || []);
+      hint.className = 'ct-hint ' + (p ? 'text-danger fw-bold' : 'text-success');
+      hint.textContent = p || '✔️ أول حصة هتبقى سيريال ' + (base + 1);
+    }
+
+    const form = document.getElementById('newCenterForm');
+    const inputs = Array.from(form.querySelectorAll('.js-base'));
+    function checkAll() {
+      inputs.forEach(input => {
+        const others = inputs.filter(o => o !== input && o.value !== '').map(o => ({ base: Number(o.value), label: 'مادة تانية في نفس الفورم' }));
+        check(input, others);
+      });
+    }
+    inputs.forEach(input => input.addEventListener('input', checkAll));
+    form.querySelectorAll('.js-suggest').forEach(btn => btn.addEventListener('click', () => {
+      form.querySelector('[name="' + btn.dataset.target + '"]').value = btn.dataset.value;
+      checkAll();
+    }));
+    checkAll();
+    form.addEventListener('submit', e => {
+      const filled = inputs.filter(i => i.value !== '');
+      if (!filled.length) { e.preventDefault(); alert('حدد أساس سيريال لمادة واحدة على الأقل'); return; }
+      if (!confirm('إنشاء سنتر "' + form.name.value.trim() + '"؟')) e.preventDefault();
+    });
+
+    document.querySelectorAll('.js-add-series').forEach(f => {
+      const select = f.querySelector('select');
+      const input = f.querySelector('.js-base');
+      select.addEventListener('change', () => { input.value = select.selectedOptions[0].dataset.suggest; check(input); });
+      input.addEventListener('input', () => check(input));
+      check(input);
+      f.addEventListener('submit', e => {
+        if (!confirm('إضافة ' + select.selectedOptions[0].text + ' بأساس سيريال ' + input.value + '؟ (الأساس مبيتغيرش بعد كده)')) e.preventDefault();
+      });
+    });
+  })();
+</script>
+
+<%- include('partials/footer') %>
