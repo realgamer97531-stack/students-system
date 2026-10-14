@@ -4393,38 +4393,37 @@ app.post('/exams/:id/delete', requirePermission('exams'), async (req, res) => {
   }
 });
 
+// طلاب الامتحان: لو مرتبط بحصة → اللي حضروا الحصة دي بس، ولو مستقل → كل طلاب المادة
+async function getExamStudents(exam, attributes = ['id', 'student_code', 'name']) {
+  if (exam.SessionId) {
+    const attendances = await Attendance.findAll({
+      where: { SessionId: exam.SessionId },
+      attributes: ['StudentId'],
+      raw: true,
+    });
+    const attendedStudentIds = [...new Set(attendances.map(a => a.StudentId))];
+    return Student.findAll({
+      where: { id: attendedStudentIds }, // لو القائمة فاضية، هيرجع مفيش طلاب وهو ده المنطقي
+      include: [Center],
+      attributes,
+      order: [['name', 'ASC']],
+    });
+  }
+  return Student.findAll({
+    where: { SubjectId: exam.SubjectId },
+    include: [Center],
+    attributes,
+    order: [['name', 'ASC']],
+  });
+}
+
 // صفحة رصد الدرجات لامتحان معين
 app.get('/exams/:id', async (req, res) => {
   try {
     const exam = await Exam.findOne({ where: { id: req.params.id }, include: [Subject, { model: Session, include: [Center, Subject] }] });
     if (!exam) return res.status(404).send('❌ الامتحان غير موجود');
 
-    let students;
-
-    if (exam.SessionId) {
-      // الامتحان مرتبط بحصة معينة → بس الطلاب اللي حضروا هذه الحصة بالذات
-      const attendances = await Attendance.findAll({
-        where: { SessionId: exam.SessionId },
-        attributes: ['StudentId'],
-        raw: true,
-      });
-      const attendedStudentIds = [...new Set(attendances.map(a => a.StudentId))];
-
-      students = await Student.findAll({
-        where: { id: attendedStudentIds }, // لو القائمة فاضية، هيرجع مفيش طلاب وهو ده المنطقي
-        include: [Center],
-        attributes: ['id', 'student_code', 'name'],
-        order: [['name', 'ASC']],
-      });
-    } else {
-      // امتحان مستقل (مش مرتبط بحصة) → كل طلاب المادة زي الأول
-      students = await Student.findAll({
-        where: { SubjectId: exam.SubjectId },
-        include: [Center],
-        attributes: ['id', 'student_code', 'name'],
-        order: [['name', 'ASC']],
-      });
-    }
+    const students = await getExamStudents(exam);
 
     const results = await ExamResult.findAll({
       where: { ExamId: exam.id },
@@ -4434,10 +4433,54 @@ app.get('/exams/:id', async (req, res) => {
     const existingScores = {};
     results.forEach(r => { existingScores[r.StudentId] = r.score; });
 
-    res.render('exam-scores', { exam, students, existingScores });
+    res.render('exam-scores', { exam, students, existingScores, callCenterIntegrationEnabled: isCallCenterIntegrationEnabled() });
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+// إرسال الطلاب المعروضين (بعد الفلتر) في صفحة الامتحان للكول سنتر.
+// السيرفر بيصفّي قايمة طلاب الامتحان نفسها بس (مستحيل يتبعت طالب مش من طلاب الامتحان ده)
+app.post('/exams/:id/send-to-callcenter', async (req, res) => {
+  try {
+    const exam = await Exam.findOne({ where: { id: req.params.id }, include: [Subject, { model: Session, include: [Center, Subject] }] });
+    if (!exam) return res.status(404).json({ error: 'الامتحان غير موجود' });
+
+    const requestedIds = new Set((Array.isArray(req.body && req.body.student_ids) ? req.body.student_ids : []).map(Number).filter(Number.isInteger));
+    if (!requestedIds.size) return res.status(400).json({ error: 'مفيش طلاب معروضين' });
+
+    const allStudents = await getExamStudents(exam, ['id']);
+    const ids = allStudents.map(student => student.id).filter(id => requestedIds.has(Number(id)));
+    if (!ids.length) return res.status(400).json({ error: 'مفيش طلاب من المعروضين في الامتحان ده' });
+
+    const students = await Student.findAll({ where: { id: ids }, include: [Center, Subject], order: [['name', 'ASC']] });
+    const results = await ExamResult.findAll({ where: { ExamId: exam.id, StudentId: ids }, attributes: ['StudentId', 'score'], raw: true });
+    const scoreByStudentId = new Map(results.map(r => [r.StudentId, r.score]));
+
+    const filterLabel = typeof (req.body && req.body.filter_label) === 'string' ? req.body.filter_label.trim().slice(0, 200) : '';
+    const filters = { Exam: exam.name, Selected: `${students.length} of ${allStudents.length}`, Filter: filterLabel };
+    const name = exam.Session
+      ? buildCallCenterSessionName({ session: exam.Session, scope: 'Exam', filters })
+      : buildCallCenterSessionName({
+        session: { id: '-', lesson_number: '-', Subject: exam.Subject, Center: { name: 'All centers' } },
+        scope: 'Exam (independent)',
+        filters,
+      });
+
+    const result = await sendStudentsToCallCenter(
+      name,
+      students.map(student => callCenterStudent(student, {
+        examScore: scoreByStudentId.has(student.id) ? scoreByStudentId.get(student.id) : null,
+        examMax: exam.max_score,
+        mainSessionId: exam.SessionId || null,
+      })),
+      exam.SessionId || null
+    );
+    res.json({ success: true, sessionId: result.id, imported: result.imported });
+  } catch (error) {
+    console.error('Exam call-center handoff failed:', error);
+    res.status(error.code === 'CALLCENTER_DISABLED' ? 503 : (error.status || 500)).json({ error: error.message });
   }
 });
 

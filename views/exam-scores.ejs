@@ -19,9 +19,57 @@
 <% if (exam.SessionId && exam.Session) { %>
   <p class="text-muted small">⚠️ <span class="ar-only">ظاهر هنا بس الطلاب اللي سجلوا حضورهم في حصة</span><span class="en-only" style="display:none;">Only students who actually attended session</span> <%= exam.Session.lesson_number %> <span class="ar-only">فعليًا.</span><span class="en-only" style="display:none;">are shown here.</span></p>
 <% } %>
-<input type="text" id="searchBox" class="form-control mb-3" placeholder="🔍 بحث بالاسم أو الكود...">
+<%
+  const hasScore = (id) => existingScores[id] !== undefined && existingScores[id] !== null;
+  const scoredCount = students.filter(s => hasScore(s.id)).length;
+  const centerCounts = new Map();
+  students.forEach(s => {
+    const key = s.Center ? String(s.Center.id) : 'none';
+    const label = s.Center ? s.Center.name : 'غير محدد';
+    const entry = centerCounts.get(key) || { label, n: 0 };
+    entry.n += 1;
+    centerCounts.set(key, entry);
+  });
+%>
+<div class="card mb-3 shadow-sm">
+  <div class="card-body py-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <input type="text" id="searchBox" class="form-control" placeholder="🔍 بحث بالاسم أو الكود...">
+      </div>
+      <div class="col-md-3 col-6">
+        <select id="scoreFilter" class="form-select" data-no-select2="1">
+          <option value=""><span class="ar-only">كل الطلاب</span><span class="en-only" style="display:none;">All students</span> (<%= students.length %>)</option>
+          <option value="missing"><span class="ar-only">لسه ملهمش درجة</span><span class="en-only" style="display:none;">No score yet</span> (<%= students.length - scoredCount %>)</option>
+          <option value="scored"><span class="ar-only">ليهم درجة</span><span class="en-only" style="display:none;">Has a score</span> (<%= scoredCount %>)</option>
+        </select>
+      </div>
+      <div class="col-md-3 col-6">
+        <select id="centerFilter" class="form-select" data-no-select2="1">
+          <option value=""><span class="ar-only">كل السناتر</span><span class="en-only" style="display:none;">All centers</span></option>
+          <% centerCounts.forEach((entry, key) => { %>
+            <option value="<%= key %>"><%= entry.label %> (<%= entry.n %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="button" id="filtersReset" class="btn btn-outline-secondary w-100"><span class="ar-only">مسح الفلتر</span><span class="en-only" style="display:none;">Reset</span></button>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+      <span class="small text-muted"><span class="ar-only">المعروض:</span><span class="en-only" style="display:none;">Showing:</span> <strong id="visibleCount"><%= students.length %></strong> / <%= students.length %></span>
+      <span class="small text-muted">· <span class="ar-only">الفلتر بالدرجات المحفوظة (لو كتبت درجات احفظها الأول)</span><span class="en-only" style="display:none;">Filter uses saved scores (save first if you typed any)</span></span>
+      <% if (callCenterIntegrationEnabled) { %>
+        <button type="button" class="btn btn-sm btn-success ms-auto" id="sendToCallCenter">
+          ☎️ <span class="ar-only">إرسال المعروضين للاتصال</span><span class="en-only" style="display:none;">Send shown students to Call Center</span> (<span id="sendCount"><%= students.length %></span>)
+        </button>
+        <span id="sendStatus" class="small text-muted w-100 text-end"></span>
+      <% } %>
+    </div>
+  </div>
+</div>
 
-<form action="/exams/<%= exam.id %>/scores" method="POST">
+<form action="/exams/<%= exam.id %>/scores" method="POST" id="scoresForm">
   <div class="table-responsive bg-white rounded shadow-sm p-3">
     <table class="table align-middle" id="studentsTable">
       <thead class="table-light">
@@ -34,7 +82,10 @@
       </thead>
       <tbody>
         <% students.forEach(student => { %>
-          <tr data-search="<%= (student.name + ' ' + student.student_code).toLowerCase() %>">
+          <tr data-student-id="<%= student.id %>"
+              data-search="<%= (student.name + ' ' + student.student_code).toLowerCase() %>"
+              data-center="<%= student.Center ? student.Center.id : 'none' %>"
+              data-scored="<%= hasScore(student.id) ? '1' : '0' %>">
             <td><%= student.student_code %></td>
             <td><%= student.name %></td>
             <td><%= student.Center ? student.Center.name : 'غير محدد' %></td>
@@ -45,12 +96,13 @@
                 name="score_<%= student.id %>"
                 class="form-control"
                 style="max-width: 120px;"
-                value="<%= existingScores[student.id] !== undefined ? existingScores[student.id] : '' %>"
+                value="<%= hasScore(student.id) ? existingScores[student.id] : '' %>"
                 max="<%= exam.max_score %>"
                 min="0">
             </td>
           </tr>
         <% }) %>
+        <tr id="emptyRow" hidden><td colspan="4" class="text-center text-muted py-4"><span class="ar-only">مفيش طلاب بالفلتر ده</span><span class="en-only" style="display:none;">No students match</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -58,13 +110,84 @@
 </form>
 
 <script>
-  document.getElementById('searchBox').addEventListener('input', function () {
-    const term = this.value.toLowerCase().trim();
-    document.querySelectorAll('#studentsTable tbody tr').forEach(row => {
-      const match = row.dataset.search.includes(term);
-      row.style.display = match ? '' : 'none';
+  (function () {
+    const rows = Array.from(document.querySelectorAll('#studentsTable tbody tr[data-student-id]'));
+    const search = document.getElementById('searchBox');
+    const scoreFilter = document.getElementById('scoreFilter');
+    const centerFilter = document.getElementById('centerFilter');
+    const visibleCount = document.getElementById('visibleCount');
+    const emptyRow = document.getElementById('emptyRow');
+    const sendButton = document.getElementById('sendToCallCenter');
+    const sendCount = document.getElementById('sendCount');
+    const sendStatus = document.getElementById('sendStatus');
+    const KEY = 'examFilter:<%= exam.id %>';
+
+    function apply() {
+      const term = search.value.toLowerCase().trim();
+      let shown = 0;
+      rows.forEach(row => {
+        const ok = (!term || row.dataset.search.includes(term))
+          && (!scoreFilter.value || (scoreFilter.value === 'scored') === (row.dataset.scored === '1'))
+          && (!centerFilter.value || row.dataset.center === centerFilter.value);
+        row.hidden = !ok;
+        if (ok) shown++;
+      });
+      visibleCount.textContent = shown;
+      emptyRow.hidden = shown !== 0;
+      if (sendCount) sendCount.textContent = shown;
+      if (sendButton) sendButton.disabled = shown === 0;
+      try { sessionStorage.setItem(KEY, JSON.stringify({ s: scoreFilter.value, c: centerFilter.value })); } catch (e) {}
+    }
+
+    // الفلتر بيفضل زي ما هو بعد حفظ الدرجات (الصفحة بتتحمل من جديد)
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(KEY) || '{}');
+      if (saved.s) scoreFilter.value = saved.s;
+      if (saved.c && centerFilter.querySelector('option[value="' + saved.c + '"]')) centerFilter.value = saved.c;
+    } catch (e) {}
+
+    search.addEventListener('input', apply);
+    scoreFilter.addEventListener('change', apply);
+    centerFilter.addEventListener('change', apply);
+    document.getElementById('filtersReset').addEventListener('click', () => {
+      search.value = ''; scoreFilter.value = ''; centerFilter.value = ''; apply();
     });
-  });
+    apply();
+
+    let typedSinceSave = false;
+    document.getElementById('scoresForm').addEventListener('input', () => { typedSinceSave = true; });
+
+    if (sendButton) sendButton.addEventListener('click', async () => {
+      const ids = rows.filter(row => !row.hidden).map(row => Number(row.dataset.studentId)).filter(Boolean);
+      if (!ids.length) return;
+      if (typedSinceSave && !confirm('فيه درجات اتكتبت ومتحفظتش. الفلتر والإرسال بالدرجات المحفوظة بس. تكمل؟')) return;
+      if (!confirm('هيتبعت ' + ids.length + ' طالب (المعروضين) من ' + rows.length + ' للاتصال. متأكد؟')) return;
+      const label = [scoreFilter, centerFilter]
+        .filter(s => s.value)
+        .map(s => s.options[s.selectedIndex].text.replace(/\s*\(\d+\)\s*$/, '').trim())
+        .concat(search.value.trim() ? ['بحث: ' + search.value.trim()] : [])
+        .join(' + ');
+      sendButton.disabled = true;
+      sendStatus.className = 'small text-muted w-100 text-end';
+      sendStatus.textContent = 'جاري الإرسال...';
+      try {
+        const response = await fetch('/exams/<%= exam.id %>/send-to-callcenter', {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_ids: ids, filter_label: label }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'تعذر الإرسال');
+        sendStatus.className = 'small text-success w-100 text-end';
+        sendStatus.textContent = '✅ تم إنشاء جلسة اتصال رقم ' + result.sessionId + ' (' + result.imported + ' طالب)';
+      } catch (error) {
+        sendStatus.className = 'small text-danger w-100 text-end';
+        sendStatus.textContent = '❌ فشل الإرسال: ' + error.message;
+      } finally {
+        sendButton.disabled = false;
+      }
+    });
+  })();
 </script>
 
 <%- include('partials/footer') %>
