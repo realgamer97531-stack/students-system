@@ -7432,6 +7432,64 @@ app.get('/admin/videos/:id/access', requirePermissionOrAdmin('admin_videos'), as
   });
 });
 
+// ===== درجات الامتحانات من برنامج الموبايل (قراءة بس — الحفظ بيروح لنفس صفحة الموقع /exams/:id/scores) =====
+// الموبايل بيحفظ الرد ده عنده عشان رصد الدرجات يشتغل من غير نت. أسماء الطلاب وسناترهم من نسخة المسح اللي على الموبايل.
+const STAFF_EXAMS_LIMIT = 40;
+
+app.get('/api/staff/exams', requirePermissionOrAdmin('exams'), async (req, res) => {
+  try {
+    const exams = await Exam.findAll({
+      include: [{ model: Subject, attributes: ['id', 'name'] }, { model: Session, required: false, include: [{ model: Center, attributes: ['id', 'name'] }, { model: Subject, attributes: ['id', 'name'] }] }],
+      order: [['exam_date', 'DESC'], ['id', 'DESC']],
+      limit: STAFF_EXAMS_LIMIT,
+    });
+    const examIds = exams.map(exam => exam.id);
+    const sessionIds = [...new Set(exams.map(exam => exam.SessionId).filter(Boolean))];
+    const [results, attendances] = await Promise.all([
+      examIds.length ? ExamResult.findAll({ where: { ExamId: examIds }, attributes: ['ExamId', 'StudentId', 'score'], raw: true }) : [],
+      sessionIds.length ? Attendance.findAll({ where: { SessionId: sessionIds }, attributes: ['SessionId', 'StudentId'], raw: true }) : [],
+    ]);
+    const scoresByExam = new Map();
+    results.forEach(row => {
+      if (!scoresByExam.has(row.ExamId)) scoresByExam.set(row.ExamId, []);
+      scoresByExam.get(row.ExamId).push([row.StudentId, row.score]);
+    });
+    const attendeesBySession = new Map();
+    attendances.forEach(row => {
+      if (!attendeesBySession.has(row.SessionId)) attendeesBySession.set(row.SessionId, new Set());
+      attendeesBySession.get(row.SessionId).add(row.StudentId);
+    });
+
+    res.json({
+      success: true,
+      callCenter: !!isCallCenterIntegrationEnabled(),
+      exams: exams.map(exam => ({
+        id: exam.id,
+        name: exam.name,
+        max: exam.max_score,
+        date: exam.exam_date,
+        subjectId: exam.SubjectId,
+        subject: exam.Subject ? exam.Subject.name : '',
+        sessionId: exam.SessionId || null,
+        session: exam.Session ? {
+          lesson: exam.Session.lesson_number,
+          serial: exam.Session.serial_number,
+          date: exam.Session.session_date,
+          centerId: exam.Session.CenterId,
+          center: exam.Session.Center ? exam.Session.Center.name : '',
+          label: sessionLabelForApp(exam.Session),
+        } : null,
+        // مرتبط بحصة → اللي حضروها بس (زي صفحة الموقع)، مستقل → null (كل طلاب المادة من نسخة الموبايل)
+        studentIds: exam.SessionId ? [...(attendeesBySession.get(exam.SessionId) || [])] : null,
+        scores: scoresByExam.get(exam.id) || [],
+      })),
+    });
+  } catch (error) {
+    console.error('Staff exams list failed:', error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة: ' + error.message });
+  }
+});
+
 // ===== إدارة الفيديوهات من برنامج الموبايل (قراءة بس — التعديلات بتروح لنفس صفحات الموقع) =====
 function sessionLabelForApp(session) {
   if (!session) return '';

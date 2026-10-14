@@ -477,4 +477,114 @@ void main() {
     // تنظيف التايمرز
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('staff exams: filter no-score, save offline then synced, send shown to call center', (tester) async {
+    await phone(tester);
+    final scoreOps = <http.Request>[];
+    final callOps = <http.Request>[];
+    var serverScores = <List<num>>[[1, 18]];
+    server.routes['/api/sync/register-device'] = (r) => json('{"success":true,"token":"device-1","deviceName":"موبايل"}');
+    server.routes['/api/sync/mobile/staff-login'] = (r) => json('{"success":true,"user":{"id":3,"name":"أسيستانت تجربة","role":"staff","permissions":["exams"]}}');
+    server.routes['/api/sync/mobile/snapshot'] = (r) => json(fixture('snapshot.json'));
+    var examLoads = 0;
+    server.routes['/api/staff/exams'] = (r) {
+      if ((r.headers['X-Sync-Context'] ?? '').isNotEmpty) examLoads++;
+      return json(jsonEncode({
+        'success': true,
+        'callCenter': true,
+        'exams': [
+          {
+            'id': 5, 'name': 'امتحان الحصة 2', 'max': 20, 'date': '2026-10-10', 'subjectId': 1, 'subject': 'Senior 2 Physics', 'sessionId': 12,
+            'session': {'lesson': 2, 'serial': 102, 'date': '2026-10-10', 'centerId': 1, 'center': 'سنتر الاختبار', 'label': 'Senior 2 Physics - سنتر الاختبار - حصة 2'},
+            'studentIds': [1, 2],
+            'scores': serverScores,
+          },
+        ],
+      }));
+    };
+    server.routes['/exams/5/scores'] = (r) {
+      scoreOps.add(r);
+      final body = jsonDecode(r.body) as Map;
+      body.forEach((k, v) => serverScores = [...serverScores.where((row) => 'score_${row[0]}' != k), [int.parse('$k'.substring(6)), v as num]]);
+      return json(jsonEncode({'envelope': true, 'ok': true, 'status': 302, 'body': 'Found. Redirecting to /exams/5'}));
+    };
+    server.routes['/exams/5/send-to-callcenter'] = (r) {
+      callOps.add(r);
+      return json('{"success":true,"sessionId":91,"imported":1}');
+    };
+
+    await tester.pumpWidget(const StudyisfunnyApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('موظف'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
+    await tester.enterText(find.byType(TextFormField).at(1), 'secret');
+    await tester.tap(find.text('دخول'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('الدرجات').last);
+    await tester.pumpAndSettle();
+    expect(find.text('امتحان الحصة 2'), findsOneWidget);
+    expect(examLoads, 1); // بيتقرا باسم الموظف
+    expect(find.text('اترصد 1 من 2'), findsOneWidget);
+    expect(find.text('1 لسه ملهمش درجة'), findsOneWidget);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/19_staff_exams.png'));
+
+    await tester.tap(find.text('امتحان الحصة 2'));
+    await tester.pumpAndSettle();
+    expect(find.text('طالب واحد'), findsOneWidget);
+    expect(find.text('طالب تاني'), findsOneWidget);
+
+    // فلتر "لسه ملهمش درجة": طالب تاني بس
+    await tester.tap(find.text('لسه ملهمش درجة (1)'));
+    await tester.pumpAndSettle();
+    expect(find.text('طالب واحد'), findsNothing);
+    expect(find.text('طالب تاني'), findsOneWidget);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/20_staff_exam_missing.png'));
+
+    // إرسال المعروضين للاتصال: طالب تاني بس
+    await tester.tap(find.text('للاتصال (1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ابعت'));
+    await tester.pumpAndSettle();
+    expect(callOps, hasLength(1));
+    expect(jsonDecode(callOps.single.body), allOf(containsPair('student_ids', [2]), containsPair('filter_label', 'لسه ملهمش درجة')));
+    expect(find.textContaining('جلسة اتصال رقم 91'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 6)); // الرسالة تختفي زي على الموبايل
+    await tester.pumpAndSettle();
+
+    // درجة غلط (أكبر من النهائية) مترفضة
+    final scoreField = find.descendant(of: find.widgetWithText(Card, 'طالب تاني'), matching: find.byType(TextField));
+    await tester.enterText(scoreField, '25');
+    await tester.pumpAndSettle();
+    expect(find.text('0–20'), findsOneWidget);
+    expect(find.text('مفيش تغييرات'), findsOneWidget);
+
+    // من غير نت: الدرجة (بأرقام عربي) بتتحفظ في الطابور وبتتحسب في الفلتر
+    server.offline = true;
+    await tester.enterText(scoreField, '١٥٫٥');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('حفظ 1 درجة'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('اتحفظت على الموبايل'), findsOneWidget);
+    expect(StaffStore.queue.value, hasLength(1));
+    expect(scoreOps, isEmpty);
+    expect(find.text('لسه ملهمش درجة (0)'), findsOneWidget);
+
+    // النت رجع: بتتبعت لوحدها — الدرجة اللي اتغيرت بس
+    server.offline = false;
+    await StaffStore.flush();
+    await tester.pumpAndSettle();
+    expect(StaffStore.queue.value, isEmpty);
+    expect(scoreOps, hasLength(1));
+    expect(jsonDecode(scoreOps.single.body), {'score_2': 15.5});
+    expect(scoreOps.single.headers['X-Sync-Op-Id'], isNotEmpty);
+    expect(find.text('لسه ملهمش درجة (0)'), findsOneWidget); // بعد التحميل من السيرفر لسه ليها درجة
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('اترصد 2 من 2'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+  });
 }
