@@ -50,8 +50,8 @@
   <div class="card-body">
     <h6 class="mb-1"><span class="ar-only">➕ إضافة فيديوهات للدرس (كذا لينك مرة واحدة)</span><span class="en-only" style="display:none;">➕ Add videos to this lesson (many links at once)</span></h6>
     <p class="small text-muted mb-3">
-      <span class="ar-only">حط كل لينك في سطر بالترتيب. لو عايز مدة لكل لينك اكتبها بعده في نفس السطر (مثال: <code dir="ltr">https://... 25:30</code> أو <code dir="ltr">1:05:00</code>)، ولو مكتبتش هتاخد المدة اللي تحت.</span>
-      <span class="en-only" style="display:none;">One link per line, in order. To give each link its own duration put it after the link on the same line (e.g. <code>https://... 25:30</code> or <code>1:05:00</code>); otherwise the duration below is used.</span>
+      <span class="ar-only">حط كل لينك في سطر بالترتيب، أو افصل بين كل لينكين بـ <code dir="ltr">,</code>. لو عايز مدة لكل لينك اكتبها بعده في نفس السطر (مثال: <code dir="ltr">https://... 25:30</code> أو <code dir="ltr">1:05:00</code>)، ولو مكتبتش هتاخد المدة اللي تحت.</span>
+      <span class="en-only" style="display:none;">One link per line, in order, or separate links with <code>,</code>. To give each link its own duration put it after the link on the same line (e.g. <code>https://... 25:30</code> or <code>1:05:00</code>); otherwise the duration below is used.</span>
     </p>
     <% if (typeof partsMessage !== 'undefined' && partsMessage) { %>
       <div class="alert alert-success py-2"><%= partsMessage %></div>
@@ -132,7 +132,8 @@
     }
     function parseLines() {
       const fallback = defaultDuration();
-      return links.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+      // كل لينك في سطر لوحده، أو افصل بينهم بـ , (بنقسم بس على الفاصلة اللي بعدها لينك جديد — عشان لو فيه , جوه اللينك نفسه)
+      return links.value.split(/\r?\n|,\s*(?=https?:\/\/)/i).map(line => line.trim().replace(/,+$/, '').trim()).filter(Boolean).map(line => {
         const bits = line.split(/[\s|]+/).filter(Boolean);
         const url = bits[0] || '';
         const own = parseDuration(bits.slice(1).join(''));
