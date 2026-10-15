@@ -50,6 +50,35 @@ async function liveCopy(rel) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// Hostinger's CDN re-compresses images, so the served bytes never match git. For images,
+// compare the file size on the server (Hostinger file API) instead of the downloaded copy.
+const IMAGE = /.(png|jpe?g|gif|webp)$/i;
+const listings = new Map();
+
+async function serverSize(site, rel) {
+  const dir = path.posix.dirname(rel);
+  if (!listings.has(dir)) {
+    const query = dir === '.' ? '' : `?directory=${encodeURIComponent(dir)}`;
+    const res = await api('GET', `/api/hosting/v1/accounts/${site.username}/domains/${DOMAIN}/files${query}`);
+    const items = res.items || [];
+    if (res.total_items > items.length) throw new Error(`${dir}: file listing has more than one page`);
+    listings.set(dir, new Map(items.filter((i) => i.type === 'file').map((i) => [i.name, i.size_bytes])));
+  }
+  return listings.get(dir).get(path.posix.basename(rel));
+}
+
+// Returns 'same', 'changed' or 'new'.
+async function compare(site, rel, local) {
+  if (IMAGE.test(rel)) {
+    const size = await serverSize(site, rel);
+    if (size === undefined) return 'new';
+    return size === local.length ? 'same' : 'changed';
+  }
+  const live = await liveCopy(rel);
+  if (!live) return 'new';
+  return live.equals(local) ? 'same' : 'changed';
+}
+
 async function uploadFile(target, rel, data) {
   const url = `${target.url.replace(/\/$/, '')}/${rel.split('/').map(encodeURIComponent).join('/')}?override=true`;
   const headers = { 'X-Auth': target.auth_key, 'X-Auth-Rest': target.rest_auth_key, 'Tus-Resumable': '1.0.0' };
@@ -86,9 +115,8 @@ async function main() {
   const changed = [];
   for (const rel of files) {
     const local = fs.readFileSync(path.join(ROOT, 'public', rel));
-    const live = await liveCopy(rel);
-    if (live && live.equals(local)) continue;
-    changed.push({ rel, data: local, status: live ? 'changed' : 'new' });
+    const status = await compare(site, rel, local);
+    if (status !== 'same') changed.push({ rel, data: local, status });
   }
 
   console.log(`${files.length} portal files checked, ${changed.length} to upload to ${DOMAIN}:`);
@@ -106,10 +134,10 @@ async function main() {
   }
 
   // Confirm the site now serves exactly what is in git.
+  listings.clear();
   const wrong = [];
   for (const f of changed) {
-    const live = await liveCopy(f.rel);
-    if (!live || !live.equals(f.data)) wrong.push(f.rel);
+    if ((await compare(site, f.rel, f.data)) !== 'same') wrong.push(f.rel);
   }
   if (wrong.length) throw new Error(`uploaded but live copy still differs: ${wrong.join(', ')}`);
   console.log(`\nDone. ${changed.length} file(s) live on ${DOMAIN}.`);
