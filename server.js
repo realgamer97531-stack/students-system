@@ -71,6 +71,7 @@ const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
 const entityColors = require('./utils/entityColors');
 const centerMove = require('./utils/centerMove');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
+const registerFarahAppRoutes = require('./routes/farahApp');
 const syncServer = require('./utils/sync/server');
 // برنامج الديسكتوب (أوفلاين) بيشغل نفس السيرفر ده على الجهاز مع DESKTOP_MODE=1
 const desktopRuntime = process.env.DESKTOP_MODE === '1' ? require('./desktop/runtime/server-hooks') : null;
@@ -1220,6 +1221,9 @@ app.get('/logout', (req, res) => {
     res.redirect('/login');
   });
 });
+// تطبيق Farah (منبه الأسيستانت) محمي بتوكن خاص بيه، فلازم يتسجل قبل حماية الجلسة
+registerFarahAppRoutes(app);
+
 // ===== Middleware الحماية =====
 // أي صفحة بعد السطر ده هتكون محمية - لازم تسجيل دخول الأول
 function requireLogin(req, res, next) {
