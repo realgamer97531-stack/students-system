@@ -1,15 +1,9 @@
-# Deploys the student portal (public/) to Hostinger (shadyelsharkawy.com) over FTPS.
+# Deploys the student portal (public/) to Hostinger (shadyelsharkawy.com) through
+# the Hostinger API. See scripts/deploy-portal.js: it uploads only files whose live
+# copy differs from git, never deletes anything, and checks the live site afterwards.
 #
-# Only uploads files that changed since the last deploy (tracked in
-# .ftp-deploy-sync-state.json on the server). It never touches files on Hostinger
-# that this workflow did not upload itself (uploads, PHP, anything added by hand).
-#
-# Needed GitHub secrets (Settings -> Secrets and variables -> Actions):
-#   HOSTINGER_FTP_SERVER    e.g. ftp.shadyelsharkawy.com (or the IP shown in hPanel)
-#   HOSTINGER_FTP_USERNAME  e.g. u123456789.portal
-#   HOSTINGER_FTP_PASSWORD
-#   HOSTINGER_FTP_DIR       folder of the site as seen by that FTP account, ending in /
-#                           (usually  public_html/  or  /  if the account starts there)
+# Needed GitHub secret (Settings -> Secrets and variables -> Actions):
+#   HOSTINGER_API_TOKEN   token from hPanel -> Profile -> API
 
 name: Deploy portal to Hostinger
 
@@ -31,18 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Upload public/ to Hostinger
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - uses: actions/setup-node@v4
         with:
-          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./public/
-          server-dir: ${{ secrets.HOSTINGER_FTP_DIR }}
-          dry-run: ${{ inputs.dry_run }}
-          log-level: standard
-          exclude: |
-            **/.git*
-            **/.git*/**
-            get_avatars.php
+          node-version: 22
+
+      - name: Upload changed portal files
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+        run: node scripts/deploy-portal.js ${{ !inputs.dry_run && '--upload' || '' }}

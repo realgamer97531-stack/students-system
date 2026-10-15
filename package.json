@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "clear-db": "node clearDatabase.js --confirm"
+    "clear-db": "node clearDatabase.js --confirm",
+    "deploy:portal": "node scripts/deploy-portal.js"
   },
   "keywords": [],
   "author": "",
