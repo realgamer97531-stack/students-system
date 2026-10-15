@@ -82,6 +82,17 @@ class StaffApi {
     return utf8.decode(response.bodyBytes);
   }
 
+  /// الرافع: بيرفع عمليات أجهزة تانية (كل عملية متوقعة من الجهاز اللي عملها، والسيرفر بيتأكد من التوقيع)
+  static Future<List<Map<String, dynamic>>> relay(List<Map<String, dynamic>> ops) async {
+    final headers = await _deviceHeaders();
+    final body = await _deviceJson(() => client.post(
+          _uri('/api/sync/mesh/relay'),
+          headers: {...headers, 'Content-Type': 'application/json'},
+          body: jsonEncode({'ops': ops}),
+        ));
+    return ((body['results'] as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+
   /// ملف طالب واحد من السيرفر: الرصيد الحالي + البوكليتات + آخر حركات الرصيد (محتاج نت)
   static Future<Map<String, dynamic>> studentDetails(int studentId) async {
     final headers = await _deviceHeaders();

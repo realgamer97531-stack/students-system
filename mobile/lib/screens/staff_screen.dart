@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'staff/create_forms.dart';
 import 'staff/exams_tab.dart';
+import 'staff/network_tab.dart';
 import 'staff/scan_tabs.dart';
 import 'staff/students_tab.dart';
 import 'staff/videos_tab.dart';
@@ -70,6 +71,8 @@ class _StaffScreenState extends State<StaffScreen> {
       if (u.can('students_view')) _StaffTab('الطلاب', Icons.groups_outlined, (_) => Scaffold(body: StudentsTab(openWeb: _openWeb, user: u, activeSession: _activeSession))),
       if (u.can('exams')) _StaffTab('الدرجات', Icons.grading_outlined, (_) => Scaffold(body: ExamsTab(user: u))),
       if (u.can('admin_videos')) _StaffTab('الفيديوهات', Icons.video_library_outlined, (_) => Scaffold(body: VideosTab(user: u, openWeb: _openWeb))),
+      if (u.can('attendance_scan') || u.can('homework_scan') || u.can('door_scan'))
+        _StaffTab('الشبكة', Icons.hub_outlined, (_) => Scaffold(body: NetworkTab(user: u))),
       _StaffTab('السيستم', Icons.dashboard_outlined, (_) => WebScreen(
             key: _web,
             title: 'السيستم',

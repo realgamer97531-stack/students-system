@@ -53,6 +53,8 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // شبكة الأجهزة أوفلاين (بلوتوث + Wi-Fi Direct)
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
 }
 
 kotlin {

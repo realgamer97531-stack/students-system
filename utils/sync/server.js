@@ -14,6 +14,7 @@ const mysql = require('mysql2/promise');
 const syncContext = require('./context');
 const { judgeOutcome } = require('./outcome');
 const entityColors = require('../entityColors');
+const mesh = require('./mesh');
 
 // جداول مش بتنزل على الأجهزة
 const EXCLUDED_TABLES = new Set(['sync_devices', 'sync_applied_ops', 'deleted_student_archive', 'mobile_app_users', 'web_sessions']);
@@ -349,12 +350,14 @@ function captureResponse(res, onDone) {
 function deviceRequestMiddleware({ sequelize, User }) {
   return async (req, res, next) => {
     const token = req.get('x-sync-device-token');
-    if (!token || req.path.startsWith('/api/sync/')) return next();
+    const relayed = !token && Boolean(req.get('x-sync-relay-secret'));
+    if ((!token && !relayed) || req.path.startsWith('/api/sync/')) return next();
 
     const db = getPool(sequelize);
     let device;
     try {
-      device = await authenticateDevice(sequelize, token);
+      // عملية جهاز تاني جاية عن طريق "الرافع" (اتأكدنا من توقيعها في mesh.js)
+      device = relayed ? await mesh.relayDevice(req, db) : await authenticateDevice(sequelize, token);
     } catch (error) {
       return res.status(503).json({ success: false, message: 'السيرفر مش قادر يوصل لقاعدة البيانات دلوقتي' });
     }
@@ -513,6 +516,7 @@ function install(app, { sequelize, User, bcrypt, onMobileStaffLogin }) {
   });
 
   installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin });
+  mesh.install(app, { requireDevice, getPool, sequelize });
 
   app.use(deviceRequestMiddleware({ sequelize, User }));
 }
@@ -585,6 +589,7 @@ function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin 
         students,
         attendance,
         homework,
+        meshKey: mesh.meshKey(), // مفتاح شبكة الأجهزة أوفلاين (للأجهزة المتسجلة بس)
       });
     } catch (error) {
       console.error('Mobile snapshot error:', error);

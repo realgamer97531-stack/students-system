@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/mesh/mesh_service.dart';
 import '../../services/net.dart';
 import '../../services/session_store.dart';
 import '../../services/staff_api.dart';
@@ -132,6 +133,11 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
   @override
   Future<void> handle(String code) async {
     _forceCode = null;
+    // مساعد تاني جنبك (في الشبكة) سجله ولسه مارفعش: السيرفر لسه ميعرفش، فبنوقفه هنا
+    final pre = StaffStore.snapshot.value;
+    final preStudent = pre?.student(code);
+    final by = preStudent == null ? null : pre!.attendanceBy['${preStudent.id}:$sessionId'];
+    if (by != null) return show('${preStudent!.name} مسجل حضوره من قبل ($by)', 'warn');
     Map<String, dynamic>? online;
     try {
       final r = await StaffApi.call('/attendance/scan/lookup', {'student_code': code}, userId: ctx.user.id, activeSessionId: sessionId);
@@ -166,7 +172,10 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
         _alarm();
         return show('🚨 هذا الطالب تابع لمادة ${snap.subjects[s.subjectId] ?? 'مختلفة'}، والحصة الحالية لمادة مختلفة', 'error');
       }
-      if (snap.attendance.contains('${s.id}:$sessionId')) return show('${s.name} مسجل حضوره من قبل', 'warn');
+      if (snap.attendance.contains('${s.id}:$sessionId')) {
+        final who = snap.attendanceBy['${s.id}:$sessionId'];
+        return show('${s.name} مسجل حضوره من قبل${who == null ? '' : ' ($who)'}', 'warn');
+      }
       info = {
         'offline': true,
         'student': {
@@ -232,6 +241,11 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
     try {
       final op = newOp('force', '/attendance/scan/force', {'student_code': code, 'password': password.text}, 'حضور بالقوة: $code');
       final res = await StaffApi.call('/attendance/scan/force', op['body'] as Map<String, dynamic>, userId: ctx.user.id, activeSessionId: sessionId, opId: '${op['id']}');
+      if (res.ok) {
+        // الأجهزة التانية تعرف إنه اتسجل (الباسورد مش بيتبعت للشبكة)
+        await MeshService.instance.recordOwn(op);
+        MeshService.instance.receipt('${op['id']}', ok: true, message: res.message);
+      }
       _forceCode = res.ok ? null : _forceCode;
       show(res.message, res.ok ? 'ok' : 'error');
     } on ApiException catch (e) {

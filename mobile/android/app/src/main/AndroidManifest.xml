@@ -5,6 +5,23 @@
     <!-- تثبيت تحديثات البرنامج من جوه البرنامج -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <!-- شبكة الأجهزة أوفلاين (Nearby Connections: بلوتوث + Wi-Fi Direct) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+    <uses-feature android:name="android.hardware.wifi.direct" android:required="false"/>
 
     <application
         android:label="Shady Elsharkawy"
@@ -32,6 +49,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- إشعار "شبكة الأجهزة شغالة" عشان الاتصال يفضل شغال والشاشة مقفولة -->
+        <service
+            android:name=".MeshService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- تحميل وتثبيت التحديثات (ota_update) -->
         <provider

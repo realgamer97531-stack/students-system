@@ -6,6 +6,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import 'cache.dart';
+import 'mesh/mesh_core.dart' show OpState;
+import 'mesh/mesh_service.dart';
 import 'net.dart';
 import 'session_store.dart';
 import 'staff_api.dart';
@@ -105,6 +107,9 @@ class Snapshot {
   final Map<int, SnapStudent> byId = {};
   final Set<String> attendance = {};
   final Map<String, String> homework = {};
+  /// مين سجل الحضور/الواجب (للعمليات اللي لسه مارفعتش، من الموبايل ده أو من أجهزة الشبكة)
+  final Map<String, String> attendanceBy = {};
+  final Map<String, String> homeworkBy = {};
 
   Map<String, dynamic>? session(int? id) => id == null ? null : sessions.where((s) => _int(s['id']) == id).firstOrNull;
 
@@ -152,11 +157,12 @@ class StaffStore {
     if (snap != null) {
       try {
         snapshot.value = await parseSnapshot(snap.$1);
-        snapshotAt.value = snap.$2;
+        snapshotAt.value = await _savedSnapshotAt() ?? snap.$2;
       } catch (_) {}
     }
     queue.value = (((await Cache.read('queue'))?.data as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
     problems.value = (((await Cache.read('problems'))?.data as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
+    await MeshService.instance.load(await SessionStore.staffUser());
     _applyQueueToSnapshot();
     Connection.online.addListener(_onConnection);
     _timer = Timer.periodic(const Duration(seconds: 45), (_) => flush());
@@ -169,6 +175,7 @@ class StaffStore {
     _timer?.cancel();
     _timer = null;
     _started = false;
+    unawaited(MeshService.instance.detach());
   }
 
   static void _onConnection() {
@@ -183,8 +190,10 @@ class StaffStore {
       final raw = await StaffApi.snapshotJson();
       final parsed = await parseSnapshot(raw);
       await Cache.writeRaw('snapshot', raw);
+      final now = DateTime.now();
+      await Cache.write('snapshot_meta', {'at': now.millisecondsSinceEpoch, 'from': 'server'});
       snapshot.value = parsed;
-      snapshotAt.value = DateTime.now();
+      snapshotAt.value = now;
       _applyQueueToSnapshot();
       deviceRevoked.value = false;
       Connection.report(true);
@@ -205,24 +214,101 @@ class StaffStore {
     return 'm-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}-${List.generate(10, (_) => r.nextInt(36).toRadixString(36)).join()}';
   }
 
+  /// وقت نسخة البيانات الحقيقي (من السيرفر — أو من السيرفر عن طريق جهاز تاني في الشبكة)
+  static Future<DateTime?> _savedSnapshotAt() async {
+    final at = ((await Cache.read('snapshot_meta'))?.data as Map?)?['at'];
+    return at is int ? DateTime.fromMillisecondsSinceEpoch(at) : null;
+  }
+
   /// العمليات المستنية لازم تبان في الفحص أوفلاين (مثلاً متسجلش حضور نفس الطالب مرتين)
+  /// — بتاعة الموبايل ده + اللي وصلت من أجهزة الشبكة
   static void _applyQueueToSnapshot() {
     final snap = snapshot.value;
     if (snap == null) return;
     for (final op in queue.value) {
-      _applyOp(snap, op);
+      _applyOp(snap, op, by: 'الموبايل ده');
     }
+    applyMeshEntries(MeshService.instance.log.ofKind('op').where((e) => e['o'] != MeshService.instance.nodeIdOrNull).toList());
   }
 
-  static void _applyOp(Snapshot snap, Map<String, dynamic> op) {
+  static void _applyOp(Snapshot snap, Map<String, dynamic> op, {String? by}) {
     final student = snap.student('${op['body']?['student_code'] ?? ''}');
     if (student == null) return;
     final key = '${student.id}:${op['activeSessionId']}';
-    if (op['kind'] == 'attendance') {
+    if (op['kind'] == 'attendance' || op['kind'] == 'force') {
       snap.attendance.add(key);
+      if (by != null) snap.attendanceBy.putIfAbsent(key, () => by);
     } else if (op['kind'] == 'homework') {
       snap.homework[key] = '${op['body']['status']}';
+      if (by != null) snap.homeworkBy[key] = by;
     }
+  }
+
+  static String _hhmm(dynamic ms) {
+    if (ms is! num) return '';
+    final t = DateTime.fromMillisecondsSinceEpoch(ms.toInt());
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// عمليات وصلت من أجهزة تانية في الشبكة: بتتحسب في الفحص أوفلاين (حضور/واجب/الباب)
+  static void applyMeshEntries(List<Map<String, dynamic>> entries) {
+    final snap = snapshot.value;
+    if (snap == null) return;
+    var changed = false;
+    for (final e in entries) {
+      if (e['k'] != 'op') continue;
+      final d = (e['d'] as Map).cast<String, dynamic>();
+      final state = MeshService.instance.statusOf('${d['id']}')?.state;
+      if (state == OpState.rejected || state == OpState.dismissed) continue;
+      final op = {'kind': d['kind'], 'body': d['body'], 'activeSessionId': d['sid']};
+      final student = snap.student('${(d['body'] as Map?)?['student_code'] ?? ''}');
+      final key = student == null ? null : '${student.id}:${d['sid']}';
+      final already = key != null && snap.attendance.contains(key);
+      _applyOp(snap, op, by: '${d['user'] ?? 'جهاز تاني'} ${_hhmm(d['ct'])}'.trim());
+      // الرصيد التقريبي: مرة واحدة بس، وللعمليات اللي لسه مارفعتش (اللي اترفعت السيرفر حسبها في النسخة الجاية)
+      if ((d['kind'] == 'attendance') && !already && student != null && state == OpState.pending) {
+        student.balance = student.balance + _num((d['body'] as Map)['payment_collected']) - student.price;
+      }
+      changed = true;
+    }
+    if (changed) MeshService.instance.revision.value++;
+  }
+
+  /// نسخة بيانات أحدث جت من جهاز تاني في الشبكة (من غير نت)
+  static Future<bool> adoptPeerSnapshot(String raw, DateTime at, String fromName) async {
+    final current = snapshotAt.value;
+    if (current != null && !at.isAfter(current)) return false;
+    try {
+      final parsed = await parseSnapshot(raw);
+      if ('${parsed.raw['meshKey'] ?? ''}'.isEmpty) return false;
+      await Cache.writeRaw('snapshot', raw);
+      await Cache.write('snapshot_meta', {'at': at.millisecondsSinceEpoch, 'from': fromName});
+      snapshot.value = parsed;
+      snapshotAt.value = at;
+      _applyQueueToSnapshot();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// بعد ما الرافع رفع عمليات من الموبايل ده (أو اتعرف إنها مكررة) بتتشال من الطابور
+  static Future<void> flushMeshUploaded() async {
+    var removed = false;
+    for (final op in [...queue.value]) {
+      final s = MeshService.instance.statusOf('${op['id']}');
+      if (s == null) continue;
+      if (s.state == OpState.uploaded || s.state == OpState.rejected) {
+        if (s.state == OpState.rejected) await addProblem(op, s.message);
+        await _remove('${op['id']}');
+        removed = true;
+      } else if (s.state == OpState.duplicate || s.state == OpState.dismissed) {
+        await addProblem(op, 'ماترفعتش: ${s.message}');
+        await _remove('${op['id']}');
+        removed = true;
+      }
+    }
+    if (removed) MeshService.instance.revision.value++;
   }
 
   static Future<void> enqueue(Map<String, dynamic> op) async {
@@ -258,6 +344,8 @@ class StaffStore {
   /// بيبعت عملية على طول (لو فيه نت)، ولو النت فاصل بيحطها في الطابور.
   /// بيرجع النتيجة لو اتبعتت، أو null لو اتحفظت للإرسال بعدين.
   static Future<OpResult?> submit(Map<String, dynamic> op) async {
+    // كل عملية بتتسجل في سجل الشبكة (متوقعة بمفتاح الجهاز) عشان الأجهزة التانية تعرف بيها حتى من غير نت
+    await MeshService.instance.recordOwn(op);
     if (queue.value.isNotEmpty) {
       // فيه عمليات أقدم مستنية: لازم تتبعت بالترتيب
       await enqueue(op);
@@ -268,7 +356,8 @@ class StaffStore {
       final result = await _send(op);
       Connection.report(true);
       final snap = snapshot.value;
-      if (result.ok && snap != null) _applyOp(snap, op);
+      if (result.ok && snap != null) _applyOp(snap, op, by: 'الموبايل ده');
+      MeshService.instance.receipt('${op['id']}', ok: result.ok, message: result.message, duplicate: result.duplicate);
       return result;
     } on ApiException catch (e) {
       if (!e.offline) rethrow;
@@ -295,9 +384,22 @@ class StaffStore {
     syncing.value = true;
     try {
       for (final op in [...queue.value]) {
+        // تصفية المكرر قبل الرفع (هنا على الموبايل، مش على السيرفر)
+        final mesh = MeshService.instance.statusOf('${op['id']}');
+        if (mesh != null && mesh.state != OpState.pending) {
+          if (mesh.state == OpState.review) continue; // مستنية قرار الأدمن
+          if (mesh.state == OpState.uploaded) {
+            await _remove('${op['id']}');
+          } else {
+            await addProblem(op, mesh.state == OpState.rejected ? mesh.message : 'ماترفعتش: ${mesh.message}');
+            await _remove('${op['id']}');
+          }
+          continue;
+        }
         try {
           final result = await _send(op);
           Connection.report(true);
+          MeshService.instance.receipt('${op['id']}', ok: result.ok, message: result.message, duplicate: result.duplicate);
           if (!result.ok) await addProblem(op, result.message);
           await _remove('${op['id']}');
         } on DeviceNotAuthorized {
