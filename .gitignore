@@ -13,6 +13,7 @@ public/*
 !public/popup-question.js
 !public/sw.js
 !public/pwa.js
+!public/staff-drafts.js
 !public/manifest.json
 !public/staff-manifest.json
 !public/offline.html

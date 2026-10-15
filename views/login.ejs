@@ -238,6 +238,7 @@
         <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
 
         <form action="/login" method="POST">
+          <% if (typeof next !== 'undefined' && next) { %><input type="hidden" name="next" value="<%= next %>"><% } %>
           <div class="mb-3">
             <label class="form-label small fw-bold">
               <span class="ar-only">اليوزرنيم</span>

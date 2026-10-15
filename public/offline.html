@@ -24,8 +24,22 @@
   <div class="card">
     <img src="/icons/icon-192.png?v=3" alt="">
     <h1>لا يوجد اتصال بالإنترنت</h1>
-    <p>اتأكد إن النت شغال وجرب تاني.<br>You're offline — check your connection and try again.</p>
+    <p>اتأكد إن النت شغال وجرب تاني. لو السيرفر بيتحدث، الصفحة هترجع لوحدها أول ما يرجع.<br>You're offline — check your connection and try again. If the server is updating, this page reloads by itself once it's back.</p>
     <button onclick="location.reload()">إعادة المحاولة</button>
   </div>
+  <script>
+    // كل 4 ثواني نشوف السيرفر رجع ولا لأ، ولو رجع نفتح نفس الصفحة اللي كانت مفتوحة (من غير ما يحتاج يدوس حاجة)
+    (function () {
+      var tries = 0;
+      function check() {
+        if (++tries > 150) return; // 10 دقايق كفاية، بعدها بزرار إعادة المحاولة
+        fetch(location.href, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' })
+          .then(function (r) { if (r.status < 500) location.reload(); else setTimeout(check, 4000); })
+          .catch(function () { setTimeout(check, 4000); });
+      }
+      setTimeout(check, 4000);
+      window.addEventListener('online', function () { setTimeout(check, 500); });
+    })();
+  </script>
 </body>
 </html>

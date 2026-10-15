@@ -76,7 +76,10 @@ async function buildSqlDump(sequelize) {
         lines.push(createSql.replace(/^CREATE TABLE /i, 'CREATE TABLE IF NOT EXISTS ') + ';');
       }
 
-      const rows = await sequelize.query(`SELECT * FROM ${quoteIdentifier(tableName)}`, { type: QueryTypes.SELECT, transaction });
+      // جلسات تسجيل الدخول مؤقتة وفيها مفاتيح دخول — الجدول بيتنسخ فاضي
+      const rows = tableName === 'web_sessions'
+        ? []
+        : await sequelize.query(`SELECT * FROM ${quoteIdentifier(tableName)}`, { type: QueryTypes.SELECT, transaction });
       summary.push({ table: tableName, rows: rows.length });
       if (!rows.length) {
         lines.push('');

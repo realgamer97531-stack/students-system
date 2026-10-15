@@ -16,7 +16,7 @@ const { judgeOutcome } = require('./outcome');
 const entityColors = require('../entityColors');
 
 // جداول مش بتنزل على الأجهزة
-const EXCLUDED_TABLES = new Set(['sync_devices', 'sync_applied_ops', 'deleted_student_archive', 'mobile_app_users']);
+const EXCLUDED_TABLES = new Set(['sync_devices', 'sync_applied_ops', 'deleted_student_archive', 'mobile_app_users', 'web_sessions']);
 const RESPONSE_CAPTURE_LIMIT = 256 * 1024;
 const STUCK_OP_MS = 10 * 60 * 1000;
 
@@ -366,6 +366,7 @@ function deviceRequestMiddleware({ sequelize, User }) {
     if (!user) return res.status(403).json({ success: false, code: 'USER_GONE', message: 'اليوزر اللي عمل العملية مبقاش موجود' });
 
     // جلسة مؤقتة للطلب ده بس، بنفس بيانات اليوزر على الجهاز، وبتتمسح بعد ما الطلب يخلص
+    req.session.syncTemp = true; // مخزن الجلسات مش بيحفظ الجلسة المؤقتة دي في قاعدة البيانات
     req.session.userId = user.id;
     req.session.userName = user.name;
     req.session.userRole = user.role;

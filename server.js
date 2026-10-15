@@ -64,6 +64,7 @@ const {
   ensureDeletedStudentArchiveSchema, archiveAndDeleteStudent, restoreArchivedStudent, listArchivedStudents,
 } = require('./utils/studentArchive');
 const { appUsageMiddleware, recordAppUser, getAppUsageStats, ensureAppUsageSchema, appVersionOf } = require('./utils/appUsage');
+const { DbSessionStore } = require('./utils/sessionStore');
 const {
   buildSqlDump, runBackup, listBackups, getDownloadUrl, getLastResult, BACKUP_FOLDER,
 } = require('./utils/dailyBackup');
@@ -1013,6 +1014,8 @@ app.use(appUsageMiddleware(sequelize));
 
 // الملفات المرفوعة أسماؤها فيها وقت الرفع فمش بتتغير أبدًا، فالمتصفح يقدر يحتفظ بيها بدل ما يحملها كل مرة
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), { maxAge: '7d' }));
+// الصفحة الرئيسية للسيرفر تفتح على تسجيل دخول السيستم مش المنصة (المنصة لسه على /index.html وعلى هوستنجر)
+app.get('/', (req, res) => res.redirect('/login'));
 // عشان نقدر نستخدم ملفات CSS / JS / صور من فولدر public
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -1029,10 +1032,16 @@ app.get('/_health', (req, res) => {
 // الفيديوهات والصور لينكات بس — مفيش رفع ملفات على السيرفر
 
 // إعداد نظام الجلسات (تسجيل الدخول)
+// الجلسات محفوظة في قاعدة البيانات (جدول web_sessions) فأي ديبلوي/ريستارت مش بيخرج حد،
+// والكوكي بتفضل 30 يوم من آخر استخدام حتى لو المتصفح اتقفل
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 app.use(session({
   secret: sessionSecret,
+  store: new DbSessionStore(sequelize, { ttlMs: SESSION_TTL_MS }),
   resave: false,
   saveUninitialized: false,
+  rolling: true,
+  cookie: { maxAge: SESSION_TTL_MS, sameSite: 'lax', httpOnly: true },
 }));
 
 // مزامنة برنامج الديسكتوب: تسجيل الأجهزة + تنزيل البيانات + تنفيذ العمليات اللي اتعملت أوفلاين
@@ -1045,11 +1054,6 @@ if (desktopRuntime) app.use(desktopRuntime.sessionMiddleware);
 // إعداد محرك الصفحات EJS
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-
-// صفحة تجريبية للتأكد إن السيرفر شغال
-app.get('/', (req, res) => {
-  res.send('<h1>السيستم شغال تمام! 🎉</h1>');
-});
 
 app.get('/api/public/student-registration-options', async (req, res) => {
   try {
@@ -1177,13 +1181,24 @@ app.get('/api/public/center-dashboard', verifyCenterPortalToken, async (req, res
 
 // ===== Routes بتاعة تسجيل الدخول =====
 
+// الصفحة اللي كان فاتحها قبل ما يتطلب منه يدخل — مسار داخلي بس (مش لينك لموقع تاني)
+function safeNextPath(value) {
+  const next = String(value || '');
+  if (!next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\') || next.startsWith('/login')) return null;
+  return next.slice(0, 2000);
+}
+
 app.get('/login', (req, res) => {
-  res.render('login', { error: null });
+  const next = safeNextPath(req.query.next);
+  if (req.session.userId) return res.redirect(next || '/sessions');
+  res.render('login', { error: null, next });
 });
 
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    const next = safeNextPath(req.body.next);
+    res.locals.next = next;
 
     let user;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -1209,7 +1224,7 @@ app.post('/login', async (req, res) => {
     req.session.userName = user.name;
     req.session.userRole = user.role;
 
-    res.redirect('/sessions');
+    res.redirect(next || '/sessions');
   } catch (error) {
     console.error(error);
     res.render('login', { error: 'قاعدة البيانات غير متاحة مؤقتًا، حاول مرة أخرى بعد قليل' });
@@ -1234,6 +1249,10 @@ function requireLogin(req, res, next) {
     return next();
   }
   if (!req.session.userId) {
+    // فتح صفحة عادية: بعد الدخول يرجع لنفس الصفحة
+    if (req.method === 'GET' && !req.path.startsWith('/api/') && req.accepts(['html', 'json']) === 'html') {
+      return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+    }
     return res.redirect('/login');
   }
   next();

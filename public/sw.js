@@ -2,7 +2,7 @@
 // القاعدة: النت دايمًا الأول — الكاش بيستخدم بس لما النت يقطع، فالموقع وهو أونلاين بيشتغل زي ما هو بالظبط.
 // مش بنخزن أبدًا: طلبات الـ API، الملفات المرفوعة/الفيديوهات، أي طلب غير GET، ولا صفحات نظام الموظفين (فيها بيانات خاصة).
 // لو حصلت أي مشكلة: غير VERSION أو خلي الملف ده فاضي من الـ fetch handler وكل الأجهزة هتاخد النسخة الجديدة.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const PAGE_CACHE = `sf-pages-${VERSION}`;
 const ASSET_CACHE = `sf-assets-${VERSION}`;
 const CDN_CACHE = `sf-cdn-${VERSION}`;
@@ -53,6 +53,11 @@ function putInCache(cacheName, request, response) {
 async function networkFirst(request, cacheName, { fallbackToOffline = false } = {}) {
   try {
     const response = await fetch(request);
+    // السيرفر بيعمل ديبلوي/ريستارت (502/503/504): نعرض صفحة "بنحاول نوصل" اللي بترجع لنفس الصفحة لوحدها
+    if (fallbackToOffline && [502, 503, 504].includes(response.status)) {
+      const offline = await caches.match(OFFLINE_URL);
+      if (offline) return offline;
+    }
     if (cacheName) putInCache(cacheName, request, response);
     return response;
   } catch (err) {
