@@ -311,6 +311,14 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
           child: Text('لا يوجد فيديو من هذا النوع لهذا الدرس', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted)),
         )
       else ...[
+        if (parts.length > 1) ...[
+          Row(children: [
+            OutlinedButton(onPressed: _index > 0 ? () => _changePart(-1) : null, child: const Text('السابق')),
+            Expanded(child: Text('${_index + 1} / ${parts.length}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted))),
+            OutlinedButton(onPressed: _index < parts.length - 1 ? () => _changePart(1) : null, child: const Text('التالي')),
+          ]),
+          const SizedBox(height: 12),
+        ],
         LessonVideo(
           key: ValueKey(_playerKey),
           source: source!,
@@ -330,14 +338,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
             padding: EdgeInsets.only(top: 6),
             child: Text('لو الفيديو مبدأش لوحده، اضغط تشغيل جوه الفيديو وشغّل الصوت لو مقفول.', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
           ),
-        if (parts.length > 1) ...[
-          const SizedBox(height: 12),
-          Row(children: [
-            OutlinedButton(onPressed: _index > 0 ? () => _changePart(-1) : null, child: const Text('السابق')),
-            Expanded(child: Text('${_index + 1} / ${parts.length}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted))),
-            OutlinedButton(onPressed: _index < parts.length - 1 ? () => _changePart(1) : null, child: const Text('التالي')),
-          ]),
-        ],
       ],
     ]);
   }

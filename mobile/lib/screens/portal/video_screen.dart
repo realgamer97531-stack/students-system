@@ -37,15 +37,15 @@ class _VideoScreenState extends State<VideoScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        LessonVideo(key: ValueKey(_index), source: sourceForPart(part), autoplay: true),
         if (many) ...[
-          const SizedBox(height: 14),
           Row(children: [
             OutlinedButton(onPressed: _index > 0 ? () => setState(() => _index--) : null, child: const Text('السابق')),
             Expanded(child: Text('${_index + 1} / ${widget.parts.length}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted))),
             OutlinedButton(onPressed: _index < widget.parts.length - 1 ? () => setState(() => _index++) : null, child: const Text('التالي')),
           ]),
+          const SizedBox(height: 14),
         ],
+        LessonVideo(key: ValueKey(_index), source: sourceForPart(part), autoplay: true),
       ]),
     );
   }
