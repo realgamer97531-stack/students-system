@@ -13,8 +13,26 @@
   html, body { margin: 0; height: 100%; overflow: hidden; }
   body {
     font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 13px; background: var(--bar); color: var(--text);
-    display: flex; align-items: center; gap: 10px; padding: 0 12px; user-select: none;
+    user-select: none;
   }
+  .bar { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 12px; }
+  /* صف التبويبات */
+  .tabs { height: 36px; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; background: #0F0D3A; overflow: hidden; }
+  .tab {
+    flex: 0 1 220px; min-width: 70px; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 10px;
+    background: rgba(255,255,255,.06); color: var(--muted); border-radius: 9px 9px 0 0; cursor: pointer; overflow: hidden;
+  }
+  .tab:hover { background: rgba(255,255,255,.12); color: #fff; }
+  .tab.active { background: #F4F5FC; color: #181527; font-weight: 600; }
+  .tab .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab .x {
+    flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit;
+    font-size: 14px; line-height: 1; justify-content: center;
+  }
+  .tab .x:hover { background: rgba(0,0,0,.15); }
+  .tab .spin-dot { flex: none; width: 10px; height: 10px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; opacity: .7; }
+  #newTab { flex: none; height: 28px; width: 30px; padding: 0; justify-content: center; margin-bottom: 1px; font-size: 18px; border-radius: 8px; background: transparent; border-color: transparent; color: var(--muted); }
+  #newTab:hover { color: #fff; }
   .group { display: flex; align-items: center; gap: 6px; }
   .brand { font-weight: 700; font-size: 15px; margin-left: 6px; white-space: nowrap; }
   .spacer { flex: 1; }
@@ -47,6 +65,7 @@
 </style>
 </head>
 <body>
+ <div class="bar">
   <div class="group">
     <button class="icon" id="back" title="رجوع">→</button>
     <button class="icon" id="forward" title="للأمام">←</button>
@@ -69,6 +88,10 @@
     <button id="updateBtn" title="تحديثات البرنامج">⭳ تحديثات البرنامج</button>
     <button class="icon" id="settings" title="معلومات وإعدادات">⚙</button>
   </div>
+ </div>
+ <div class="tabs" id="tabs">
+   <button id="newTab" title="تبويب جديد (Ctrl+T)">+</button>
+ </div>
   <div id="toast"></div>
 
 <script>
@@ -148,6 +171,39 @@
   $('settings').onclick = () => window.desktop.openSettings();
   $('problems').onclick = () => window.desktop.problems.open();
   $('updateBtn').onclick = () => window.desktop.updateAction();
+
+  // ===== التبويبات =====
+  function renderTabs(list) {
+    const strip = $('tabs');
+    const add = $('newTab');
+    strip.querySelectorAll('.tab').forEach(el => el.remove());
+    for (const t of list || []) {
+      const el = document.createElement('div');
+      el.className = 'tab' + (t.active ? ' active' : '');
+      el.title = t.title;
+      if (t.loading) {
+        const s = document.createElement('span');
+        s.className = 'spin-dot';
+        el.appendChild(s);
+      }
+      const title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = t.title || 'صفحة جديدة';
+      const x = document.createElement('button');
+      x.className = 'x';
+      x.title = 'قفل التبويب (Ctrl+W)';
+      x.textContent = '×';
+      x.onclick = (e) => { e.stopPropagation(); window.desktop.tabs.close(t.id); };
+      el.append(title, x);
+      el.onclick = () => window.desktop.tabs.switchTo(t.id);
+      el.onauxclick = (e) => { if (e.button === 1) window.desktop.tabs.close(t.id); }; // الضغط بالعجلة يقفل
+      strip.insertBefore(el, add);
+    }
+  }
+  window.desktop.tabs.onChange(renderTabs);
+  window.desktop.tabs.list().then(renderTabs);
+  $('newTab').onclick = () => window.desktop.tabs.create();
+  $('tabs').ondblclick = (e) => { if (e.target.id === 'tabs') window.desktop.tabs.create(); };
 
   $('pingBtn').onclick = async () => {
     const btn = $('pingBtn');

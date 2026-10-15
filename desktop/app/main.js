@@ -15,7 +15,8 @@ const cdnCache = require('./cdn-cache');
 const PROGRAM_NAME = 'Studyisfunny';
 const DISPLAY_NAME = 'Shady Elsharkawy';
 const DEFAULT_SERVER_URL = 'https://students-system-production-6b89.up.railway.app';
-const TOOLBAR_HEIGHT = 56;
+const TOOLBAR_HEIGHT = 92; // صف الأزرار (56) + صف التبويبات (36)
+const MAX_TABS = 20;
 
 // للاختبار بس: فولدر بيانات منفصل
 if (process.env.STUDYISFUNNY_USER_DATA) app.setPath('userData', process.env.STUDYISFUNNY_USER_DATA);
@@ -34,7 +35,10 @@ const configFile = path.join(userData, 'config.json');
 
 let mainWindow = null;
 let toolbarView = null;
-let contentView = null;
+let contentView = null; // التبويب المفتوح دلوقتي (كل الأزرار بتشتغل عليه)
+let tabs = []; // [{ id, view }]
+let nextTabId = 1;
+let systemReady = false;
 let setupWindow = null;
 let problemsWindow = null;
 let serverProcess = null;
@@ -78,12 +82,167 @@ function layout() {
   if (!mainWindow) return;
   const { width, height } = mainWindow.getContentBounds();
   toolbarView.setBounds({ x: 0, y: 0, width, height: TOOLBAR_HEIGHT });
-  contentView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width, height: Math.max(0, height - TOOLBAR_HEIGHT) });
+  for (const tab of tabs) tab.view.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width, height: Math.max(0, height - TOOLBAR_HEIGHT) });
 }
 
 function isAppUrl(url) {
   return appPort && url.startsWith(`http://127.0.0.1:${appPort}`);
 }
+
+function appUrl(pathname) {
+  return `http://127.0.0.1:${appPort}${pathname}`;
+}
+
+// ===== التبويبات (زي المتصفح) =====
+function tabsState() {
+  return tabs.map(tab => {
+    const wc = tab.view.webContents;
+    const destroyed = wc.isDestroyed();
+    return {
+      id: tab.id,
+      title: destroyed ? '' : (wc.getTitle() || 'صفحة جديدة'),
+      loading: !destroyed && wc.isLoading(),
+      active: tab.view === contentView,
+    };
+  });
+}
+
+function sendTabs() {
+  sendToolbar('tabs', tabsState());
+  saveOpenTabs();
+}
+
+// التبويبات المفتوحة بتتحفظ، فلما البرنامج يتقفل ويفتح (أو يتحدث) يرجع على نفس الصفحات
+let saveTabsTimer = null;
+function saveOpenTabs() {
+  if (!systemReady || quitting) return;
+  clearTimeout(saveTabsTimer);
+  saveTabsTimer = setTimeout(() => {
+    const urls = [];
+    let active = 0;
+    for (const tab of tabs) {
+      const url = tab.view.webContents.isDestroyed() ? '' : tab.view.webContents.getURL();
+      if (!isAppUrl(url)) continue;
+      if (tab.view === contentView) active = urls.length;
+      urls.push(new URL(url).pathname + new URL(url).search);
+    }
+    const config = readConfig();
+    config.openTabs = { urls, active };
+    writeConfig(config);
+  }, 800);
+}
+
+function createTab(url, { activate = true } = {}) {
+  if (tabs.length >= MAX_TABS) {
+    const target = tabs[tabs.length - 1];
+    if (url) target.view.webContents.loadURL(url);
+    switchTab(target.id);
+    return target;
+  }
+  const view = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
+  const tab = { id: nextTabId++, view };
+  tabs.push(tab);
+  mainWindow.contentView.addChildView(view);
+  mainWindow.contentView.addChildView(toolbarView); // الشريط يفضل فوق
+  view.setVisible(false);
+  wireTab(tab);
+  layout();
+  if (url) view.webContents.loadURL(url);
+  if (activate || !contentView) switchTab(tab.id);
+  else sendTabs();
+  return tab;
+}
+
+function switchTab(id) {
+  const tab = tabs.find(t => t.id === id);
+  if (!tab) return;
+  for (const t of tabs) t.view.setVisible(t === tab);
+  contentView = tab.view;
+  if (!contentView.webContents.isDestroyed()) contentView.webContents.focus();
+  sendToolbar('nav-state', navState());
+  sendTabs();
+}
+
+function closeTab(id) {
+  const index = tabs.findIndex(t => t.id === id);
+  if (index === -1) return;
+  // آخر تبويب: بدل ما نقفله بنرجعه للصفحة الرئيسية
+  if (tabs.length === 1) {
+    if (appPort && systemReady) tabs[0].view.webContents.loadURL(appUrl('/sessions'));
+    return;
+  }
+  const [tab] = tabs.splice(index, 1);
+  const wasActive = tab.view === contentView;
+  mainWindow.contentView.removeChildView(tab.view);
+  if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
+  if (wasActive) switchTab(tabs[Math.min(index, tabs.length - 1)].id);
+  else sendTabs();
+}
+
+function cycleTab(step) {
+  const index = tabs.findIndex(t => t.view === contentView);
+  switchTab(tabs[(index + step + tabs.length) % tabs.length].id);
+}
+
+function wireTab(tab) {
+  const wc = tab.view.webContents;
+  // لينك بيفتح في شباك جديد (target=_blank أو ضغطة بالعجلة) = تبويب جديد جوه البرنامج
+  wc.setWindowOpenHandler(({ url, disposition }) => {
+    if (isAppUrl(url)) {
+      createTab(url, { activate: disposition !== 'background-tab' });
+    } else if (/^https?:/i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+  wc.on('will-navigate', (event, url) => {
+    if (!isAppUrl(url) && !url.startsWith('file:') && /^https?:/i.test(url)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+  const onNav = () => {
+    if (tab.view === contentView) sendToolbar('nav-state', navState());
+    sendTabs();
+  };
+  wc.on('did-navigate', onNav);
+  wc.on('did-navigate-in-page', onNav);
+  wc.on('page-title-updated', sendTabs);
+  wc.on('did-start-loading', sendTabs);
+  wc.on('did-stop-loading', sendTabs);
+  wc.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta)) return;
+    const key = String(input.key || '').toLowerCase();
+    let handled = true;
+    if (key === 't') newTab();
+    else if (key === 'w') closeTab(tab.id);
+    else if (key === 'tab') cycleTab(input.shift ? -1 : 1);
+    else if (/^[1-9]$/.test(key)) {
+      const target = key === '9' ? tabs[tabs.length - 1] : tabs[Number(key) - 1];
+      if (target) switchTab(target.id);
+    } else handled = false;
+    if (handled) event.preventDefault();
+  });
+  wc.on('context-menu', (event, params) => {
+    const items = [];
+    if (params.linkURL && isAppUrl(params.linkURL)) {
+      items.push({ label: 'فتح في تبويب جديد', click: () => createTab(params.linkURL, { activate: true }) });
+    }
+    if (params.isEditable) items.push({ role: 'cut', label: 'قص' }, { role: 'copy', label: 'نسخ' }, { role: 'paste', label: 'لصق' }, { role: 'selectAll', label: 'تحديد الكل' });
+    else if (params.selectionText) items.push({ role: 'copy', label: 'نسخ' });
+    if (items.length) Menu.buildFromTemplate(items).popup();
+  });
+}
+
+function newTab() {
+  if (!appPort || !systemReady) return;
+  createTab(appUrl('/sessions'), { activate: true });
+}
+
+ipcMain.handle('tabs:new', () => newTab());
+ipcMain.handle('tabs:close', (event, id) => closeTab(Number(id)));
+ipcMain.handle('tabs:switch', (event, id) => switchTab(Number(id)));
+ipcMain.handle('tabs:list', () => tabsState());
 
 function createMainWindow() {
   mainWindow = new BaseWindow({
@@ -98,10 +257,16 @@ function createMainWindow() {
   });
 
   toolbarView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
-  contentView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
-  mainWindow.contentView.addChildView(contentView);
   mainWindow.contentView.addChildView(toolbarView);
   toolbarView.webContents.loadFile(path.join(__dirname, 'toolbar.html'));
+  toolbarView.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta)) return;
+    const key = String(input.key || '').toLowerCase();
+    if (key === 't') { newTab(); event.preventDefault(); }
+    if (key === 'w' && contentView) { const tab = tabs.find(t => t.view === contentView); if (tab) closeTab(tab.id); event.preventDefault(); }
+    if (key === 'tab') { cycleTab(input.shift ? -1 : 1); event.preventDefault(); }
+  });
+  createTab(null, { activate: true });
   contentView.webContents.loadFile(path.join(__dirname, 'loading.html'));
   mainWindow.on('resize', layout);
   mainWindow.on('maximize', layout);
@@ -109,29 +274,6 @@ function createMainWindow() {
   mainWindow.show();
   mainWindow.maximize();
   layout();
-
-  const wc = contentView.webContents;
-  wc.setWindowOpenHandler(({ url }) => {
-    if (isAppUrl(url)) {
-      return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, icon: path.join(__dirname, 'icon.png') } };
-    }
-    if (/^https?:/i.test(url)) shell.openExternal(url);
-    return { action: 'deny' };
-  });
-  wc.on('will-navigate', (event, url) => {
-    if (!isAppUrl(url) && !url.startsWith('file:') && /^https?:/i.test(url)) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-  wc.on('did-navigate', () => sendToolbar('nav-state', navState()));
-  wc.on('did-navigate-in-page', () => sendToolbar('nav-state', navState()));
-  wc.on('context-menu', (event, params) => {
-    const items = [];
-    if (params.isEditable) items.push({ role: 'cut', label: 'قص' }, { role: 'copy', label: 'نسخ' }, { role: 'paste', label: 'لصق' }, { role: 'selectAll', label: 'تحديد الكل' });
-    else if (params.selectionText) items.push({ role: 'copy', label: 'نسخ' });
-    if (items.length) Menu.buildFromTemplate(items).popup();
-  });
 
   mainWindow.on('close', (event) => {
     if (!quitting) {
@@ -288,13 +430,31 @@ function handleServerMessage(message) {
     sendToolbar('status', lastStatus);
   }
   if (message.type === 'ready') {
-    contentView.webContents.loadURL(`http://127.0.0.1:${appPort}/login`);
+    systemReady = true;
+    restoreTabs();
     pollStatus();
     setTimeout(reportFinishedUpdate, 2500);
     setTimeout(() => checkForUpdates(false), 15000);
     setInterval(() => checkForUpdates(false), 6 * 60 * 60 * 1000);
   }
   if (message.type === 'fatal') setLoadingMessage(`مشكلة في التشغيل: ${message.message}`, true);
+}
+
+// أول ما السيستم يجهز: نفتح نفس التبويبات اللي كانت مفتوحة آخر مرة (أو صفحة الدخول)
+function restoreTabs() {
+  const saved = readConfig().openTabs;
+  const urls = (saved && Array.isArray(saved.urls) ? saved.urls : [])
+    .filter(u => typeof u === 'string' && u.startsWith('/') && !u.startsWith('//'))
+    .slice(0, MAX_TABS);
+  if (!urls.length) {
+    contentView.webContents.loadURL(appUrl('/login'));
+    return;
+  }
+  const first = tabs[0];
+  first.view.webContents.loadURL(appUrl(urls[0]));
+  for (const url of urls.slice(1)) createTab(appUrl(url), { activate: false });
+  const active = tabs[Math.min(Number(saved.active) || 0, tabs.length - 1)];
+  switchTab(active.id);
 }
 
 async function control(method, urlPath) {

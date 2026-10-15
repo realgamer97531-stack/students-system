@@ -19,6 +19,13 @@ contextBridge.exposeInMainWorld('desktop', {
   nav: action => ipcRenderer.invoke('nav', action),
   updateAction: () => ipcRenderer.invoke('update:action'),
   openSettings: () => ipcRenderer.invoke('settings:open'),
+  tabs: {
+    onChange: listen('tabs'),
+    list: () => ipcRenderer.invoke('tabs:list'),
+    create: () => ipcRenderer.invoke('tabs:new'),
+    close: id => ipcRenderer.invoke('tabs:close', id),
+    switchTo: id => ipcRenderer.invoke('tabs:switch', id),
+  },
   problems: {
     open: () => ipcRenderer.invoke('problems:open'),
     list: () => ipcRenderer.invoke('problems:list'),
