@@ -93,6 +93,82 @@ class Snapshot {
     for (final h in (raw['homework'] as List? ?? [])) {
       homework['${h[0]}:${h[1]}'] = '${h[2]}';
     }
+    final details = raw['details'];
+    if (details is Map) {
+      hasDetails = true;
+      for (final r in (details['history'] as List? ?? [])) {
+        (_history[_int(r[0])!] ??= {})[_int(r[1])!] = _int(r[2]);
+      }
+      for (final r in (details['groups'] as List? ?? [])) {
+        (_groupLessons['${r[0]}:${r[1]}'] ??= {}).add(_int(r[2])!);
+      }
+      for (final r in (details['exams'] as List? ?? [])) {
+        (_exams[_int(r[0])!] ??= []).add({'name': r[1], 'score': r[2], 'maxScore': r[3], 'examDate': r[4]});
+      }
+      for (final r in (details['booklets'] as List? ?? [])) {
+        (_booklets[_int(r[1])] ??= []).add(r as List);
+      }
+      for (final r in (details['studentBooklets'] as List? ?? [])) {
+        _studentBooklets['${r[0]}:${r[1]}'] = r as List;
+      }
+      for (final r in (details['reservations'] as List? ?? [])) {
+        _reservations['${r[0]}:${r[1]}'] = '${r[2]}';
+      }
+      for (final r in (details['followUp'] as List? ?? [])) {
+        _followUp[_int(r[0])!] = '${r[1]}';
+      }
+    }
+  }
+
+  /// النسخة فيها تفاصيل الطالب (السيرفر الجديد بيبعتها)
+  bool hasDetails = false;
+  final Map<int, Map<int, int?>> _history = {};
+  final Map<String, Set<int>> _groupLessons = {};
+  final Map<int, List<Map<String, dynamic>>> _exams = {};
+  final Map<int?, List<List>> _booklets = {};
+  final Map<String, List> _studentBooklets = {};
+  final Map<String, String> _reservations = {};
+  final Map<int, String> _followUp = {};
+
+  /// نفس اللي /attendance/scan/lookup بيرجعه (تاريخ الحضور + الامتحانات + البوكليتات + المتابعة) من النسخة المحفوظة
+  Map<String, dynamic> lookupDetails(SnapStudent s) {
+    if (!hasDetails) return {};
+    final attended = _history[s.id] ?? const {};
+    final lessons = {...?_groupLessons['${s.centerId}:${s.subjectId}'], ...attended.keys}.toList()..sort();
+    final booklets = [
+      for (final b in _booklets[s.subjectId] ?? const <List>[])
+        () {
+          final sb = _studentBooklets['${s.id}:${b[0]}'];
+          final price = sb != null ? _num(sb[2]) : _num(b[3]);
+          final paid = sb != null ? _num(sb[3]) : 0;
+          final remaining = max(0, price - paid);
+          return <String, dynamic>{
+            'id': b[0],
+            'name': b[2],
+            'sellPrice': price,
+            'paidAmount': paid,
+            'remaining': remaining,
+            'studentBookletId': null, // التسليم محتاج نت
+            'isDelivered': sb != null && (sb[4] == 1 || sb[4] == true),
+            'reservationStatus': _reservations['${s.id}:${b[0]}'],
+            'isFullyPaid': remaining <= 0,
+          };
+        }(),
+    ];
+    return {
+      'summary': [
+        for (final n in lessons)
+          {
+            'lessonNumber': n,
+            'attended': attended.containsKey(n),
+            'attendedWhere': attended.containsKey(n) ? (centers[attended[n]] ?? '') : null,
+            'parts': const [],
+          },
+      ],
+      'independentExamResults': _exams[s.id] ?? const [],
+      'bookletStatuses': booklets,
+      if (_followUp[s.id] != null) 'followUpAssistant': {'name': _followUp[s.id]},
+    };
   }
 
   final Map<String, dynamic> raw;

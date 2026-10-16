@@ -190,6 +190,8 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
           'blocked': s.blocked,
         },
         'activeSession': {'centerId': session['CenterId'], 'centerName': snap.centers[(session['CenterId'] as num?)?.toInt()] ?? 'غير محدد'},
+        // تاريخ الحضور + الامتحانات + البوكليتات + المتابعة (من آخر بيانات اتحفظت)
+        ...snap.lookupDetails(s),
       };
     }
     if (!mounted) return;
