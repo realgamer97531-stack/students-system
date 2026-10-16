@@ -9,6 +9,7 @@ import '../../services/staff_store.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import 'scanner_box.dart';
+import 'student_search.dart';
 
 /// اللي محتاجه كل تاب مسح: الموظف + الحصة المختارة
 class StaffScanContext {
@@ -78,7 +79,7 @@ abstract class _ScanTabState<T extends StatefulWidget> extends State<T> {
 
   Future<void> handle(String code);
 
-  Future<void> onCode(String code) async {
+  Future<void> onCode(String input) async {
     if (busy) return;
     if (sessionId == null) {
       show('⚠️ اختار الحصة الشغالة الأول من فوق', 'warn');
@@ -86,6 +87,9 @@ abstract class _ScanTabState<T extends StatefulWidget> extends State<T> {
     }
     setState(() { busy = true; loading = true; result = null; });
     try {
+      // كود أو رقم تليفون (أو جزء منه): لو أكتر من طالب بيطلع قايمة تختار منها
+      final code = await resolveStudentInput(context, input, userId: ctx.user.id, sessionId: sessionId);
+      if (code == null) return;
       await handle(code);
     } on DeviceNotAuthorized catch (e) {
       StaffStore.deviceRevoked.value = true;
@@ -98,7 +102,11 @@ abstract class _ScanTabState<T extends StatefulWidget> extends State<T> {
   }
 
   Widget scanBody(List<Widget> extra) => ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 40), children: [
-        ScannerBox(onCode: onCode, enabled: !busy),
+        ScannerBox(
+          onCode: onCode,
+          enabled: !busy,
+          suggest: (q) => searchStudents(q, userId: ctx.user.id, sessionId: sessionId),
+        ),
         if (loading) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
         if (result != null) ResultBanner(result: result!),
         ...extra,

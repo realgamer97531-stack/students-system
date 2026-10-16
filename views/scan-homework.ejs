@@ -178,8 +178,9 @@
   function submitManual() {
     const code = document.getElementById('manualCode').value.trim();
     if (code) {
-      selectCode(code);
       document.getElementById('manualCode').value = '';
+      // كود أو رقم تليفون (أو جزء منه) — لو أكتر من طالب بيطلع قايمة تختار منها
+      studentPicker.resolve(code, selectCode);
     }
   }
 
@@ -223,4 +224,6 @@
   ).catch(() => {});
 </script>
 
+<%- include('partials/student-picker') %>
+<script>studentPicker.setHandler(selectCode);</script>
 <%- include('partials/footer') %>

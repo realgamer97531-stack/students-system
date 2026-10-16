@@ -1,0 +1,117 @@
+<%# البحث بالتليفون مكان الكود: اقتراحات وانت بتكتب + لو أكتر من طالب بيطلع قايمة تختار منها.
+    الصفحة بتنادي studentPicker.resolve(اللي اتكتب, الدالة اللي بتكمل بالكود). %>
+<style>
+  #studentPickerBox { text-align: start; margin-top: -8px; margin-bottom: 12px; }
+  #studentPickerBox .sp-head { font-size: .85rem; font-weight: 700; margin: 6px 2px; }
+  #studentPickerBox .sp-item { display: block; width: 100%; text-align: start; border: 1px solid var(--sf-input-border); background: var(--sf-card-bg, #fff); color: inherit; border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer; }
+  #studentPickerBox .sp-item:hover, #studentPickerBox .sp-item:focus { border-color: var(--sf-primary, #4f46e5); outline: none; }
+  #studentPickerBox .sp-item.sp-other { opacity: .75; }
+  #studentPickerBox .sp-meta { font-size: .78rem; color: var(--sf-muted, #6b7280); }
+  #studentPickerBox mark { padding: 0 1px; border-radius: 3px; }
+  #studentPickerBox .badge { font-size: .65rem; }
+</style>
+<script>
+  window.studentPicker = (function () {
+    const input = document.getElementById('manualCode');
+    if (!input) return { resolve: (text, onCode) => onCode(text) };
+    input.setAttribute('placeholder', 'كود الطالب أو رقم التليفون (أو جزء منه)');
+    input.setAttribute('autocomplete', 'off');
+    const box = document.createElement('div');
+    box.id = 'studentPickerBox';
+    input.closest('.input-group').insertAdjacentElement('afterend', box);
+
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const digitsOf = (v) => String(v || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g, '');
+    const matchLabels = {
+      '-1': '<span class="badge bg-dark">الكود</span>',
+      0: '<span class="badge bg-success">نفس السنتر والمادة</span>',
+      1: '<span class="badge bg-info text-dark">نفس المادة</span>',
+      2: '<span class="badge bg-secondary">مادة تانية</span>',
+    };
+    let onPick = null;
+    let handler = null; // اللي بيكمل بالكود لما تختار من الاقتراحات
+    let timer = null;
+    let lastQuery = '';
+
+    function highlight(phone, digits) {
+      const p = String(phone || '');
+      if (!p) return '';
+      const i = digits.length >= 3 ? p.replace(/\s/g, '').indexOf(digits) : -1;
+      if (i < 0) return esc(p);
+      const clean = p.replace(/\s/g, '');
+      return esc(clean.slice(0, i)) + '<mark>' + esc(clean.slice(i, i + digits.length)) + '</mark>' + esc(clean.slice(i + digits.length));
+    }
+
+    function render(data, query, asChoice) {
+      const list = (data && data.students) || [];
+      if (!list.length) { box.innerHTML = ''; return; }
+      const digits = digitsOf(query);
+      const more = data.total > list.length ? ` <span class="text-muted">(أول ${list.length} من ${data.total} — اكتب أرقام أكتر)</span>` : '';
+      box.innerHTML = `<div class="sp-head">${asChoice ? `👇 لقينا ${data.total} طالب — اضغط على الطالب اللي انت عايزه` : '🔎 اقتراحات'}${more}</div>`
+        + list.map(s => `
+          <button type="button" class="sp-item ${s.match === 2 ? 'sp-other' : ''}" data-code="${esc(s.code)}">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+              <strong>${esc(s.name)}</strong>
+              <span class="d-flex gap-1 flex-wrap justify-content-end">${matchLabels[s.match] || ''}${s.present ? '<span class="badge bg-primary">حاضر في الحصة</span>' : ''}${s.blocked ? '<span class="badge bg-danger">محظور</span>' : ''}</span>
+            </div>
+            <div class="sp-meta">${esc(s.code)} • ${esc(s.subject)} • ${esc(s.center)}</div>
+            <div class="sp-meta" dir="ltr" style="text-align:end;">${s.phone ? '📱 ' + highlight(s.phone, digits) : ''}${s.parentPhone ? ' &nbsp; 👪 ' + highlight(s.parentPhone, digits) : ''}</div>
+          </button>`).join('');
+    }
+
+    function clear() { box.innerHTML = ''; onPick = null; }
+
+    async function search(query) {
+      const res = await fetch('/attendance/scan/search?q=' + encodeURIComponent(query), { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error('search failed');
+      return res.json();
+    }
+
+    box.addEventListener('click', (e) => {
+      const item = e.target.closest('.sp-item');
+      if (!item) return;
+      const code = item.dataset.code;
+      const cb = onPick || handler;
+      clear();
+      input.value = '';
+      if (cb) cb(code);
+    });
+
+    // اقتراحات وانت بتكتب (أقرب الطلاب لمجموعة الحصة الشغالة فوق)
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      onPick = null;
+      const q = input.value.trim();
+      if (q.length < 2) { box.innerHTML = ''; return; }
+      timer = setTimeout(async () => {
+        lastQuery = q;
+        try {
+          const data = await search(q);
+          if (lastQuery === q && input.value.trim() === q) render(data, q, false);
+        } catch (e) { /* من غير نت: الكتابة بالكود شغالة عادي */ }
+      }, 300);
+    });
+
+    // اللي اتكتب: كود مطابق → على طول. طالب واحد بالرقم ده → على طول. أكتر من واحد → اختار.
+    async function resolve(text, onCode) {
+      clearTimeout(timer);
+      handler = onCode;
+      let data;
+      try {
+        data = await search(text);
+      } catch (e) {
+        return onCode(text); // مفيش نت: يكمل بالكود زي الأول
+      }
+      if (!data || !data.success) return onCode(text);
+      if (data.exactCode) { clear(); return onCode(text); } // كود مطابق: يكمل بالظبط زي الأول
+      const list = data.students || [];
+      if (list.length === 0) { clear(); return onCode(text); }
+      if (list.length === 1) { clear(); return onCode(list[0].code); }
+      render(data, text, true);
+      onPick = onCode;
+      return null;
+    }
+
+    return { resolve, clear, setHandler: (fn) => { handler = fn; } };
+  })();
+</script>

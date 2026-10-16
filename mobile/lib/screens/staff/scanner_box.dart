@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../theme.dart';
+import 'student_search.dart';
 
-/// كاميرا مسح كود الطالب + خانة لكتابة الكود بإيدك.
+/// كاميرا مسح كود الطالب + خانة لكتابة الكود أو رقم التليفون بإيدك.
 /// الكاميرا بتقفل لوحدها لما التاب مش ظاهر (توفير بطارية).
 class ScannerBox extends StatefulWidget {
-  const ScannerBox({super.key, required this.onCode, required this.enabled});
+  const ScannerBox({super.key, required this.onCode, required this.enabled, this.suggest});
   final void Function(String code) onCode;
+
+  /// اقتراحات وانت بتكتب (أقرب الطلاب لمجموعة الحصة الشغالة فوق)
+  final Future<StudentSearchResult> Function(String query)? suggest;
 
   /// وقت ما فيه طالب بيتراجع، المسح بيقف عشان ميقراش نفس الكود تاني
   final bool enabled;
@@ -27,6 +33,33 @@ class _ScannerBoxState extends State<ScannerBox> {
   DateTime _lastAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _visible = true;
   bool _camera = ScannerBox.useCamera;
+  Timer? _debounce;
+  StudentSearchResult? _suggestions;
+  String _suggestFor = '';
+
+  void _onTyping(String value) {
+    _debounce?.cancel();
+    final q = value.trim();
+    if (widget.suggest == null || q.length < 2) {
+      if (_suggestions != null) setState(() => _suggestions = null);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
+      _suggestFor = q;
+      final result = await widget.suggest!(q);
+      if (!mounted || _suggestFor != q || _manual.text.trim() != q) return;
+      setState(() => _suggestions = result.hits.isEmpty ? null : result);
+    });
+  }
+
+  void _pickSuggestion(StudentHit hit) {
+    if (!widget.enabled) return;
+    _debounce?.cancel();
+    _manual.clear();
+    FocusScope.of(context).unfocus();
+    setState(() => _suggestions = null);
+    widget.onCode(hit.code);
+  }
 
   @override
   void didChangeDependencies() {
@@ -44,6 +77,7 @@ class _ScannerBoxState extends State<ScannerBox> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller?.dispose();
     _manual.dispose();
     super.dispose();
@@ -63,8 +97,10 @@ class _ScannerBoxState extends State<ScannerBox> {
   void _submitManual() {
     final code = _manual.text.trim();
     if (code.isEmpty || !widget.enabled) return;
+    _debounce?.cancel();
     _manual.clear();
     FocusScope.of(context).unfocus();
+    setState(() => _suggestions = null);
     widget.onCode(code);
   }
 
@@ -130,7 +166,8 @@ class _ScannerBoxState extends State<ScannerBox> {
             controller: _manual,
             textDirection: TextDirection.ltr,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(hintText: 'أو اكتب كود الطالب', isDense: true, prefixIcon: Icon(Icons.keyboard)),
+            decoration: const InputDecoration(hintText: 'أو اكتب الكود أو رقم التليفون', isDense: true, prefixIcon: Icon(Icons.keyboard)),
+            onChanged: _onTyping,
             onSubmitted: (_) => _submitManual(),
           ),
         ),
@@ -150,6 +187,14 @@ class _ScannerBoxState extends State<ScannerBox> {
           },
         ),
       ]),
+      if (_suggestions != null) ...[
+        const SizedBox(height: 6),
+        Text(
+          _suggestions!.total > _suggestions!.hits.length ? '🔎 اقتراحات (أول ${_suggestions!.hits.length} من ${_suggestions!.total} — اكتب أرقام أكتر)' : '🔎 اقتراحات',
+          style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w700),
+        ),
+        for (final h in _suggestions!.hits.take(8)) StudentHitTile(hit: h, query: _manual.text, onTap: () => _pickSuggestion(h)),
+      ],
     ]);
   }
 }

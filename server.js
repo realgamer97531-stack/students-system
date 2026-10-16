@@ -4004,6 +4004,93 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
   }
 });
 
+// البحث بالتليفون مكان الكود (صفحات الحضور/الواجب/الباب + برنامج الموبايل):
+// الكود المطابق بالظبط الأول، وبعده أي طالب رقمه أو رقم ولي أمره فيه الأرقام دي.
+// الترتيب: نفس سنتر ومادة الحصة الشغالة ← نفس المادة ← الباقي.
+function phoneSearchDigits(input) {
+  // تليفون بس لو اللي اتكتب أرقام (مسافات/+/- مسموحة)، مش كود زي STU-00123
+  if (!/^[+\d\s\-٠-٩۰-۹]+$/.test(String(input || '').trim())) return '';
+  let digits = String(input || '')
+    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/\D/g, '');
+  // +20 / 0020 قبل الرقم المصري
+  if (/^(?:00)?201\d{9}$/.test(digits)) digits = digits.replace(/^(?:00)?20/, '0');
+  return digits;
+}
+
+const STUDENT_SEARCH_LIMIT = 30;
+
+app.get('/attendance/scan/search', async (req, res) => {
+  try {
+    const perms = req.session.userPermissions || [];
+    if (req.session.userRole !== 'admin' && !['attendance_scan', 'homework_scan', 'door_scan'].some(p => perms.includes(p))) {
+      return res.status(403).json({ success: false, message: '⛔ لا تملك صلاحية الوصول' });
+    }
+    const q = String(req.query.q || '').trim().slice(0, 40);
+    if (!q) return res.json({ success: true, exactCode: null, students: [] });
+
+    const sessionId = Number.parseInt(req.query.session_id, 10) || req.session.activeSessionId || null;
+    const [activeSession, exact] = await Promise.all([
+      sessionId ? Session.findByPk(sessionId, { attributes: ['id', 'CenterId', 'SubjectId'] }) : null,
+      findStudentByCode(q, { attributes: ['id'] }),
+    ]);
+
+    const digits = phoneSearchDigits(q);
+    const or = [];
+    if (exact) or.push({ id: exact.id });
+    if (digits.length >= 3) {
+      const like = { [Op.like]: `%${digits}%` };
+      or.push(sequelize.where(sequelize.fn('REPLACE', sequelize.col('Student.phone'), ' ', ''), like));
+      or.push(sequelize.where(sequelize.fn('REPLACE', sequelize.col('Student.parent_phone'), ' ', ''), like));
+    }
+    if (!or.length) return res.json({ success: true, exactCode: null, students: [] });
+
+    const rows = await Student.findAll({
+      where: { [Op.or]: or },
+      attributes: ['id', 'name', 'student_code', 'phone', 'parent_phone', 'CenterId', 'SubjectId', 'is_blocked'],
+      include: [{ model: Center, attributes: ['name'] }, { model: Subject, attributes: ['name'] }],
+      limit: 500,
+    });
+
+    const rank = (s) => {
+      if (exact && s.id === exact.id) return -1;
+      if (!activeSession) return 2;
+      if (s.SubjectId === activeSession.SubjectId && s.CenterId === activeSession.CenterId) return 0;
+      if (s.SubjectId === activeSession.SubjectId) return 1;
+      return 2;
+    };
+    rows.sort((a, b) => rank(a) - rank(b) || String(a.name).localeCompare(String(b.name), 'ar'));
+    const top = rows.slice(0, STUDENT_SEARCH_LIMIT);
+
+    const present = new Set(activeSession && top.length
+      ? (await Attendance.findAll({ where: { SessionId: activeSession.id, StudentId: top.map(s => s.id) }, attributes: ['StudentId'], raw: true })).map(a => a.StudentId)
+      : []);
+
+    res.json({
+      success: true,
+      exactCode: exact ? exact.student_code : null,
+      total: rows.length,
+      students: top.map(s => ({
+        id: s.id,
+        name: s.name,
+        code: s.student_code,
+        phone: s.phone,
+        parentPhone: s.parent_phone,
+        center: s.Center ? s.Center.name : '',
+        subject: s.Subject ? s.Subject.name : '',
+        // 0 = نفس السنتر والمادة، 1 = نفس المادة، 2 = مادة تانية، -1 = الكود نفسه
+        match: rank(s),
+        blocked: !!s.is_blocked,
+        present: present.has(s.id),
+      })),
+    });
+  } catch (error) {
+    console.error('Student scan search failed:', error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
+  }
+});
+
 // المرحلة 1: عرض ملخص الطالب قبل تأكيد الحضور
 app.post('/attendance/scan/lookup', async (req, res) => {
   try {
@@ -7510,6 +7597,161 @@ app.get('/api/staff/exams', requirePermissionOrAdmin('exams'), async (req, res) 
   } catch (error) {
     console.error('Staff exams list failed:', error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة: ' + error.message });
+  }
+});
+
+// ===== تقارير الحصص المختصرة لبرنامج الموبايل (قراءة بس، نفس حسبة صفحة /sessions/:id/report) =====
+const STAFF_SESSIONS_LIMIT = 300;
+
+app.get('/api/staff/sessions', requirePermissionOrAdmin('sessions_view'), async (req, res) => {
+  try {
+    const sessions = await Session.findAll({
+      attributes: ['id', 'lesson_number', 'serial_number', 'session_date', 'status', 'CenterId', 'SubjectId'],
+      include: [{ model: Center, attributes: ['name'] }, { model: Subject, attributes: ['name'] }],
+      order: [['session_date', 'DESC'], ['lesson_number', 'DESC'], ['id', 'DESC']],
+      limit: STAFF_SESSIONS_LIMIT,
+    });
+    const ids = sessions.map(s => s.id);
+    const counts = new Map(ids.length ? (await Attendance.findAll({
+      where: { SessionId: ids },
+      attributes: ['SessionId', [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('StudentId'))), 'n']],
+      group: ['SessionId'],
+      raw: true,
+    })).map(row => [row.SessionId, Number(row.n) || 0]) : []);
+    res.json({
+      success: true,
+      sessions: sessions.map(s => ({
+        id: s.id,
+        lesson: s.lesson_number,
+        serial: s.serial_number,
+        date: s.session_date,
+        status: s.status,
+        centerId: s.CenterId,
+        subjectId: s.SubjectId,
+        center: s.Center ? s.Center.name : '',
+        subject: s.Subject ? s.Subject.name : '',
+        present: counts.get(s.id) || 0,
+      })),
+    });
+  } catch (error) {
+    console.error('Staff sessions list failed:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.get('/api/staff/sessions/:id/brief', requirePermissionOrAdmin('sessions_view'), async (req, res) => {
+  try {
+    const session = await Session.findByPk(req.params.id, { include: [Center, Subject] });
+    if (!session) return res.status(404).json({ success: false, message: 'الحصة غير موجودة' });
+    const isAdmin = req.session.userRole === 'admin';
+
+    const [ownAttendances, lessonAttendances, homeworkRows, linkedExam] = await Promise.all([
+      Attendance.findAll({ where: { SessionId: session.id }, include: [{ model: Student, attributes: ['id', 'name', 'student_code', 'phone', 'parent_phone', 'CenterId'] }], order: [['id', 'ASC']] }),
+      // حضور نفس رقم الحصة في أي سنتر (للأونلاين ولمكان حضور الغايبين)
+      Attendance.findAll({
+        attributes: ['StudentId'],
+        include: [{ model: Session, attributes: ['CenterId'], where: { lesson_number: session.lesson_number, SubjectId: session.SubjectId }, include: [{ model: Center, attributes: ['name'] }] }],
+      }),
+      HomeworkCheck.findAll({ where: { SessionId: session.id }, attributes: ['StudentId', 'status'], raw: true }),
+      Exam.findOne({ where: { SessionId: session.id }, attributes: ['id', 'name', 'max_score'] }),
+    ]);
+    const homework = new Map(homeworkRows.map(h => [h.StudentId, h.status]));
+    const exam = new Map(linkedExam
+      ? (await ExamResult.findAll({ where: { ExamId: linkedExam.id }, attributes: ['StudentId', 'score'], raw: true })).map(r => [r.StudentId, r.score])
+      : []);
+    const centerNames = new Map((await Center.findAll({ attributes: ['id', 'name'], raw: true })).map(c => [c.id, c.name]));
+
+    const seen = new Set();
+    const present = [];
+    let cash = 0;
+    ownAttendances.forEach((a) => {
+      if (!a.Student || seen.has(a.StudentId)) return;
+      seen.add(a.StudentId);
+      cash += getActualSessionPayment(a);
+      present.push({
+        id: a.Student.id, name: a.Student.name, code: a.Student.student_code,
+        phone: a.Student.phone, parentPhone: a.Student.parent_phone,
+        where: session.Center ? session.Center.name : '',
+        otherCenter: a.Student.CenterId !== session.CenterId ? (centerNames.get(a.Student.CenterId) || 'غير معروف') : null,
+        payment: isAdmin ? getActualSessionPayment(a) : undefined,
+        comment: a.comment || null,
+        homework: homework.get(a.StudentId) || null,
+        exam: exam.has(a.StudentId) ? exam.get(a.StudentId) : null,
+      });
+    });
+
+    const ownCenterIds = new Set();
+    const onlineIds = new Set();
+    const elsewhere = new Map();
+    lessonAttendances.forEach((a) => {
+      if (!a.Session) return;
+      if (a.Session.CenterId === session.CenterId) { ownCenterIds.add(a.StudentId); return; }
+      const place = a.Session.Center ? a.Session.Center.name : 'غير معروف';
+      if (place === 'أونلاين') onlineIds.add(a.StudentId);
+      if (!elsewhere.has(a.StudentId)) elsewhere.set(a.StudentId, place);
+    });
+
+    let absent = [];
+    if (session.status !== 'cancelled') {
+      const group = await Student.findAll({
+        where: { CenterId: session.CenterId, SubjectId: session.SubjectId },
+        attributes: ['id', 'name', 'student_code', 'phone', 'parent_phone'],
+        order: [['name', 'ASC']],
+      });
+      // طلاب المجموعة اللي حضروا أونلاين بيظهروا مع الحاضرين (زي صفحة التقرير)
+      group.filter(s => onlineIds.has(s.id) && !seen.has(s.id)).forEach((s) => {
+        seen.add(s.id);
+        present.push({
+          id: s.id, name: s.name, code: s.student_code, phone: s.phone, parentPhone: s.parent_phone,
+          where: 'أونلاين', otherCenter: null, payment: isAdmin ? 0 : undefined, comment: null,
+          homework: homework.get(s.id) || null, exam: exam.has(s.id) ? exam.get(s.id) : null,
+        });
+      });
+      absent = group.filter(s => !ownCenterIds.has(s.id)).map(s => ({
+        id: s.id, name: s.name, code: s.student_code, phone: s.phone, parentPhone: s.parent_phone,
+        attendedElsewhere: elsewhere.get(s.id) || null,
+      }));
+    }
+
+    const hwCounts = { complete: 0, incomplete: 0, no_steps: 0, not_done: 0, none: 0 };
+    present.forEach((p) => {
+      const key = !p.homework ? 'none' : (['complete', 'incomplete', 'no_steps'].includes(p.homework) ? p.homework : 'not_done');
+      hwCounts[key] += 1;
+    });
+    const scores = present.map(p => Number(p.exam)).filter(Number.isFinite);
+
+    res.json({
+      success: true,
+      session: {
+        id: session.id,
+        lesson: session.lesson_number,
+        serial: session.serial_number,
+        date: session.session_date,
+        status: session.status,
+        center: session.Center ? session.Center.name : '',
+        subject: session.Subject ? session.Subject.name : '',
+        centerId: session.CenterId,
+        subjectId: session.SubjectId,
+      },
+      stats: {
+        present: present.length,
+        absent: absent.length,
+        otherCenter: present.filter(p => p.otherCenter).length,
+        homework: hwCounts,
+        exam: linkedExam ? {
+          name: linkedExam.name,
+          max: linkedExam.max_score,
+          count: scores.length,
+          average: scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null,
+        } : null,
+        cash: isAdmin ? cash : undefined,
+      },
+      present,
+      absent,
+    });
+  } catch (error) {
+    console.error('Staff session brief failed:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

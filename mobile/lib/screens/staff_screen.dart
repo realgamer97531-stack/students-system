@@ -12,6 +12,7 @@ import 'staff/create_forms.dart';
 import 'staff/exams_tab.dart';
 import 'staff/network_tab.dart';
 import 'staff/scan_tabs.dart';
+import 'staff/sessions_tab.dart';
 import 'staff/students_tab.dart';
 import 'staff/videos_tab.dart';
 import 'web_screen.dart';
@@ -69,6 +70,7 @@ class _StaffScreenState extends State<StaffScreen> {
       if (u.can('homework_scan')) _StaffTab('الواجب', Icons.assignment_turned_in_outlined, (_) => _ScanPage(ctx: _ctx, child: HomeworkScanTab(ctx: _ctx))),
       if (u.can('door_scan')) _StaffTab('الباب', Icons.door_front_door_outlined, (_) => _ScanPage(ctx: _ctx, child: DoorTab(ctx: _ctx))),
       if (u.can('students_view')) _StaffTab('الطلاب', Icons.groups_outlined, (_) => Scaffold(body: StudentsTab(openWeb: _openWeb, user: u, activeSession: _activeSession))),
+      if (u.can('sessions_view')) _StaffTab('الحصص', Icons.event_note_outlined, (_) => Scaffold(body: SessionsTab(user: u))),
       if (u.can('exams')) _StaffTab('الدرجات', Icons.grading_outlined, (_) => Scaffold(body: ExamsTab(user: u))),
       if (u.can('admin_videos')) _StaffTab('الفيديوهات', Icons.video_library_outlined, (_) => Scaffold(body: VideosTab(user: u, openWeb: _openWeb))),
       if (u.can('attendance_scan') || u.can('homework_scan') || u.can('door_scan'))
@@ -167,6 +169,8 @@ class _StaffScreenState extends State<StaffScreen> {
             ? null
             : NavigationBar(
                 selectedIndex: _tab,
+                // تابات كتير: الاسم بيظهر تحت التاب المفتوح بس (عشان الأسامي متتقطعش)
+                labelBehavior: _tabs.length > 7 ? NavigationDestinationLabelBehavior.onlyShowSelected : null,
                 onDestinationSelected: (i) => setState(() {
                   _tab = i;
                   _opened.add(i);
