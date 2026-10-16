@@ -63,6 +63,20 @@ async function main() {
   require('../../server.js');
   await waitForServer(Number(process.env.PORT));
   engine.start();
+  // شبكة الأجهزة (الموبايلات + الكمبيوترات بالواي فاي) — مقفولة لحد ما حد يشغلها من زرار "الشبكة"
+  try {
+    const syncServer = require('../../utils/sync/server');
+    await require('./mesh').init({
+      sequelize: require('../../config/database'),
+      engine,
+      store: require('./store'),
+      buildMobileSnapshot: syncServer.buildMobileSnapshot,
+      ensureSyncSchema: syncServer.ensureSyncSchema,
+      replayLocally: require('../../utils/sync/mesh').replayLocally,
+    });
+  } catch (error) {
+    console.error('Mesh init failed:', error);
+  }
   report({ type: 'ready', port: Number(process.env.PORT) });
 }
 

@@ -261,7 +261,7 @@ class _PeerTile extends StatelessWidget {
           ]),
           title: Text(peer.name.isEmpty ? peer.node : peer.name, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text([label, if (peer.role.isNotEmpty) peer.role, if (uploader) 'الرافع', if (peer.pending > 0) 'مستني رفع ${peer.pending}', if (peer.rttMs != null && peer.direct) '${peer.rttMs}ms'].join(' • ')),
-          trailing: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+          trailing: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, textDirection: TextDirection.ltr, children: [
             for (var i = 1; i <= 3; i++)
               Container(
                 width: 5,

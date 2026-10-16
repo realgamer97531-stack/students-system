@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>شبكة الأجهزة</title>
+<style>
+  :root { --primary:#4338CA; --accent:#14B8A6; --warn:#F59E0B; --danger:#E11D48; --bg:#F4F5FC; --text:#181527; --muted:#6B7280; --card:#fff; --line:#E5E7EB; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  main { max-width: 860px; margin: 0 auto; padding: 18px; }
+  .card { background:var(--card); border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  h1 { font-size:20px; margin:0; }
+  h2 { font-size:16px; margin:18px 4px 8px; }
+  .muted { color:var(--muted); }
+  .pill { background:#F3F4F6; border-radius:999px; padding:4px 10px; font-size:12.5px; }
+  .pill.ok { background:#D1FAE5; color:#047857; } .pill.warn { background:#FEF3C7; color:#92400E; }
+  button { font-family:inherit; font-size:14px; border-radius:10px; padding:9px 14px; cursor:pointer; border:1px solid var(--line); background:#fff; }
+  button.primary { background:var(--primary); color:#fff; border-color:var(--primary); }
+  button:disabled { opacity:.5; cursor:default; }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--muted); flex:none; }
+  .dot.on { background:var(--accent); box-shadow:0 0 0 4px rgba(20,184,166,.2); }
+  .peer { display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--line); }
+  .peer:last-child { border-bottom:0; }
+  .peer .name { font-weight:700; }
+  .bars { display:flex; align-items:flex-end; gap:2px; margin-inline-start:auto; direction:ltr; }
+  .bars i { width:5px; background:#E5E7EB; border-radius:2px; display:block; }
+  .review { background:#FEF3C7; }
+  .msg { color:#92400E; margin-top:8px; }
+  .help { line-height:1.7; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div class="row">
+      <span class="dot" id="dot"></span>
+      <div style="flex:1">
+        <h1 id="title">شبكة الأجهزة</h1>
+        <div class="muted" id="sub">بيجهز...</div>
+      </div>
+      <button class="primary" id="toggle">تشغيل الشبكة</button>
+      <button id="reconnect" style="display:none">إعادة الاتصال</button>
+    </div>
+    <div class="row" style="margin-top:12px" id="pills"></div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div style="flex:1">
+        <b id="uploaderTitle">الجهاز اللي بيرفع للكل</b>
+        <div class="muted" id="uploaderSub">أول ما النت يرجع للجهاز ده بيرفع عمليات كل الأجهزة (بعد ما يشيل المكرر)</div>
+      </div>
+      <button id="makeUploader">خلي الكمبيوتر ده هو الرافع</button>
+      <button id="uploadNow" style="display:none">ارفع دلوقتي</button>
+    </div>
+  </div>
+
+  <div id="reviewBox" style="display:none">
+    <h2>محتاج مراجعة</h2>
+    <div class="muted" style="margin:0 4px 8px">حضور متسجل مرتين والتاني معاه فلوس — مش هيترفع غير بقرارك</div>
+    <div id="review"></div>
+  </div>
+
+  <h2 id="peersTitle">الأجهزة</h2>
+  <div class="card" id="peers"></div>
+
+  <div class="card help muted">
+    الكمبيوتر بيدخل الشبكة عن طريق <b>الواي فاي</b>: نفس راوتر السنتر اللي الموبايلات عليه، أو وصّل الكمبيوتر بـ<b>هوت سبوت</b> موبايل من الموبايلات.
+    الموبايلات بتتوصل ببعض بالبلوتوث، فأي موبايل على نفس الواي فاي بيوصّل الكمبيوتر بالباقي.
+    أول مرة الويندوز ممكن يسأل "السماح بالوصول" — اختار <b>سماح</b>.
+  </div>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  let data = null;
+  let busy = false;
+
+  function ago(ms) {
+    if (!ms) return '';
+    const m = Math.round((Date.now() - ms) / 60000);
+    if (m < 1) return 'دلوقتي';
+    if (m < 60) return `من ${m} دقيقة`;
+    return `من ${Math.round(m / 60)} ساعة`;
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  function render(v) {
+    data = v;
+    $('dot').className = 'dot' + (v.running ? ' on' : '');
+    $('title').textContent = v.running ? 'الشبكة شغالة' : 'الشبكة مقفولة';
+    const reachable = v.peers.filter(p => p.online).length;
+    $('sub').textContent = v.running ? `متوصل مباشرة بـ ${v.direct} • شايف ${reachable} جهاز • الكمبيوتر ده: ${v.me.name}` : 'شغّلها عشان الكمبيوتر يتبادل البيانات مع الموبايلات من غير نت';
+    $('toggle').textContent = v.running ? 'إيقاف' : 'تشغيل الشبكة';
+    $('toggle').className = v.running ? '' : 'primary';
+    $('reconnect').style.display = v.running ? '' : 'none';
+    $('pills').innerHTML = [
+      `<span class="pill ${v.online ? 'ok' : 'warn'}">${v.online ? 'فيه نت' : 'مفيش نت'}</span>`,
+      `<span class="pill">عمليات الشبكة اللي لسه مارفعتش: ${v.waiting}</span>`,
+      v.meshKey ? '' : '<span class="pill warn">محتاج نت مرة عشان ياخد مفتاح الشبكة</span>',
+    ].join('');
+    $('msg').textContent = v.message || v.problem || '';
+    const uploaderPeer = v.peers.find(p => p.node === v.uploader);
+    $('uploaderTitle').textContent = !v.uploader ? 'مفيش جهاز رافع محدد' : v.isUploader ? 'الكمبيوتر ده هو الرافع' : `الرافع: ${uploaderPeer ? uploaderPeer.name : 'جهاز تاني'}`;
+    $('makeUploader').style.display = v.isUploader ? 'none' : '';
+    $('uploadNow').style.display = v.isUploader ? '' : 'none';
+    $('uploadNow').disabled = v.uploading || !v.online;
+
+    $('reviewBox').style.display = v.review.length ? '' : 'none';
+    $('review').innerHTML = v.review.map(r => `<div class="card review">
+        <b>${esc(r.label)}</b>
+        <div>التانية: ${esc(r.user)} • دفع ${r.money} ج</div>
+        <div>الأولى: ${esc(r.firstUser || '')} • دفع ${r.firstMoney} ج</div>
+        <div class="row" style="margin-top:8px">
+          <button class="primary" data-op="${esc(r.id)}" data-a="upload">ارفعها برضه</button>
+          <button data-op="${esc(r.id)}" data-a="dismiss">تجاهلها</button>
+        </div></div>`).join('');
+
+    $('peersTitle').textContent = `الأجهزة (${v.peers.length})`;
+    $('peers').innerHTML = v.peers.length ? v.peers.map((p) => {
+      const label = !p.online ? `مش متصل • آخر ظهور ${ago(p.lastSeen)}`
+        : p.direct ? 'متصل مباشرة' : `متصل عن طريق ${p.hops - 1 <= 1 ? 'جهاز تاني' : (p.hops - 1) + ' أجهزة'}`;
+      const bars = !p.online ? 0 : p.direct ? (p.quality || 3) : 1;
+      return `<div class="peer"><span class="dot${p.online ? ' on' : ''}"></span>
+        <div><div class="name">${esc(p.name || p.node)}</div>
+        <div class="muted">${[label, p.role, p.node === v.uploader ? 'الرافع' : '', p.pending ? 'مستني رفع ' + p.pending : '', p.direct && p.rttMs ? p.rttMs + 'ms' : ''].filter(Boolean).map(esc).join(' • ')}</div></div>
+        <span class="bars">${[1, 2, 3].map(i => `<i style="height:${6 + i * 5}px;${i <= bars ? 'background:var(--accent)' : ''}"></i>`).join('')}</span></div>`;
+    }).join('') : '<div class="muted">لسه مفيش أجهزة ظهرت. شغّل الشبكة على الموبايلات واتأكد إن الكمبيوتر على نفس الواي فاي.</div>';
+  }
+
+  async function refresh() {
+    try { render(await window.desktop.mesh.view()); } catch (e) { $('sub').textContent = 'السيستم لسه بيجهز...'; }
+  }
+  async function act(name, params) {
+    if (busy) return;
+    busy = true;
+    try {
+      const r = await window.desktop.mesh.action(name, params || {});
+      if (r && r.success === false && r.message) $('msg').textContent = r.message;
+      if (name === 'upload-now' && r && r.success) $('msg').textContent = r.sent ? `✔ اترفع ${r.sent}` : 'مفيش حاجة مستنية الرفع';
+    } finally {
+      busy = false;
+      refresh();
+    }
+  }
+
+  $('toggle').onclick = () => act(data && data.running ? 'disable' : 'enable');
+  $('reconnect').onclick = () => act('reconnect');
+  $('makeUploader').onclick = () => data && act('uploader', { node: data.me.node });
+  $('uploadNow').onclick = () => act('upload-now');
+  $('review').onclick = (e) => {
+    const b = e.target.closest('button[data-op]');
+    if (b) act('decide', { op: b.dataset.op, action: b.dataset.a });
+  };
+  refresh();
+  setInterval(refresh, 3000);
+</script>
+</body>
+</html>

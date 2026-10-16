@@ -275,6 +275,7 @@ class _Link {
   bool connected = false;
   bool authed = false;
   bool helloSent = false;
+  bool outgoing = false;
   int quality = 0;
   int lastRx = DateTime.now().millisecondsSinceEpoch;
   int? pingAt;
@@ -402,6 +403,7 @@ class MeshNode {
         final link = _links.putIfAbsent(ev.id, () => _Link(ev.id));
         final parts = (ev.name ?? '').split('|');
         if (parts.length >= 2 && parts[0] == protocol) link.node = parts[1];
+        link.outgoing = ev.incoming == false;
         _candidates.remove(ev.id);
       case 'result':
         final link = _links[ev.id];
@@ -497,12 +499,16 @@ class MeshNode {
         _drop(link.endpointId);
         return;
       }
-      // لو متوصلين بنفس الجهاز مرتين (من الناحيتين) بنسيب واحد بس
-      final dup = _links.values.any((l) => l != link && l.authed && l.node == node);
-      if (dup) {
-        transport.disconnect(link.endpointId);
-        _drop(link.endpointId);
-        return;
+      // متوصلين بنفس الجهاز مرتين (الاتنين بدأوا الاتصال في نفس اللحظة): الطرفين لازم يسيبوا نفس الاتصال —
+      // اللي بدأه الجهاز صاحب الرقم الأصغر
+      final other = _links.values.where((l) => l != link && l.authed && l.node == node).firstOrNull;
+      if (other != null) {
+        final smaller = nodeId.compareTo(node) < 0 ? nodeId : node;
+        final keepNew = (link.outgoing ? nodeId : node) == smaller;
+        final loser = keepNew ? other : link;
+        transport.disconnect(loser.endpointId);
+        _links.remove(loser.endpointId);
+        if (!keepNew) return;
       }
       link.node = node;
       link.authed = true;

@@ -388,6 +388,7 @@ async function startSystem() {
       JWT_SECRET: sessionSecret,
       SYNC_SERVER_URL: config.serverUrl,
       SYNC_DEVICE_TOKEN: unseal(config.deviceToken),
+      DESKTOP_DEVICE_NAME: config.deviceName || os.hostname(),
       DESKTOP_CONTROL_SECRET: controlSecret,
       DESKTOP_OUTBOX_KEY: outboxKey,
       APP_VERSION: app.getVersion(),
@@ -535,6 +536,28 @@ ipcMain.handle('problems:open', () => {
   problemsWindow.on('closed', () => { problemsWindow = null; });
 });
 ipcMain.handle('problems:list', async () => (await control('GET', '/problems')).problems || []);
+
+// ===== شبكة الأجهزة (الموبايلات + الكمبيوترات من غير نت) =====
+let meshWindow = null;
+ipcMain.handle('mesh:open', () => {
+  if (meshWindow) { meshWindow.focus(); return; }
+  meshWindow = new BrowserWindow({
+    width: 900,
+    height: 760,
+    title: 'شبكة الأجهزة',
+    icon: path.join(__dirname, 'icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
+  });
+  meshWindow.loadFile(path.join(__dirname, 'network.html'));
+  meshWindow.on('closed', () => { meshWindow = null; });
+});
+ipcMain.handle('mesh:view', () => control('GET', '/mesh'));
+ipcMain.handle('mesh:action', (event, name, params) => {
+  if (!/^[a-z-]+$/.test(String(name))) return { success: false };
+  const query = new URLSearchParams(Object.entries(params || {}).map(([k, v]) => [k, String(v)])).toString();
+  return control('POST', `/mesh/${name}${query ? `?${query}` : ''}`);
+});
 ipcMain.handle('problems:dismiss', (event, seq) => control('POST', `/problems/${Number(seq)}/dismiss`));
 ipcMain.handle('problems:retry', (event, seq) => control('POST', `/problems/${Number(seq)}/retry`));
 

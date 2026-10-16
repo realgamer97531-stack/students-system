@@ -14,6 +14,7 @@ import '../net.dart';
 import '../session_store.dart';
 import '../staff_api.dart';
 import '../staff_store.dart';
+import 'lan_transport.dart';
 import 'mesh_core.dart';
 
 /// النقل الحقيقي: Google Nearby Connections (بلوتوث + Wi-Fi Direct) — الكود في MeshPlugin.kt
@@ -64,7 +65,8 @@ class MeshService implements MeshHost {
   static final instance = MeshService._();
 
   /// في الاختبارات: نقل وهمي
-  static MeshTransport Function() transportFactory = NearbyTransport.new;
+  /// بلوتوث/Wi-Fi Direct (Nearby) + الواي فاي العادي (عشان برنامج الكمبيوتر والموبايلات اللي على نفس الراوتر)
+  static MeshTransport Function() transportFactory = () => CombinedTransport({'n': NearbyTransport(), 'l': LanTransport()});
 
   MeshNode? _node;
   late String nodeId;

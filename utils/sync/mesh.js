@@ -151,8 +151,10 @@ async function relayDevice(req, db) {
   if (!crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(RELAY_SECRET))) return null;
   const id = Number(req.get('x-sync-relay-device'));
   if (!Number.isInteger(id)) return null;
+  // برنامج الديسكتوب: عمليات الموبايلات اللي وصلت من الشبكة بتتنفذ على قاعدة البيانات اللي على الجهاز
+  if (process.env.DESKTOP_MODE === '1' && id === 0) return { id: 0, name: 'شبكة الأجهزة', meshForeign: true };
   const [rows] = await db.query('SELECT id, name, revoked_at FROM sync_devices WHERE id = ? LIMIT 1', [id]);
   return rows[0] && !rows[0].revoked_at ? { id: rows[0].id, name: rows[0].name } : null;
 }
 
-module.exports = { install, relayDevice, meshKey, verifyOp, RELAY_PATHS };
+module.exports = { install, relayDevice, replayLocally, meshKey, verifyOp, RELAY_PATHS };

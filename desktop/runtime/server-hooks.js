@@ -9,6 +9,8 @@ const store = require('./store');
 const engine = require('./engine');
 
 const CAPTURE_LIMIT = 64 * 1024;
+// شبكة الأجهزة (بتتحمل وقت الاستخدام عشان مايبقاش فيه require دايري مع السيرفر)
+const meshService = () => require('./mesh');
 
 // العمليات اللي مينفعش تتعمل أوفلاين: إضافة طلاب (عشان الـ ids/الأكواد متتداخلش)، رفع ملفات وصور،
 // الكول سنتر، النسخ الاحتياطي، مسح/استيراد قاعدة البيانات، وحاجات بتتخزن على السيرفر بس.
@@ -92,6 +94,10 @@ async function handleControl(req, res) {
     if (req.method === 'POST' && path === '/ping') return res.json({ success: true, online: await engine.ping(), lastError: engine.state.lastError });
     if (req.method === 'POST' && path === '/push') return res.json({ success: true, ...(await engine.push({ force: true })) });
     if (req.method === 'GET' && path === '/problems') return res.json({ success: true, problems: await store.listProblems() });
+    // شبكة الأجهزة
+    if (req.method === 'GET' && path === '/mesh') return res.json(meshService().view());
+    const meshAction = /^\/mesh\/([a-z-]+)$/.exec(path);
+    if (req.method === 'POST' && meshAction) return res.json(await meshService().action(meshAction[1], req.query));
     const dismiss = /^\/problems\/(\d+)\/dismiss$/.exec(path);
     if (req.method === 'POST' && dismiss) {
       await store.markOp(Number(dismiss[1]), { dismissed: 1 });
@@ -236,6 +242,8 @@ async function sessionMiddleware(req, res, next) {
   }
 
   if (!req.session || !req.session.userId) return next();
+  // عملية جاية من موبايل في شبكة الأجهزة: بتتنفذ على الجهاز بس ومش بتترفع من هنا
+  if (req.meshForeign) return next();
 
   const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
   if (isWrite) await engine.waitForGate();
@@ -279,6 +287,8 @@ async function sessionMiddleware(req, res, next) {
       const result = { ok: outcome.ok, message: outcome.message, created: ctx.created, tables: [...ctx.tables] };
       if (!isWrite) await store.insertOp({ ...op, state: 'started' });
       await store.finishLocalOp(opId, result);
+      // مسح حضور/واجب نجح على الكمبيوتر: الموبايلات اللي حواليه تعرف بيه (شبكة الأجهزة)
+      if (outcome.ok) meshService().recordDesktopOp(op, op.payload.context);
     } catch (error) {
       console.error('Desktop outbox finish failed:', error);
     } finally {

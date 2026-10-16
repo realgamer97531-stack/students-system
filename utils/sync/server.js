@@ -371,6 +371,8 @@ function deviceRequestMiddleware({ sequelize, User }) {
 
     // جلسة مؤقتة للطلب ده بس، بنفس بيانات اليوزر على الجهاز، وبتتمسح بعد ما الطلب يخلص
     req.session.syncTemp = true; // مخزن الجلسات مش بيحفظ الجلسة المؤقتة دي في قاعدة البيانات
+    // على الديسكتوب: عملية من موبايل في الشبكة — متدخلش طابور الرفع بتاع الجهاز (اللي عملها هو اللي بيرفعها)
+    if (device.meshForeign) req.meshForeign = true;
     req.session.userId = user.id;
     req.session.userName = user.name;
     req.session.userRole = user.role;
@@ -530,6 +532,56 @@ function install(app, { sequelize, User, bcrypt, onMobileStaffLogin }) {
 // والعمليات نفسها بتتبعت لنفس صفحات السيستم بـ X-Sync-Device-Token (نفس طريقة الديسكتوب).
 const MOBILE_SNAPSHOT_SESSIONS = 150;
 
+// نسخة المسح أوفلاين للموبايل. بيستخدمها السيرفر (GET /api/sync/mobile/snapshot) وبرنامج الديسكتوب
+// (بيديها للموبايلات اللي حواليه في شبكة الأجهزة، من قاعدة البيانات اللي على الجهاز).
+// excludeLocalIds: على الديسكتوب، الحصص اللي اتعملت أوفلاين ولسه مااترفعتش (رقم مؤقت) مش بتتبعت.
+async function buildMobileSnapshot(sequelize, { meshKey, excludeLocalIds = false } = {}) {
+  const db = getPool(sequelize);
+  const [sessions] = await db.query(
+    `SELECT id, lesson_number, week_number, serial_number, session_date, status, CenterId, SubjectId, createdAt
+     FROM sessions ${excludeLocalIds ? 'WHERE id < 2000000000' : ''} ORDER BY createdAt DESC, id DESC LIMIT ?`, [MOBILE_SNAPSHOT_SESSIONS],
+  );
+  const sessionIds = sessions.map(s => s.id);
+  const [[centers], [subjects], [students], [attendance], [homework]] = await Promise.all([
+    db.query('SELECT id, name FROM centers ORDER BY name'),
+    db.query('SELECT id, name FROM subjects ORDER BY name'),
+    db.query({
+      // أعمدة جديدة بتتضاف في الآخر بس (عشان الإصدارات القديمة من البرنامج تفضل شغالة)
+      sql: `SELECT id, student_code, name, SubjectId, CenterId, balance, price_per_session, is_blocked, admin_note,
+            phone, parent_phone, points
+            FROM students ORDER BY name`,
+      rowsAsArray: true,
+    }),
+    sessionIds.length
+      ? db.query({ sql: 'SELECT StudentId, SessionId FROM attendances WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
+      : [[]],
+    sessionIds.length
+      ? db.query({ sql: 'SELECT StudentId, SessionId, status FROM homeworkchecks WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
+      : [[]],
+  ]);
+  // لون كل سنتر/مادة (المحفوظ أو التلقائي) عشان التطبيق يلوّن القوايم زي الموقع
+  const colorMaps = await entityColors.getColorMaps(sequelize);
+  const withColor = (kind, rows) => rows.map(row => ({ ...row, color: (colorMaps[kind].byId.get(Number(row.id)) || {}).color || entityColors.autoColor(kind, row.id) }));
+  // تفاصيل الطالب وقت المسح أوفلاين (لو فشلت النسخة بتتبعت من غيرها زي الأول)
+  const details = await buildMobileDetails(sequelize).catch((error) => {
+    console.error('Mobile snapshot details error:', error.message);
+    return null;
+  });
+  return {
+    success: true,
+    serverTime: utcNowString(),
+    centers: withColor('center', centers),
+    subjects: withColor('subject', subjects),
+    sessions,
+    studentColumns: ['id', 'code', 'name', 'subjectId', 'centerId', 'balance', 'price', 'blocked', 'note', 'phone', 'parentPhone', 'points'],
+    students,
+    attendance,
+    homework,
+    meshKey, // مفتاح شبكة الأجهزة أوفلاين (للأجهزة المتسجلة بس)
+    details,
+  };
+}
+
 function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin }) {
   app.post('/api/sync/mobile/staff-login', requireDevice(sequelize), async (req, res) => {
     try {
@@ -554,50 +606,7 @@ function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin 
 
   app.get('/api/sync/mobile/snapshot', requireDevice(sequelize), async (req, res) => {
     try {
-      const db = getPool(sequelize);
-      const [sessions] = await db.query(
-        `SELECT id, lesson_number, week_number, serial_number, session_date, status, CenterId, SubjectId, createdAt
-         FROM sessions ORDER BY createdAt DESC, id DESC LIMIT ?`, [MOBILE_SNAPSHOT_SESSIONS],
-      );
-      const sessionIds = sessions.map(s => s.id);
-      const [[centers], [subjects], [students], [attendance], [homework]] = await Promise.all([
-        db.query('SELECT id, name FROM centers ORDER BY name'),
-        db.query('SELECT id, name FROM subjects ORDER BY name'),
-        db.query({
-          // أعمدة جديدة بتتضاف في الآخر بس (عشان الإصدارات القديمة من البرنامج تفضل شغالة)
-          sql: `SELECT id, student_code, name, SubjectId, CenterId, balance, price_per_session, is_blocked, admin_note,
-                phone, parent_phone, points
-                FROM students ORDER BY name`,
-          rowsAsArray: true,
-        }),
-        sessionIds.length
-          ? db.query({ sql: 'SELECT StudentId, SessionId FROM attendances WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
-          : [[]],
-        sessionIds.length
-          ? db.query({ sql: 'SELECT StudentId, SessionId, status FROM homeworkchecks WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
-          : [[]],
-      ]);
-      // لون كل سنتر/مادة (المحفوظ أو التلقائي) عشان التطبيق يلوّن القوايم زي الموقع
-      const colorMaps = await entityColors.getColorMaps(sequelize);
-      const withColor = (kind, rows) => rows.map(row => ({ ...row, color: (colorMaps[kind].byId.get(Number(row.id)) || {}).color || entityColors.autoColor(kind, row.id) }));
-      // تفاصيل الطالب وقت المسح أوفلاين (لو فشلت النسخة بتتبعت من غيرها زي الأول)
-      const details = await buildMobileDetails(sequelize).catch((error) => {
-        console.error('Mobile snapshot details error:', error.message);
-        return null;
-      });
-      res.json({
-        success: true,
-        serverTime: utcNowString(),
-        centers: withColor('center', centers),
-        subjects: withColor('subject', subjects),
-        sessions,
-        studentColumns: ['id', 'code', 'name', 'subjectId', 'centerId', 'balance', 'price', 'blocked', 'note', 'phone', 'parentPhone', 'points'],
-        students,
-        attendance,
-        homework,
-        meshKey: mesh.meshKey(), // مفتاح شبكة الأجهزة أوفلاين (للأجهزة المتسجلة بس)
-        details,
-      });
+      res.json(await buildMobileSnapshot(sequelize, { meshKey: mesh.meshKey() }));
     } catch (error) {
       console.error('Mobile snapshot error:', error);
       res.status(500).json({ success: false, message: error.message });
@@ -677,4 +686,4 @@ function installAdminRoutes(app, { sequelize, requireAdmin }) {
   });
 }
 
-module.exports = { install, installAdminRoutes, ensureSyncSchema, EXCLUDED_TABLES };
+module.exports = { install, installAdminRoutes, ensureSyncSchema, buildMobileSnapshot, EXCLUDED_TABLES };

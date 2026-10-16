@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld('desktop', {
     close: id => ipcRenderer.invoke('tabs:close', id),
     switchTo: id => ipcRenderer.invoke('tabs:switch', id),
   },
+  mesh: {
+    open: () => ipcRenderer.invoke('mesh:open'),
+    view: () => ipcRenderer.invoke('mesh:view'),
+    action: (name, params) => ipcRenderer.invoke('mesh:action', name, params),
+  },
   problems: {
     open: () => ipcRenderer.invoke('problems:open'),
     list: () => ipcRenderer.invoke('problems:list'),

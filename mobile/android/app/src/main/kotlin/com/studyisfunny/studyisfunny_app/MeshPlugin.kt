@@ -2,6 +2,7 @@ package com.studyisfunny.studyisfunny_app
 
 import android.content.Context
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -36,6 +37,8 @@ class MeshPlugin(private val context: Context, messenger: BinaryMessenger) : Met
     private var events: EventChannel.EventSink? = null
     private var localName = ""
     private var serviceId = ""
+    // بعض الموبايلات بتتجاهل رسايل الواي فاي (اكتشاف الكمبيوتر) لو مفيش القفل ده
+    private var wifiLock: WifiManager.MulticastLock? = null
 
     init {
         MethodChannel(messenger, "sf/mesh").setMethodCallHandler(this)
@@ -90,6 +93,12 @@ class MeshPlugin(private val context: Context, messenger: BinaryMessenger) : Met
                 localName = call.argument<String>("name") ?: "device"
                 serviceId = call.argument<String>("serviceId") ?: "com.studyisfunny.mesh"
                 startService(call.argument<String>("notice") ?: "")
+                try {
+                    if (wifiLock == null) {
+                        val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                        wifiLock = wifi.createMulticastLock("sf-mesh").apply { setReferenceCounted(false); acquire() }
+                    }
+                } catch (e: Exception) { /* مش أساسي */ }
                 startRadio(result)
             }
             "restart" -> {
@@ -101,6 +110,8 @@ class MeshPlugin(private val context: Context, messenger: BinaryMessenger) : Met
                 client.stopAdvertising()
                 client.stopDiscovery()
                 client.stopAllEndpoints()
+                try { wifiLock?.release() } catch (e: Exception) {}
+                wifiLock = null
                 context.stopService(Intent(context, MeshService::class.java))
                 result.success(true)
             }

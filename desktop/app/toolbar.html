@@ -83,6 +83,7 @@
 
   <div class="group">
     <button class="warn" id="problems" style="display:none">⚠ <span id="problemsCount">0</span> عمليات مرفوضة</button>
+    <button id="meshBtn" title="شبكة الأجهزة: الكمبيوتر والموبايلات يتبادلوا البيانات من غير نت">📡 الشبكة</button>
     <button class="primary" id="pullBtn" title="ينزل التغييرات الجديدة بس من السيرفر ويصلّح أي فرق (مش نسخة كاملة)">⬇ تحديث البيانات</button>
     <button class="primary" id="pushBtn" title="يرفع كل العمليات اللي على الجهاز للسيرفر دلوقتي">⬆ رفع البيانات</button>
     <button id="updateBtn" title="تحديثات البرنامج">⭳ تحديثات البرنامج</button>
@@ -170,6 +171,7 @@
   $('home').onclick = () => window.desktop.nav('home');
   $('settings').onclick = () => window.desktop.openSettings();
   $('problems').onclick = () => window.desktop.problems.open();
+  $('meshBtn').onclick = () => window.desktop.mesh.open();
   $('updateBtn').onclick = () => window.desktop.updateAction();
 
   // ===== التبويبات =====
