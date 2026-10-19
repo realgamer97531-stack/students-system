@@ -560,6 +560,7 @@ ipcMain.handle('mesh:action', (event, name, params) => {
 });
 ipcMain.handle('problems:dismiss', (event, seq) => control('POST', `/problems/${Number(seq)}/dismiss`));
 ipcMain.handle('problems:retry', (event, seq) => control('POST', `/problems/${Number(seq)}/retry`));
+ipcMain.handle('problems:retryConnection', () => control('POST', '/problems/retry-connection'));
 
 ipcMain.handle('settings:open', async () => {
   const config = readConfig();

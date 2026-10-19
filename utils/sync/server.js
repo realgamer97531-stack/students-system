@@ -36,8 +36,11 @@ function getPool(sequelize) {
       password: c.password,
       database: c.database,
       connectionLimit: 2,
-      maxIdle: 0,
-      idleTimeout: 60000,
+      // maxIdle كان 0 = كل query بتفتح اتصال جديد وتقفله، وده كان بيخلص حد هوستنجر (500 اتصال في الساعة)
+      maxIdle: 2,
+      idleTimeout: 10 * 60 * 1000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
       dateStrings: true,
       supportBigNumbers: true,
       bigNumberStrings: true,
@@ -288,7 +291,21 @@ function decodeContextHeader(value) {
   }
 }
 
+// قاعدة البيانات مش متاحة (خلص حد الاتصالات / النت وقع): العملية ماتنفذتش، فالجهاز يستنى ويعيدها
+const DB_UNAVAILABLE_RE = /max_connections_per_hour|max_user_connections|Too many connections|ER_USER_LIMIT_REACHED|ER_CON_COUNT_ERROR|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|PROTOCOL_CONNECTION_LOST|ConnectionAcquireTimeout|SequelizeConnection|Connection lost/i;
+
+function isDbUnavailable(text) {
+  return DB_UNAVAILABLE_RE.test(String(text || ''));
+}
+
+// عمليات فشلت بخطأ سيرفر ومقدرناش نمسح تسجيلها (قاعدة البيانات كانت واقعة) — بنمسحه أول ما الجهاز يعيدها
+const pendingRelease = new Set();
+
 async function claimOp(db, opId, device, req, user, clientTime) {
+  if (pendingRelease.has(opId)) {
+    await db.query("DELETE FROM sync_applied_ops WHERE op_id = ? AND status = 'processing'", [opId]);
+    pendingRelease.delete(opId);
+  }
   try {
     await db.query(
       'INSERT INTO sync_applied_ops (op_id, device_id, status, method, path, user_id, client_time, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -340,9 +357,11 @@ function captureResponse(res, onDone) {
       res.writeHead = originalWriteHead;
       res.write = originalWrite;
       for (const header of ['location', 'content-type', 'content-length', 'content-disposition', 'etag']) res.removeHeader(header);
-      res.statusCode = 200;
+      const override = envelope && envelope.statusOverride;
+      res.statusCode = override || 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      originalEnd.call(res, JSON.stringify(envelope || { envelope: true, error: 'no result' }), 'utf8', typeof callback === 'function' ? callback : undefined);
+      const payload = override ? envelope.body : (envelope || { envelope: true, error: 'no result' });
+      originalEnd.call(res, JSON.stringify(payload), 'utf8', typeof callback === 'function' ? callback : undefined);
     });
     return res;
   };
@@ -366,7 +385,12 @@ function deviceRequestMiddleware({ sequelize, User }) {
 
     const context = decodeContextHeader(req.get('x-sync-context'));
     if (!context || !context.userId) return res.status(400).json({ success: false, message: 'بيانات العملية ناقصة' });
-    const user = await User.findByPk(context.userId, { attributes: ['id', 'name', 'role'] });
+    let user;
+    try {
+      user = await User.findByPk(context.userId, { attributes: ['id', 'name', 'role'] });
+    } catch (error) {
+      return res.status(503).json({ success: false, code: 'DB_BUSY', message: 'السيرفر مش قادر يوصل لقاعدة البيانات دلوقتي' });
+    }
     if (!user) return res.status(403).json({ success: false, code: 'USER_GONE', message: 'اليوزر اللي عمل العملية مبقاش موجود' });
 
     // جلسة مؤقتة للطلب ده بس، بنفس بيانات اليوزر على الجهاز، وبتتمسح بعد ما الطلب يخلص
@@ -426,6 +450,7 @@ function deviceRequestMiddleware({ sequelize, User }) {
         created: ctx.created,
         body: result.body.slice(0, 64 * 1024),
       };
+      const dbDown = result.status >= 500 && isDbUnavailable(result.body);
       try {
         if (result.status >= 500) {
           // خطأ في السيرفر: نسيب العملية تتعاد تاني بدل ما نعتبرها اتنفذت
@@ -439,6 +464,11 @@ function deviceRequestMiddleware({ sequelize, User }) {
         }
       } catch (error) {
         console.error('Sync op bookkeeping error:', error.message);
+        if (result.status >= 500) pendingRelease.add(opId);
+      }
+      if (dbDown) {
+        // مش "رفض": رد 503 عادي (مش ظرف) فالبرنامج والموبايل يسيبوها في الطابور ويعيدوها بعدين، من غير ما يعدّوها محاولة فاشلة
+        return { statusOverride: 503, body: { success: false, code: 'DB_BUSY', message: 'قاعدة البيانات مشغولة دلوقتي، العملية هتترفع تلقائي بعد شوية' } };
       }
       return envelope;
     });

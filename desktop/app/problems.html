@@ -28,14 +28,39 @@
     <strong>العملية دي ماتسجلتش على السيرفر</strong>، والبيانات على الجهاز رجعت زي السيرفر.
     راجع كل واحدة: لو لازم تتعمل، صلّح السبب (مثلاً اشحن رصيد الطالب) واضغط "حاول تاني"، أو اضغط "تم المراجعة".
   </p>
+  <div id="connBox" class="card" style="display:none;background:#EEF2FF;">
+    <div class="row" style="align-items:center;">
+      <div style="font-size:14px;line-height:1.8;">
+        <strong><span id="connCount">0</span> عملية</strong> فشلت بسبب مشكلة اتصال بقاعدة البيانات على السيرفر، مش رفض حقيقي.
+        ممكن تترفع تاني كلها مرة واحدة.
+      </div>
+      <button class="retry" id="retryConn">🔄 ارفعهم كلهم تاني</button>
+    </div>
+  </div>
   <div id="list"></div>
 <script>
   const list = document.getElementById('list');
+  // نفس القايمة اللي في runtime/server-hooks.js
+  const CONNECTION_FAILURE_RE = /max_connections_per_hour|max_user_connections|Too many connections|ER_USER_LIMIT_REACHED|ER_CON_COUNT_ERROR|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|PROTOCOL_CONNECTION_LOST|ConnectionAcquireTimeout|SequelizeConnection|Connection lost|HTTP 50[234]/i;
+  document.getElementById('retryConn').addEventListener('click', async () => {
+    const btn = document.getElementById('retryConn');
+    btn.disabled = true;
+    try {
+      const result = await window.desktop.problems.retryConnection();
+      alert(`رجعت ${result && result.count ? result.count : 0} عملية للطابور، وهتترفع لوحدها دلوقتي.`);
+    } finally {
+      btn.disabled = false;
+      load();
+    }
+  });
   function esc(text) {
     return String(text == null ? '' : text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
   async function load() {
     const problems = await window.desktop.problems.list();
+    const connCount = problems.filter(p => CONNECTION_FAILURE_RE.test(`${p.server_message || ''} ${p.last_error || ''}`)).length;
+    document.getElementById('connCount').textContent = connCount;
+    document.getElementById('connBox').style.display = connCount ? '' : 'none';
     if (!problems.length) {
       list.innerHTML = '<div class="empty">✔ مفيش عمليات مرفوضة</div>';
       return;

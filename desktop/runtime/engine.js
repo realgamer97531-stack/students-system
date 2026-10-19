@@ -276,7 +276,14 @@ async function sendOp(op) {
   return 'failed';
 }
 
+// قاعدة البيانات على السيرفر مش متاحة (زي حد الاتصالات في الساعة بتاع هوستنجر): العملية ماتنفذتش، نستنى من غير ما نعدّها محاولة
+const DB_UNAVAILABLE_RE = /max_connections_per_hour|max_user_connections|Too many connections|ER_USER_LIMIT_REACHED|ER_CON_COUNT_ERROR|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|PROTOCOL_CONNECTION_LOST|ConnectionAcquireTimeout|SequelizeConnection|Connection lost/i;
+
 async function countServerError(op, message) {
+  if (DB_UNAVAILABLE_RE.test(String(message || ''))) {
+    await store.markOp(op.seq, { last_error: message });
+    return 'retry-later';
+  }
   const attempts = Number(op.attempts) + 1;
   if (attempts >= MAX_SERVER_ERROR_ATTEMPTS) {
     await failOp(op, { attempts, server_message: `السيرفر طلع خطأ ${attempts} مرات: ${message}` });

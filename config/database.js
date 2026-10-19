@@ -11,9 +11,11 @@ const sequelize = new Sequelize(
     port: process.env.DB_PORT || process.env.MYSQLPORT || 3306,
     dialect: 'mysql',
     dialectModule: mysql2,
-    connectTimeout: 20000,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 10000,
+    dialectOptions: {
+      connectTimeout: 20000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+    },
     retry: {
       max: 3,
       match: [/ETIMEDOUT/, /ECONNRESET/, /PROTOCOL_CONNECTION_LOST/],
@@ -25,7 +27,9 @@ const sequelize = new Sequelize(
       max: Number.parseInt(process.env.DB_POOL_MAX, 10) || 10,
       min: 0,
       acquire: 30000,
-      idle: 60000,
+      // هوستنجر بيسمح بـ 500 اتصال جديد بس في الساعة لليوزر (max_connections_per_hour)؛
+      // كان الاتصال بيتقفل بعد دقيقة فاضي ويتفتح تاني، فبنسيبه مفتوح 10 دقايق ونعيد استخدامه.
+      idle: Number.parseInt(process.env.DB_POOL_IDLE_MS, 10) || 10 * 60 * 1000,
     },
   }
 );

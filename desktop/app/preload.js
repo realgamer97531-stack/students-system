@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('desktop', {
     list: () => ipcRenderer.invoke('problems:list'),
     dismiss: seq => ipcRenderer.invoke('problems:dismiss', seq),
     retry: seq => ipcRenderer.invoke('problems:retry', seq),
+    retryConnection: () => ipcRenderer.invoke('problems:retryConnection'),
   },
   setup: {
     defaults: () => ipcRenderer.invoke('setup:defaults'),

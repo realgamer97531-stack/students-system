@@ -9,6 +9,23 @@ const store = require('./store');
 const engine = require('./engine');
 
 const CAPTURE_LIMIT = 64 * 1024;
+// فشل بسبب الاتصال بقاعدة البيانات على السيرفر (مش رفض حقيقي) — زي ما حصل لما هوستنجر قفل الاتصالات (max_connections_per_hour)
+const CONNECTION_FAILURE_RE = /max_connections_per_hour|max_user_connections|Too many connections|ER_USER_LIMIT_REACHED|ER_CON_COUNT_ERROR|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|PROTOCOL_CONNECTION_LOST|ConnectionAcquireTimeout|SequelizeConnection|Connection lost|HTTP 50[234]/i;
+
+function isConnectionFailure(op) {
+  return CONNECTION_FAILURE_RE.test(`${op.server_message || ''} ${op.last_error || ''}`);
+}
+
+// نفس العملية برقم جديد (الرقم القديم السيرفر سجّل إنه رفضه) في آخر الطابور
+async function requeueFailedOp(op) {
+  await store.meta().query(
+    `INSERT INTO outbox (op_id, state, method, url, payload, summary, user_name, client_time, local_ok, local_created, local_tables, created_at)
+     VALUES (?, 'ready', ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?)`,
+    [crypto.randomUUID(), op.method, op.url, op.payload, op.summary, op.user_name, op.client_time, op.local_tables, store.mysqlNow()],
+  );
+  await store.markOp(op.seq, { dismissed: 1 });
+}
+
 // شبكة الأجهزة (بتتحمل وقت الاستخدام عشان مايبقاش فيه require دايري مع السيرفر)
 const meshService = () => require('./mesh');
 
@@ -105,17 +122,19 @@ async function handleControl(req, res) {
     }
     const retry = /^\/problems\/(\d+)\/retry$/.exec(path);
     if (req.method === 'POST' && retry) {
-      // نفس العملية برقم جديد (الرقم القديم السيرفر سجّل إنه رفضه) في آخر الطابور
       const [[op]] = await store.meta().query("SELECT * FROM outbox WHERE seq = ? AND state = 'failed'", [Number(retry[1])]);
       if (!op) return res.status(404).json({ success: false });
-      await store.meta().query(
-        `INSERT INTO outbox (op_id, state, method, url, payload, summary, user_name, client_time, local_ok, local_created, local_tables, created_at)
-         VALUES (?, 'ready', ?, ?, ?, ?, ?, ?, 1, '[]', ?, ?)`,
-        [crypto.randomUUID(), op.method, op.url, op.payload, op.summary, op.user_name, op.client_time, op.local_tables, store.mysqlNow()],
-      );
-      await store.markOp(op.seq, { dismissed: 1 });
+      await requeueFailedOp(op);
       engine.schedulePush(0);
       return res.json({ success: true });
+    }
+    // كل العمليات اللي فشلت بسبب الاتصال/قاعدة البيانات (مش رفض حقيقي) ترجع الطابور مرة واحدة، بنفس ترتيبها
+    if (req.method === 'POST' && path === '/problems/retry-connection') {
+      const [ops] = await store.meta().query("SELECT * FROM outbox WHERE state = 'failed' AND dismissed = 0 ORDER BY seq ASC");
+      const toRetry = ops.filter(isConnectionFailure);
+      for (const op of toRetry) await requeueFailedOp(op);
+      if (toRetry.length) engine.schedulePush(0);
+      return res.json({ success: true, count: toRetry.length });
     }
     res.status(404).json({ success: false });
   } catch (error) {
