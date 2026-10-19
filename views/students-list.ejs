@@ -145,6 +145,11 @@
       <span class="ar-only">📥 تصدير إكسيل</span>
       <span class="en-only" style="display:none;">📥 Export Excel</span>
     </a>
+    <% if (typeof callCenterIntegrationEnabled !== 'undefined' && callCenterIntegrationEnabled && students.length > 0) { %>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#callcenterModal">
+        ☎️ <span class="ar-only">إرسال المعروضين للاتصال</span><span class="en-only" style="display:none;">Send Shown to Call Center</span>
+      </button>
+    <% } %>
     <a href="/students/new" class="btn btn-primary">
       <span class="ar-only">+ تسجيل طالب جديد</span>
       <span class="en-only" style="display:none;">+ Add Student</span>
@@ -343,6 +348,69 @@
     </div>
   </div>
 </div>
+
+<% if (typeof callCenterIntegrationEnabled !== 'undefined' && callCenterIntegrationEnabled && students.length > 0) { %>
+<div class="modal fade" id="callcenterModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">☎️ <span class="ar-only">إرسال الطلاب لجلسة اتصال</span><span class="en-only" style="display:none;">Send Students to a Call Session</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3"><span class="ar-only">هيتعمل جلسة اتصال جديدة في الكول سنتر فيها الطلاب دول، بنفس الفلتر اللي فوق.</span><span class="en-only" style="display:none;">A new call session is created in the call center with these students, using the filter above.</span></p>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="radio" name="callcenterScope" id="ccScopeAll" value="all" data-count="<%= totalStudents %>" checked>
+          <label class="form-check-label" for="ccScopeAll"><span class="ar-only">كل الطلاب في الفلتر</span><span class="en-only" style="display:none;">All students in the filter</span> (<strong><%= totalStudents %></strong>)</label>
+        </div>
+        <% if (totalPages > 1) { %>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="callcenterScope" id="ccScopePage" value="page" data-count="<%= students.length %>">
+            <label class="form-check-label" for="ccScopePage"><span class="ar-only">الصفحة دي بس (صفحة <%= currentPage %>)</span><span class="en-only" style="display:none;">This page only (page <%= currentPage %>)</span> (<strong><%= students.length %></strong>)</label>
+          </div>
+        <% } %>
+        <div id="callcenterResult" class="mt-3 small"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span class="ar-only">إغلاق</span><span class="en-only" style="display:none;">Close</span></button>
+        <button type="button" class="btn btn-primary" id="callcenterSend">☎️ <span class="ar-only">إرسال</span><span class="en-only" style="display:none;">Send</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="application/json" id="callcenterListConfig"><%- JSON.stringify({ filters, page: currentPage }).replace(/</g, '\\u003c') %></script>
+<script>
+  (function () {
+    const config = JSON.parse(document.getElementById('callcenterListConfig').textContent);
+    const sendButton = document.getElementById('callcenterSend');
+    const resultBox = document.getElementById('callcenterResult');
+    sendButton.addEventListener('click', async () => {
+      const choice = document.querySelector('input[name="callcenterScope"]:checked');
+      const count = Number(choice.dataset.count);
+      if (!confirm('هيتبعت ' + count + ' طالب لجلسة اتصال جديدة. متأكد؟')) return;
+      sendButton.disabled = true;
+      resultBox.className = 'mt-3 small text-muted';
+      resultBox.textContent = 'جاري الإرسال...';
+      try {
+        const response = await fetch('/students/send-to-callcenter', {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filters: config.filters, scope: choice.value, page: config.page, expected_count: count }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || result.message || ('HTTP ' + response.status));
+        resultBox.className = 'mt-3 small text-success fw-bold';
+        resultBox.textContent = '✅ اتعملت جلسة اتصال رقم ' + result.sessionId + ' فيها ' + result.imported + ' طالب';
+      } catch (error) {
+        resultBox.className = 'mt-3 small text-danger';
+        resultBox.textContent = '❌ فشل الإرسال: ' + error.message;
+      } finally {
+        sendButton.disabled = false;
+      }
+    });
+  })();
+</script>
+<% } %>
 
 <script>
   document.getElementById('bulkUploadForm').addEventListener('submit', function () {

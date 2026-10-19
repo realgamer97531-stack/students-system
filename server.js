@@ -225,6 +225,12 @@ function isCallCenterIntegrationEnabled() {
     && process.env.CALLCENTER_SERVICE_TOKEN;
 }
 
+// زرار "إرسال للكول سنتر" في الصفحات: على برنامج الديسكتوب بيظهر برضه، لأن الإرسال بيتحول للسيرفر الأونلاين
+// (اللي عنده إعدادات الكول سنتر). صفحة المتابعة مش منهم: إرسالها محتاج توقيع من السيرفر نفسه.
+function callCenterButtonsVisible() {
+  return Boolean(isCallCenterIntegrationEnabled() || process.env.DESKTOP_MODE === '1');
+}
+
 function buildCallCenterSessionName({ session, scope, filters = {} }) {
   const details = [
     `Session ${session.id}`,
@@ -2094,8 +2100,9 @@ app.post('/settings/clear-videos', requireAdmin, async (req, res) => {
 
 // ===== Routes بتاعة الطلاب =====
 
-app.get('/students', requirePermission('students_view'), async (req, res) => {
-  const { search, center_id, subject_id, booklet_remaining_only, low_balance_only } = req.query;
+// فلاتر صفحة قائمة الطلاب — نفس النتيجة للعرض ولإرسال المعروضين للكول سنتر (بنفس الترتيب)
+async function getStudentsListRows(query) {
+  const { search, center_id, subject_id, booklet_remaining_only, low_balance_only } = query;
   const showBookletRemainingOnly = booklet_remaining_only === '1' || booklet_remaining_only === 'on';
   const showLowBalanceOnly = low_balance_only === '1' || low_balance_only === 'on';
 
@@ -2103,29 +2110,19 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
   if (center_id) where.CenterId = center_id;
   if (subject_id) where.SubjectId = subject_id;
 
-  // بنجيب الأعمدة اللي الصفحة بتعرضها بس، وبيانات خام (أسرع بكتير مع آلاف الطلاب)،
-  // ومعاها السناتر والمواد وإجمالي مدفوعات البوكليت في نفس الوقت
-  const [studentRows, centers, subjects, bookletPaidRows] = await Promise.all([
-    Student.findAll({
-      where,
-      attributes: ['id', 'profile_photo_url', 'student_code', 'name', 'phone', 'parent_phone', 'price_per_session',
-        'balance', 'is_offer_subscribed', 'booklet_status', 'CenterId', 'SubjectId', 'createdAt'],
-      include: [
-        { model: Center, attributes: ['id', 'name'] },
-        { model: Subject, attributes: ['id', 'name'] },
-      ],
-      order: [['createdAt', 'DESC']],
-      raw: true,
-      nest: true,
-    }),
-    Center.findAll(),
-    Subject.findAll(),
-    StudentBooklet.findAll({
-      attributes: ['StudentId', [sequelize.fn('SUM', sequelize.col('paid_amount')), 'total_paid']],
-      group: ['StudentId'],
-      raw: true,
-    }),
-  ]);
+  // بنجيب الأعمدة اللي الصفحة بتعرضها بس، وبيانات خام (أسرع بكتير مع آلاف الطلاب)
+  const studentRows = await Student.findAll({
+    where,
+    attributes: ['id', 'profile_photo_url', 'student_code', 'name', 'phone', 'parent_phone', 'price_per_session',
+      'balance', 'is_offer_subscribed', 'booklet_status', 'CenterId', 'SubjectId', 'createdAt'],
+    include: [
+      { model: Center, attributes: ['id', 'name'] },
+      { model: Subject, attributes: ['id', 'name'] },
+    ],
+    order: [['createdAt', 'DESC']],
+    raw: true,
+    nest: true,
+  });
   let students = studentRows.map((student) => ({
     ...student,
     Center: student.Center && student.Center.id !== null ? student.Center : null,
@@ -2165,28 +2162,8 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
     students = students.filter((student) => Number(student.balance || 0) <= 90);
   }
 
-  // Compute total paid amounts for booklets per student so the list view can show "Paid Price for the Current Booklet"
-  const bookletPaidTotals = {};
-  bookletPaidRows.forEach(row => {
-    bookletPaidTotals[row.StudentId] = Number(row.total_paid || 0);
-  });
-
-  // تقسيم النتيجة على صفحات: عرض آلاف الصفوف مرة واحدة كان بيتقل المتصفح جدًا
-  const STUDENTS_PAGE_SIZE = 100;
-  const totalStudents = students.length;
-  const totalPages = Math.max(1, Math.ceil(totalStudents / STUDENTS_PAGE_SIZE));
-  const requestedPage = Number.parseInt(req.query.page, 10);
-  const currentPage = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), totalPages) : 1;
-  const pageStudents = students.slice((currentPage - 1) * STUDENTS_PAGE_SIZE, currentPage * STUDENTS_PAGE_SIZE);
-
-  res.render('students-list', {
-    students: pageStudents,
-    totalStudents,
-    currentPage,
-    totalPages,
-    centers,
-    subjects,
-    bookletPaidTotals,
+  return {
+    students,
     filters: {
       search: search || '',
       center_id: center_id || '',
@@ -2194,7 +2171,89 @@ app.get('/students', requirePermission('students_view'), async (req, res) => {
       booklet_remaining_only: showBookletRemainingOnly ? '1' : '',
       low_balance_only: showLowBalanceOnly ? '1' : '',
     },
+  };
+}
+
+// تقسيم النتيجة على صفحات: عرض آلاف الصفوف مرة واحدة كان بيتقل المتصفح جدًا
+const STUDENTS_PAGE_SIZE = 100;
+function studentsListPage(students, requested) {
+  const totalPages = Math.max(1, Math.ceil(students.length / STUDENTS_PAGE_SIZE));
+  const requestedPage = Number.parseInt(requested, 10);
+  const currentPage = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), totalPages) : 1;
+  return { totalPages, currentPage, pageStudents: students.slice((currentPage - 1) * STUDENTS_PAGE_SIZE, currentPage * STUDENTS_PAGE_SIZE) };
+}
+
+app.get('/students', requirePermission('students_view'), async (req, res) => {
+  const [{ students, filters }, centers, subjects, bookletPaidRows] = await Promise.all([
+    getStudentsListRows(req.query),
+    Center.findAll(),
+    Subject.findAll(),
+    StudentBooklet.findAll({
+      attributes: ['StudentId', [sequelize.fn('SUM', sequelize.col('paid_amount')), 'total_paid']],
+      group: ['StudentId'],
+      raw: true,
+    }),
+  ]);
+
+  // Compute total paid amounts for booklets per student so the list view can show "Paid Price for the Current Booklet"
+  const bookletPaidTotals = {};
+  bookletPaidRows.forEach(row => {
+    bookletPaidTotals[row.StudentId] = Number(row.total_paid || 0);
   });
+
+  const { totalPages, currentPage, pageStudents } = studentsListPage(students, req.query.page);
+
+  res.render('students-list', {
+    students: pageStudents,
+    totalStudents: students.length,
+    currentPage,
+    totalPages,
+    centers,
+    subjects,
+    bookletPaidTotals,
+    filters,
+    callCenterIntegrationEnabled: callCenterButtonsVisible(),
+  });
+});
+
+// إرسال الطلاب المعروضين في قائمة الطلاب لجلسة اتصال جديدة في الكول سنتر.
+// السيرفر بيحسب القايمة تاني من نفس الفلاتر (مش بيصدق ids جاية من المتصفح)
+// body: { filters, scope: 'all' | 'page', page, expected_count }
+app.post('/students/send-to-callcenter', requirePermission('students_view'), async (req, res) => {
+  try {
+    const { students, filters } = await getStudentsListRows((req.body && req.body.filters) || {});
+    const scope = req.body && req.body.scope === 'page' ? 'page' : 'all';
+    const { currentPage, pageStudents } = studentsListPage(students, req.body && req.body.page);
+    const selected = scope === 'page' ? pageStudents : students;
+    if (!selected.length) return res.status(400).json({ error: 'مفيش طلاب معروضين للإرسال' });
+    // القايمة اتغيرت من ساعة ما الصفحة اتفتحت (طالب اتضاف/اتمسح): الأدمن يحدّث ويشوف العدد الصح قبل الإرسال
+    const expected = Number.parseInt(req.body && req.body.expected_count, 10);
+    if (Number.isInteger(expected) && expected !== selected.length) {
+      return res.status(409).json({ error: `عدد الطلاب اتغير (بقى ${selected.length} بدل ${expected}). حدّث الصفحة وجرب تاني` });
+    }
+
+    const [center, subject] = await Promise.all([
+      filters.center_id ? Center.findByPk(filters.center_id, { attributes: ['name'] }) : null,
+      filters.subject_id ? Subject.findByPk(filters.subject_id, { attributes: ['name'] }) : null,
+    ]);
+    const name = buildCallCenterSessionName({
+      session: { id: '-', lesson_number: '-', Subject: subject || { name: 'All subjects' }, Center: center || { name: 'All centers' } },
+      scope: 'Students list',
+      filters: {
+        Search: filters.search,
+        'Booklet remaining': filters.booklet_remaining_only ? 'yes' : '',
+        'Low balance': filters.low_balance_only ? 'yes' : '',
+        Page: scope === 'page' ? String(currentPage) : '',
+        Selected: `${selected.length} of ${students.length}`,
+      },
+    });
+
+    const result = await sendStudentsToCallCenter(name, selected.map(student => callCenterStudent(student)), null);
+    res.json({ success: true, sessionId: result.id, imported: result.imported });
+  } catch (error) {
+    console.error('Students-list call-center handoff failed:', error);
+    res.status(error.code === 'CALLCENTER_DISABLED' ? 503 : (error.status || 500)).json({ error: error.message });
+  }
 });
 
 app.get('/students/new', requirePermission('students_add'), async (req, res) => {
@@ -3359,7 +3418,7 @@ app.get('/sessions/:id/report', async (req, res) => {
       totalCashCollected,
       assistantAttendances,
       allUsers,
-      callCenterIntegrationEnabled: isCallCenterIntegrationEnabled(),
+      callCenterIntegrationEnabled: callCenterButtonsVisible(),
     });
   } catch (error) {
     console.error(error);
@@ -4565,7 +4624,7 @@ app.get('/exams/:id', async (req, res) => {
     const existingScores = {};
     results.forEach(r => { existingScores[r.StudentId] = r.score; });
 
-    res.render('exam-scores', { exam, students, existingScores, callCenterIntegrationEnabled: isCallCenterIntegrationEnabled() });
+    res.render('exam-scores', { exam, students, existingScores, callCenterIntegrationEnabled: callCenterButtonsVisible() });
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);

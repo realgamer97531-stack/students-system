@@ -51,6 +51,8 @@ const ONLINE_ONLY_WRITE = [
   /^\/admin\/video-broadcasts(\/|$)/,
   /^\/admin\/popup-questions(\/|$)/,
   /^\/follow-up-dashboard\/send-to-callcenter(\/|$)/,
+  /^\/students\/send-to-callcenter(\/|$)/,
+  /^\/exams\/[^/]+\/send-to-callcenter(\/|$)/,
   /^\/sessions\/[^/]+\/report\/send-(present|absent)(\/|$)/,
 ];
 const SECRET_KEYS = /pass|token|secret/i;
