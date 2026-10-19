@@ -139,7 +139,7 @@
         const own = parseDuration(bits.slice(1).join(''));
         let error = '';
         if (!/^https?:\/\/\S+$/i.test(url)) error = en ? 'not a link' : 'ده مش لينك';
-        else if (url.length > 255) error = en ? 'link too long' : 'اللينك طويل جدًا';
+        else if (url.length > 2048) error = en ? 'link too long' : 'اللينك طويل جدًا';
         else if (Number.isNaN(own)) error = en ? 'bad duration' : 'المدة مش مظبوطة';
         const duration = own == null ? fallback : own;
         if (!error && !(duration > 0)) error = en ? 'needs a duration' : 'محتاج مدة';

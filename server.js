@@ -579,6 +579,28 @@ async function ensureSessionHomeworkFields() {
   }
 }
 
+// لينكات الفيديو (زي باني بالتوكن) بتعدي 255 حرف بسهولة: نوسّع العمود (توسيع بس، البيانات الموجودة زي ما هي)
+const VIDEO_URL_MAX = 2048;
+async function ensureVideoPartUrlLength() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('videoparts');
+    const match = /varchar\((\d+)\)/i.exec(String((tableInfo.video_url && tableInfo.video_url.type) || ''));
+    if (match && Number(match[1]) < VIDEO_URL_MAX) {
+      await queryInterface.changeColumn('videoparts', 'video_url', {
+        type: sequelize.Sequelize.STRING(VIDEO_URL_MAX),
+        allowNull: true,
+      });
+      console.log(`✅ videoparts.video_url widened to ${VIDEO_URL_MAX} characters`);
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to widen videoparts.video_url:', error.message);
+  }
+}
+
 async function ensureVideoQuestionsDisplayColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -7346,8 +7368,8 @@ app.post('/admin/videos/:id/add-parts', requirePermissionOrAdmin('admin_videos')
       .filter(part => part.url);
     if (!parts.length) return res.status(400).json({ success: false, message: '❌ حط لينك واحد على الأقل' });
     if (parts.length > 100) return res.status(400).json({ success: false, message: '❌ أقصى عدد 100 لينك مرة واحدة' });
-    const tooLong = parts.findIndex(part => part.url.length > 255);
-    if (tooLong >= 0) return res.status(400).json({ success: false, message: `❌ اللينك رقم ${tooLong + 1} طويل جدًا (أكتر من 255 حرف)` });
+    const tooLong = parts.findIndex(part => part.url.length > VIDEO_URL_MAX);
+    if (tooLong >= 0) return res.status(400).json({ success: false, message: `❌ اللينك رقم ${tooLong + 1} طويل جدًا (أكتر من ${VIDEO_URL_MAX} حرف)` });
 
     transaction = await sequelize.transaction();
     const maxOrder = Number(await VideoPart.max('order_index', { where: { VideoId: video.id, category }, transaction })) || 0;
@@ -11955,6 +11977,7 @@ async function startServer() {
     await ensureSessionVideoPriceColumns();
     await ensureStudentBookletCustomPriceColumn();
     await ensureVideoQuestionsDisplayColumn();
+    await ensureVideoPartUrlLength();
     await ensureBalanceTransactionSessionColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
     await ensureHomeworkAssignmentLinkColumns();
@@ -12022,6 +12045,7 @@ async function startServer() {
           await ensureSessionVideoPriceColumns();
           await ensureStudentBookletCustomPriceColumn();
           await ensureVideoQuestionsDisplayColumn();
+          await ensureVideoPartUrlLength();
           await ensureUserProfilePhotoColumn();
           await ensureStudentOfferColumn();
           await entityColors.ensureColorColumns(sequelize);

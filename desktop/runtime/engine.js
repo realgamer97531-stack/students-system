@@ -512,9 +512,16 @@ async function addNewColumns(conn, table, entry) {
   if (local.some(column => !serverColumns.includes(column.Field))) return false; // عمود اتشال من السيرفر
   const localNames = new Set(local.map(column => column.Field));
   const added = serverColumns.filter(name => !localNames.has(name));
-  if (!added.length) return true; // التغيير في فهرس/نوع بس: البيانات زي ما هي
-
   const lines = String(entry.ddl || '').split('\n').map(line => line.trim());
+  // نوع عمود اتغير على السيرفر (زي video_url اتوسع من 255 لـ 2048): الجدول يتبني من جديد بالشكل الجديد،
+  // غير كده القيم الطويلة كانت هتتقص على الجهاز من غير ما حد ياخد باله
+  const typeChanged = local.some((column) => {
+    const line = lines.find(l => l.startsWith(`${quoteId(column.Field)} `));
+    return line && !line.slice(quoteId(column.Field).length + 1).toLowerCase().startsWith(String(column.Type).toLowerCase());
+  });
+  if (typeChanged) return false;
+  if (!added.length) return true; // التغيير في فهرس بس: البيانات زي ما هي
+
   for (const name of added) {
     const line = lines.find(l => l.startsWith(`${quoteId(name)} `));
     if (!line) return false;

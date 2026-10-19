@@ -22,7 +22,7 @@ const VideoPart = sequelize.define('VideoPart', {
     defaultValue: 'link',
   },
   video_url: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(2048), // لينكات باني بالتوكن طويلة (العمود بيتوسع في ensureVideoPartUrlLength)
     allowNull: true, // لو لينك
   },
   file_path: {
