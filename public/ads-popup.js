@@ -49,7 +49,9 @@
 
     const card = document.createElement('div');
     card.style.cssText = 'position:relative;max-width:92vw;max-height:90vh;display:flex;';
-    card.innerHTML = content;
+    // Tall ads scroll inside the popup instead of getting cut off at the bottom.
+    const radius = ad.ad_type === 'image' ? 16 : ((ad.design && ad.design.borderRadius != null && ad.design.borderRadius !== '') ? ad.design.borderRadius : 18);
+    card.innerHTML = `<div style="max-height:90vh;overflow-y:auto;display:flex;justify-content:center;align-items:flex-start;width:100%;border-radius:${Number(radius) || 0}px;">${content}</div>`;
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';

@@ -69,6 +69,7 @@
               <h6 class="fw-bold"><span class="ar-only">الفيديو</span><span class="en-only" style="display:none;">Video</span></h6>
               <label class="form-label small"><span class="ar-only">رابط الفيديو من جوجل درايف (أو يوتيوب / فيميو / لينك مباشر mp4)</span><span class="en-only" style="display:none;">Google Drive video link (or YouTube / Vimeo / direct mp4 link)</span></label>
               <input type="url" name="design_videoUrl" id="design_videoUrl" class="form-control" dir="ltr" placeholder="https://drive.google.com/file/d/.../view" value="<%= d.videoUrl || '' %>">
+              <small id="videoShapeHint" class="text-success mt-1" style="display:none;"></small>
               <small class="text-muted d-block mt-1"><span class="ar-only">مهم: في درايف لازم مشاركة الفيديو تكون "أي حد معاه اللينك" (Anyone with the link).</span><span class="en-only" style="display:none;">Important: on Drive the video must be shared as "Anyone with the link".</span></small>
               <div class="row g-3 mt-1 align-items-end">
                 <div class="col-auto">
@@ -342,7 +343,7 @@
   </div>
 </form>
 
-<script src="/ad-render.js?v=2"></script>
+<script src="/ad-render.js?v=3"></script>
 <script>
   const form = document.getElementById('adForm');
   const existingImageUrl = <%- JSON.stringify(isEdit && ad.image_url ? ad.image_url : null) %>;
@@ -493,8 +494,50 @@
     }, 250);
   });
 
+  // ===== شكل الفيديو بيتعرف لوحده من اللينك (عشان ميبقاش فيه شريط أسود جنب الفيديو) =====
+  function pickNearestAspect(w, h) {
+    const options = { '16:9': 16 / 9, '9:16': 9 / 16, '1:1': 1, '4:3': 4 / 3 };
+    const r = w / h;
+    return Object.keys(options).reduce((best, k) => Math.abs(Math.log(options[k] / r)) < Math.abs(Math.log(options[best] / r)) ? k : best, '16:9');
+  }
+
+  function applyDetectedAspect(aspect) {
+    const select = form.design_videoAspect;
+    if (select.value === aspect) return;
+    select.value = aspect;
+    const hint = document.getElementById('videoShapeHint');
+    hint.textContent = 'تم اختيار شكل الفيديو تلقائيًا: ' + select.options[select.selectedIndex].text;
+    hint.style.display = 'block';
+    updatePreview();
+  }
+
+  function detectVideoAspect() {
+    const url = form.design_videoUrl.value.trim();
+    document.getElementById('videoShapeHint').style.display = 'none';
+    if (!url) return;
+    const drive = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([a-zA-Z0-9_-]+)/i);
+    if (drive) {
+      const img = new Image();
+      img.onload = () => { if (img.naturalWidth && img.naturalHeight) applyDetectedAspect(pickNearestAspect(img.naturalWidth, img.naturalHeight)); };
+      img.src = 'https://drive.google.com/thumbnail?id=' + drive[1] + '&sz=w400';
+      return;
+    }
+    if (/youtube\.com\/shorts\//i.test(url)) return applyDetectedAspect('9:16');
+    if (/\.(mp4|m4v|mov|webm)(\?|$)/i.test(url)) {
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      v.onloadedmetadata = () => { if (v.videoWidth && v.videoHeight) applyDetectedAspect(pickNearestAspect(v.videoWidth, v.videoHeight)); };
+      v.src = url;
+    }
+  }
+
+  form.design_videoUrl.addEventListener('change', detectVideoAspect);
+  form.design_videoUrl.addEventListener('paste', () => setTimeout(detectVideoAspect, 0));
+
   togglePanels();
   updatePreview();
+  // إعلان قديم شكله غلط: بيتصلح لوحده وقت الفتح، والأدمن يدوس حفظ
+  if (form.querySelector('input[name="ad_type"]:checked').value === 'video') detectVideoAspect();
   renderStudentChips();
 </script>
 

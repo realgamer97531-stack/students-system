@@ -30,13 +30,23 @@ function adVideoEmbedUrl(url, d) {
   return null;
 }
 
+function adVideoRatio(d) {
+  return { '16:9': [16, 9], '9:16': [9, 16], '1:1': [1, 1], '4:3': [4, 3] }[d.videoAspect] || [16, 9];
+}
+
+// A video card is as wide as its max width, but never so wide that the video
+// alone is taller than ~58% of the screen (tall videos get a narrower card).
+function adCardWidth(d, maxWidth) {
+  const [rw, rh] = adVideoRatio(d);
+  return `width:min(${maxWidth}px, calc(58vh * ${rw} / ${rh}));max-width:100%;`;
+}
+
 function renderAdVideo(d, radiusCss) {
   const embed = adVideoEmbedUrl(d.videoUrl, d);
   if (!embed) return '';
-  const ratio = { '16:9': '16 / 9', '9:16': '9 / 16', '1:1': '1 / 1', '4:3': '4 / 3' }[d.videoAspect] || '16 / 9';
-  // Tall videos shrink in width too, so they keep their shape instead of getting black bars.
-  const [rw, rh] = ratio.split(' / ').map(Number);
-  const box = `position:relative;width:100%;max-width:calc(70vh * ${rw} / ${rh});margin:0 auto;aspect-ratio:${ratio};background:#000;overflow:hidden;border-radius:${radiusCss};`;
+  const ratio = adVideoRatio(d).join(' / ');
+  // The card itself is sized to the video (see adCardWidth), so the video always fills it edge to edge.
+  const box = `position:relative;width:100%;aspect-ratio:${ratio};background:#000;overflow:hidden;border-radius:${radiusCss};`;
   const fill = 'position:absolute;inset:0;width:100%;height:100%;border:0;display:block;';
   const inner = embed.kind === 'video'
     ? `<video src="${escapeAdHtml(embed.src)}" controls playsinline${embed.auto ? ' autoplay' : ''}${embed.muted ? ' muted' : ''}${embed.loop ? ' loop' : ''} style="${fill}object-fit:contain;background:#000;"></video>`
@@ -93,7 +103,7 @@ function renderAdPopupContent(ad) {
     : '';
 
   // A video has no natural width, so the card takes its full max width (still shrinks on small screens).
-  const width = d.videoUrl ? `width:${maxWidth}px;max-width:100%;` : `max-width:${maxWidth}px;width:100%;`;
+  const width = d.videoUrl ? adCardWidth(d, maxWidth) : `max-width:${maxWidth}px;width:100%;`;
   const textBlock = d.videoUrl && !hasText ? '' : `
       <div style="padding:${(d.imageUrl || d.videoUrl) ? '20px 24px 24px' : '28px 24px'};">
         ${badge}

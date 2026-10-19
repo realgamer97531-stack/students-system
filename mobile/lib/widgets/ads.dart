@@ -83,27 +83,27 @@ class _AdDialog extends StatelessWidget {
     final videoUrl = '${d['videoUrl'] ?? ''}'.trim();
     final videoWidget = videoUrl.isEmpty
         ? null
-        : ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.6),
-            child: Center(
-              heightFactor: 1,
-              child: LessonVideo(
-                source: _adVideoSource(videoUrl),
-                autoplay: d['videoAutoplay'] == true,
-                muted: d['videoMuted'] == true || d['videoAutoplay'] == true,
-                loop: d['videoLoop'] == true,
-                aspectRatio: _adAspect(d['videoAspect']),
-                borderRadius: 0,
-                claimGestures: true,
-              ),
-            ),
+        : LessonVideo(
+            source: _adVideoSource(videoUrl),
+            autoplay: d['videoAutoplay'] == true,
+            muted: d['videoMuted'] == true || d['videoAutoplay'] == true,
+            loop: d['videoLoop'] == true,
+            aspectRatio: _adAspect(d['videoAspect']),
+            borderRadius: 0,
+            claimGestures: true,
           );
     final hasText = '${d['badgeText'] ?? ''}'.isNotEmpty ||
         '${d['heading'] ?? ''}'.isNotEmpty ||
         '${d['body'] ?? ''}'.isNotEmpty ||
         (d['buttonEnabled'] == true && '${d['buttonText'] ?? ''}'.isNotEmpty);
+    // الكارت نفسه بياخد عرض الفيديو (الفيديو الطولي = كارت أضيق) عشان الفيديو يملا الكارت من غير فراغات
+    var maxWidth = ((d['maxWidth'] as num?) ?? 420).toDouble();
+    if (videoWidget != null) {
+      final byHeight = MediaQuery.sizeOf(context).height * 0.58 * _adAspect(d['videoAspect']);
+      if (byHeight < maxWidth) maxWidth = byHeight;
+    }
     return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: ((d['maxWidth'] as num?) ?? 420).toDouble()),
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: decoration,
