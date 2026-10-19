@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -31,6 +33,11 @@ class LessonVideo extends StatefulWidget {
     this.startAt = 0,
     this.endAt = 0,
     this.autoplay = false,
+    this.muted = false,
+    this.loop = false,
+    this.aspectRatio = 16 / 9,
+    this.borderRadius = 14,
+    this.claimGestures = false,
     this.onTime,
     this.onEnded,
     this.onPlayState,
@@ -43,6 +50,15 @@ class LessonVideo extends StatefulWidget {
   /// لفيديو حل السؤال: يقف هنا (0 = لحد الآخر)
   final int endAt;
   final bool autoplay;
+
+  // للإعلانات: صوت/تكرار/شكل الفيديو
+  final bool muted;
+  final bool loop;
+  final double aspectRatio;
+  final double borderRadius;
+
+  /// لو المشغل جوه حاجة بتتداس (زي الإعلان): اللمس كله يروح للمشغل
+  final bool claimGestures;
 
   /// الوقت الحقيقي للفيديو (من المشغلات اللي بتبلغ بيه)
   final void Function(double seconds, double? duration, bool playing)? onTime;
@@ -109,6 +125,8 @@ class _LessonVideoState extends State<LessonVideo> with WidgetsBindingObserver {
       await c.initialize();
       if (widget.startAt > 0) await c.seekTo(Duration(seconds: widget.startAt));
       c.addListener(_onNativeTick);
+      if (widget.muted) await c.setVolume(0);
+      if (widget.loop) await c.setLooping(true);
       if (widget.autoplay) await c.play();
       if (mounted) setState(() {});
     } catch (_) {
@@ -206,7 +224,7 @@ class _LessonVideoState extends State<LessonVideo> with WidgetsBindingObserver {
     const send = 'function send(o){try{App.postMessage(JSON.stringify(o))}catch(e){}}';
     switch (_src.kind) {
       case VideoKind.youtube:
-        final vars = {'playsinline': 1, 'rel': 0, 'modestbranding': 1, 'start': start, if (end > 0) 'end': end, 'autoplay': widget.autoplay ? 1 : 0};
+        final vars = {'playsinline': 1, 'rel': 0, 'modestbranding': 1, 'start': start, if (end > 0) 'end': end, 'autoplay': widget.autoplay ? 1 : 0, if (widget.muted) 'mute': 1, if (widget.loop) 'loop': 1, if (widget.loop) 'playlist': _src.id};
         return '$head<div id="p"></div><script>$send'
             'var player;'
             'function onYouTubeIframeAPIReady(){player=new YT.Player("p",{width:"100%",height:"100%",videoId:${jsonEncode(_src.id)},playerVars:${jsonEncode(vars)},'
@@ -343,15 +361,18 @@ class _LessonVideoState extends State<LessonVideo> with WidgetsBindingObserver {
     } else if (_error != null) {
       child = _PlayerMessage(_error!);
     } else if (_web != null) {
-      child = WebViewWidget(controller: _web!);
+      child = WebViewWidget(
+        controller: _web!,
+        gestureRecognizers: widget.claimGestures ? {Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new)} : const {},
+      );
     } else if (_native != null && _native!.value.isInitialized) {
       child = _NativePlayerView(controller: _native!, onFullscreen: _openNativeFullscreen);
     } else {
       child = const Center(child: CircularProgressIndicator(color: Colors.white));
     }
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: AspectRatio(aspectRatio: 16 / 9, child: ColoredBox(color: Colors.black, child: child)),
+      borderRadius: BorderRadius.circular(widget.borderRadius),
+      child: AspectRatio(aspectRatio: widget.aspectRatio, child: ColoredBox(color: Colors.black, child: child)),
     );
   }
 }

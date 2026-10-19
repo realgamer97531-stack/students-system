@@ -72,7 +72,8 @@
     const targetUrl = ad.link_url || (ad.design && ad.design.buttonUrl) || null;
     if (targetUrl) {
       card.style.cursor = 'pointer';
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest && e.target.closest('[data-ad-video]')) return; // playing the video is not a click on the ad
         window.open(targetUrl, '_blank', 'noopener,noreferrer');
       });
     }

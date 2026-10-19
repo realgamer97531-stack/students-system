@@ -8140,7 +8140,8 @@ function uploadBufferToCloudinary(buffer, folder) {
 }
 
 function parseAdFormBody(body) {
-  const ad_type = body.ad_type === 'design' ? 'design' : 'image';
+  // إعلان الفيديو بيتخزن كتصميم (design) فيه رابط فيديو، عشان مفيش تغيير في الجدول والنسخ القديمة تعرض التصميم عادي
+  const ad_type = (body.ad_type === 'design' || body.ad_type === 'video') ? 'design' : 'image';
   const target_mode = body.target_mode === 'all' ? 'all' : 'filtered';
 
   const toIntArray = (value) => {
@@ -8210,6 +8211,17 @@ async function buildAdDesignFromBody(body, files, existing) {
     borderRadius: parseInt(body.design_borderRadius, 10) || 18,
     maxWidth: parseInt(body.design_maxWidth, 10) || 420,
   };
+
+  if (body.ad_type === 'video') {
+    const videoUrl = String(body.design_videoUrl || '').trim();
+    if (!/^https?:\/\//i.test(videoUrl)) throw new Error('لازم تحط رابط الفيديو (درايف أو يوتيوب أو غيره)');
+    design.videoUrl = videoUrl;
+    design.videoPosition = body.design_videoPosition === 'bottom' ? 'bottom' : 'top';
+    design.videoAspect = ['16:9', '9:16', '1:1', '4:3'].includes(body.design_videoAspect) ? body.design_videoAspect : '16:9';
+    design.videoAutoplay = body.design_videoAutoplay === 'on' || body.design_videoAutoplay === 'true';
+    design.videoMuted = body.design_videoMuted === 'on' || body.design_videoMuted === 'true';
+    design.videoLoop = body.design_videoLoop === 'on' || body.design_videoLoop === 'true';
+  }
 
   if (files?.design_background_image?.[0]) {
     const uploaded = await uploadBufferToCloudinary(files.design_background_image[0].buffer, 'studyisfunny/ads');

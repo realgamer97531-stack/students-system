@@ -58,6 +58,8 @@
             <td>
               <% if (adRow.ad_type === 'image') { %>
                 <span class="badge bg-info"><span class="ar-only">صورة</span><span class="en-only" style="display:none;">Image</span></span>
+              <% } else if (/"videoUrl":"[^"]/.test(adRow.design || '')) { %>
+                <span class="badge bg-danger"><span class="ar-only">فيديو</span><span class="en-only" style="display:none;">Video</span></span>
               <% } else { %>
                 <span class="badge bg-primary"><span class="ar-only">تصميم</span><span class="en-only" style="display:none;">Design</span></span>
               <% } %>

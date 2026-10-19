@@ -6,6 +6,8 @@
   const targetSubjectIds = ad ? ad.target_subject_ids : [];
   const isEdit = !!ad;
   const formAction = isEdit ? ('/admin/ads/' + ad.id) : '/admin/ads';
+  // إعلان الفيديو = تصميم فيه رابط فيديو
+  const isVideoAd = isEdit && ad.ad_type === 'design' && !!d.videoUrl;
 %>
 
 <h3 class="mb-4"><%- isEdit ? '✏️ <span class="ar-only">تعديل إعلان</span><span class="en-only" style="display:none;">Edit Ad</span>' : '➕ <span class="ar-only">إعلان جديد</span><span class="en-only" style="display:none;">New Ad</span>' %></h3>
@@ -47,8 +49,10 @@
           <div class="btn-group mb-3" role="group">
             <input type="radio" class="btn-check" name="ad_type" id="ad_type_image" value="image" <%= (!isEdit || ad.ad_type === 'image') ? 'checked' : '' %>>
             <label class="btn btn-outline-primary" for="ad_type_image">🖼️ <span class="ar-only">رفع صورة جاهزة</span><span class="en-only" style="display:none;">Upload Ready Image</span></label>
-            <input type="radio" class="btn-check" name="ad_type" id="ad_type_design" value="design" <%= (isEdit && ad.ad_type === 'design') ? 'checked' : '' %>>
+            <input type="radio" class="btn-check" name="ad_type" id="ad_type_design" value="design" <%= (isEdit && ad.ad_type === 'design' && !isVideoAd) ? 'checked' : '' %>>
             <label class="btn btn-outline-primary" for="ad_type_design">🎨 <span class="ar-only">تصميم إعلان</span><span class="en-only" style="display:none;">Design Ad</span></label>
+            <input type="radio" class="btn-check" name="ad_type" id="ad_type_video" value="video" <%= isVideoAd ? 'checked' : '' %>>
+            <label class="btn btn-outline-primary" for="ad_type_video">🎬 <span class="ar-only">فيديو</span><span class="en-only" style="display:none;">Video</span></label>
           </div>
 
           <div id="imagePanel">
@@ -60,6 +64,50 @@
           </div>
 
           <div id="designPanel" style="display:none;">
+
+            <div id="videoSection" style="display:none;" class="border rounded-3 p-3 mb-3">
+              <h6 class="fw-bold"><span class="ar-only">الفيديو</span><span class="en-only" style="display:none;">Video</span></h6>
+              <label class="form-label small"><span class="ar-only">رابط الفيديو من جوجل درايف (أو يوتيوب / فيميو / لينك مباشر mp4)</span><span class="en-only" style="display:none;">Google Drive video link (or YouTube / Vimeo / direct mp4 link)</span></label>
+              <input type="url" name="design_videoUrl" id="design_videoUrl" class="form-control" dir="ltr" placeholder="https://drive.google.com/file/d/.../view" value="<%= d.videoUrl || '' %>">
+              <small class="text-muted d-block mt-1"><span class="ar-only">مهم: في درايف لازم مشاركة الفيديو تكون "أي حد معاه اللينك" (Anyone with the link).</span><span class="en-only" style="display:none;">Important: on Drive the video must be shared as "Anyone with the link".</span></small>
+              <div class="row g-3 mt-1 align-items-end">
+                <div class="col-auto">
+                  <label class="form-label small mb-0"><span class="ar-only">مكانه</span><span class="en-only" style="display:none;">Position</span></label>
+                  <select name="design_videoPosition" class="form-select form-select-sm">
+                    <option value="top" <%= d.videoPosition !== 'bottom' ? 'selected' : '' %>>أعلى / Top</option>
+                    <option value="bottom" <%= d.videoPosition === 'bottom' ? 'selected' : '' %>>أسفل / Bottom</option>
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <label class="form-label small mb-0"><span class="ar-only">شكل الفيديو</span><span class="en-only" style="display:none;">Shape</span></label>
+                  <select name="design_videoAspect" class="form-select form-select-sm">
+                    <option value="16:9" <%= (!d.videoAspect || d.videoAspect === '16:9') ? 'selected' : '' %>>16:9 عرضي / Landscape</option>
+                    <option value="9:16" <%= d.videoAspect === '9:16' ? 'selected' : '' %>>9:16 طولي / Vertical</option>
+                    <option value="1:1" <%= d.videoAspect === '1:1' ? 'selected' : '' %>>1:1 مربع / Square</option>
+                    <option value="4:3" <%= d.videoAspect === '4:3' ? 'selected' : '' %>>4:3</option>
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="design_videoAutoplay" id="design_videoAutoplay" <%= d.videoAutoplay ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="design_videoAutoplay"><span class="ar-only">تشغيل تلقائي</span><span class="en-only" style="display:none;">Autoplay</span></label>
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="design_videoMuted" id="design_videoMuted" <%= d.videoMuted ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="design_videoMuted"><span class="ar-only">بدون صوت</span><span class="en-only" style="display:none;">Muted</span></label>
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="design_videoLoop" id="design_videoLoop" <%= d.videoLoop ? 'checked' : '' %>>
+                    <label class="form-check-label small" for="design_videoLoop"><span class="ar-only">تكرار</span><span class="en-only" style="display:none;">Loop</span></label>
+                  </div>
+                </div>
+              </div>
+              <small class="text-muted d-block mt-2"><span class="ar-only">مشغل درايف نفسه مش بيسمح بالتشغيل التلقائي أو التكرار، الطالب بيدوس تشغيل. الاختيارات دي بتشتغل مع يوتيوب وفيميو واللينك المباشر. الخلفية والعنوان والنص والزر تحت كلهم اختياريين.</span><span class="en-only" style="display:none;">Drive's own player doesn't allow autoplay or loop, the student presses play. These options work with YouTube, Vimeo and direct links. The background, heading, text and button below are all optional.</span></small>
+            </div>
 
             <h6 class="fw-bold mt-2"><span class="ar-only">الخلفية</span><span class="en-only" style="display:none;">Background</span></h6>
             <div class="row g-3 align-items-end mb-2">
@@ -294,7 +342,7 @@
   </div>
 </form>
 
-<script src="/ad-render.js"></script>
+<script src="/ad-render.js?v=2"></script>
 <script>
   const form = document.getElementById('adForm');
   const existingImageUrl = <%- JSON.stringify(isEdit && ad.image_url ? ad.image_url : null) %>;
@@ -307,7 +355,9 @@
   function togglePanels() {
     const adType = form.querySelector('input[name="ad_type"]:checked').value;
     document.getElementById('imagePanel').style.display = adType === 'image' ? 'block' : 'none';
-    document.getElementById('designPanel').style.display = adType === 'design' ? 'block' : 'none';
+    document.getElementById('designPanel').style.display = adType !== 'image' ? 'block' : 'none';
+    document.getElementById('videoSection').style.display = adType === 'video' ? 'block' : 'none';
+    document.getElementById('design_videoUrl').required = adType === 'video';
 
     const targetMode = form.querySelector('input[name="target_mode"]:checked').value;
     document.getElementById('filteredPanel').style.display = targetMode === 'filtered' ? 'block' : 'none';
@@ -365,6 +415,16 @@
       borderRadius: parseInt(form.design_borderRadius.value, 10) || 18,
       maxWidth: parseInt(form.design_maxWidth.value, 10) || 420,
     };
+    if (adType === 'video') {
+      Object.assign(design, {
+        videoUrl: form.design_videoUrl.value.trim(),
+        videoPosition: form.design_videoPosition.value,
+        videoAspect: form.design_videoAspect.value,
+        videoAutoplay: form.design_videoAutoplay.checked,
+        videoMuted: form.design_videoMuted.checked,
+        videoLoop: form.design_videoLoop.checked,
+      });
+    }
     return { ad_type: 'design', design };
   }
 

@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api.dart';
 import '../services/session_store.dart';
+import 'lesson_video.dart';
+import 'video_source.dart';
 
 Color _hex(dynamic v, Color fallback) {
   var s = '${v ?? ''}'.trim();
@@ -13,6 +15,14 @@ Color _hex(dynamic v, Color fallback) {
   final n = int.tryParse(s, radix: 16);
   return n == null ? fallback : Color(n);
 }
+
+/// فيديو الإعلان (درايف غالبًا) — لينكات درايف التانية بتتحول لشكل file/d عشان المشغل يعرفها
+VideoSource _adVideoSource(String raw) {
+  final m = RegExp(r'drive\.google\.com/(?:open\?id=|uc\?(?:export=\w+&)?id=)([a-zA-Z0-9_-]+)', caseSensitive: false).firstMatch(raw);
+  return detectVideoSource(m != null ? 'https://drive.google.com/file/d/${m.group(1)}/view' : raw);
+}
+
+double _adAspect(dynamic v) => switch ('$v') { '9:16' => 9 / 16, '1:1' => 1.0, '4:3' => 4 / 3, _ => 16 / 9 };
 
 /// الإعلانات اللي الأدمن عاملها للطالب/ولي الأمر — بتظهر مرة واحدة في كل صفحة كل ما البرنامج يتفتح
 class Ads {
@@ -70,14 +80,37 @@ class _AdDialog extends StatelessWidget {
       image: bgImage.isNotEmpty ? DecorationImage(image: NetworkImage(bgImage), fit: BoxFit.cover) : null,
     );
     final imageWidget = image.isEmpty ? null : Image.network(image, width: double.infinity, fit: BoxFit.cover);
+    final videoUrl = '${d['videoUrl'] ?? ''}'.trim();
+    final videoWidget = videoUrl.isEmpty
+        ? null
+        : ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.6),
+            child: Center(
+              heightFactor: 1,
+              child: LessonVideo(
+                source: _adVideoSource(videoUrl),
+                autoplay: d['videoAutoplay'] == true,
+                muted: d['videoMuted'] == true || d['videoAutoplay'] == true,
+                loop: d['videoLoop'] == true,
+                aspectRatio: _adAspect(d['videoAspect']),
+                borderRadius: 0,
+                claimGestures: true,
+              ),
+            ),
+          );
+    final hasText = '${d['badgeText'] ?? ''}'.isNotEmpty ||
+        '${d['heading'] ?? ''}'.isNotEmpty ||
+        '${d['body'] ?? ''}'.isNotEmpty ||
+        (d['buttonEnabled'] == true && '${d['buttonText'] ?? ''}'.isNotEmpty);
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: ((d['maxWidth'] as num?) ?? 420).toDouble()),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: decoration,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (videoWidget != null && d['videoPosition'] != 'bottom') videoWidget,
           if (imageWidget != null && d['imagePosition'] != 'bottom') imageWidget,
-          Padding(
+          if (videoWidget == null || hasText) Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
             child: Column(crossAxisAlignment: align, children: [
               if ('${d['badgeText'] ?? ''}'.isNotEmpty)
@@ -110,6 +143,7 @@ class _AdDialog extends StatelessWidget {
             ]),
           ),
           if (imageWidget != null && d['imagePosition'] == 'bottom') imageWidget,
+          if (videoWidget != null && d['videoPosition'] == 'bottom') videoWidget,
         ]),
       ),
     );
