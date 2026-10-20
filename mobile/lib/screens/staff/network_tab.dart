@@ -105,10 +105,49 @@ class _NetworkTabState extends State<NetworkTab> {
     if (mounted) toast(context, chosen.isEmpty ? 'اتلغى الرافع' : 'اتحدد الرافع — الإعداد بيوصل لكل الأجهزة');
   }
 
+  /// الواي فاي اللي برنامج الكمبيوتر بيعمله: الموبايل بيدخله لوحده
+  Widget _pcWifiCard() {
+    final state = mesh.pcWifi.value;
+    final info = mesh.pcWifiInfo!;
+    final connected = state == 'connected';
+    final text = switch (state) {
+      'connected' => 'متوصل بواي فاي الكمبيوتر',
+      'connecting' => 'بيتوصل بالكمبيوتر... لو ظهرت رسالة "توصيل بالجهاز" اختار توصيل',
+      'searching' => 'بيدور على واي فاي الكمبيوتر (افتح الواي فاي في الموبايل وقرّب من الكمبيوتر)',
+      'error' => 'مقدرش يدخل واي فاي الكمبيوتر — جرب الزرار أو دخّله يدوي',
+      _ => 'واي فاي الكمبيوتر',
+    };
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(Icons.computer, color: connected ? AppColors.accent : AppColors.muted),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700))),
+          ]),
+          const SizedBox(height: 6),
+          Text('اسم الشبكة: ${info.ssid}   الباسورد: ${info.password}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          if (!connected) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => mesh.joinPcWifi(force: true),
+                icon: const Icon(Icons.wifi),
+                label: const Text('اتصل بواي فاي الكمبيوتر'),
+              ),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([mesh.revision, mesh.running, mesh.message, mesh.uploading, StaffStore.snapshotAt, StaffStore.queue, Connection.online]),
+      listenable: Listenable.merge([mesh.revision, mesh.running, mesh.message, mesh.uploading, mesh.pcWifi, StaffStore.snapshotAt, StaffStore.queue, Connection.online]),
       builder: (context, _) {
         final node = mesh.node;
         final running = mesh.running.value;
@@ -181,6 +220,10 @@ class _NetworkTabState extends State<NetworkTab> {
               ]),
             ),
           ),
+          if (running && mesh.pcWifiInfo != null) ...[
+            const SizedBox(height: 12),
+            _pcWifiCard(),
+          ],
           const SizedBox(height: 12),
           Card(
             child: ListTile(

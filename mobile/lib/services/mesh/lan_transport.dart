@@ -223,7 +223,7 @@ class LanTransport implements MeshTransport {
 }
 
 /// بيجمع أكتر من نقل (بلوتوث + واي فاي) في واحد: كل جهاز بيتعرف برقمه فمش بيتوصل بنفس الجهاز مرتين
-class CombinedTransport implements MeshTransport {
+class CombinedTransport implements MeshTransport, PerEndpointLimit {
   CombinedTransport(this.parts);
   final Map<String, MeshTransport> parts; // prefix -> transport
   final _events = StreamController<MeshEvent>.broadcast();
@@ -233,6 +233,14 @@ class CombinedTransport implements MeshTransport {
   Stream<MeshEvent> get events => _events.stream;
   @override
   int get maxBytes => parts.values.map((t) => t.maxBytes).reduce((a, b) => a < b ? a : b);
+
+  /// الواي فاي بياخد رسايل لحد 1MB، البلوتوث 32KB — من غير كده نسخة البيانات على الواي فاي كانت بتتقسم مية جزء
+  @override
+  int maxBytesFor(String endpointId) {
+    final i = endpointId.indexOf('|');
+    final t = i < 0 ? null : parts[endpointId.substring(0, i)];
+    return t == null ? maxBytes : t.maxBytes;
+  }
 
   (MeshTransport, String) _split(String id) {
     final i = id.indexOf('|');

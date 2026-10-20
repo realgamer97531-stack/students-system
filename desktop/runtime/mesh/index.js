@@ -7,8 +7,9 @@
 //   - ينفع يبقى "الرافع": يرفع عمليات كل الأجهزة أول ما يلاقي نت
 const crypto = require('crypto');
 const os = require('os');
-const { MeshLog, MeshNode, computeStatuses, OpState, hmacHex } = require('./core');
+const { MeshLog, MeshNode, computeStatuses, OpState, hmacHex, pcWifiCredentials } = require('./core');
 const { LanTransport } = require('./lan');
+const { PcHotspot } = require('./hotspot');
 
 const SCAN_PATHS = new Set(['/attendance/scan', '/homework/scan/save']);
 const sha = v => crypto.createHash('sha256').update(String(v)).digest('hex');
@@ -21,7 +22,14 @@ const state = {
   uploading: false,
   meshKey: '',
   nodeId: null,
+  hotspot: true, // الكمبيوتر يعمل واي فاي بنفسه للموبايلات (تقدر تقفله لو فيه راوتر)
 };
+
+const hotspot = new PcHotspot();
+function syncHotspot() {
+  if (node && state.hotspot && state.meshKey) hotspot.start(pcWifiCredentials(state.meshKey));
+  else hotspot.stop();
+}
 
 let deps = null; // { sequelize, engine, store, buildMobileSnapshot, ensureSyncSchema, replayLocally }
 let log = new MeshLog();
@@ -221,6 +229,7 @@ async function refreshKey() {
     if (json && json.meshKey && json.meshKey !== state.meshKey) {
       state.meshKey = json.meshKey;
       await deps.store.setKv('mesh_key', state.meshKey);
+      syncHotspot();
     }
   } catch (e) { /* أوفلاين */ }
 }
@@ -238,6 +247,7 @@ async function startNode() {
     await node.start();
     state.running = true;
     state.message = '';
+    syncHotspot();
   } catch (error) {
     node = null;
     state.running = false;
@@ -249,6 +259,7 @@ async function stopNode() {
   if (!node) return;
   const n = node;
   node = null;
+  syncHotspot();
   await n.stop().catch(() => {});
   state.running = false;
 }
@@ -264,6 +275,8 @@ async function init(dependencies) {
   log = MeshLog.fromJSON(await deps.store.getKv('mesh_log', null));
   state.meshKey = (await deps.store.getKv('mesh_key', '')) || '';
   state.enabled = (await deps.store.getKv('mesh_enabled', false)) === true;
+  state.hotspot = (await deps.store.getKv('mesh_hotspot', true)) !== false;
+  process.once('exit', () => hotspot.stop());
   state.ready = true;
   let lastPull = deps.engine.state.lastPullAt;
   deps.engine.onChange(() => {
@@ -307,6 +320,7 @@ function view() {
     waiting,
     problem: node ? node.lastProblem : '',
     online: deps ? deps.engine.state.online : false,
+    wifi: hotspot.view(),
   };
 }
 
@@ -327,6 +341,11 @@ async function action(name, body = {}) {
     case 'reconnect':
       if (!node) await startNode();
       else await node.reconnect();
+      return { success: true };
+    case 'hotspot':
+      state.hotspot = body.on === 'true' || body.on === true;
+      await deps.store.setKv('mesh_hotspot', state.hotspot);
+      syncHotspot();
       return { success: true };
     case 'take-all':
       return { success: Boolean(node && node.requestSnapshot()) };

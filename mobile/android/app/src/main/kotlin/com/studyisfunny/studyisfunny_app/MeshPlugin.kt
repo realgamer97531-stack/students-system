@@ -39,6 +39,8 @@ class MeshPlugin(private val context: Context, messenger: BinaryMessenger) : Met
     private var serviceId = ""
     // بعض الموبايلات بتتجاهل رسايل الواي فاي (اكتشاف الكمبيوتر) لو مفيش القفل ده
     private var wifiLock: WifiManager.MulticastLock? = null
+    // الواي فاي اللي برنامج الكمبيوتر بيعمله
+    private val pcWifi = PcWifiLink(context) { map -> main.post { events?.success(map) } }
 
     init {
         MethodChannel(messenger, "sf/mesh").setMethodCallHandler(this)
@@ -110,6 +112,7 @@ class MeshPlugin(private val context: Context, messenger: BinaryMessenger) : Met
                 client.stopAdvertising()
                 client.stopDiscovery()
                 client.stopAllEndpoints()
+                pcWifi.leave()
                 try { wifiLock?.release() } catch (e: Exception) {}
                 wifiLock = null
                 context.stopService(Intent(context, MeshService::class.java))
@@ -133,6 +136,18 @@ class MeshPlugin(private val context: Context, messenger: BinaryMessenger) : Met
                     .addOnFailureListener { result.success(false) }
             }
             "maxBytes" -> result.success(ConnectionsClient.MAX_BYTES_DATA_SIZE)
+            "pcWifiJoin" -> {
+                pcWifi.join(
+                    call.argument<String>("ssid") ?: "",
+                    call.argument<String>("password") ?: "",
+                    call.argument<String>("advert") ?: "",
+                    call.argument<Int>("tcp") ?: 0,
+                    call.argument<Boolean>("force") ?: false,
+                )
+                result.success(pcWifi.status())
+            }
+            "pcWifiLeave" -> { pcWifi.leave(); result.success(true) }
+            "pcWifiStatus" -> result.success(pcWifi.status())
             else -> result.notImplemented()
         }
     }

@@ -9,6 +9,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show gzip;
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -38,6 +39,11 @@ abstract class MeshTransport {
   Future<void> disconnect(String endpointId);
   Future<bool> send(String endpointId, Uint8List data);
   int get maxBytes;
+}
+
+/// نقل فيه أكتر من نوع اتصال (بلوتوث 32KB / واي فاي 1MB): أكبر رسالة لكل اتصال لوحده
+abstract class PerEndpointLimit {
+  int maxBytesFor(String endpointId);
 }
 
 // ======================= السجل =======================
@@ -281,6 +287,35 @@ class _Link {
   int? pingAt;
   int? rtt;
   final Map<String, List<String?>> parts = {};
+  // الرسايل الكبيرة بتتفك في isolate: اللي بعدها بيستنى عشان الترتيب ميتلخبطش
+  Future<void> inbox = Future.value();
+  int queued = 0;
+}
+
+/// فك رسالة مقسمة (gzip + base64) — بتشتغل في isolate للرسايل الكبيرة عشان الشاشة متقفش
+Map<String, dynamic>? _unpack(String packed) {
+  try {
+    return (jsonDecode(utf8.decode(gzip.decode(base64Decode(packed)))) as Map).cast<String, dynamic>();
+  } catch (_) {
+    return null;
+  }
+}
+
+// دوال top-level عشان الـ isolate ميتبعتلوش غير البيانات (مش الـ MeshNode كله)
+Future<Map<String, dynamic>?> _unpackInIsolate(String packed) => Isolate.run(() => _unpack(packed));
+Future<List<Uint8List>> _packInIsolate(Map<String, dynamic> msg, int limit, String x) => Isolate.run(() => _pack(msg, limit, x));
+
+/// تجهيز رسالة للإرسال: لو أكبر من الحد بتتضغط وتتقسم أجزاء
+List<Uint8List> _pack(Map<String, dynamic> msg, int limit, String x) {
+  final bytes = utf8.encode(jsonEncode(msg));
+  if (bytes.length <= limit) return [Uint8List.fromList(bytes)];
+  final packed = base64Encode(gzip.encode(bytes));
+  final size = limit - 200;
+  final n = (packed.length / size).ceil();
+  return [
+    for (var i = 0; i < n; i++)
+      Uint8List.fromList(utf8.encode(jsonEncode({'t': '~', 'x': x, 'i': i, 'n': n, 'd': packed.substring(i * size, min((i + 1) * size, packed.length))}))),
+  ];
 }
 
 String _randomHex(int bytes) {
@@ -289,6 +324,15 @@ String _randomHex(int bytes) {
 }
 
 String hmacHex(String key, String message) => Hmac(sha256, utf8.encode(key)).convert(utf8.encode(message)).toString();
+
+/// اسم وباسورد الواي فاي اللي برنامج الكمبيوتر بيعمله — من مفتاح الشبكة (نفس الدالة في desktop/runtime/mesh/core.js)
+({String ssid, String password})? pcWifiCredentials(String meshKey) {
+  if (meshKey.isEmpty) return null;
+  return (
+    ssid: 'SF-${hmacHex(meshKey, 'sf-pc-wifi-ssid').substring(0, 6).toUpperCase()}',
+    password: hmacHex(meshKey, 'sf-pc-wifi-pass').substring(0, 16),
+  );
+}
 
 /// اللي الجهاز بيقدمه للشبكة (تطبيق الموبايل أو الاختبارات)
 abstract class MeshHost {
@@ -311,6 +355,9 @@ class MeshNode {
         _now = clock ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   static const protocol = 'SF1';
+  /// الرسايل الكبيرة (نسخة البيانات) بتتضغط/تتفك في isolate. الاختبارات ممكن تقفله
+  static bool useIsolate = true;
+  static const _isolateFrom = 64 * 1024;
   final MeshTransport transport;
   final MeshHost host;
   final String nodeId;
@@ -460,27 +507,46 @@ class MeshNode {
   final Map<String, int> _seenBeacons = {};
 
   void _receive(_Link link, Uint8List bytes) {
+    if (link.queued == 0) {
+      final pending = _receiveNow(link, bytes);
+      if (pending != null) _enqueue(link, () => pending);
+    } else {
+      _enqueue(link, () => _receiveNow(link, bytes) ?? Future.value());
+    }
+  }
+
+  void _enqueue(_Link link, Future<void> Function() job) {
+    link.queued++;
+    link.inbox = link.inbox.then((_) => job()).catchError((_) {}).whenComplete(() => link.queued--);
+  }
+
+  /// بيرجع Future لو الرسالة اتبعتت للـ isolate (والباقي يستناها)
+  Future<void>? _receiveNow(_Link link, Uint8List bytes) {
     Map<String, dynamic> msg;
     try {
       msg = (jsonDecode(utf8.decode(bytes)) as Map).cast<String, dynamic>();
     } catch (_) {
-      return;
+      return null;
     }
     if (msg['t'] == '~') {
       final x = '${msg['x']}';
       final n = msg['n'] as int;
       final list = link.parts.putIfAbsent(x, () => List<String?>.filled(n, null));
       list[msg['i'] as int] = '${msg['d']}';
-      if (list.any((p) => p == null)) return;
+      if (list.any((p) => p == null)) return null;
       link.parts.remove(x);
-      try {
-        final raw = gzip.decode(base64Decode(list.join()));
-        msg = (jsonDecode(utf8.decode(raw)) as Map).cast<String, dynamic>();
-      } catch (_) {
-        return;
+      final packed = list.join();
+      if (useIsolate && packed.length > _isolateFrom) {
+        return _unpackInIsolate(packed).then((m) {
+          if (m != null && running && _links[link.endpointId] == link) _handle(link, m);
+        });
       }
+      final m = _unpack(packed);
+      if (m == null) return null;
+      msg = m;
     }
     _handle(link, msg);
+    return null;
   }
 
   void _handle(_Link link, Map<String, dynamic> msg) {
@@ -631,19 +697,14 @@ class MeshNode {
   }
 
   Future<void> _send(_Link link, Map<String, dynamic> msg) async {
-    final bytes = utf8.encode(jsonEncode(msg));
-    final limit = transport.maxBytes - 512;
-    if (bytes.length <= limit) {
-      await transport.send(link.endpointId, Uint8List.fromList(bytes));
-      return;
-    }
-    final packed = base64Encode(gzip.encode(bytes));
-    final size = limit - 200;
-    final n = (packed.length / size).ceil();
+    final t = transport;
+    final limit = (t is PerEndpointLimit ? (t as PerEndpointLimit).maxBytesFor(link.endpointId) : t.maxBytes) - 512;
     final x = _randomHex(6);
-    for (var i = 0; i < n; i++) {
-      final part = {'t': '~', 'x': x, 'i': i, 'n': n, 'd': packed.substring(i * size, min((i + 1) * size, packed.length))};
-      final ok = await transport.send(link.endpointId, Uint8List.fromList(utf8.encode(jsonEncode(part))));
+    // نسخة البيانات كاملة (ميجات): التحويل والضغط في isolate
+    final heavy = useIsolate && (msg['t'] == 'S' || ((msg['es'] as List?)?.length ?? 0) > 50);
+    final frames = heavy ? await _packInIsolate(msg, limit, x) : _pack(msg, limit, x);
+    for (final frame in frames) {
+      final ok = await transport.send(link.endpointId, frame);
       if (!ok) return;
     }
   }
@@ -690,8 +751,10 @@ class MeshNode {
         'role': host.role, 'snapAt': host.snapshotAt, 'pending': host.pendingCount,
       });
     }
-    if (_tick % 6 == 0) _broadcast({'t': 's', 'sum': log.summary()});
-    _changed();
+    if (_tick % 6 == 0) {
+      _broadcast({'t': 's', 'sum': log.summary()});
+      _changed(); // "آخر ظهور" للأجهزة بيتحدث على الشاشة كل نص دقيقة بس (مش كل 5 ثواني)
+    }
   }
 
   /// الأجهزة اللي اتشافت (مباشر أو عن طريق أجهزة تانية)، الأحدث الأول

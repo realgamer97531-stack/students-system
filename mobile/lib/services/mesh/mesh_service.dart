@@ -82,6 +82,10 @@ class MeshService implements MeshHost {
   final revision = ValueNotifier<int>(0);
   final message = ValueNotifier<String>('');
   final uploading = ValueNotifier<bool>(false);
+  /// واي فاي برنامج الكمبيوتر: off | searching | connecting | connected | error
+  final pcWifi = ValueNotifier<String>('off');
+  StreamSubscription<MeshEvent>? _pcWifiSub;
+  static const _channel = MethodChannel('sf/mesh');
   Map<String, OpStatus> _statuses = {};
   bool _statusesDirty = true;
 
@@ -166,12 +170,14 @@ class MeshService implements MeshHost {
     if (_node?.running == true) return null;
     if (meshKey.isEmpty) return 'مفيش مفتاح شبكة لسه — افتح التطبيق مرة وفيه نت';
     _node = MeshNode(transportFactory(), this, nodeId: nodeId, log: _log);
-    _changesSub = _node!.changes.listen((_) => _bump());
+    // تغييرات الاتصال بس (مش السجل): نحدث الشاشة من غير ما نعيد حساب حالة كل العمليات
+    _changesSub = _node!.changes.listen((_) => revision.value++);
     try {
       await _node!.start();
       running.value = true;
       message.value = '';
       _bump();
+      unawaited(joinPcWifi());
       return null;
     } catch (e) {
       running.value = false;
@@ -188,9 +194,37 @@ class MeshService implements MeshHost {
     await stop();
   }
 
+  /// يدخل الواي فاي اللي برنامج الكمبيوتر عامله (لوحده لما يلاقيه، أو على طول لو [force] من الزرار)
+  Future<void> joinPcWifi({bool force = false}) async {
+    final node = _node;
+    final creds = pcWifiCredentials(meshKey);
+    final t = node?.transport;
+    if (node == null || creds == null || t is! CombinedTransport) return;
+    final lan = t.parts['l'];
+    final nearby = t.parts['n'];
+    if (lan is! LanTransport) return;
+    if (_pcWifiSub == null && nearby is NearbyTransport) {
+      _pcWifiSub = nearby.events.where((e) => e.type == 'pcwifi').listen((e) {
+        pcWifi.value = e.name ?? 'off';
+        if (e.name == 'error' && (e.message ?? '').isNotEmpty) message.value = 'واي فاي الكمبيوتر: ${e.message}';
+      });
+    }
+    try {
+      final r = await _channel.invokeMethod<Map>('pcWifiJoin', {
+        'ssid': creds.ssid, 'password': creds.password, 'advert': node.advertName, 'tcp': lan.tcpPort, 'force': force,
+      });
+      if (r != null) pcWifi.value = '${r['name'] ?? 'off'}';
+    } catch (_) {} // الاختبارات / أجهزة من غير المكون ده
+  }
+
+  ({String ssid, String password})? get pcWifiInfo => pcWifiCredentials(meshKey);
+
   Future<void> stop() async {
     await _changesSub?.cancel();
     _changesSub = null;
+    await _pcWifiSub?.cancel();
+    _pcWifiSub = null;
+    pcWifi.value = 'off';
     await _node?.stop();
     _node = null;
     running.value = false;
@@ -203,6 +237,7 @@ class MeshService implements MeshHost {
       return;
     }
     await _node!.reconnect();
+    unawaited(joinPcWifi(force: true));
   }
 
   // ===== المضيف (MeshHost) =====

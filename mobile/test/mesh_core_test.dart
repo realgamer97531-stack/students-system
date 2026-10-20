@@ -309,4 +309,11 @@ void main() {
     expect(again.add({'e': 'a:2', 'o': 'a', 's': 2, 'k': 'op', 'at': 0, 'd': {}}), isFalse, reason: 'old entries are not re-added');
     expect(again.missingFor({'a': 3}).map((e) => e['s']), [4, 5]);
   });
+
+  test('PC Wi-Fi name/password match the desktop program (core.js pcWifiCredentials)', () {
+    final c = pcWifiCredentials('test-key-123')!;
+    expect(c.ssid, 'SF-64808A');
+    expect(c.password, '4c40cbaae5fe77ea');
+    expect(pcWifiCredentials(''), isNull);
+  });
 }

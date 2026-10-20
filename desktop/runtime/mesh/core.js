@@ -10,6 +10,15 @@ function hmacHex(key, message) {
   return crypto.createHmac('sha256', Buffer.from(String(key), 'utf8')).update(String(message), 'utf8').digest('hex');
 }
 
+// اسم وباسورد الواي فاي اللي الكمبيوتر بيعمله: من مفتاح الشبكة، فكل موبايل عارفهم لوحده (نفس الدالة في mesh_core.dart)
+function pcWifiCredentials(meshKey) {
+  if (!meshKey) return null;
+  return {
+    ssid: `SF-${hmacHex(meshKey, 'sf-pc-wifi-ssid').slice(0, 6).toUpperCase()}`,
+    password: hmacHex(meshKey, 'sf-pc-wifi-pass').slice(0, 16),
+  };
+}
+
 function randomHex(bytes) {
   return crypto.randomBytes(bytes).toString('hex');
 }
@@ -595,4 +604,4 @@ class MeshNode extends EventEmitter {
   isOnline(p) { return p.direct || this.now() - p.lastSeen < 90 * 1000; }
 }
 
-module.exports = { MeshLog, MeshNode, computeStatuses, opMoney, OpState, hmacHex, defaultNormalize, PROTOCOL };
+module.exports = { MeshLog, MeshNode, computeStatuses, opMoney, OpState, hmacHex, pcWifiCredentials, defaultNormalize, PROTOCOL };
