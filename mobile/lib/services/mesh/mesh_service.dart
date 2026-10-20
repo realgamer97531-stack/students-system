@@ -253,7 +253,10 @@ class MeshService implements MeshHost {
     final k = e['k'];
     if (k == 'cfg') return false;
     if (k != 'op') return true;
-    final s = statusOf('${e['d']?['id']}')?.state;
+    final id = '${e['d']?['id']}';
+    final s = statusOf(id)?.state;
+    // عملية مرفوضة لسه في "اترفضت من السيرفر": متتمسحش (ممكن تترفع تاني على حصة تانية)
+    if (e['o'] == nodeId && StaffStore.hasProblem(id)) return false;
     return s != null && s != OpState.pending && s != OpState.review;
   }
 

@@ -239,6 +239,8 @@ class StaffStore {
     queue.value = (((await Cache.read('queue'))?.data as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
     problems.value = (((await Cache.read('problems'))?.data as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
     await MeshService.instance.load(await SessionStore.staffUser());
+    // قبل أي حفظ للسجل (الحفظ بيمسح القديم): ناخد نسخة كاملة من العمليات المرفوضة
+    await _rescueProblemOps();
     _applyQueueToSnapshot();
     Connection.online.addListener(_onConnection);
     _timer = Timer.periodic(const Duration(seconds: 45), (_) => flush());
@@ -404,9 +406,10 @@ class StaffStore {
     await Cache.write('queue', queue.value);
   }
 
+  /// العملية المرفوضة بتتحفظ كاملة (مش الاسم بس) عشان تترفع تاني على حصة تانية
   static Future<void> addProblem(Map<String, dynamic> op, String message) async {
     problems.value = [
-      {'id': op['id'], 'label': op['label'], 'message': message, 'at': DateTime.now().toIso8601String(), 'clientTime': op['clientTime']},
+      {'id': op['id'], 'label': op['label'], 'message': message, 'at': DateTime.now().toIso8601String(), 'clientTime': op['clientTime'], 'op': op},
       ...problems.value,
     ];
     await Cache.write('problems', problems.value);
@@ -415,6 +418,89 @@ class StaffStore {
   static Future<void> dismissProblem(String id) async {
     problems.value = problems.value.where((p) => p['id'] != id).toList();
     await Cache.write('problems', problems.value);
+  }
+
+  /// المشكلة لسه مفتوحة (السجل مش بيمسح عمليتها)
+  static bool hasProblem(String id) => problems.value.any((p) => '${p['id']}' == id);
+
+  /// المشاكل القديمة كان متحفظ فيها الاسم بس: بنرجّع العملية كاملة من سجل الشبكة
+  static Future<void> _rescueProblemOps() async {
+    final ops = {for (final e in MeshService.instance.log.ofKind('op')) '${e['d']?['id']}': (e['d'] as Map).cast<String, dynamic>()};
+    var changed = false;
+    final list = [
+      for (final p in problems.value)
+        if (p['op'] == null && ops['${p['id']}'] != null)
+          () {
+            changed = true;
+            final d = ops['${p['id']}']!;
+            return <String, dynamic>{
+              ...p,
+              'op': {
+                'id': d['id'], 'kind': d['kind'], 'path': d['path'], 'body': d['body'], 'userId': d['userId'],
+                'activeSessionId': d['sid'], 'clientTime': d['ct'], 'label': d['label'],
+              },
+            };
+          }()
+        else
+          p,
+    ];
+    if (!changed) return;
+    problems.value = list;
+    await Cache.write('problems', list);
+  }
+
+  /// المشكلة دي ينفع تترفع تاني على حصة (عندنا العملية كاملة)
+  static bool canResend(Map<String, dynamic> problem) {
+    final op = problem['op'];
+    return op is Map && op['path'] != null && op['body'] is Map && op['userId'] is num && op['activeSessionId'] != null;
+  }
+
+  /// عملية اترفضت (مثلاً حصتها اتمسحت): بنرفعها تاني على الحصة اللي الموظف اختارها، بنفس وقت المسح الأصلي.
+  /// بيرجع null لو اترفعت، أو رسالة الرفض (والمشكلة بتفضل محفوظة).
+  static Future<String?> resendProblem(Map<String, dynamic> problem, int sessionId) async {
+    final old = (problem['op'] as Map).cast<String, dynamic>();
+    final op = <String, dynamic>{
+      ...old,
+      'id': newOpId(), // رقم جديد: الرقم القديم السيرفر فاكره إنه اترفض
+      'body': Map<String, dynamic>.from(old['body'] as Map),
+      'userId': (old['userId'] as num).toInt(),
+      'activeSessionId': sessionId,
+      'clientTime': (old['clientTime'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
+    };
+    final oldId = '${problem['id']}';
+    String? failure;
+    try {
+      final result = await _send(op);
+      Connection.report(true);
+      await MeshService.instance.recordOwn(op);
+      MeshService.instance.receipt('${op['id']}', ok: result.ok, message: result.message, duplicate: result.duplicate);
+      if (result.ok) {
+        final snap = snapshot.value;
+        if (snap != null) _applyOp(snap, op, by: 'الموبايل ده');
+        await dismissProblem(oldId);
+        return null;
+      }
+      failure = result.message;
+    } on DeviceNotAuthorized {
+      deviceRevoked.value = true;
+      return 'الموبايل ده اتلغى تسجيله من السيستم';
+    } on ApiException catch (e) {
+      if (e.offline) {
+        Connection.report(false);
+        return 'مفيش نت — جرب تاني لما النت يرجع (العملية لسه محفوظة)';
+      }
+      failure = e.message;
+    }
+    // اترفضت تاني: نحفظها بالحصة الجديدة مكان القديمة (البيانات متضيعش)
+    problems.value = [
+      for (final p in problems.value)
+        if ('${p['id']}' == oldId)
+          {...p, 'id': op['id'], 'op': op, 'message': failure, 'at': DateTime.now().toIso8601String()}
+        else
+          p,
+    ];
+    await Cache.write('problems', problems.value);
+    return failure;
   }
 
   /// بيبعت عملية على طول (لو فيه نت)، ولو النت فاصل بيحطها في الطابور.

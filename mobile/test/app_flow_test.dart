@@ -228,6 +228,74 @@ void main() {
     expect(find.text('دخول'), findsNothing);
   });
 
+  testWidgets('staff: refused offline scan is kept (even old-format problems) and re-uploads to another session', (tester) async {
+    await phone(tester);
+    final ops = <http.Request>[];
+    var accept = false;
+    server.routes['/api/sync/register-device'] = (r) => json('{"success":true,"token":"device-1","deviceName":"موبايل"}');
+    server.routes['/api/sync/mobile/staff-login'] = (r) => json('{"success":true,"user":{"id":3,"name":"أسيستانت تجربة","role":"admin","permissions":[]}}');
+    server.routes['/api/sync/mobile/snapshot'] = (r) => json(fixture('snapshot.json'));
+    server.routes['/attendance/scan'] = (r) {
+      ops.add(r);
+      return json(jsonEncode(accept
+          ? {'envelope': true, 'ok': true, 'status': 200, 'body': jsonEncode({'success': true, 'message': 'تم تسجيل الحضور'})}
+          : {'envelope': true, 'ok': false, 'status': 400, 'message': 'الحصة غير موجودة', 'body': jsonEncode({'success': false, 'message': 'الحصة غير موجودة'})}));
+    };
+
+    await tester.pumpWidget(const StudyisfunnyApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('موظف'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
+    await tester.enterText(find.byType(TextFormField).at(1), 'secret');
+    await tester.tap(find.text('دخول'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('اضغط هنا واختار الحصة').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('حصة 2 • سيريال 102'));
+    await tester.pumpAndSettle();
+
+    server.offline = true;
+    await tester.enterText(find.byType(TextField).first, '1');
+    await tester.tap(find.text('بحث').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('✅ تأكيد الحضور'));
+    await tester.pumpAndSettle();
+    expect(StaffStore.queue.value, hasLength(1));
+
+    // الحصة اتمسحت: السيرفر رفض — العملية بتتحفظ كاملة
+    server.offline = false;
+    await StaffStore.flush();
+    await tester.pumpAndSettle();
+    expect(StaffStore.queue.value, isEmpty);
+    expect(StaffStore.problems.value, hasLength(1));
+    expect(StaffStore.canResend(StaffStore.problems.value.single), isTrue);
+
+    // مشكلة بالشكل القديم (الاسم بس): بعد فتح التطبيق تاني بترجع كاملة من سجل الشبكة
+    final oldFormat = {...StaffStore.problems.value.single}..remove('op');
+    StaffStore.problems.value = [oldFormat];
+    await Cache.write('problems', [oldFormat]);
+    StaffStore.stop();
+    await StaffStore.start();
+    await tester.pumpAndSettle();
+    final rescued = StaffStore.problems.value.single;
+    expect(StaffStore.canResend(rescued), isTrue);
+    expect(rescued['op']['activeSessionId'], 12);
+    expect(rescued['op']['body']['student_code'], '1');
+
+    // رفعها على حصة تانية (11): رقم عملية جديد + نفس الطالب
+    accept = true;
+    final error = await StaffStore.resendProblem(rescued, 11);
+    expect(error, isNull);
+    expect(StaffStore.problems.value, isEmpty);
+    final resent = ops.last;
+    final context = jsonDecode(utf8.decode(base64Decode(resent.headers['X-Sync-Context']!))) as Map;
+    expect(context['activeSessionId'], 11);
+    expect(context['clientTime'], rescued['op']['clientTime']);
+    expect(resent.headers['X-Sync-Op-Id'], isNot(ops.first.headers['X-Sync-Op-Id']));
+    expect(jsonDecode(resent.body)['student_code'], '1');
+  });
+
   testWidgets('staff: register phone, login, scan attendance offline, synced later', (tester) async {
     await phone(tester);
     final ops = <http.Request>[];

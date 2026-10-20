@@ -110,7 +110,7 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   void _openSync() {
-    showModalBottomSheet<void>(context: context, useRootNavigator: true, isScrollControlled: true, showDragHandle: true, builder: (_) => const _SyncSheet());
+    showModalBottomSheet<void>(context: context, useRootNavigator: true, isScrollControlled: true, showDragHandle: true, builder: (_) => _SyncSheet(user: widget.user));
   }
 
   @override
@@ -386,8 +386,87 @@ class _SyncBadge extends StatelessWidget {
   }
 }
 
-class _SyncSheet extends StatelessWidget {
-  const _SyncSheet();
+class _SyncSheet extends StatefulWidget {
+  const _SyncSheet({required this.user});
+  final StaffUser user;
+  @override
+  State<_SyncSheet> createState() => _SyncSheetState();
+}
+
+class _SyncSheetState extends State<_SyncSheet> {
+  bool _resending = false;
+  String _progress = '';
+
+  /// رفع عملية (أو كل العمليات) اترفضت على حصة يختارها الموظف
+  Future<void> _resend(List<Map<String, dynamic>> items) async {
+    final sessionId = await showModalBottomSheet<int>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _SessionList(selected: null, user: widget.user),
+    );
+    if (sessionId == null || !mounted) return;
+    final snap = StaffStore.snapshot.value;
+    final session = snap?.session(sessionId);
+    final label = session == null ? 'حصة رقم $sessionId' : snap!.sessionLabel(session);
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('رفع على حصة تانية'),
+        content: Text('هيترفع ${items.length == 1 ? '"${items.first['label']}"' : '${items.length} عملية'} على:\n$label\n\nبنفس وقت المسح الأصلي.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لأ')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('ارفع')),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+    setState(() => _resending = true);
+    var ok = 0;
+    final failed = <String>[];
+    for (var i = 0; i < items.length; i++) {
+      if (mounted) setState(() => _progress = '${i + 1} / ${items.length}');
+      final error = await StaffStore.resendProblem(items[i], sessionId);
+      if (error == null) {
+        ok++;
+      } else {
+        failed.add('${items[i]['label']}: $error');
+        if (error.startsWith('مفيش نت')) break;
+      }
+    }
+    if (!mounted) return;
+    setState(() { _resending = false; _progress = ''; });
+    await showDialog<void>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(failed.isEmpty ? '✅ اترفعوا' : 'النتيجة'),
+        content: SingleChildScrollView(
+          child: Text('اترفع: $ok${failed.isEmpty ? '' : '\nماترفعش (لسه محفوظ في القايمة): ${failed.length}\n\n${failed.join('\n')}'}'),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('تمام'))],
+      ),
+    );
+  }
+
+  Future<void> _dismiss(Map<String, dynamic> p) async {
+    if (StaffStore.canResend(p)) {
+      final sure = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('تشيلها من القايمة؟'),
+          content: const Text('العملية دي لسه ممكن تترفع على حصة تانية. لو شلتها هتضيع من الموبايل.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لأ')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('شيلها', style: TextStyle(color: AppColors.danger))),
+          ],
+        ),
+      );
+      if (sure != true) return;
+    }
+    await StaffStore.dismissProblem('${p['id']}');
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -422,15 +501,41 @@ class _SyncSheet extends StatelessWidget {
                 ),
               const Divider(height: 28),
               Text('اترفضت من السيرفر (${problems.length})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-              const Text('عمليات اتعملت من غير نت والسيرفر رفضها (مثلاً رصيد مش كفاية) — لازم تتراجع يدوي.', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+              const Text('عمليات اتعملت من غير نت والسيرفر رفضها (مثلاً رصيد مش كفاية أو الحصة اتمسحت). العمليات دي محفوظة على الموبايل — ممكن ترفعها على حصة تانية.',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+              if (_resending) Padding(padding: const EdgeInsets.only(top: 8), child: Row(children: [
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 10),
+                Text('بيرفع... $_progress'),
+              ])),
+              if (!_resending && problems.where(StaffStore.canResend).length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: FilledButton.icon(
+                    onPressed: () => _resend(problems.where(StaffStore.canResend).toList()),
+                    icon: const Icon(Icons.drive_file_move_outline),
+                    label: Text('ارفع الكل (${problems.where(StaffStore.canResend).length}) على حصة...'),
+                  ),
+                ),
               for (final p in problems)
                 Card(
                   color: AppColors.dangerSoft,
-                  child: ListTile(
-                    title: Text('${p['label']}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text('${p['message']}\n${p['clientTime'] is int ? fmtDate(DateTime.fromMillisecondsSinceEpoch(p['clientTime'] as int).toIso8601String(), withTime: true) : ''}'),
-                    trailing: IconButton(icon: const Icon(Icons.close), tooltip: 'تمام، اتراجعت', onPressed: () => StaffStore.dismissProblem('${p['id']}')),
-                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    ListTile(
+                      title: Text('${p['label']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text('${p['message']}\n${p['clientTime'] is int ? fmtDate(DateTime.fromMillisecondsSinceEpoch(p['clientTime'] as int).toIso8601String(), withTime: true) : ''}'),
+                      trailing: IconButton(icon: const Icon(Icons.close), tooltip: 'تمام، اتراجعت', onPressed: _resending ? null : () => _dismiss(p)),
+                    ),
+                    if (StaffStore.canResend(p))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                        child: OutlinedButton.icon(
+                          onPressed: _resending ? null : () => _resend([p]),
+                          icon: const Icon(Icons.drive_file_move_outline),
+                          label: const Text('ارفعها على حصة...'),
+                        ),
+                      ),
+                  ]),
                 ),
             ]);
           },
