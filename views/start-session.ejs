@@ -25,7 +25,8 @@
         </div>
         <% } %>
 
-        <form action="/sessions" method="POST" id="startSessionForm">
+        <%# data-no-draft: استرجاع المسودة كان بيرجّع سناتر متعلّمة من مرة قبل كده من غير ما تبان فالحصة تتعمل فيها غلط %>
+        <form action="/sessions" method="POST" id="startSessionForm" data-no-draft>
           <div class="mb-3">
             <label class="form-label"><span class="ar-only">المادة</span><span class="en-only" style="display:none;">Subject</span></label>
             <select name="subject_id" class="form-select" required>
