@@ -6895,40 +6895,52 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     }
 
     // 5) أكد الدفع - نتحقق من الرصيد وننفذ
-    if (student.balance < totalPrice) {
-      return res.json({ success: false, message: 'رصيدك غير كافٍ لدفع ثمن هذه الحصة' });
-    }
+    // كله في transaction قافلة على صف الطالب: لو داس "ادفع" مرتين ورا بعض، الطلب التاني بيستنى الأول
+    // ويلاقي الصلاحية اتعملت فمبيخصمش تاني (كان بيتخصم مرتين في نفس الثانية)
+    const payment = await sequelize.transaction(async (transaction) => {
+      const locked = await Student.findByPk(student.id, { transaction, lock: transaction.LOCK.UPDATE });
+      const alreadyPaid = await VideoAccessGrant.findOne({
+        where: { StudentId: student.id, SessionId: session.id, VideoId: video.id, method: 'paid' },
+        transaction,
+      });
+      if (alreadyPaid) return { grant: alreadyPaid, balance: locked.balance };
+      if (locked.balance < totalPrice) return { insufficient: true };
 
-    await adjustStudentBalance(student, -totalPrice);
-
-    await BalanceTransaction.create({
-      StudentId: student.id,
-      SessionId: session.id,
-      amount: -videoPrice.base,
-      reason: `${ONLINE_VIDEO_PAYMENT_REASON} (سيريال ${session.serial_number})`,
-    });
-    if (surchargeAmount > 0) {
+      await adjustStudentBalance(locked, -totalPrice, transaction);
       await BalanceTransaction.create({
         StudentId: student.id,
         SessionId: session.id,
-        amount: -surchargeAmount,
-        reason: surchargeReason(surchargeRule),
-      });
-    }
+        amount: -videoPrice.base,
+        reason: `${ONLINE_VIDEO_PAYMENT_REASON} (سيريال ${session.serial_number})`,
+      }, { transaction });
+      if (surchargeAmount > 0) {
+        await BalanceTransaction.create({
+          StudentId: student.id,
+          SessionId: session.id,
+          amount: -surchargeAmount,
+          reason: surchargeReason(surchargeRule),
+        }, { transaction });
+      }
 
-    grant = await VideoAccessGrant.create({
-      StudentId: student.id,
-      SessionId: session.id,
-      VideoId: video.id,
-      method: 'paid',
-      max_views: session.views_if_paid,
-      views_used: 1,
-      ...createAccessWindow(session.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS),
+      const paidGrant = await VideoAccessGrant.create({
+        StudentId: student.id,
+        SessionId: session.id,
+        VideoId: video.id,
+        method: 'paid',
+        max_views: session.views_if_paid,
+        views_used: 1,
+        ...createAccessWindow(session.access_duration_hours || DEFAULT_ACCESS_DURATION_HOURS),
+      }, { transaction });
+      return { grant: paidGrant, balance: locked.balance };
     });
+    if (payment.insufficient) {
+      return res.json({ success: false, message: 'رصيدك غير كافٍ لدفع ثمن هذه الحصة' });
+    }
+    grant = payment.grant;
 
     await ensureAttendance(student.id, session.id, '📹 حضر عن طريق دفع ثمن مشاهدة الفيديو أونلاين');
 
-    res.json({ success: true, viewsUsed: 1, maxViews: grant.max_views, remainingBalance: student.balance });
+    res.json({ success: true, viewsUsed: 1, maxViews: grant.max_views, remainingBalance: payment.balance });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
