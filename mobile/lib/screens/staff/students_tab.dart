@@ -149,6 +149,12 @@ class _StudentDetailsState extends State<StudentDetails> {
   bool _loading = false;
   final _walletOp = OnlineOp();
   final _bookletOps = <int, OnlineOp>{};
+  final _attendanceOp = OnlineOp();
+
+  /// حصص الغياب المحددة لتسجيل الحضور (رقم الحصة → حصة سنتر الطالب)
+  final _picked = <int>{};
+  bool _charge = true;
+  bool _marking = false;
 
   @override
   void initState() {
@@ -214,6 +220,45 @@ class _StudentDetailsState extends State<StudentDetails> {
     if (!res.ok) return toast(context, res.message, error: true);
     toast(context, '✅ اتدفع ${fmtNum(input.$1)} ج في ${b['name']}');
     _loadLive();
+  }
+
+  /// تسجيل حضور الطالب في حصص سنتره (نفس صفحة الموقع /students/:id/attendance/mark)
+  Future<void> _markAttendance(Map<int, int> sessionByLesson) async {
+    final lessons = _picked.where(sessionByLesson.containsKey).toList()..sort();
+    if (lessons.isEmpty) return;
+    final s = widget.student;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تسجيل حضور'),
+        content: Text('${lessons.map((n) => 'حصة $n').join('، ')}\n'
+            '${_charge ? 'هيتخصم ${fmtNum(s.price * lessons.length)} ج من الرصيد' : 'من غير خصم من الرصيد'}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('رجوع')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('سجّل')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _marking = true);
+    final res = await _attendanceOp.send(
+      context,
+      '/students/${s.id}/attendance/mark',
+      {'session_ids': [for (final n in lessons) sessionByLesson[n]], 'charge': _charge ? '1' : '0'},
+      user: widget.user,
+    );
+    if (mounted) setState(() => _marking = false);
+    if (res == null || !mounted) return;
+    final added = ((res.data['added'] as List?) ?? []).map((e) => (e as num).toInt()).toList();
+    final snap = StaffStore.snapshot.value!;
+    for (final n in added) {
+      snap.attendance.add('${s.id}:${sessionByLesson[n]}');
+    }
+    final balance = res.data['balance'];
+    if (balance is num) s.balance = balance;
+    setState(() => _picked.removeAll(added));
+    toast(context, res.message, error: !res.ok);
+    if (added.isNotEmpty) _loadLive();
   }
 
   Widget _phone(String label, String? phone) {
@@ -346,6 +391,14 @@ class _StudentDetailsState extends State<StudentDetails> {
       byLesson[lesson] = (prev.$1 ?? attendedHere, prev.$2 ?? snap.homework[key]);
     }
     final lessons = byLesson.keys.toList()..sort((a, b) => b.compareTo(a));
+    // الحضور بيتسجل في حصة سنتر الطالب بس (مش الملغية)
+    final ownSessionByLesson = <int, int>{
+      for (final x in sessions)
+        if ((x['CenterId'] as num?)?.toInt() == s.centerId && x['status'] != 'cancelled')
+          (x['lesson_number'] as num?)?.toInt() ?? 0: (x['id'] as num).toInt(),
+    };
+    final canMark = widget.user.can('attendance_scan');
+    bool markable(int n) => canMark && byLesson[n]!.$1 == null && ownSessionByLesson.containsKey(n);
     return Scaffold(
       appBar: AppBar(title: Text(s.name)),
       body: RefreshIndicator(
@@ -387,16 +440,58 @@ class _StudentDetailsState extends State<StudentDetails> {
           const SizedBox(height: 8),
           const Text('آخر الحصص (من البيانات المحفوظة)', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
+          if (lessons.any(markable))
+            Card(
+              color: AppColors.neutralSoft,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 12, 8),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  CheckboxListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _charge,
+                    onChanged: (v) => setState(() => _charge = v ?? true),
+                    title: Text('اخصم سعر الحصة (${fmtNum(s.price)} ج) من الرصيد'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _picked.isEmpty || _marking ? null : () => _markAttendance(ownSessionByLesson),
+                    icon: _marking
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.how_to_reg),
+                    label: Text('سجّل حضور المحدد (${_picked.length})'),
+                  ),
+                ]),
+              ),
+            ),
           for (final n in lessons)
             Card(
               margin: const EdgeInsets.only(bottom: 6),
               child: ListTile(
                 dense: true,
+                leading: markable(n)
+                    ? Checkbox(
+                        value: _picked.contains(n),
+                        onChanged: (v) => setState(() => v == true ? _picked.add(n) : _picked.remove(n)),
+                      )
+                    : null,
                 title: Text('حصة $n', style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text(byLesson[n]!.$2 == null ? 'الواجب: لم يصحح' : 'الواجب: ${_hw[byLesson[n]!.$2] ?? byLesson[n]!.$2}'),
                 trailing: byLesson[n]!.$1 != null
                     ? Pill('حضر (${byLesson[n]!.$1})', AppColors.successSoft, AppColors.successText, fontSize: 11.5)
-                    : const Pill('غاب', AppColors.dangerSoft, AppColors.dangerText, fontSize: 11.5),
+                    : markable(n)
+                        ? TextButton(
+                            onPressed: _marking
+                                ? null
+                                : () {
+                                    setState(() => _picked
+                                      ..clear()
+                                      ..add(n));
+                                    _markAttendance(ownSessionByLesson);
+                                  },
+                            child: const Text('غاب • سجّل حضور'),
+                          )
+                        : const Pill('غاب', AppColors.dangerSoft, AppColors.dangerText, fontSize: 11.5),
               ),
             ),
           const SizedBox(height: 12),

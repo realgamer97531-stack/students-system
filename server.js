@@ -2641,10 +2641,68 @@ app.get('/students/:id', async (req, res) => {
       availableBooklets,
       followUpAssistant,
       profilePhotoUrl,
+      attendanceMessage: typeof req.query.attendance_msg === 'string' ? req.query.attendance_msg.slice(0, 500) : null,
     });
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+// تسجيل حضور من ملف الطالب (حصة واحدة أو كذا حصة مع بعض): بيتسجل في حصة سنتر الطالب ومادته بس،
+// وبيتخصم سعر الحصة ويتضاف نقط الحضور زي المسح بالظبط (حتى لو الرصيد هيبقى بالسالب)، إلا لو اختار "من غير خصم"
+app.post('/students/:id/attendance/mark', requirePermissionOrAdmin('attendance_scan'), async (req, res) => {
+  const wantsJson = req.headers['x-sync-device-token'] || (req.headers.accept || '').includes('application/json') || req.body?.response_format === 'json';
+  const reply = (status, message, extra = {}) => (wantsJson
+    ? res.status(status).json({ success: status < 400, message, ...extra })
+    : res.redirect(`/students/${req.params.id}?attendance_msg=${encodeURIComponent(message)}`));
+  try {
+    const student = await Student.findByPk(req.params.id);
+    if (!student) return reply(404, '❌ الطالب غير موجود');
+
+    const submitted = req.body.session_ids ?? req.body['session_ids[]'];
+    const sessionIds = [...new Set((Array.isArray(submitted) ? submitted : (submitted ? String(submitted).split(',') : []))
+      .map(Number).filter(id => Number.isInteger(id) && id > 0))];
+    if (!sessionIds.length) return reply(400, '❌ اختار حصة واحدة على الأقل');
+    const charge = !['0', 'false', 'off'].includes(String(req.body.charge ?? '1'));
+
+    const sessions = await Session.findAll({ where: { id: sessionIds } });
+    const lessonNumbers = [...new Set(sessions.map(s => s.lesson_number))];
+    const sameLessonIds = lessonNumbers.length
+      ? (await Session.findAll({ where: { SubjectId: student.SubjectId, lesson_number: lessonNumbers }, attributes: ['id', 'lesson_number'] }))
+      : [];
+    const attendedSessionIds = new Set((await Attendance.findAll({
+      where: { StudentId: student.id, SessionId: sameLessonIds.map(s => s.id) },
+      attributes: ['SessionId'],
+    })).map(a => a.SessionId));
+    const attendedLessons = new Set(sameLessonIds.filter(s => attendedSessionIds.has(s.id)).map(s => s.lesson_number));
+
+    const added = [], skipped = [];
+    for (const session of sessions.sort((a, b) => a.lesson_number - b.lesson_number)) {
+      const label = `حصة ${session.lesson_number}`;
+      if (session.SubjectId !== student.SubjectId || session.CenterId !== student.CenterId) { skipped.push(`${label}: مش حصة سنتر ومادة الطالب`); continue; }
+      if (session.status === 'cancelled') { skipped.push(`${label}: ملغية`); continue; }
+      if (attendedLessons.has(session.lesson_number)) { skipped.push(`${label}: حاضرها قبل كده`); continue; }
+
+      const [, created] = await Attendance.findOrCreate({
+        where: { StudentId: student.id, SessionId: session.id },
+        defaults: { StudentId: student.id, SessionId: session.id, UserId: req.session.userId, comment: '✍️ اتسجل حضور من ملف الطالب' },
+      });
+      if (!created) { skipped.push(`${label}: حاضرها قبل كده`); continue; }
+      attendedLessons.add(session.lesson_number);
+      if (charge) await recordAttendanceCharge(student, req.session.userId, `رسوم الحضور (حصة ${session.lesson_number} - من ملف الطالب)`);
+      await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
+      added.push(session.lesson_number);
+    }
+
+    const parts = [];
+    if (added.length) parts.push(`✅ اتسجل حضور ${added.map(n => `حصة ${n}`).join('، ')}${charge ? ` واتخصم ${added.length * (Number(student.price_per_session) || 0)} ج` : ' من غير خصم'}`);
+    if (skipped.length) parts.push(`⚠️ متسجلش: ${skipped.join('، ')}`);
+    await student.reload({ attributes: ['balance'] });
+    return reply(added.length ? 200 : 400, parts.join(' — '), { added, skipped, balance: student.balance });
+  } catch (error) {
+    console.error('Mark attendance from profile failed:', error);
+    return reply(500, '❌ حصلت مشكلة: ' + error.message);
   }
 });
 

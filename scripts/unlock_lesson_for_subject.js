@@ -92,6 +92,7 @@ async function main() {
 
     const work = async (transaction) => {
       const st = await Student.findByPk(student.id, { transaction, ...(transaction ? { lock: transaction.LOCK.UPDATE } : {}) });
+      if (!st) { skipped.push({ ...base, why: 'student deleted during the run' }); return; }
       const [lessonCharge, adminGrant, grants] = await Promise.all([
         BalanceTransaction.findOne({ where: { StudentId: st.id, SessionId: lessonIds, amount: { [Op.lt]: 0 } }, transaction }),
         VideoAccessGrant.findOne({ where: { StudentId: st.id, SessionId: lessonIds, method: { [Op.in]: ['admin_free', 'admin_paid'] } }, transaction }),
