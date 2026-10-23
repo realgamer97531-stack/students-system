@@ -5344,6 +5344,21 @@ async function videoGrantSessionIds(video, extraSessionIds = []) {
   return [...new Set([...extraSessionIds, ...linked.map(session => session.id), ...sameLesson.map(session => session.id)])];
 }
 
+// الحصص المربوطة بالفيديو مباشرة (الحصة الأساسية + VideoSessions)
+function directVideoSessionIds(video) {
+  return new Set([video.SessionId, ...(video.VideoSessions || []).map(row => row.SessionId)].filter(Boolean).map(Number));
+}
+
+// الفيديو ممكن يتربط بحصص أرقامها مختلفة (كل سنتر بترقيمه، أو حصة اتربطت بالغلط)، فصلاحية على حصة من
+// درس تاني مينفعش تفتحه: كانت صلاحية حصة 5 بتفتح فيديو حصة 6 ببلاش ومن غير خصم ولا حضور.
+// اللي بيتحسب: صلاحية على حصة من نفس درس الطالب (أي سنتر)، أو صلاحية اتعملت للفيديو ده بالذات
+// على حصة مربوطة بيه مباشرة (زي الوقت الإضافي من صفحة التحكم).
+function grantBelongsToStudentLesson(grant, video, ownLessonSessionIds, directSessionIds) {
+  const sessionId = Number(grant.SessionId);
+  if (ownLessonSessionIds.has(sessionId)) return true;
+  return directSessionIds.has(sessionId) && Number(grant.VideoId) === Number(video.id);
+}
+
 async function cleanupStaleVideoAccessGrants(studentId, sessionId = null) {
   const where = { StudentId: studentId };
   if (sessionId !== null) {
@@ -6572,7 +6587,10 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         grantSessionIds.add(linked.id);
         (sessionIdsByLessonKey.get(lessonKeyOf(linked)) || []).forEach(id => grantSessionIds.add(id));
       });
-      const lessonGrants = [...grantSessionIds].flatMap(sessionId => grantsBySessionId[sessionId] || []);
+      const ownLessonSessionIds = new Set(equivalentSessionIds.map(Number));
+      const directSessionIds = new Set((linkedSessionIdsByVideoId.get(v.id) || []).map(Number));
+      const lessonGrants = [...grantSessionIds].flatMap(sessionId => grantsBySessionId[sessionId] || [])
+        .filter(candidate => grantBelongsToStudentLesson(candidate, v, ownLessonSessionIds, directSessionIds));
       const grant = lessonGrants[0];
       const attended = session && attendedLessonNumbers.has(session.lesson_number);
       let status, viewsUsed = 0, maxViews = 0;
@@ -6721,9 +6739,11 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
     // الشغالة هي اللي بتكسب، مش أول واحدة بتطلع من قاعدة البيانات
     // وبندوّر في نفس الحصص اللي صفحة الأدمن بتشوفها (كل حصص الفيديو + نفس رقم الحصة)
     const equivalentSessionIdSet = new Set(equivalentSessionIds);
+    const directSessionIds = directVideoSessionIds(video);
     const grantSessionIds = await videoGrantSessionIds(video, equivalentSessionIds);
-    const lessonGrants = await VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: grantSessionIds } });
-    const attendedAnyLinked = attendanceExists || !!(await Attendance.findOne({ where: { StudentId: student.id, SessionId: grantSessionIds }, attributes: ['id'] }));
+    const lessonGrants = (await VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: grantSessionIds } }))
+      .filter(candidate => grantBelongsToStudentLesson(candidate, video, equivalentSessionIdSet, directSessionIds));
+    const attendedAnyLinked = attendanceExists || !!(await Attendance.findOne({ where: { StudentId: student.id, SessionId: [...directSessionIds] }, attributes: ['id'] }));
     const validGrants = [];
     for (const candidate of lessonGrants) {
       const isValidGrant = candidate.method === 'paid' || candidate.method === 'admin_free' || candidate.method === 'admin_paid' || (candidate.method === 'attended' && attendedAnyLinked);
@@ -6950,11 +6970,14 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
         attributes: ['id'],
       });
       const equivalentSessionIds = equivalentSessions.map(equivalentSession => equivalentSession.id);
+      const directSessionIds = directVideoSessionIds(video);
       const grantSessionIds = await videoGrantSessionIds(video, equivalentSessionIds);
-      const [lessonGrants, attendanceExists] = await Promise.all([
+      const [allLessonGrants, attendanceExists] = await Promise.all([
         VideoAccessGrant.findAll({ where: { StudentId: student.id, SessionId: grantSessionIds } }),
-        Attendance.findOne({ where: { StudentId: student.id, SessionId: grantSessionIds }, attributes: ['id'] }),
+        Attendance.findOne({ where: { StudentId: student.id, SessionId: [...new Set([...equivalentSessionIds, ...directSessionIds])] }, attributes: ['id'] }),
       ]);
+      const ownLessonSessionIds = new Set(equivalentSessionIds);
+      const lessonGrants = allLessonGrants.filter(candidate => grantBelongsToStudentLesson(candidate, video, ownLessonSessionIds, directSessionIds));
       const validGrants = lessonGrants.filter(candidate =>
         candidate.method === 'paid' ||
         candidate.method === 'admin_free' ||
@@ -7247,6 +7270,12 @@ app.post('/admin/videos/:id/add-session', requirePermissionOrAdmin('admin_videos
 // حذف حصة من فيديو
 app.post('/admin/videos/:videoId/remove-session/:sessionId', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   await VideoSession.destroy({ where: { VideoId: req.params.videoId, SessionId: req.params.sessionId } });
+  // لو دي كانت الحصة الأساسية للفيديو، الأساسية تبقى حصة من اللي لسه مربوطة (وإلا كانت بتفضل محسوبة)
+  const video = await Video.findByPk(req.params.videoId, { attributes: ['id', 'SessionId'] });
+  if (video && Number(video.SessionId) === Number(req.params.sessionId)) {
+    const remaining = await VideoSession.findOne({ where: { VideoId: video.id }, order: [['id', 'ASC']] });
+    if (remaining) await video.update({ SessionId: remaining.SessionId });
+  }
   res.redirect('/admin/videos/' + req.params.videoId + '/access');
 });
 
@@ -8158,8 +8187,16 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   // ساعة الفيديو ده: صلاحيته هو (أو صلاحية قديمة كان موجود وقتها) على أي حصة من حصصه
   const video2 = await Video.findOne({ where: { id: video.id }, include: [Session, { model: VideoSession, include: [Session] }] });
   const grantSessionIds = await videoGrantSessionIds(video2, [...allowedSessionIds]);
+  // صلاحيات درس الطالب ده بس (مش صلاحية حصة تانية زي حصة 5 على فيديو حصة 6)
+  const grantStudent = await Student.findByPk(req.params.studentId, { attributes: ['id', 'SubjectId', 'CenterId'] });
+  const linkedForGrant = [video2.Session, ...(video2.VideoSessions || []).map(row => row.Session)].filter(Boolean);
+  const studentSession = (grantStudent && linkedForGrant.find(s => s.SubjectId === grantStudent.SubjectId && s.CenterId === grantStudent.CenterId)) || session;
+  const ownLessonSessionIds = new Set(studentSession
+    ? (await Session.findAll({ where: { SubjectId: studentSession.SubjectId, lesson_number: studentSession.lesson_number }, attributes: ['id'] })).map(s => Number(s.id))
+    : []);
   const studentGrants = (await VideoAccessGrant.findAll({ where: { StudentId: req.params.studentId, SessionId: grantSessionIds } }))
-    .filter(candidate => grantAppliesToVideo(candidate, video));
+    .filter(candidate => grantAppliesToVideo(candidate, video))
+    .filter(candidate => grantBelongsToStudentLesson(candidate, video, ownLessonSessionIds, directVideoSessionIds(video2)));
   const firstPartAt = (await firstPartTimesByVideo([video.id])).get(Number(video.id)) || null;
   let grant = studentGrants.find(candidate => Number(candidate.VideoId) === Number(video.id))
     || studentGrants.find(candidate => grantUsable(candidate, session, firstPartAt))
