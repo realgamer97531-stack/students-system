@@ -976,6 +976,25 @@ async function findStudentByCode(rawCode, options = {}) {
   return matches.find((s) => s.student_code === raw) || matches[0] || null;
 }
 
+// الحصة المختارة على حساب الموظف بتفضل محفوظة أيام (الدخول بيفضل 30 يوم)، فلما يضيف طالب جديد يوم مفيهوش
+// حصة كان الطالب بيتسجل حاضر ويتخصم منه في حصة قديمة (أو حصة مادة تانية). الحضور مع التسجيل بقى بس لو الحصة
+// المختارة بتاعة النهارده (يوم العملية نفسها لو جاية من جهاز كان أوفلاين) ومن نفس مادة الطالب.
+async function registrationAttendanceSession(activeSessionId, student) {
+  if (!activeSessionId) return { note: '⚠️ لا توجد حصة شغالة الآن لتسجيل حضور الطالب.' };
+  const session = await Session.findByPk(activeSessionId);
+  if (!session || session.status === 'cancelled') return { note: '⚠️ الحصة الحالية غير متاحة للتسجيل.' };
+  const ctx = require('./utils/sync/context').current();
+  const now = new Date(Date.now() + ((ctx && ctx.shiftMs) || 0));
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (String(session.session_date || '').slice(0, 10) !== today) {
+    return { note: '⚠️ مفيش حصة شغالة النهارده — الطالب اتسجل من غير حضور ومن غير خصم.' };
+  }
+  if (Number(session.SubjectId) !== Number(student.SubjectId)) {
+    return { note: '⚠️ الحصة الشغالة مادة تانية غير مادة الطالب — الطالب اتسجل من غير حضور ومن غير خصم.' };
+  }
+  return { session };
+}
+
 async function recordAttendanceCharge(student, userId, reason = 'رسوم الحضور', transaction = null) {
   if (!student) return 0;
 
@@ -2893,34 +2912,30 @@ app.post('/students', async (req, res) => {
     }
 
     if (register_attendance === 'on') {
-      const sessionId = req.session.activeSessionId;
-      if (!sessionId) {
-        attendanceNote = '⚠️ لا توجد حصة شغالة الآن لتسجيل حضور الطالب.';
+      const { session: activeSession, note } = await registrationAttendanceSession(req.session.activeSessionId, student);
+      const sessionId = activeSession && activeSession.id;
+      if (!activeSession) {
+        attendanceNote = note;
       } else {
-        const activeSession = await Session.findByPk(sessionId);
-        if (!activeSession || activeSession.status === 'cancelled') {
-          attendanceNote = '⚠️ الحصة الحالية غير متاحة للتسجيل.';
+        const existingAttendance = await Attendance.findOne({
+          where: { StudentId: student.id, SessionId: sessionId },
+        });
+        if (existingAttendance) {
+          attendanceNote = '⚠️ الطالب مسجل حضور في هذه الحصة بالفعل.';
+        } else if (student.balance < student.price_per_session) {
+          attendanceNote = `⚠️ رصيد الطالب غير كافٍ لتسجيل الحضور (الرصيد: ${student.balance} ج).`;
         } else {
-          const existingAttendance = await Attendance.findOne({
-            where: { StudentId: student.id, SessionId: sessionId },
-          });
-          if (existingAttendance) {
-            attendanceNote = '⚠️ الطالب مسجل حضور في هذه الحصة بالفعل.';
-          } else if (student.balance < student.price_per_session) {
-            attendanceNote = `⚠️ رصيد الطالب غير كافٍ لتسجيل الحضور (الرصيد: ${student.balance} ج).`;
-          } else {
-            await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
+          await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
 
-            await Attendance.create({
-              StudentId: student.id,
-              SessionId: sessionId,
-              UserId: req.session.userId,
-              comment: comment || null,
-              payment_collected: initialBalance,
-            });
-            await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
-            attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
-          }
+          await Attendance.create({
+            StudentId: student.id,
+            SessionId: sessionId,
+            UserId: req.session.userId,
+            comment: comment || null,
+            payment_collected: initialBalance,
+          });
+          await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
+          attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
         }
       }
     }
@@ -4104,33 +4119,29 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
 
     let attendanceNote = null;
     if (register_attendance === 'on') {
-      const sessionId = req.session.activeSessionId;
-      if (!sessionId) {
-        attendanceNote = '⚠️ لا توجد حصة شغالة الآن لتسجيل حضور الطالب.';
+      const { session: activeSession, note } = await registrationAttendanceSession(req.session.activeSessionId, student);
+      const sessionId = activeSession && activeSession.id;
+      if (!activeSession) {
+        attendanceNote = note;
       } else {
-        const activeSession = await Session.findByPk(sessionId);
-        if (!activeSession || activeSession.status === 'cancelled') {
-          attendanceNote = '⚠️ الحصة الحالية غير متاحة للتسجيل.';
+        const existingAttendance = await Attendance.findOne({
+          where: { StudentId: student.id, SessionId: sessionId },
+        });
+        if (existingAttendance) {
+          attendanceNote = '⚠️ الطالب مسجل حضور في هذه الحصة بالفعل.';
+        } else if (student.balance < student.price_per_session) {
+          attendanceNote = `⚠️ رصيد الطالب غير كافٍ لتسجيل الحضور (الرصيد: ${student.balance} ج).`;
         } else {
-          const existingAttendance = await Attendance.findOne({
-            where: { StudentId: student.id, SessionId: sessionId },
+          await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
+          await Attendance.create({
+            StudentId: student.id,
+            SessionId: sessionId,
+            UserId: req.session.userId,
+            comment: comment || null,
+            payment_collected: initialBalance,
           });
-          if (existingAttendance) {
-            attendanceNote = '⚠️ الطالب مسجل حضور في هذه الحصة بالفعل.';
-          } else if (student.balance < student.price_per_session) {
-            attendanceNote = `⚠️ رصيد الطالب غير كافٍ لتسجيل الحضور (الرصيد: ${student.balance} ج).`;
-          } else {
-            await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
-            await Attendance.create({
-              StudentId: student.id,
-              SessionId: sessionId,
-              UserId: req.session.userId,
-              comment: comment || null,
-              payment_collected: initialBalance,
-            });
-            await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
-            attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
-          }
+          await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
+          attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
         }
       }
     }
