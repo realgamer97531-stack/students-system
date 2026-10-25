@@ -6,6 +6,7 @@
 //
 //   HOSTINGER_API_TOKEN=... node scripts/deploy-portal.js            (dry run)
 //   HOSTINGER_API_TOKEN=... node scripts/deploy-portal.js --upload   (really upload)
+//   ... --upload --also=quiz_upload_key.php                          (also send a public/ file that is NOT in git, e.g. a secret)
 
 const fs = require('fs');
 const path = require('path');
@@ -19,6 +20,7 @@ const EXCLUDE = new Set(['get_avatars.php']);
 
 const token = process.env.HOSTINGER_API_TOKEN;
 const upload = process.argv.includes('--upload');
+const also = (process.argv.find((a) => a.startsWith('--also=')) || '').slice('--also='.length).split(',').filter(Boolean);
 
 // Retries network errors (timeouts, resets) a few times; HTTP errors are returned as-is.
 async function request(url, options, tries = 4) {
@@ -52,16 +54,23 @@ async function liveCopy(rel) {
 
 // Hostinger's CDN re-compresses images, so the served bytes never match git. For images,
 // compare the file size on the server (Hostinger file API) instead of the downloaded copy.
-const IMAGE = /.(png|jpe?g|gif|webp)$/i;
+// PHP files run instead of downloading, so they are compared by size too.
+const IMAGE = /.(png|jpe?g|gif|webp|php)$/i;
 const listings = new Map();
 
 async function serverSize(site, rel) {
   const dir = path.posix.dirname(rel);
   if (!listings.has(dir)) {
-    const query = dir === '.' ? '' : `?directory=${encodeURIComponent(dir)}`;
-    const res = await api('GET', `/api/hosting/v1/accounts/${site.username}/domains/${DOMAIN}/files${query}`);
-    const items = res.items || [];
-    if (res.total_items > items.length) throw new Error(`${dir}: file listing has more than one page`);
+    // The API returns 1000 items per page; the root folder has thousands (homework uploads), so page with ?offset=
+    const items = [];
+    for (;;) {
+      const params = new URLSearchParams({ ...(dir === '.' ? {} : { directory: dir }), ...(items.length ? { offset: String(items.length) } : {}) });
+      const query = params.toString() ? `?${params}` : '';
+      const res = await api('GET', `/api/hosting/v1/accounts/${site.username}/domains/${DOMAIN}/files${query}`);
+      const page = res.items || [];
+      items.push(...page);
+      if (!page.length || items.length >= (res.total_items || 0)) break;
+    }
     listings.set(dir, new Map(items.filter((i) => i.type === 'file').map((i) => [i.name, i.size_bytes])));
   }
   return listings.get(dir).get(path.posix.basename(rel));
@@ -110,7 +119,10 @@ async function main() {
   const files = execSync('git ls-files public', { cwd: ROOT, encoding: 'utf8' })
     .split('\n').filter(Boolean)
     .map((f) => f.replace(/^public\//, ''))
-    .filter((f) => !EXCLUDE.has(f));
+    .filter((f) => !EXCLUDE.has(f))
+    .concat(also.filter((f) => fs.existsSync(path.join(ROOT, 'public', f))));
+  const missing = also.filter((f) => !fs.existsSync(path.join(ROOT, 'public', f)));
+  if (missing.length) throw new Error(`--also file(s) not found in public/: ${missing.join(', ')}`);
 
   const changed = [];
   for (const rel of files) {
