@@ -1,0 +1,891 @@
+<%- include('partials/header') %>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive.min.js"></script>
+<script src="/quiz-render.js?v=1"></script>
+
+<style>
+  #qb { --qb-border: var(--sf-border, rgba(0,0,0,.09)); padding-bottom: 96px; }
+  .qb-card { background: var(--sf-card-bg); border: 1px solid var(--qb-border); border-radius: var(--sf-radius); box-shadow: var(--sf-shadow); padding: 18px; margin-bottom: 16px; }
+  .qb-card h6 { font-weight: 800; }
+  .qb-q { position: relative; border-inline-start: 5px solid var(--sf-primary); }
+  .qb-q[data-type="essay"] { border-inline-start-color: var(--sf-warning); }
+  .qb-q[data-type="bonus"] { border-inline-start-color: var(--sf-accent); }
+  .qb-q.qb-drop { outline: 3px dashed var(--sf-primary); outline-offset: 2px; }
+  .qb-qhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .qb-num { width: 36px; height: 36px; border-radius: 10px; background: var(--sf-primary); color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }
+  .qb-q[data-type="essay"] .qb-num { background: var(--sf-warning); }
+  .qb-q[data-type="bonus"] .qb-num { background: var(--sf-accent); }
+  .qb-types { display: inline-flex; border: 1px solid var(--qb-border); border-radius: 10px; overflow: hidden; }
+  .qb-types button { border: 0; background: transparent; padding: 6px 12px; font-weight: 700; font-size: .85rem; color: var(--sf-muted); }
+  .qb-types button.active { background: var(--sf-primary); color: #fff; }
+  .qb-marks { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: .85rem; }
+  .qb-marks input { width: 76px; text-align: center; font-weight: 800; }
+  .qb-tools { margin-inline-start: auto; display: flex; gap: 4px; }
+  .qb-tools button { border: 1px solid var(--qb-border); background: var(--sf-card-bg); border-radius: 8px; width: 34px; height: 34px; color: var(--sf-muted); }
+  .qb-tools button:hover { color: var(--sf-primary); border-color: var(--sf-primary); }
+  .qb-tools button.danger:hover { color: var(--sf-danger); border-color: var(--sf-danger); }
+  .qb-textbar { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+  .qb-textbar button { border: 1px solid var(--qb-border); background: var(--sf-primary-light); color: var(--sf-primary); border-radius: 8px; padding: 3px 10px; font-size: .85rem; font-weight: 700; }
+  .qb-textbar button.sym { background: transparent; color: var(--sf-text); min-width: 32px; padding: 3px 6px; font-weight: 600; }
+  .qb-text { min-height: 70px; resize: vertical; font-size: 1rem; }
+  .qb-preview { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--sf-bg); font-size: 1.05rem; line-height: 1.9; min-height: 20px; word-break: break-word; }
+  .qb-preview:empty { display: none; }
+  .qb-preview .qz-math[data-math-index] { cursor: pointer; border-radius: 6px; padding: 0 2px; }
+  .qb-preview .qz-math[data-math-index]:hover { background: rgba(67,56,202,.12); }
+  .qz-math { direction: ltr; unicode-bidi: isolate; }
+  .qz-math-block { display: block; text-align: center; margin: 6px 0; overflow-x: auto; }
+  .qb-img { position: relative; display: inline-block; margin-top: 10px; }
+  .qb-img img { max-width: 100%; max-height: 260px; border-radius: 10px; border: 1px solid var(--qb-border); }
+  .qb-img button { position: absolute; top: 6px; inset-inline-end: 6px; border: 0; border-radius: 50%; width: 28px; height: 28px; background: rgba(225,29,72,.92); color: #fff; }
+  .qb-preview { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+  .qb-choice > div { min-width: 0; }
+  @media (max-width: 576px) {
+    .qb-choice { grid-template-columns: 34px minmax(0, 1fr) !important; }
+    .qb-choice-tools { grid-column: 2; }
+  }
+  .qb-choice { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 8px; border-radius: 12px; border: 1px solid var(--qb-border); margin-bottom: 8px; }
+  .qb-choice.correct { border-color: var(--sf-accent); background: rgba(20,184,166,.08); }
+  .qb-choice .qb-letter { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--qb-border); background: transparent; font-weight: 800; color: var(--sf-muted); }
+  .qb-choice.correct .qb-letter { background: var(--sf-accent); border-color: var(--sf-accent); color: #fff; }
+  .qb-choice textarea { min-height: 38px; resize: vertical; }
+  .qb-choice .qb-img img { max-height: 140px; }
+  .qb-choice-tools { display: flex; gap: 4px; }
+  .qb-choice-tools button { border: 1px solid var(--qb-border); background: transparent; border-radius: 8px; width: 34px; height: 34px; color: var(--sf-muted); }
+  .qb-hint { font-size: .8rem; color: var(--sf-muted); }
+  .qb-add { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 8px 0 20px; }
+  .qb-add button { border-radius: 12px; font-weight: 700; padding: 10px 16px; }
+  .qb-bar { position: fixed; bottom: 0; inset-inline: 0; z-index: 1030; background: var(--sf-card-bg); border-top: 1px solid var(--qb-border); box-shadow: 0 -8px 24px rgba(0,0,0,.08); padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+  @media (min-width: 992px) { .qb-bar { inset-inline-start: var(--sf-sidebar-width, 260px); } }
+  .qb-stats { display: flex; gap: 14px; flex-wrap: wrap; font-weight: 700; font-size: .9rem; }
+  .qb-stats b { color: var(--sf-primary); }
+  .qb-dirty { color: var(--sf-warning); font-size: .85rem; font-weight: 700; }
+  .qb-busy { opacity: .55; pointer-events: none; }
+  /* نافذة المعادلات */
+  #mathModal math-field { width: 100%; min-height: 64px; font-size: 1.6rem; border: 2px solid var(--sf-primary); border-radius: 12px; padding: 8px 12px; direction: ltr; background: var(--sf-card-bg); color: var(--sf-text); }
+  #mathModal .mm-fallback { direction: ltr; font-family: monospace; }
+  #mathModal .mm-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 12px 0 8px; }
+  #mathModal .mm-tabs button { border: 1px solid var(--qb-border, rgba(0,0,0,.1)); background: transparent; border-radius: 999px; padding: 4px 12px; font-weight: 700; font-size: .85rem; }
+  #mathModal .mm-tabs button.active { background: var(--sf-primary); color: #fff; border-color: var(--sf-primary); }
+  #mathModal .mm-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; max-height: 230px; overflow-y: auto; padding: 2px; }
+  #mathModal .mm-keys button { border: 1px solid var(--qb-border, rgba(0,0,0,.1)); background: var(--sf-bg); border-radius: 10px; min-height: 52px; padding: 4px; font-size: .95rem; color: var(--sf-text); display: grid; place-items: center; overflow: hidden; }
+  #mathModal .mm-keys button:hover { border-color: var(--sf-primary); background: var(--sf-primary-light); }
+  #mathModal .mm-keys .katex { font-size: 1em; }
+  #mathModal .mm-preview { min-height: 40px; text-align: center; padding: 8px; border-radius: 10px; background: var(--sf-bg); direction: ltr; overflow-x: auto; }
+  #previewModal .pv-q { border: 1px solid var(--sf-border, rgba(0,0,0,.1)); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  #previewModal .pv-choice { border: 1px solid var(--sf-border, rgba(0,0,0,.1)); border-radius: 10px; padding: 8px 12px; margin-top: 8px; }
+  #previewModal .pv-choice.correct { border-color: var(--sf-accent); background: rgba(20,184,166,.08); }
+  #previewModal img { max-width: 100%; border-radius: 10px; margin-top: 8px; }
+</style>
+
+<div id="qb" data-no-draft>
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="mb-1">📝 <%= quiz ? 'تعديل الاختبار' : 'اختبار جديد' %></h3>
+      <p class="text-muted small mb-0">اكتب السؤال أو ارفع صورته (أو الاتنين). لصق صورة بـ <kbd>Ctrl</kbd>+<kbd>V</kbd> أو سحبها على السؤال بيشتغل كمان.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/admin/platform-quizzes" class="btn btn-outline-secondary">⬅ رجوع</a>
+      <% if (quiz) { %><a href="/admin/platform-quizzes/<%= quiz.id %>/results" class="btn btn-outline-success">📊 النتايج</a><% } %>
+    </div>
+  </div>
+
+  <div id="draftBanner" class="alert alert-warning d-none d-flex align-items-center gap-2 flex-wrap">
+    <span>📝 فيه تعديلات مش محفوظة من آخر مرة على الجهاز ده.</span>
+    <button type="button" class="btn btn-sm btn-warning" onclick="restoreDraft()">رجّعها</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="discardDraft()">تجاهلها</button>
+  </div>
+
+  <% if (quiz && quiz.attemptCount) { %>
+    <div class="alert alert-info small">👥 <strong><%= quiz.attemptCount %></strong> محاولة على الاختبار ده. لو غيرت إجابة صحيحة أو درجة، هنسألك بعد الحفظ لو عايز تعيد تصحيح الطلاب اللي حلوا.</div>
+  <% } %>
+  <% if (!uploadReady) { %>
+    <div class="alert alert-warning small">⚠️ رفع الصور على هوستينجر لسه مش متظبط — تقدر تكتب الأسئلة بالمعادلات دلوقتي، والصور هتشتغل لما يتظبط.</div>
+  <% } %>
+
+  <div class="qb-card">
+    <h6 class="mb-3">⚙️ بيانات الاختبار</h6>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-bold">اسم الاختبار</label>
+        <input type="text" id="fTitle" class="form-control" maxlength="200" placeholder="مثال: اختبار الأسبوع الأول — الحركة في خط مستقيم">
+      </div>
+      <div class="col-md-3 col-6">
+        <label class="form-label small fw-bold">المادة</label>
+        <select id="fSubject" class="form-select"></select>
+      </div>
+      <div class="col-md-3 col-6">
+        <label class="form-label small fw-bold">يظهر ويقفل الأسبوع رقم</label>
+        <input type="number" id="fWeek" class="form-control" min="1" list="weekList" placeholder="2">
+        <datalist id="weekList"></datalist>
+        <div class="qb-hint mt-1">اختبار الأسبوع 1 ← حطه في الأسبوع 2</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-bold mb-1">السناتر <span class="qb-hint fw-normal">(لو مختارتش أي سنتر = كل سناتر المادة)</span></label>
+        <div id="fCenters" class="d-flex flex-wrap gap-3 border rounded p-2 small"></div>
+      </div>
+      <div class="col-md-4 col-6">
+        <label class="form-label small fw-bold">الوقت (بالدقايق)</label>
+        <input type="number" id="fTime" class="form-control" min="1" max="600" placeholder="من غير وقت">
+      </div>
+      <div class="col-md-8">
+        <label class="form-label small fw-bold">لينك فيديو شرح الاختبار <span class="qb-hint fw-normal">(بيظهر للطالب بعد ما يسلّم)</span></label>
+        <input type="url" id="fVideo" class="form-control" dir="ltr" placeholder="https://youtu.be/... أو Vimeo / Drive / Bunny">
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-bold">تعليمات للطالب <span class="qb-hint fw-normal">(اختياري)</span></label>
+        <textarea id="fInstructions" class="form-control" rows="2" maxlength="5000" placeholder="مثال: ركز في الوحدات، والآلة الحاسبة مسموحة"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="questions"></div>
+
+  <div class="qb-add">
+    <button type="button" class="btn btn-primary" onclick="addQuestion('mcq')">➕ سؤال اختياري</button>
+    <button type="button" class="btn btn-warning" onclick="addQuestion('essay')">➕ سؤال مقالي</button>
+    <button type="button" class="btn btn-success" onclick="addQuestion('bonus')">➕ سؤال بونص</button>
+  </div>
+
+  <div class="qb-bar">
+    <div class="qb-stats">
+      <span>❓ <b id="sCount">0</b> سؤال</span>
+      <span>🎯 <b id="sMarks">0</b> درجة</span>
+      <span class="d-none d-sm-inline">🔘 <b id="sMcq">0</b> اختياري · ✍️ <b id="sEssay">0</b> مقالي · ⭐ <b id="sBonus">0</b> بونص</span>
+      <span class="qb-dirty d-none" id="sDirty">● تعديلات مش محفوظة</span>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary" onclick="openPreview()">👁 معاينة</button>
+      <button type="button" class="btn btn-primary px-4" id="saveBtn" onclick="saveQuiz()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة المعادلات -->
+<div class="modal fade" id="mathModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">∑ معادلة</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="mmEditorWrap"></div>
+        <div class="d-flex align-items-center gap-3 flex-wrap mt-2 small">
+          <label class="mb-0"><input type="checkbox" id="mmDisplay"> في سطر لوحدها (كبيرة وفي النص)</label>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="mmKeyboardBtn" onclick="toggleMathKeyboard()">⌨️ كيبورد الرياضيات</button>
+          <span class="qb-hint">اكتب على الكيبورد عادي: <code dir="ltr">x^2</code> ، <code dir="ltr">a/b</code> ، <code dir="ltr">sqrt</code> ، <code dir="ltr">alpha</code></span>
+        </div>
+        <div class="mm-tabs" id="mmTabs"></div>
+        <div class="mm-keys" id="mmKeys"></div>
+        <div class="mt-3 small text-muted">المعاينة:</div>
+        <div class="mm-preview" id="mmPreview"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-danger me-auto d-none" id="mmDelete" onclick="deleteMath()">🗑 مسح المعادلة</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+        <button type="button" class="btn btn-primary px-4" onclick="commitMath()">✔ إدخال</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- معاينة زي الطالب -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">👁 الاختبار زي ما الطالب هيشوفه</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="previewBody"></div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="imagePicker" accept="image/*" class="d-none">
+
+<script>
+  const SUBJECTS = <%- JSON.stringify(subjects).replace(/</g, '\\u003c') %>;
+  const INITIAL = <%- JSON.stringify(quiz).replace(/</g, '\\u003c') %>;
+  const UPLOAD_READY = <%- JSON.stringify(uploadReady) %>;
+  const LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+  const TYPE_LABELS = { mcq: '🔘 اختياري', essay: '✍️ مقالي', bonus: '⭐ بونص' };
+  const DRAFT_KEY = 'pq_builder:' + (INITIAL ? INITIAL.id : 'new');
+
+  let uidSeq = 1;
+  const newChoice = () => ({ text: '', image: '' });
+  function newQuestion(type) {
+    return {
+      uid: uidSeq++, id: null, type, text: '', image: '', marks: 2, requiresAnswer: false,
+      choices: type === 'mcq' ? [newChoice(), newChoice(), newChoice(), newChoice()] : [],
+      correctIndex: null,
+    };
+  }
+
+  // الافتراضي: 6 أسئلة، أول 3 اختياري، كل سؤال 2 درجة
+  const state = INITIAL ? {
+    id: INITIAL.id,
+    subjectId: INITIAL.subjectId, week: INITIAL.week, centerIds: INITIAL.centerIds || [],
+    title: INITIAL.title, instructions: INITIAL.instructions, timeLimit: INITIAL.timeLimit, answerVideoUrl: INITIAL.answerVideoUrl,
+    attemptCount: INITIAL.attemptCount || 0,
+    questions: INITIAL.questions.map(q => ({
+      uid: uidSeq++, id: q.id, type: q.type, text: q.text || '', image: q.image || '', marks: q.marks,
+      requiresAnswer: Boolean(q.requiresAnswer),
+      choices: (q.choices || []).map(c => ({ text: c.text || '', image: c.image || '' })),
+      correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : null,
+    })),
+  } : {
+    id: null, subjectId: SUBJECTS[0] ? SUBJECTS[0].id : null, week: '', centerIds: [], title: '', instructions: '',
+    timeLimit: '', answerVideoUrl: '', attemptCount: 0,
+    questions: ['mcq', 'mcq', 'mcq', 'essay', 'essay', 'essay'].map(newQuestion),
+  };
+
+  const esc = (v) => QuizRender.escapeHtml(v);
+  let dirty = false;
+
+  // ================= بيانات الاختبار =================
+  function renderMeta() {
+    const subjectSel = document.getElementById('fSubject');
+    subjectSel.innerHTML = SUBJECTS.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    subjectSel.value = state.subjectId || '';
+    document.getElementById('fTitle').value = state.title || '';
+    document.getElementById('fWeek').value = state.week || '';
+    document.getElementById('fTime').value = state.timeLimit || '';
+    document.getElementById('fVideo').value = state.answerVideoUrl || '';
+    document.getElementById('fInstructions').value = state.instructions || '';
+    renderSubjectDetails();
+  }
+
+  function renderSubjectDetails() {
+    const subject = SUBJECTS.find(s => s.id === Number(state.subjectId));
+    document.getElementById('weekList').innerHTML = (subject ? subject.weeks : []).map(w => `<option value="${w}">`).join('');
+    const box = document.getElementById('fCenters');
+    if (!subject || !subject.centers.length) { box.innerHTML = '<span class="text-muted">مفيش سناتر للمادة دي</span>'; return; }
+    box.innerHTML = subject.centers.map(c => `
+      <label class="mb-0"><input type="checkbox" value="${c.id}" ${state.centerIds.includes(c.id) ? 'checked' : ''} onchange="toggleCenter(${c.id}, this.checked)"> ${esc(c.name)}</label>
+    `).join('');
+  }
+
+  function toggleCenter(id, on) {
+    state.centerIds = on ? [...new Set([...state.centerIds, id])] : state.centerIds.filter(x => x !== id);
+    markDirty();
+  }
+
+  document.getElementById('fSubject').addEventListener('change', (e) => {
+    state.subjectId = Number(e.target.value);
+    state.centerIds = [];
+    renderSubjectDetails();
+    markDirty();
+  });
+  [['fTitle', 'title'], ['fWeek', 'week'], ['fTime', 'timeLimit'], ['fVideo', 'answerVideoUrl'], ['fInstructions', 'instructions']].forEach(([el, key]) => {
+    document.getElementById(el).addEventListener('input', (e) => { state[key] = e.target.value; markDirty(); });
+  });
+
+  // ================= الأسئلة =================
+  const findQ = (uid) => state.questions.find(q => q.uid === uid);
+
+  const QUICK_TEMPLATES = {
+    frac: '\\frac{#?}{#?}',
+    pow: '#?^{#?}',
+    sqrt: '\\sqrt{#?}',
+    matrix: '\\begin{pmatrix}#?&#?\\\\#?&#?\\end{pmatrix}',
+  };
+  function textBar(target) {
+    const quick = ['°', 'Ω', 'μ', 'π', 'Δ', 'θ', 'λ', '→', '×', '±', '≈', '≠'];
+    return `<div class="qb-textbar">
+      <button type="button" onclick="openMath('${target}')">∑ معادلة</button>
+      <button type="button" onclick="openMath('${target}', QUICK_TEMPLATES.frac)">½ كسر</button>
+      <button type="button" onclick="openMath('${target}', QUICK_TEMPLATES.pow)">x² أس</button>
+      <button type="button" onclick="openMath('${target}', QUICK_TEMPLATES.sqrt)">√ جذر</button>
+      <button type="button" onclick="openMath('${target}', QUICK_TEMPLATES.matrix)">▦ مصفوفة</button>
+      ${quick.map(s => `<button type="button" class="sym" onclick="insertPlain('${target}', '${s}')">${s}</button>`).join('')}
+    </div>`;
+  }
+
+  function imageBlock(url, removeCall) {
+    if (!url) return '';
+    return `<div class="qb-img"><img src="${esc(url)}" alt="" loading="lazy"><button type="button" title="شيل الصورة" onclick="${removeCall}">✕</button></div>`;
+  }
+
+  function choiceRow(q, ci) {
+    const c = q.choices[ci];
+    const target = `c:${q.uid}:${ci}`;
+    return `
+      <div class="qb-choice ${q.correctIndex === ci ? 'correct' : ''}">
+        <button type="button" class="qb-letter" title="دوس عشان تخليها الإجابة الصحيحة" onclick="setCorrect(${q.uid}, ${ci})">${LETTERS[ci]}</button>
+        <div>
+          <textarea class="form-control qb-input" rows="1" data-target="${target}" placeholder="الاختيار ${LETTERS[ci]} (نص أو معادلة أو صورة)">${esc(c.text)}</textarea>
+          <div class="qb-preview" data-preview="${target}"></div>
+          ${imageBlock(c.image, `removeImage('${target}')`)}
+        </div>
+        <div class="qb-choice-tools">
+          <button type="button" title="معادلة" onclick="openMath('${target}')">∑</button>
+          <button type="button" title="صورة للاختيار" onclick="pickImage('${target}')">📷</button>
+          ${q.choices.length > 2 ? `<button type="button" title="مسح الاختيار" onclick="removeChoice(${q.uid}, ${ci})">✕</button>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function questionCard(q, index) {
+    const target = `q:${q.uid}`;
+    let body = '';
+    if (q.type === 'mcq') {
+      body = `
+        <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+          <strong class="small">الاختيارات <span class="qb-hint fw-normal">— دوس على الحرف عشان تحدد الإجابة الصحيحة</span></strong>
+          ${q.choices.length < 6 ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="addChoice(${q.uid})">➕ اختيار</button>` : ''}
+        </div>
+        ${q.choices.map((_, ci) => choiceRow(q, ci)).join('')}
+        ${q.correctIndex === null ? '<div class="small text-danger fw-bold">⚠️ لسه محددتش الإجابة الصحيحة</div>' : ''}`;
+    } else if (q.type === 'essay') {
+      body = `
+        <label class="form-check mt-3 mb-0 small fw-bold">
+          <input type="checkbox" class="form-check-input" ${q.requiresAnswer ? 'checked' : ''} onchange="setRequiresAnswer(${q.uid}, this.checked)">
+          الطالب لازم يكتب إجابة (وأنا أصححها بعدين)
+        </label>
+        <div class="qb-hint">${q.requiresAnswer ? 'الطالب هيكتب الحل أو يرفع صورته، والدرجة هتستنى تصحيحك من صفحة النتايج.' : 'الطالب هيشوف السؤال بس وياخد درجته تلقائي.'}</div>`;
+    } else {
+      body = '<div class="qb-hint mt-2">⭐ سؤال بونص: الطالب مش محتاج يجاوب، وبياخد الدرجة تلقائي.</div>';
+    }
+    return `
+      <div class="qb-card qb-q" data-uid="${q.uid}" data-type="${q.type}">
+        <div class="qb-qhead">
+          <div class="qb-num">${index + 1}</div>
+          <div class="qb-types">
+            ${Object.entries(TYPE_LABELS).map(([t, label]) => `<button type="button" class="${q.type === t ? 'active' : ''}" onclick="setType(${q.uid}, '${t}')">${label}</button>`).join('')}
+          </div>
+          <label class="qb-marks">الدرجة <input type="number" class="form-control form-control-sm" min="0" max="1000" step="0.5" value="${q.marks}" oninput="setMarks(${q.uid}, this.value)"></label>
+          <div class="qb-tools">
+            <button type="button" title="لفوق" onclick="moveQuestion(${q.uid}, -1)" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up"></i></button>
+            <button type="button" title="لتحت" onclick="moveQuestion(${q.uid}, 1)" ${index === state.questions.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down"></i></button>
+            <button type="button" title="نسخة" onclick="duplicateQuestion(${q.uid})"><i class="bi bi-copy"></i></button>
+            <button type="button" class="danger" title="مسح السؤال" onclick="removeQuestion(${q.uid})"><i class="bi bi-trash3"></i></button>
+          </div>
+        </div>
+        ${textBar(target)}
+        <textarea class="form-control qb-text qb-input" data-target="${target}" placeholder="اكتب السؤال هنا… المعادلات من زرار ∑">${esc(q.text)}</textarea>
+        <div class="qb-preview" data-preview="${target}"></div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="pickImage('${target}')">📷 ${q.image ? 'غيّر الصورة' : 'صورة للسؤال'}</button>
+          <span class="qb-hint">أو الصق صورة / اسحبها هنا</span>
+        </div>
+        ${imageBlock(q.image, `removeImage('${target}')`)}
+        ${body}
+      </div>`;
+  }
+
+  function renderQuestions() {
+    const box = document.getElementById('questions');
+    box.innerHTML = state.questions.map(questionCard).join('');
+    box.querySelectorAll('[data-preview]').forEach(el => refreshPreview(el.dataset.preview));
+    box.querySelectorAll('textarea.qb-input').forEach(autoGrow);
+    renderStats();
+  }
+
+  function renderStats() {
+    const qs = state.questions;
+    document.getElementById('sCount').textContent = qs.length;
+    document.getElementById('sMarks').textContent = Math.round(qs.reduce((s, q) => s + (Number(q.marks) || 0), 0) * 100) / 100;
+    document.getElementById('sMcq').textContent = qs.filter(q => q.type === 'mcq').length;
+    document.getElementById('sEssay').textContent = qs.filter(q => q.type === 'essay').length;
+    document.getElementById('sBonus').textContent = qs.filter(q => q.type === 'bonus').length;
+  }
+
+  // target = "q:uid" (نص السؤال) أو "c:uid:index" (اختيار)
+  function targetRef(target) {
+    const [kind, uid, ci] = target.split(':');
+    const q = findQ(Number(uid));
+    if (!q) return null;
+    if (kind === 'q') return { q, get: () => q.text, set: (v) => { q.text = v; }, getImage: () => q.image, setImage: (v) => { q.image = v; } };
+    const c = q.choices[Number(ci)];
+    if (!c) return null;
+    return { q, get: () => c.text, set: (v) => { c.text = v; }, getImage: () => c.image, setImage: (v) => { c.image = v; } };
+  }
+
+  function refreshPreview(target) {
+    const ref = targetRef(target);
+    const el = document.querySelector(`[data-preview="${target}"]`);
+    if (!ref || !el) return;
+    const text = ref.get();
+    // المعاينة بتظهر بس لو فيه معادلات (النص العادي ظاهر في الخانة أصلًا)
+    el.innerHTML = /\\\(|\\\[/.test(text) ? QuizRender.html(text, { editable: true }) : '';
+  }
+
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight + 2, 600) + 'px';
+  }
+
+  document.getElementById('questions').addEventListener('input', (e) => {
+    const el = e.target;
+    if (!el.matches('textarea.qb-input')) return;
+    const ref = targetRef(el.dataset.target);
+    if (!ref) return;
+    ref.set(el.value);
+    autoGrow(el);
+    refreshPreview(el.dataset.target);
+    markDirty();
+  });
+
+  // دوسة على معادلة في المعاينة = تعديلها
+  document.getElementById('questions').addEventListener('click', (e) => {
+    const math = e.target.closest('[data-math-index]');
+    if (!math) return;
+    const preview = math.closest('[data-preview]');
+    openMath(preview.dataset.preview, null, Number(math.dataset.mathIndex));
+  });
+
+  function setType(uid, type) {
+    const q = findQ(uid);
+    if (!q || q.type === type) return;
+    q.type = type;
+    if (type === 'mcq' && q.choices.length < 2) { q.choices = [newChoice(), newChoice(), newChoice(), newChoice()]; q.correctIndex = null; }
+    renderQuestions(); markDirty();
+  }
+  function setMarks(uid, value) { const q = findQ(uid); if (q) { q.marks = value; renderStats(); markDirty(); } }
+  function setRequiresAnswer(uid, on) { const q = findQ(uid); if (q) { q.requiresAnswer = on; renderQuestions(); markDirty(); } }
+  function setCorrect(uid, ci) { const q = findQ(uid); if (q) { q.correctIndex = ci; renderQuestions(); markDirty(); } }
+  function addChoice(uid) { const q = findQ(uid); if (q && q.choices.length < 6) { q.choices.push(newChoice()); renderQuestions(); markDirty(); } }
+  function removeChoice(uid, ci) {
+    const q = findQ(uid);
+    if (!q || q.choices.length <= 2) return;
+    q.choices.splice(ci, 1);
+    if (q.correctIndex === ci) q.correctIndex = null;
+    else if (q.correctIndex !== null && q.correctIndex > ci) q.correctIndex -= 1;
+    renderQuestions(); markDirty();
+  }
+  function addQuestion(type) {
+    state.questions.push(newQuestion(type));
+    renderQuestions(); markDirty();
+    const cards = document.querySelectorAll('.qb-q');
+    cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function removeQuestion(uid) {
+    const q = findQ(uid);
+    if (!q) return;
+    if ((q.text || q.image) && !confirm('مسح السؤال ده؟')) return;
+    state.questions = state.questions.filter(x => x.uid !== uid);
+    renderQuestions(); markDirty();
+  }
+  function duplicateQuestion(uid) {
+    const i = state.questions.findIndex(x => x.uid === uid);
+    if (i < 0) return;
+    const copy = JSON.parse(JSON.stringify(state.questions[i]));
+    copy.uid = uidSeq++; copy.id = null;
+    state.questions.splice(i + 1, 0, copy);
+    renderQuestions(); markDirty();
+  }
+  function moveQuestion(uid, dir) {
+    const i = state.questions.findIndex(x => x.uid === uid);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= state.questions.length) return;
+    [state.questions[i], state.questions[j]] = [state.questions[j], state.questions[i]];
+    renderQuestions(); markDirty();
+  }
+
+  // بيدخل نص في مكان المؤشر في الخانة
+  const caretByTarget = {};
+  document.getElementById('questions').addEventListener('focusout', (e) => {
+    if (e.target.matches('textarea.qb-input')) caretByTarget[e.target.dataset.target] = [e.target.selectionStart, e.target.selectionEnd];
+  });
+  function insertAtCaret(target, snippet) {
+    const ref = targetRef(target);
+    if (!ref) return;
+    const el = document.querySelector(`textarea[data-target="${target}"]`);
+    const text = ref.get();
+    const caret = el && document.activeElement === el ? [el.selectionStart, el.selectionEnd] : (caretByTarget[target] || [text.length, text.length]);
+    const next = text.slice(0, caret[0]) + snippet + text.slice(caret[1]);
+    ref.set(next);
+    if (el) {
+      el.value = next;
+      autoGrow(el);
+      const pos = caret[0] + snippet.length;
+      caretByTarget[target] = [pos, pos];
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    }
+    refreshPreview(target);
+    markDirty();
+  }
+  function insertPlain(target, symbol) { insertAtCaret(target, symbol); }
+
+  // ================= الصور =================
+  let imageTarget = null;
+  function pickImage(target) {
+    if (!UPLOAD_READY) { alert('رفع الصور لسه مش متظبط على السيرفر'); return; }
+    imageTarget = target;
+    const picker = document.getElementById('imagePicker');
+    picker.value = '';
+    picker.click();
+  }
+  document.getElementById('imagePicker').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file && imageTarget) uploadImage(imageTarget, file);
+  });
+
+  // الصور الكبيرة (صور الموبايل) بتتصغر قبل الرفع عشان تفتح بسرعة عند الطلاب
+  function shrinkImage(file) {
+    return new Promise((resolve) => {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 1.5 * 1024 * 1024) return resolve(file);
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const scale = Math.min(1, 1800 / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob((blob) => resolve(blob && blob.size < file.size ? new File([blob], 'image.jpg', { type: 'image/jpeg' }) : file), 'image/jpeg', 0.88);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  async function uploadImage(target, file) {
+    if (!UPLOAD_READY) { alert('رفع الصور لسه مش متظبط على السيرفر'); return; }
+    if (!/^image\//.test(file.type)) { alert('الملف ده مش صورة'); return; }
+    const ref = targetRef(target);
+    const card = document.querySelector(`.qb-q[data-uid="${ref && ref.q.uid}"]`);
+    if (!ref) return;
+    card && card.classList.add('qb-busy');
+    try {
+      const body = new FormData();
+      body.append('image', await shrinkImage(file));
+      const response = await fetch('/admin/platform-quizzes/upload-image', { method: 'POST', body, headers: { Accept: 'application/json' } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || 'فشل رفع الصورة');
+      ref.setImage(data.url);
+      renderQuestions(); markDirty();
+    } catch (error) {
+      alert('❌ ' + error.message);
+    } finally {
+      card && card.classList.remove('qb-busy');
+    }
+  }
+  function removeImage(target) {
+    const ref = targetRef(target);
+    if (ref) { ref.setImage(''); renderQuestions(); markDirty(); }
+  }
+
+  // لصق صورة أو سحبها على كارت السؤال
+  let lastFocusedTarget = null;
+  document.getElementById('questions').addEventListener('focusin', (e) => {
+    const el = e.target.closest('[data-target]');
+    if (el) lastFocusedTarget = el.dataset.target;
+  });
+  document.addEventListener('paste', (e) => {
+    const items = [...((e.clipboardData && e.clipboardData.items) || [])];
+    const item = items.find(i => i.kind === 'file' && /^image\//.test(i.type));
+    if (!item || !lastFocusedTarget || !document.activeElement || !document.activeElement.closest('#questions')) return;
+    e.preventDefault();
+    uploadImage(lastFocusedTarget, item.getAsFile());
+  });
+  document.getElementById('questions').addEventListener('dragover', (e) => {
+    const card = e.target.closest('.qb-q');
+    if (!card) return;
+    e.preventDefault();
+    card.classList.add('qb-drop');
+  });
+  document.getElementById('questions').addEventListener('dragleave', (e) => {
+    const card = e.target.closest('.qb-q');
+    if (card && !card.contains(e.relatedTarget)) card.classList.remove('qb-drop');
+  });
+  document.getElementById('questions').addEventListener('drop', (e) => {
+    const card = e.target.closest('.qb-q');
+    if (!card) return;
+    e.preventDefault();
+    card.classList.remove('qb-drop');
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    const choiceEl = e.target.closest('.qb-choice');
+    const target = choiceEl ? choiceEl.querySelector('[data-target]').dataset.target : `q:${card.dataset.uid}`;
+    if (file) uploadImage(target, file);
+  });
+
+  // ================= المعادلات =================
+  // #? = خانة فاضية الطالب/المساعد يملاها
+  const MATH_KEYS = {
+    'قوالب': [
+      ['\\frac{#?}{#?}', 'كسر'], ['#?^{#?}', 'أس'], ['#?_{#?}', 'رقم سفلي'], ['#?_{#?}^{#?}', ''], ['\\sqrt{#?}', 'جذر'], ['\\sqrt[#?]{#?}', 'جذر نوني'],
+      ['\\left|#?\\right|', 'مطلق'], ['\\left(#?\\right)', ''], ['\\left[#?\\right]', ''], ['\\vec{#?}', 'متجه'], ['\\hat{#?}', 'متجه وحدة'], ['\\overline{#?}', ''],
+      ['\\dot{#?}', ''], ['#?\\times10^{#?}', '×10ⁿ'], ['\\begin{pmatrix}#?&#?\\\\#?&#?\\end{pmatrix}', 'مصفوفة 2×2'],
+      ['\\begin{pmatrix}#?&#?&#?\\\\#?&#?&#?\\\\#?&#?&#?\\end{pmatrix}', 'مصفوفة 3×3'], ['\\begin{pmatrix}#?\\\\#?\\end{pmatrix}', 'عمود'],
+      ['\\begin{vmatrix}#?&#?\\\\#?&#?\\end{vmatrix}', 'محدد'], ['\\begin{cases}#?\\\\#?\\end{cases}', 'معادلتين'],
+      ['\\int #?\\,d#?', 'تكامل'], ['\\int_{#?}^{#?} #?\\,d#?', 'تكامل محدد'], ['\\sum_{#?}^{#?} #?', 'مجموع'], ['\\prod_{#?}^{#?}', ''],
+      ['\\lim_{#?\\to#?} #?', 'نهاية'], ['\\frac{d#?}{d#?}', 'تفاضل'], ['\\frac{\\partial #?}{\\partial #?}', ''], ['\\log_{#?}#?', 'لوغاريتم'],
+      ['\\overrightarrow{#?}', ''], ['#?\\%', '%'],
+    ],
+    'رموز': ['\\times', '\\div', '\\pm', '\\mp', '\\cdot', '=', '\\neq', '\\approx', '\\equiv', '\\leq', '\\geq', '<', '>', '\\propto', '\\infty',
+      '^{\\circ}', '\\angle', '\\perp', '\\parallel', '\\triangle', '\\therefore', '\\because', '\\rightarrow', '\\leftarrow', '\\Rightarrow',
+      '\\Leftrightarrow', '\\uparrow', '\\downarrow', '\\rightleftharpoons', '\\in', '\\notin', '\\subset', '\\cup', '\\cap', '\\emptyset',
+      '\\mathbb{R}', '\\mathbb{N}', '\\mathbb{Z}', '\\forall', '\\exists', "'", '\\prime', '\\ldots'],
+    'يوناني': ['\\alpha', '\\beta', '\\gamma', '\\delta', '\\Delta', '\\epsilon', '\\varepsilon', '\\theta', '\\lambda', '\\mu', '\\pi', '\\rho',
+      '\\sigma', '\\Sigma', '\\tau', '\\phi', '\\varphi', '\\Phi', '\\omega', '\\Omega', '\\eta', '\\kappa', '\\nu', '\\xi', '\\psi', '\\chi', '\\Gamma', '\\Lambda', '\\Psi', '\\zeta'],
+    'دوال': ['\\sin', '\\cos', '\\tan', '\\cot', '\\sec', '\\csc', '\\sin^{-1}', '\\cos^{-1}', '\\tan^{-1}', '\\log', '\\ln', 'e^{#?}', '\\exp', '\\sinh', '\\cosh', '\\max', '\\min'],
+    'فيزياء': [
+      ['\\,\\mathrm{m/s}', 'm/s'], ['\\,\\mathrm{m/s^2}', 'm/s²'], ['\\,\\mathrm{N}', 'N'], ['\\,\\mathrm{J}', 'J'], ['\\,\\mathrm{W}', 'W'],
+      ['\\,\\mathrm{Pa}', 'Pa'], ['\\,\\mathrm{Hz}', 'Hz'], ['\\,\\Omega', 'Ω'], ['\\,\\mathrm{V}', 'V'], ['\\,\\mathrm{A}', 'A'], ['\\,\\mathrm{C}', 'C'],
+      ['\\,\\mathrm{T}', 'T'], ['\\,\\mathrm{Wb}', 'Wb'], ['\\,\\mathrm{kg}', 'kg'], ['\\,\\mathrm{mol}', 'mol'], ['\\,\\mathrm{K}', 'K'], ['\\,\\mathrm{eV}', 'eV'],
+      ['\\,^{\\circ}\\mathrm{C}', '°C'], ['\\hbar', ''], ['v_0', ''], ['\\Delta x', ''], ['\\Delta t', ''], ['F_{net}', ''], ['\\vec{F}', ''], ['\\vec{v}', ''],
+      ['\\frac{\\Delta v}{\\Delta t}', ''], ['\\frac{1}{2}mv^2', ''], ['mgh', ''], ['\\mu_0', ''], ['\\varepsilon_0', ''],
+    ],
+  };
+  let mmTab = 'قوالب';
+  let mathCtx = null; // { target, index | null }
+  let mathField = null;
+  let fallbackField = null;
+  // bootstrap بيتحمل في الفوتر بعد السكريبت ده
+  const modalOf = (id) => bootstrap.Modal.getOrCreateInstance(document.getElementById(id));
+  const mathModal = { show: () => modalOf('mathModal').show(), hide: () => modalOf('mathModal').hide() };
+
+  function setupMathEditor() {
+    const wrap = document.getElementById('mmEditorWrap');
+    if (window.customElements && customElements.get('math-field')) {
+      try { if (window.MathfieldElement) { MathfieldElement.soundsDirectory = null; } } catch (_) { /* إصدار قديم */ }
+      wrap.innerHTML = '<math-field id="mmField" math-virtual-keyboard-policy="manual"></math-field>';
+      mathField = document.getElementById('mmField');
+      mathField.addEventListener('input', renderMathPreview);
+    } else {
+      // لو مكتبة المحرر مااتحملتش: خانة LaTeX عادية بمعاينة
+      wrap.innerHTML = '<textarea id="mmFallback" class="form-control mm-fallback" rows="3" placeholder="\\frac{a}{b}"></textarea><div class="qb-hint mt-1">محرر المعادلات مااتحملش — اكتب LaTeX مباشرة أو استخدم الزراير تحت.</div>';
+      fallbackField = document.getElementById('mmFallback');
+      fallbackField.addEventListener('input', renderMathPreview);
+      document.getElementById('mmKeyboardBtn').classList.add('d-none');
+    }
+  }
+
+  // \frac12 → \frac{1}{2} ، \sqrt2 → \sqrt{2} (نفس المعنى، بس الصيغة الكاملة مفهومة في كل مكان)
+  function expandLatexShorthand(latex) {
+    return latex
+      // خانات فاضية سابها المساعد (في مصفوفة مثلًا) — منغيرهاش هتظهر للطالب "\placeholder"
+      .replace(/\\placeholder(\[[^\]]*\])?\{[^{}]*\}/g, '')
+      .replace(/\\([dt]?frac)\s*(\d)\s*(\d)/g, '\\$1{$2}{$3}')
+      .replace(/\\([dt]?frac)\s*(\{[^{}]*\})\s*(\d)/g, '\\$1$2{$3}')
+      .replace(/\\([dt]?frac)\s*(\d)\s*(?=\{)/g, '\\$1{$2}')
+      .replace(/\\sqrt\s*(\d)/g, '\\sqrt{$1}');
+  }
+
+  function mathValue() {
+    // MathLive بيكتب \frac12 لما الأرقام بتتكتب — بنحولها لـ \frac{1}{2} (أضمن لعرض المعادلات في الأبلكيشن)
+    if (mathField) return expandLatexShorthand(String(mathField.getValue ? mathField.getValue('latex') : mathField.value).trim());
+    return fallbackField ? fallbackField.value.trim() : '';
+  }
+  function setMathValue(latex) {
+    if (mathField) mathField.value = latex || '';
+    else if (fallbackField) fallbackField.value = latex || '';
+    renderMathPreview();
+  }
+  function renderMathPreview() {
+    const latex = mathValue();
+    document.getElementById('mmPreview').innerHTML = latex ? QuizRender.html(document.getElementById('mmDisplay').checked ? `\\[${latex}\\]` : `\\(${latex}\\)`) : '<span class="text-muted small">—</span>';
+  }
+  document.getElementById('mmDisplay').addEventListener('change', renderMathPreview);
+
+  function insertMathKey(latex) {
+    if (mathField) {
+      mathField.focus();
+      mathField.insert(latex, { selectionMode: 'placeholder', focus: true, format: 'latex' });
+    } else if (fallbackField) {
+      const plain = latex.replace(/#\?/g, '{}');
+      const s = fallbackField.selectionStart, e = fallbackField.selectionEnd;
+      fallbackField.value = fallbackField.value.slice(0, s) + plain + fallbackField.value.slice(e);
+      fallbackField.focus();
+      fallbackField.setSelectionRange(s + plain.length, s + plain.length);
+    }
+    renderMathPreview();
+  }
+
+  function renderMathKeys() {
+    document.getElementById('mmTabs').innerHTML = Object.keys(MATH_KEYS).map(tab =>
+      `<button type="button" class="${tab === mmTab ? 'active' : ''}" onclick="mmTab='${tab}'; renderMathKeys()">${tab}</button>`).join('');
+    document.getElementById('mmKeys').innerHTML = MATH_KEYS[mmTab].map((key, i) => {
+      const latex = Array.isArray(key) ? key[0] : key;
+      const label = Array.isArray(key) && key[1] ? key[1] : '';
+      const shown = latex.replace(/#\?/g, '\\square');
+      let face = '';
+      try { face = katex.renderToString(shown, { throwOnError: false }); } catch (_) { face = esc(label || latex); }
+      return `<button type="button" title="${esc(label || latex)}" data-key="${i}">${face}</button>`;
+    }).join('');
+  }
+  document.getElementById('mmKeys').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-key]');
+    if (!btn) return;
+    const key = MATH_KEYS[mmTab][Number(btn.dataset.key)];
+    insertMathKey(Array.isArray(key) ? key[0] : key);
+  });
+
+  // index = رقم معادلة موجودة (تعديل) أو null (معادلة جديدة)، template = قالب يبدأ بيه
+  function openMath(target, template, index) {
+    const ref = targetRef(target);
+    if (!ref) return;
+    const el = document.querySelector(`textarea[data-target="${target}"]`);
+    if (el && document.activeElement === el) caretByTarget[target] = [el.selectionStart, el.selectionEnd];
+    mathCtx = { target, index: Number.isInteger(index) ? index : null };
+    const existing = mathCtx.index !== null ? QuizRender.mathAt(ref.get(), mathCtx.index) : null;
+    document.getElementById('mmDisplay').checked = Boolean(existing && existing.display);
+    document.getElementById('mmDelete').classList.toggle('d-none', !existing);
+    setMathValue(existing ? existing.value : '');
+    mathModal.show();
+    setTimeout(() => {
+      if (template) insertMathKey(template);
+      else if (mathField) mathField.focus();
+      else if (fallbackField) fallbackField.focus();
+    }, 250);
+  }
+
+  function commitMath() {
+    if (!mathCtx) return;
+    const latex = mathValue();
+    const display = document.getElementById('mmDisplay').checked;
+    const ref = targetRef(mathCtx.target);
+    if (ref && mathCtx.index !== null) {
+      ref.set(QuizRender.replaceMath(ref.get(), mathCtx.index, latex, display));
+      const el = document.querySelector(`textarea[data-target="${mathCtx.target}"]`);
+      if (el) { el.value = ref.get(); autoGrow(el); }
+      refreshPreview(mathCtx.target);
+      markDirty();
+    } else if (ref && latex) {
+      insertAtCaret(mathCtx.target, display ? `\\[${latex}\\]` : ` \\(${latex}\\) `);
+    }
+    mathModal.hide();
+  }
+  function deleteMath() {
+    if (!mathCtx || mathCtx.index === null) return;
+    setMathValue('');
+    commitMath();
+  }
+  function toggleMathKeyboard() {
+    if (!window.mathVirtualKeyboard) return;
+    if (window.mathVirtualKeyboard.visible) window.mathVirtualKeyboard.hide();
+    else { mathField && mathField.focus(); window.mathVirtualKeyboard.show(); }
+  }
+  document.getElementById('mathModal').addEventListener('hide.bs.modal', () => {
+    if (window.mathVirtualKeyboard && window.mathVirtualKeyboard.visible) window.mathVirtualKeyboard.hide();
+  });
+  // Enter جوه المحرر = إدخال
+  document.getElementById('mathModal').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && (e.target === mathField || e.target.id === 'mmField')) { e.preventDefault(); commitMath(); }
+  });
+
+  // ================= المعاينة =================
+  function openPreview() {
+    const qs = state.questions;
+    const total = Math.round(qs.reduce((s, q) => s + (Number(q.marks) || 0), 0) * 100) / 100;
+    const html = [`<h5 class="fw-bold">${esc(state.title || 'بدون اسم')}</h5>`,
+      `<div class="small text-muted mb-2">${qs.length} سؤال · ${total} درجة${state.timeLimit ? ` · ⏱ ${esc(state.timeLimit)} دقيقة` : ''}</div>`,
+      state.instructions ? `<div class="alert alert-light small">${QuizRender.html(state.instructions)}</div>` : '']
+      .concat(qs.map((q, i) => `
+        <div class="pv-q">
+          <div class="d-flex justify-content-between mb-2"><strong>سؤال ${i + 1}</strong><span class="badge bg-secondary">${q.marks} درجة · ${TYPE_LABELS[q.type]}</span></div>
+          <div style="line-height:1.9;font-size:1.05rem">${QuizRender.html(q.text)}</div>
+          ${q.image ? `<img src="${esc(q.image)}" alt="">` : ''}
+          ${q.type === 'mcq' ? q.choices.map((c, ci) => `<div class="pv-choice ${q.correctIndex === ci ? 'correct' : ''}"><strong>${LETTERS[ci]})</strong> ${QuizRender.html(c.text)}${c.image ? `<br><img src="${esc(c.image)}" alt="" style="max-height:140px">` : ''}</div>`).join('') : ''}
+          ${q.type === 'essay' && q.requiresAnswer ? '<div class="form-control mt-2 text-muted">✍️ خانة إجابة الطالب + رفع صورة الحل</div>' : ''}
+          ${q.type === 'bonus' || (q.type === 'essay' && !q.requiresAnswer) ? '<div class="small text-success mt-2 fw-bold">⭐ الطالب بياخد الدرجة تلقائي</div>' : ''}
+        </div>`));
+    document.getElementById('previewBody').innerHTML = html.join('');
+    modalOf('previewModal').show();
+  }
+
+  // ================= الحفظ =================
+  let draftTimer = null;
+  function markDirty() {
+    dirty = true;
+    document.getElementById('sDirty').classList.remove('d-none');
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), state })); } catch (_) { /* التخزين مقفول */ }
+    }, 600);
+  }
+  function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (_) { /* */ } }
+  function readDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (!d || !d.state || Date.now() - d.at > 7 * 24 * 3600 * 1000) return null;
+      return d;
+    } catch (_) { return null; }
+  }
+  function restoreDraft() {
+    const d = readDraft();
+    if (!d) return;
+    Object.assign(state, d.state, { id: state.id, attemptCount: state.attemptCount });
+    state.questions.forEach(q => { q.uid = uidSeq++; });
+    renderMeta(); renderQuestions();
+    document.getElementById('draftBanner').classList.add('d-none');
+    markDirty();
+  }
+  function discardDraft() { clearDraft(); document.getElementById('draftBanner').classList.add('d-none'); }
+
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  async function saveQuiz() {
+    if (!state.title.trim()) { alert('اكتب اسم الاختبار'); document.getElementById('fTitle').focus(); return; }
+    if (!Number(state.week)) { alert('اكتب رقم الأسبوع اللي الاختبار هيظهر فيه'); document.getElementById('fWeek').focus(); return; }
+    const noAnswer = state.questions.findIndex(q => q.type === 'mcq' && q.correctIndex === null);
+    if (noAnswer >= 0) {
+      alert(`سؤال ${noAnswer + 1}: حدد الإجابة الصحيحة`);
+      document.querySelectorAll('.qb-q')[noAnswer].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ بيتحفظ…';
+    try {
+      const payload = {
+        subject_id: state.subjectId, week_number: state.week, center_ids: state.centerIds, title: state.title,
+        instructions: state.instructions, time_limit_minutes: state.timeLimit, answer_video_url: state.answerVideoUrl,
+        questions: state.questions.map(q => ({
+          id: q.id, type: q.type, text: q.text, image: q.image, marks: q.marks, requiresAnswer: q.requiresAnswer,
+          choices: q.type === 'mcq' ? q.choices : [], correctIndex: q.correctIndex,
+        })),
+      };
+      const response = await fetch(state.id ? `/admin/platform-quizzes/${state.id}` : '/admin/platform-quizzes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({ success: false, message: 'رد غير متوقع من السيرفر' }));
+      if (!response.ok || !data.success) throw new Error(data.message || 'الحفظ فشل');
+      dirty = false;
+      clearDraft();
+      document.getElementById('sDirty').classList.add('d-none');
+      if (!state.id) { location.href = `/admin/platform-quizzes/${data.id}/edit?saved=1`; return; }
+      (data.questionIds || []).forEach((id, i) => { if (state.questions[i]) state.questions[i].id = id; });
+      if (data.attemptCount > 0 && confirm(`✅ اتحفظ.\n${data.attemptCount} طالب سلّموا الاختبار ده — تعيد تصحيحهم بالإجابات والدرجات الجديدة؟ (تصحيحك اليدوي للمقالي هيفضل زي ما هو)`)) {
+        const r = await fetch(`/admin/platform-quizzes/${state.id}/regrade`, { method: 'POST', headers: { Accept: 'application/json' } });
+        const rd = await r.json().catch(() => ({}));
+        alert(rd.success ? `✅ اتعاد تصحيح ${rd.count} محاولة` : '❌ إعادة التصحيح فشلت: ' + (rd.message || ''));
+      } else {
+        flash('✅ اتحفظ');
+      }
+    } catch (error) {
+      alert('❌ ' + error.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 حفظ';
+    }
+  }
+
+  function flash(text) {
+    const el = document.createElement('div');
+    el.className = 'alert alert-success position-fixed shadow';
+    el.style.cssText = 'top:16px;left:50%;transform:translateX(-50%);z-index:2000;font-weight:700';
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+  }
+
+  // ================= البداية =================
+  document.addEventListener('DOMContentLoaded', setupMathEditor);
+  renderMathKeys();
+  renderMeta();
+  renderQuestions();
+  if (new URLSearchParams(location.search).get('saved')) { flash('✅ الاختبار اتعمل — متنساش تنشره من صفحة الاختبارات'); history.replaceState({}, '', location.pathname); }
+  if (readDraft()) document.getElementById('draftBanner').classList.remove('d-none');
+</script>
+
+<%- include('partials/footer') %>

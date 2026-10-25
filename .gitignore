@@ -11,6 +11,9 @@ public/*
 !public/video-broadcasts.js
 !public/video-embed.js
 !public/popup-question.js
+!public/quiz.html
+!public/quiz-render.js
+!public/quiz_upload.php
 !public/sw.js
 !public/pwa.js
 !public/staff-drafts.js

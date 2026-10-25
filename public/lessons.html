@@ -431,6 +431,18 @@ html[dir="ltr"] .whatsapp-float {
         examBtn: "الاختبار",
         examVideoBtn: "فيديو إجابة الاختبار",
         questionsBtn: "الأسئلة",
+        quizTitle: "اختبار الأسبوع",
+        quizStart: "ابدأ الاختبار",
+        quizContinue: "كمّل الاختبار",
+        quizShowResult: "شوف نتيجتك",
+        quizRedo: "متاح تحل تاني",
+        quizLockedNote: "🔒 حصص الأسبوع ده هتفتح بعد ما تحل الاختبار",
+        quizLockedBadge: "🔒 حل الاختبار الأول",
+        quizWeekNeeds: "🔒 محتاج اختبار",
+        quizPending: "مقالي بيتصحح",
+        quizVideo: "فيديو شرح الاختبار",
+        quizQuestions: "سؤال",
+        quizMinutes: "دقيقة",
         statusLabels: {
           free: '<span class="badge bg-success px-2 py-1">مجانية</span>',
           granted: '<span class="badge bg-primary px-2 py-1">متاحة</span>',
@@ -464,6 +476,18 @@ html[dir="ltr"] .whatsapp-float {
         examBtn: "Quiz",
         examVideoBtn: "Quiz Answer Video",
         questionsBtn: "Questions",
+        quizTitle: "Weekly quiz",
+        quizStart: "Start quiz",
+        quizContinue: "Continue quiz",
+        quizShowResult: "See your result",
+        quizRedo: "Retake available",
+        quizLockedNote: "🔒 This week's sessions open after you take the quiz",
+        quizLockedBadge: "🔒 Take the quiz first",
+        quizWeekNeeds: "🔒 Quiz needed",
+        quizPending: "essay being marked",
+        quizVideo: "Quiz explanation video",
+        quizQuestions: "questions",
+        quizMinutes: "min",
         statusLabels: {
           free: '<span class="badge bg-success px-2 py-1">Free</span>',
           granted: '<span class="badge bg-primary px-2 py-1">Available</span>',
@@ -749,12 +773,24 @@ html[dir="ltr"] .whatsapp-float {
 
       document.getElementById('global-loader').style.display = 'none';
 
-      if (!result.success || !result.lessons || result.lessons.length === 0) {
+      // اختبار المنصة (لو مفعّل للمادة): كارت الاختبار جوه أسبوعه بدل روابط جوجل فورم
+      const quizMode = Boolean(result.success && result.quizMode);
+      const quizzes = quizMode && Array.isArray(result.quizzes) ? result.quizzes : [];
+
+      if (!result.success || ((!result.lessons || result.lessons.length === 0) && quizzes.length === 0)) {
         container.innerHTML = `<div class="col-12"><p class="text-muted text-center py-5">${translations[currentLang].noLessons}</p></div>`;
         return;
       }
+      result.lessons = result.lessons || [];
 
       const weeks = buildLessonWeeks(result.lessons, currentLang);
+      // أسبوع فيه اختبار ولسه مفيهوش فيديوهات بيظهر برضه
+      quizzes.forEach(quiz => {
+        if (!weeks.some(week => week.number === Number(quiz.weekNumber))) {
+          weeks.push({ key: `week-${quiz.weekNumber}`, number: Number(quiz.weekNumber), label: `${translations[currentLang].weekLabel} ${quiz.weekNumber}`, lessons: [] });
+        }
+      });
+      weeks.sort((a, b) => (a.number === null) - (b.number === null) || (a.number || 0) - (b.number || 0));
       result.lessons.forEach(lesson => cacheVideoAccess(lesson.videoId, lesson));
       homeworkVideosByLesson = new Map(result.lessons.map(lesson => {
         const list = Array.isArray(lesson.homeworkVideos) && lesson.homeworkVideos.length > 0
@@ -780,13 +816,17 @@ html[dir="ltr"] .whatsapp-float {
             <h4 class="fw-bold mb-0">${selectedWeek.label}</h4>
           </div>
         `;
+        const weekQuizzes = quizzes.filter(quiz => Number(quiz.weekNumber) === selectedWeek.number);
+        container.innerHTML += weekQuizzes.map(quiz => quizCardHtml(quiz, currentLang)).join('');
 
         selectedWeek.lessons.forEach((lesson, index) => {
           const extra = getLessonExtras(lesson.lessonNumber);
           const rawHomeworkItems = Array.isArray(lesson.homeworkItems) ? lesson.homeworkItems : [];
           const homeworkVideoUrl = lesson.homeworkVideoUrl || lesson.homework_video_url || extra.homeworkVideoUrl || '';
-          const examUrl = lesson.examUrl || lesson.exam_url || extra.examUrl || '';
-          const examVideoUrl = lesson.examVideoUrl || lesson.exam_video_url || '';
+          // في وضع اختبار المنصة الروابط القديمة مبتظهرش (كارت الاختبار فوق مكانها)
+          const examUrl = quizMode ? '' : (lesson.examUrl || lesson.exam_url || extra.examUrl || '');
+          const examVideoUrl = quizMode ? '' : (lesson.examVideoUrl || lesson.exam_video_url || '');
+          const quizLocked = quizMode && lesson.quizLocked;
           const accessText = lesson.status === 'expired'
             ? `<span class="small text-secondary fw-semibold">${translations[currentLang].statusLabels.expired.replace(/<[^>]+>/g, '')}</span>`
             : lesson.accessExpiresAt
@@ -799,10 +839,10 @@ html[dir="ltr"] .whatsapp-float {
 
           const lessonCardHtml = `
             <div class="col-md-4 fade-in-up" style="animation-delay: ${index * 0.08}s">
-              <div class="card lesson-card h-100" data-status="${lesson.status || 'locked'}" onclick="openLesson(${lesson.videoId})" style="border-top: 4px solid var(--sf-primary);">
+              <div class="card lesson-card h-100" data-status="${quizLocked ? 'locked' : (lesson.status || 'locked')}" onclick="${quizLocked ? `openQuiz(${lesson.quizId})` : `openLesson(${lesson.videoId})`}" style="border-top: 4px solid var(--sf-primary);${quizLocked ? 'opacity:.7;' : ''}">
                 <div class="card-body p-4">
                   <div class="d-flex justify-content-between align-items-center mb-3">
-                    ${translations[currentLang].statusLabels[lesson.status] || ''}
+                    ${quizLocked ? `<span class="badge bg-warning text-dark px-2 py-1">${translations[currentLang].quizLockedBadge}</span>` : (translations[currentLang].statusLabels[lesson.status] || '')}
                     <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].lessonOrder} ${lesson.lessonNumber}</span>
                   </div>
                   <div class="d-flex align-items-center gap-3 mb-3">
@@ -853,7 +893,7 @@ html[dir="ltr"] .whatsapp-float {
             </div>
           ` : '';
 
-          const questionsCardHtml = (lesson.hasQuestions && (lesson.questionsDisplay === 'outside' || lesson.questionsDisplay === 'both')) ? `
+          const questionsCardHtml = (!quizLocked && lesson.hasQuestions && (lesson.questionsDisplay === 'outside' || lesson.questionsDisplay === 'both')) ? `
             <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.1) * 0.08}s">
               <div class="card lesson-card h-100" data-status="${lesson.status || 'locked'}" onclick="event.stopPropagation(); openQuestionsPreview(${lesson.videoId});" style="border-top: 4px solid #EC4899;">
                 <div class="card-body p-4">
@@ -873,7 +913,7 @@ html[dir="ltr"] .whatsapp-float {
 
           const homeworkCards = [
             // ONLY show homework video card if this lesson REALLY has homework (realHomeworkUrl is NOT from global fallback)
-            ...((homeworkVideosByLesson.get(lesson.videoId) || []).length > 0 ? [`
+            ...(!quizLocked && (homeworkVideosByLesson.get(lesson.videoId) || []).length > 0 ? [`
               <div class="col-md-4 fade-in-up" style="animation-delay: ${(index + 0.2) * 0.08}s">
                 <div class="card lesson-card h-100" data-status="free" onclick="event.stopPropagation(); openHomeworkVideos(${lesson.videoId});" style="border-top: 4px solid #10B3A3;">
                   <div class="card-body p-4">
@@ -908,12 +948,69 @@ html[dir="ltr"] .whatsapp-float {
                   <span class="badge mb-3" style="background: rgba(79, 70, 229, 0.1); color: var(--sf-primary);">${translations[currentLang].weekLabel}</span>
                   <h4 class="fw-bold mb-2">${week.label}</h4>
                   <p class="mb-0 small" style="color: var(--sf-muted);">${week.lessons.length} ${translations[currentLang].lessonOrder}</p>
+                  ${quizWeekBadge(quizzes.filter(quiz => Number(quiz.weekNumber) === week.number), currentLang)}
                 </div>
               </div>
             </div>
           </div>`;
       });
       updateAccessCountdowns();
+    }
+
+    function openQuiz(quizId) {
+      if (quizId) window.location.href = `quiz.html?id=${quizId}`;
+    }
+
+    function quizWeekBadge(weekQuizzes, lang) {
+      if (!weekQuizzes.length) return '';
+      if (weekQuizzes.some(quiz => quiz.locked)) return `<span class="badge bg-warning text-dark mt-2">${translations[lang].quizWeekNeeds}</span>`;
+      return weekQuizzes.map(quiz => `<span class="badge mt-2" style="background: rgba(16,179,163,0.14); color: #0f766e;" dir="ltr">📝 ${quiz.score} / ${quiz.maxScore}</span>`).join(' ');
+    }
+
+    function quizCardHtml(quiz, lang) {
+      const t = translations[lang];
+      const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+      const action = quiz.status === 'in_progress' ? t.quizContinue : quiz.status === 'submitted' ? t.quizShowResult : t.quizStart;
+      const scoreHtml = quiz.status === 'submitted'
+        ? `<div class="fs-3 fw-bold" dir="ltr">${quiz.score} <span class="fs-6" style="color: var(--sf-muted);">/ ${quiz.maxScore}</span></div>${quiz.pendingCount ? `<div class="small" style="color:#B45309;">⏳ ${quiz.pendingCount} ${t.quizPending}</div>` : ''}`
+        : '';
+      const videoCard = quiz.answerVideoUrl ? `
+        <div class="col-md-4 fade-in-up">
+          <div class="card lesson-card h-100" data-status="free" onclick="openQuizVideo('${encodeURIComponent(quiz.answerVideoUrl)}')" style="border-top: 4px solid #F59E0B;">
+            <div class="card-body p-4 d-flex align-items-center gap-3">
+              <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #F59E0B, #EF4444);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;flex:none;">▶</div>
+              <h6 class="mb-0 fw-bold" style="font-size:1.05rem;">${t.quizVideo}</h6>
+            </div>
+          </div>
+        </div>` : '';
+      return `
+        <div class="col-md-${quiz.answerVideoUrl ? 8 : 12} fade-in-up">
+          <div class="card lesson-card h-100" data-status="free" onclick="openQuiz(${quiz.id})" style="border: 2px solid ${quiz.locked ? '#F59E0B' : 'rgba(16,179,163,0.5)'}; background: linear-gradient(135deg, rgba(79,70,229,0.08), rgba(16,179,163,0.08));">
+            <div class="card-body p-4 d-flex align-items-center gap-3 flex-wrap">
+              <div style="width:56px;height:56px;border-radius:16px;background:var(--card-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.6rem;box-shadow:0 6px 16px rgba(79,70,229,0.25);flex:none;">📝</div>
+              <div class="flex-grow-1" style="min-width: 160px;">
+                <span class="badge mb-1" style="background: rgba(79, 70, 229, 0.12); color: var(--sf-primary);">${t.quizTitle}</span>
+                <h5 class="fw-bold mb-1">${esc(quiz.title)}</h5>
+                <div class="small" style="color: var(--sf-muted);">${quiz.questionCount} ${t.quizQuestions}${quiz.timeLimitMinutes ? ` · ⏱ ${quiz.timeLimitMinutes} ${t.quizMinutes}` : ''}</div>
+                ${quiz.locked ? `<div class="small fw-bold mt-1" style="color:#B45309;">${t.quizLockedNote}</div>` : ''}
+              </div>
+              <div class="text-center">
+                ${scoreHtml}
+                <button type="button" class="btn ${quiz.status === 'submitted' ? 'btn-outline-primary' : 'btn-primary'} fw-bold mt-1">${action}</button>
+                ${quiz.redoAvailable ? `<div class="small mt-1" style="color: var(--sf-primary);">↻ ${t.quizRedo}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>${videoCard}`;
+    }
+
+    function openQuizVideo(encodedUrl) {
+      const currentLang = localStorage.getItem('portal_lang') || 'ar';
+      homeworkPreviewParts = [normalizeHomeworkPart({ sourceType: 'url', videoUrl: decodeURIComponent(encodedUrl) })];
+      homeworkPreviewIndex = 0;
+      document.getElementById('homeworkPreviewTitle').textContent = `▶ ${translations[currentLang].quizVideo}`;
+      renderHomeworkPreviewPart();
+      new bootstrap.Modal(document.getElementById('homeworkPreviewModal')).show();
     }
 
     async function openLesson(videoId) {

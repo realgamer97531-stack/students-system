@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الاختبار</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+      --sf-bg: #F7F8FD;
+      --sf-card: #ffffff;
+      --sf-text: #1E293B;
+      --sf-muted: #64748B;
+      --sf-border: #E2E8F0;
+      --sf-primary: #4F46E5;
+      --sf-primary-soft: rgba(79, 70, 229, 0.1);
+      --sf-accent: #10B3A3;
+      --sf-warm: #F59E0B;
+      --sf-good: #16A34A;
+      --sf-good-soft: rgba(22, 163, 74, 0.12);
+      --sf-bad: #DC2626;
+      --sf-bad-soft: rgba(220, 38, 38, 0.1);
+      --card-gradient: linear-gradient(135deg, #10B3A3, #4F46E5);
+    }
+    body.dark-theme {
+      --sf-bg: #0b0f19;
+      --sf-card: #141b2d;
+      --sf-text: #f1f5f9;
+      --sf-muted: #94a3b8;
+      --sf-border: #1f293d;
+      --sf-primary: #818cf8;
+      --sf-primary-soft: rgba(129, 140, 248, 0.14);
+      --sf-good: #4ade80;
+      --sf-good-soft: rgba(74, 222, 128, 0.12);
+      --sf-bad: #f87171;
+      --sf-bad-soft: rgba(248, 113, 113, 0.12);
+      --card-gradient: linear-gradient(135deg, #0f766e, #4f46e5);
+    }
+    body { background: var(--sf-bg) !important; color: var(--sf-text); font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; min-height: 100vh; }
+    .qz-wrap { max-width: 820px; margin: 0 auto; padding: 16px 16px 120px; }
+    .qz-top { position: sticky; top: 0; z-index: 20; background: var(--sf-bg); padding: 10px 0; display: flex; align-items: center; gap: 10px; }
+    .qz-back { border: 1px solid var(--sf-border); background: var(--sf-card); color: var(--sf-text); border-radius: 12px; padding: 6px 12px; text-decoration: none; font-weight: 700; font-size: .9rem; }
+    .qz-top h1 { font-size: 1.05rem; font-weight: 800; margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qz-timer { font-variant-numeric: tabular-nums; font-weight: 800; padding: 6px 12px; border-radius: 12px; background: var(--sf-primary-soft); color: var(--sf-primary); direction: ltr; }
+    .qz-timer.low { background: var(--sf-bad-soft); color: var(--sf-bad); animation: qzPulse 1s infinite; }
+    @keyframes qzPulse { 50% { opacity: .55; } }
+    .qz-card { background: var(--sf-card); border: 1px solid var(--sf-border); border-radius: 20px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04); }
+    .qz-hero { text-align: center; padding: 32px 20px; }
+    .qz-hero .icon { width: 72px; height: 72px; border-radius: 22px; margin: 0 auto 14px; background: var(--card-gradient); display: grid; place-items: center; font-size: 2rem; color: #fff; box-shadow: 0 10px 26px rgba(79, 70, 229, .25); }
+    .qz-hero h2 { font-weight: 800; font-size: 1.4rem; }
+    .qz-facts { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+    .qz-fact { background: var(--sf-bg); border: 1px solid var(--sf-border); border-radius: 14px; padding: 10px 14px; min-width: 96px; }
+    .qz-fact b { display: block; font-size: 1.25rem; color: var(--sf-primary); }
+    .qz-fact span { font-size: .8rem; color: var(--sf-muted); font-weight: 600; }
+    .qz-instructions { background: var(--sf-primary-soft); border-radius: 14px; padding: 12px 14px; text-align: start; line-height: 1.8; margin-top: 8px; }
+    .qz-btn { border: 0; border-radius: 16px; padding: 14px 22px; font-weight: 800; font-size: 1.05rem; background: var(--card-gradient); color: #fff; box-shadow: 0 8px 22px rgba(79, 70, 229, .28); }
+    .qz-btn:disabled { opacity: .6; }
+    .qz-btn-ghost { border: 1px solid var(--sf-border); background: var(--sf-card); color: var(--sf-text); border-radius: 16px; padding: 12px 18px; font-weight: 700; }
+    .qz-nav { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 10px; scrollbar-width: none; }
+    .qz-nav::-webkit-scrollbar { display: none; }
+    .qz-nav button { flex: none; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--sf-border); background: var(--sf-card); color: var(--sf-muted); font-weight: 800; }
+    .qz-nav button.done { background: var(--sf-primary); border-color: var(--sf-primary); color: #fff; }
+    .qz-nav button.auto { background: var(--sf-good-soft); border-color: transparent; color: var(--sf-good); }
+    .qz-nav button.right { background: var(--sf-good); border-color: var(--sf-good); color: #fff; }
+    .qz-nav button.wrong { background: var(--sf-bad); border-color: var(--sf-bad); color: #fff; }
+    .qz-nav button.wait { background: var(--sf-warm); border-color: var(--sf-warm); color: #fff; }
+    .qz-qhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
+    .qz-qnum { font-weight: 800; color: var(--sf-primary); }
+    .qz-marks { font-size: .8rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--sf-bg); color: var(--sf-muted); border: 1px solid var(--sf-border); }
+    .qz-text { font-size: 1.1rem; line-height: 2; word-break: break-word; }
+    .qz-math { direction: ltr; unicode-bidi: isolate; }
+    .qz-math-block { display: block; text-align: center; margin: 8px 0; overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+    .qz-img { display: block; max-width: 100%; max-height: 420px; margin: 12px auto 0; border-radius: 14px; border: 1px solid var(--sf-border); cursor: zoom-in; background: #fff; }
+    .qz-choices { display: grid; gap: 10px; margin-top: 16px; }
+    .qz-choice { display: flex; gap: 12px; align-items: center; text-align: start; width: 100%; border: 2px solid var(--sf-border); background: var(--sf-card); color: var(--sf-text); border-radius: 16px; padding: 12px 14px; font-size: 1.05rem; transition: border-color .15s, background .15s, transform .1s; }
+    .qz-choice:active { transform: scale(.99); }
+    .qz-choice .letter { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--sf-border); display: grid; place-items: center; font-weight: 800; color: var(--sf-muted); }
+    .qz-choice .body { flex: 1; min-width: 0; line-height: 1.8; }
+    .qz-choice .body img { max-width: 100%; max-height: 200px; border-radius: 10px; display: block; margin-top: 6px; }
+    .qz-choice.selected { border-color: var(--sf-primary); background: var(--sf-primary-soft); }
+    .qz-choice.selected .letter { background: var(--sf-primary); border-color: var(--sf-primary); color: #fff; }
+    .qz-choice.right { border-color: var(--sf-good); background: var(--sf-good-soft); }
+    .qz-choice.right .letter { background: var(--sf-good); border-color: var(--sf-good); color: #fff; }
+    .qz-choice.wrong { border-color: var(--sf-bad); background: var(--sf-bad-soft); }
+    .qz-choice.wrong .letter { background: var(--sf-bad); border-color: var(--sf-bad); color: #fff; }
+    .qz-choice[disabled] { cursor: default; }
+    .qz-auto { margin-top: 14px; padding: 10px 14px; border-radius: 14px; background: var(--sf-good-soft); color: var(--sf-good); font-weight: 700; font-size: .95rem; }
+    .qz-essay textarea { margin-top: 14px; min-height: 120px; border-radius: 14px; background: var(--sf-bg); color: var(--sf-text); border-color: var(--sf-border); font-size: 1.05rem; }
+    .qz-essay .photo { margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .qz-essay .photo img { max-height: 160px; border-radius: 12px; border: 1px solid var(--sf-border); }
+    .qz-verdict { margin-top: 14px; padding: 10px 14px; border-radius: 14px; font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+    .qz-verdict.right { background: var(--sf-good-soft); color: var(--sf-good); }
+    .qz-verdict.wrong { background: var(--sf-bad-soft); color: var(--sf-bad); }
+    .qz-verdict.wait { background: rgba(245, 158, 11, .14); color: #b45309; }
+    body.dark-theme .qz-verdict.wait { color: #fbbf24; }
+    .qz-bar { position: fixed; bottom: 0; inset-inline: 0; z-index: 30; background: var(--sf-card); border-top: 1px solid var(--sf-border); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(15, 23, 42, .08); }
+    .qz-bar-inner { max-width: 820px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+    .qz-progress { flex: 1; min-width: 0; }
+    .qz-progress .track { height: 8px; border-radius: 999px; background: var(--sf-border); overflow: hidden; }
+    .qz-progress .fill { height: 100%; background: var(--card-gradient); width: 0; transition: width .3s; }
+    .qz-progress .label { font-size: .8rem; color: var(--sf-muted); font-weight: 700; margin-top: 4px; display: flex; justify-content: space-between; gap: 8px; }
+    .qz-score { width: 168px; height: 168px; margin: 8px auto 16px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--sf-accent) calc(var(--p) * 1%), var(--sf-border) 0); position: relative; }
+    .qz-score::before { content: ''; position: absolute; inset: 12px; border-radius: 50%; background: var(--sf-card); }
+    .qz-score div { position: relative; text-align: center; }
+    .qz-score b { display: block; font-size: 2.2rem; font-weight: 900; line-height: 1; direction: ltr; }
+    .qz-score span { color: var(--sf-muted); font-weight: 700; font-size: .9rem; }
+    .qz-video { border-radius: 16px; overflow: hidden; background: #000; aspect-ratio: 16 / 9; }
+    .qz-video iframe, .qz-video video { width: 100%; height: 100%; border: 0; display: block; }
+    .qz-zoom { position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, .88); display: none; align-items: center; justify-content: center; padding: 16px; }
+    .qz-zoom.show { display: flex; }
+    .qz-zoom img { max-width: 100%; max-height: 100%; border-radius: 10px; background: #fff; }
+    .qz-save { font-size: .75rem; font-weight: 700; }
+    #global-loader { position: fixed; inset: 0; background: var(--sf-bg); display: flex; align-items: center; justify-content: center; z-index: 999; }
+    .spinner { width: 46px; height: 46px; border: 4px solid var(--sf-border); border-top-color: var(--sf-primary); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4338CA">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=3">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3">
+  <script src="pwa.js?v=4" defer></script>
+</head>
+<body>
+  <script>
+    if ((localStorage.getItem('portal_theme') || 'light') === 'dark') document.body.classList.add('dark-theme');
+  </script>
+  <div id="global-loader"><div class="spinner"></div></div>
+
+  <div class="qz-wrap">
+    <div class="qz-top">
+      <a href="lessons.html" class="qz-back" id="backLink">→ <span data-t="back"></span></a>
+      <h1 id="topTitle"></h1>
+      <span class="qz-timer d-none" id="timer"></span>
+    </div>
+    <div id="app"></div>
+  </div>
+
+  <div class="qz-zoom" id="zoom" onclick="this.classList.remove('show')"><img alt=""></div>
+  <input type="file" accept="image/*" class="d-none" id="answerPhoto">
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+  <script src="config.js"></script>
+  <script src="shared.js"></script>
+  <script src="video-embed.js?v=1"></script>
+  <script src="quiz-render.js?v=1"></script>
+  <script>
+    const LANG = (localStorage.getItem('portal_lang') || 'ar') === 'en' ? 'en' : 'ar';
+    if (LANG === 'en') { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
+    const T = {
+      ar: {
+        back: 'الدروس', week: 'الأسبوع', questions: 'سؤال', marks: 'درجة', minutes: 'دقيقة', noLimit: 'من غير وقت',
+        start: '🚀 ابدأ الاختبار', startTimed: (m) => `الوقت (${m} دقيقة) هيبدأ أول ما تدوس ابدأ، ومينفعش يتوقف. جاهز؟`,
+        startNote: 'معاك محاولة واحدة بس. إجاباتك بتتحفظ أول بأول.',
+        lockNote: '🔒 حصص الأسبوع ده هتفتح أول ما تسلّم الاختبار.',
+        answered: (a, n) => `جاوبت ${a} من ${n}`, submit: '✅ تسليم',
+        confirmSubmit: (left) => left ? `لسه فيه ${left} سؤال مجاوبتش عليه.\nتسلّم برضه؟ مش هتقدر تغيّر إجاباتك بعد التسليم.` : 'تسلّم الاختبار؟ مش هتقدر تغيّر إجاباتك بعد التسليم.',
+        autoNote: '⭐ السؤال ده درجته عندك تلقائي — مش محتاج تجاوب.',
+        essayPh: 'اكتب إجابتك هنا…', photo: '📷 صورة الحل', changePhoto: '📷 غيّر الصورة', removePhoto: 'شيل الصورة', uploading: '⏳ بيترفع…',
+        saved: '✓ اتحفظ', saving: '⏳ بيتحفظ…', offline: '⚠️ مفيش نت — هيتحفظ لما يرجع',
+        timeUp: '⏰ الوقت خلص — بنسلّم إجاباتك…',
+        resultTitle: 'نتيجتك', pending: (n) => `⏳ فيه ${n} سؤال مقالي لسه بيتصحح — درجتك ممكن تزيد.`, autoSubmitted: 'الاختبار اتسلّم تلقائي لما الوقت خلص.',
+        videoTitle: '🎬 فيديو شرح الاختبار', watchNow: '▶ شوف الشرح دلوقتي', watchLater: '📚 هشوفه بعدين — افتح حصص الأسبوع',
+        openWeek: '📚 افتح حصص الأسبوع', videoStays: 'الفيديو هيفضل موجود جوه الأسبوع تقدر ترجعله في أي وقت.',
+        review: 'مراجعة إجاباتك', right: '✔ صح', wrong: '✘ غلط', unanswered: 'مجاوبتش', waiting: '⏳ مستني التصحيح', full: '⭐ درجة كاملة',
+        yourAnswer: 'إجابتك', redo: '↻ حل الاختبار تاني', redoNote: 'المدرس سمحلك تحل تاني. آخر محاولة هي اللي هتتحسب.',
+        notFound: 'الاختبار ده مش متاح ليك.', error: 'حصلت مشكلة، جرب تاني.', retry: 'حاول تاني', of: 'من',
+      },
+      en: {
+        back: 'Lessons', week: 'Week', questions: 'questions', marks: 'marks', minutes: 'min', noLimit: 'No time limit',
+        start: '🚀 Start quiz', startTimed: (m) => `The ${m}-minute timer starts as soon as you press start and can't be paused. Ready?`,
+        startNote: 'You have one attempt. Your answers are saved as you go.',
+        lockNote: '🔒 This week\'s sessions open as soon as you submit.',
+        answered: (a, n) => `${a} of ${n} answered`, submit: '✅ Submit',
+        confirmSubmit: (left) => left ? `${left} question(s) still unanswered.\nSubmit anyway? You can't change your answers afterwards.` : 'Submit the quiz? You can\'t change your answers afterwards.',
+        autoNote: '⭐ You get this question\'s marks automatically — no answer needed.',
+        essayPh: 'Write your answer here…', photo: '📷 Photo of your solution', changePhoto: '📷 Change photo', removePhoto: 'Remove photo', uploading: '⏳ Uploading…',
+        saved: '✓ Saved', saving: '⏳ Saving…', offline: '⚠️ Offline — will save when you\'re back',
+        timeUp: '⏰ Time is up — submitting your answers…',
+        resultTitle: 'Your result', pending: (n) => `⏳ ${n} essay question(s) still being marked — your score may go up.`, autoSubmitted: 'Submitted automatically when time ran out.',
+        videoTitle: '🎬 Quiz explanation video', watchNow: '▶ Watch the explanation now', watchLater: '📚 Watch later — open the week',
+        openWeek: '📚 Open this week', videoStays: 'The video stays inside the week so you can come back to it any time.',
+        review: 'Review your answers', right: '✔ Correct', wrong: '✘ Wrong', unanswered: 'Not answered', waiting: '⏳ Waiting for marking', full: '⭐ Full marks',
+        yourAnswer: 'Your answer', redo: '↻ Take the quiz again', redoNote: 'Your teacher allowed a retake. Your last attempt is the one that counts.',
+        notFound: 'This quiz is not available to you.', error: 'Something went wrong, try again.', retry: 'Try again', of: 'of',
+      },
+    }[LANG];
+    const LETTERS = LANG === 'en' ? ['A', 'B', 'C', 'D', 'E', 'F'] : ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = T[el.dataset.t]; });
+
+    const QUIZ_ID = Number(new URLSearchParams(location.search).get('id'));
+    const app = document.getElementById('app');
+    const esc = (v) => QuizRender.escapeHtml(v);
+    const rich = (text) => QuizRender.html(text);
+    let data = null;
+    let answers = {};
+    let clockOffset = 0;
+    let timerHandle = null;
+    let submitting = false;
+
+    function weekLink() { return data && data.quiz ? `lessons.html?week=${data.quiz.weekNumber}` : 'lessons.html'; }
+
+    async function api(method, path, body) {
+      const res = await fetch(`${API_BASE_URL}${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+        cache: 'no-store',
+      });
+      const json = await res.json().catch(() => ({ success: false }));
+      json.httpStatus = res.status;
+      return json;
+    }
+
+    async function load() {
+      clearInterval(timerHandle);
+      document.getElementById('timer').classList.add('d-none');
+      let result;
+      try { result = await api('GET', `/api/portal/student/quizzes/${QUIZ_ID}`); }
+      catch (_) { result = { success: false, httpStatus: 0 }; }
+      document.getElementById('global-loader').style.display = 'none';
+      if (!result.success) {
+        app.innerHTML = `<div class="qz-card qz-hero"><div class="icon">⚠️</div><p class="fw-bold">${result.httpStatus === 404 ? T.notFound : T.error}</p>
+          <button class="qz-btn-ghost" onclick="location.reload()">${T.retry}</button></div>`;
+        return;
+      }
+      data = result;
+      clockOffset = new Date(result.serverNow).getTime() - Date.now();
+      document.getElementById('topTitle').textContent = result.quiz.title;
+      document.title = result.quiz.title;
+      document.getElementById('backLink').href = weekLink();
+      if (result.attempt && result.attempt.status === 'in_progress') renderTaking();
+      else if (result.attempt && result.attempt.status === 'submitted') renderResult();
+      else renderIntro();
+    }
+
+    // ============ قبل البداية ============
+    function factsHtml(q) {
+      return `<div class="qz-facts">
+        <div class="qz-fact"><b>${q.questionCount}</b><span>${T.questions}</span></div>
+        <div class="qz-fact"><b>${q.totalMarks}</b><span>${T.marks}</span></div>
+        <div class="qz-fact"><b>${q.timeLimitMinutes || '∞'}</b><span>${q.timeLimitMinutes ? T.minutes : T.noLimit}</span></div>
+      </div>`;
+    }
+
+    function renderIntro() {
+      const q = data.quiz;
+      app.innerHTML = `
+        <div class="qz-card qz-hero">
+          <div class="icon">📝</div>
+          <div class="small fw-bold" style="color:var(--sf-muted)">${T.week} ${q.weekNumber}</div>
+          <h2 class="mt-1">${esc(q.title)}</h2>
+          ${factsHtml(q)}
+          ${q.instructions ? `<div class="qz-instructions">${rich(q.instructions)}</div>` : ''}
+          <p class="small mt-3 mb-1" style="color:var(--sf-muted)">${T.startNote}</p>
+          ${q.locked ? `<p class="small fw-bold mb-3" style="color:var(--sf-warm)">${T.lockNote}</p>` : ''}
+          <button class="qz-btn mt-2" id="startBtn" onclick="startQuiz()">${T.start}</button>
+        </div>`;
+    }
+
+    async function startQuiz() {
+      const q = data.quiz;
+      if (q.timeLimitMinutes && !confirm(T.startTimed(q.timeLimitMinutes))) return;
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      const result = await api('POST', `/api/portal/student/quizzes/${QUIZ_ID}/start`, {}).catch(() => ({ success: false }));
+      if (!result.success) { alert(result.message || T.error); btn.disabled = false; return; }
+      await load();
+    }
+
+    // ============ أثناء الحل ============
+    const backupKey = () => `quiz_answers:${data.attempt.id}`;
+
+    function needsAnswer(q) { return q.type === 'mcq' || (q.type === 'essay' && q.requiresAnswer); }
+    function isAnswered(q) {
+      const a = answers[q.id];
+      if (!a) return false;
+      if (q.type === 'mcq') return Number.isInteger(a.choice);
+      return Boolean(String(a.text || '').trim() || a.image);
+    }
+
+    function renderTaking() {
+      answers = { ...(data.attempt.answers || {}) };
+      // لو فيه إجابات محفوظة على الجهاز بس (النت كان فاصل) نرجعها
+      try {
+        const local = JSON.parse(localStorage.getItem(backupKey()) || 'null');
+        if (local && local.answers) { answers = { ...answers, ...local.answers }; scheduleSave(); }
+      } catch (_) { /* */ }
+
+      const qs = data.questions;
+      app.innerHTML = `
+        <div class="qz-nav" id="qnav"></div>
+        ${qs.map((q, i) => questionHtml(q, i)).join('')}
+        <div class="text-center mt-3"><button class="qz-btn" onclick="submitQuiz(false)">${T.submit}</button></div>`;
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="qz-bar" id="bar"><div class="qz-bar-inner">
+          <div class="qz-progress"><div class="track"><div class="fill" id="pFill"></div></div>
+            <div class="label"><span id="pLabel"></span><span class="qz-save" id="saveState"></span></div></div>
+          <button class="qz-btn py-2 px-3" onclick="submitQuiz(false)">${T.submit}</button>
+        </div></div>`);
+      bindTaking();
+      updateProgress();
+      startTimer();
+    }
+
+    function questionHtml(q, i) {
+      let body = '';
+      if (q.type === 'mcq') {
+        body = `<div class="qz-choices">${q.choices.map((c, ci) => `
+          <button type="button" class="qz-choice" data-q="${q.id}" data-c="${ci}">
+            <span class="letter">${LETTERS[ci]}</span>
+            <span class="body">${rich(c.text)}${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy">` : ''}</span>
+          </button>`).join('')}</div>`;
+      } else if (q.type === 'essay' && q.requiresAnswer) {
+        body = `<div class="qz-essay">
+          <textarea class="form-control" data-essay="${q.id}" placeholder="${T.essayPh}"></textarea>
+          <div class="photo" data-photo="${q.id}"></div>
+        </div>`;
+      } else {
+        body = `<div class="qz-auto">${T.autoNote}</div>`;
+      }
+      return `
+        <div class="qz-card" id="q-${q.id}">
+          <div class="qz-qhead"><span class="qz-qnum">${LANG === 'en' ? 'Question' : 'سؤال'} ${i + 1}</span><span class="qz-marks">${q.marks} ${T.marks}</span></div>
+          ${q.text ? `<div class="qz-text">${rich(q.text)}</div>` : ''}
+          ${q.image ? `<img class="qz-img" src="${esc(q.image)}" alt="" loading="lazy">` : ''}
+          ${body}
+        </div>`;
+    }
+
+    function bindTaking() {
+      app.querySelectorAll('.qz-choice').forEach(btn => btn.addEventListener('click', () => {
+        const qid = btn.dataset.q;
+        answers[qid] = { choice: Number(btn.dataset.c) };
+        paintChoices(qid);
+        updateProgress();
+        scheduleSave();
+      }));
+      app.querySelectorAll('[data-essay]').forEach(area => {
+        const qid = area.dataset.essay;
+        area.value = (answers[qid] && answers[qid].text) || '';
+        area.addEventListener('input', () => {
+          answers[qid] = { ...(answers[qid] || {}), text: area.value };
+          updateProgress();
+          scheduleSave();
+        });
+        paintPhoto(qid);
+      });
+      data.questions.filter(q => q.type === 'mcq').forEach(q => paintChoices(String(q.id)));
+    }
+
+    function paintChoices(qid) {
+      const a = answers[qid];
+      app.querySelectorAll(`.qz-choice[data-q="${qid}"]`).forEach(btn => {
+        btn.classList.toggle('selected', Boolean(a) && Number(btn.dataset.c) === a.choice);
+      });
+    }
+
+    function paintPhoto(qid) {
+      const box = app.querySelector(`[data-photo="${qid}"]`);
+      if (!box) return;
+      const img = answers[qid] && answers[qid].image;
+      box.innerHTML = `
+        <button type="button" class="qz-btn-ghost py-2" onclick="pickPhoto('${qid}')">${img ? T.changePhoto : T.photo}</button>
+        ${img ? `<img src="${esc(img)}" alt="" class="qz-zoomable"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removePhoto('${qid}')">${T.removePhoto}</button>` : ''}`;
+    }
+
+    let photoTarget = null;
+    function pickPhoto(qid) { photoTarget = qid; const p = document.getElementById('answerPhoto'); p.value = ''; p.click(); }
+    function removePhoto(qid) {
+      if (answers[qid]) delete answers[qid].image;
+      paintPhoto(qid); updateProgress(); scheduleSave();
+    }
+    document.getElementById('answerPhoto').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      const qid = photoTarget;
+      if (!file || !qid) return;
+      const box = app.querySelector(`[data-photo="${qid}"]`);
+      if (box) box.innerHTML = `<span class="small fw-bold">${T.uploading}</span>`;
+      try {
+        const form = new FormData();
+        form.append('image', await shrinkImage(file));
+        const res = await fetch(`${API_BASE_URL}/api/portal/student/quizzes/${QUIZ_ID}/answer-image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+        const json = await res.json().catch(() => ({}));
+        if (!json.success) throw new Error(json.message || T.error);
+        answers[qid] = { ...(answers[qid] || {}), image: json.url };
+        updateProgress();
+        scheduleSave();
+      } catch (error) {
+        alert(error.message || T.error);
+      }
+      paintPhoto(qid);
+    });
+
+    function shrinkImage(file) {
+      return new Promise((resolve) => {
+        if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 1.2 * 1024 * 1024) return resolve(file);
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          canvas.toBlob((blob) => resolve(blob ? new File([blob], 'answer.jpg', { type: 'image/jpeg' }) : file), 'image/jpeg', 0.85);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+        img.src = url;
+      });
+    }
+
+    function updateProgress() {
+      const required = data.questions.filter(needsAnswer);
+      const done = required.filter(isAnswered).length;
+      document.getElementById('pFill').style.width = required.length ? `${(done / required.length) * 100}%` : '100%';
+      document.getElementById('pLabel').textContent = T.answered(done, required.length);
+      document.getElementById('qnav').innerHTML = data.questions.map((q, i) =>
+        `<button type="button" class="${!needsAnswer(q) ? 'auto' : isAnswered(q) ? 'done' : ''}" onclick="document.getElementById('q-${q.id}').scrollIntoView({behavior:'smooth',block:'center'})">${i + 1}</button>`).join('');
+    }
+
+    // حفظ تلقائي (ولو النت فاصل بيتحفظ على الجهاز ويتبعت بعدين)
+    let saveTimer = null;
+    let saveInFlight = false;
+    function setSaveState(text) { const el = document.getElementById('saveState'); if (el) el.textContent = text; }
+    function scheduleSave() {
+      try { localStorage.setItem(backupKey(), JSON.stringify({ answers, at: Date.now() })); } catch (_) { /* */ }
+      setSaveState(T.saving);
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveNow, 800);
+    }
+    async function saveNow() {
+      if (submitting) return;
+      if (saveInFlight) { saveTimer = setTimeout(saveNow, 500); return; }
+      saveInFlight = true;
+      try {
+        const result = await api('POST', `/api/portal/student/quizzes/${QUIZ_ID}/save`, { answers });
+        if (result.submitted) { cleanupTaking(); await load(); return; }
+        setSaveState(result.success ? T.saved : T.offline);
+      } catch (_) {
+        setSaveState(T.offline);
+        saveTimer = setTimeout(saveNow, 5000);
+      } finally {
+        saveInFlight = false;
+      }
+    }
+    window.addEventListener('online', () => { if (data && data.attempt && data.attempt.status === 'in_progress') saveNow(); });
+
+    function startTimer() {
+      const deadline = data.attempt.deadlineAt ? new Date(data.attempt.deadlineAt).getTime() : null;
+      if (!deadline) return;
+      const el = document.getElementById('timer');
+      el.classList.remove('d-none');
+      const tick = () => {
+        const left = Math.max(0, Math.floor((deadline - (Date.now() + clockOffset)) / 1000));
+        const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60), s = left % 60;
+        el.textContent = (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + `:${String(s).padStart(2, '0')}`;
+        el.classList.toggle('low', left <= 60);
+        if (left <= 0) { clearInterval(timerHandle); submitQuiz(true); }
+      };
+      tick();
+      timerHandle = setInterval(tick, 1000);
+    }
+
+    function cleanupTaking() {
+      clearInterval(timerHandle);
+      clearTimeout(saveTimer);
+      const bar = document.getElementById('bar');
+      if (bar) bar.remove();
+    }
+
+    async function submitQuiz(timeUp) {
+      if (submitting) return;
+      const left = data.questions.filter(q => needsAnswer(q) && !isAnswered(q)).length;
+      if (!timeUp && !confirm(T.confirmSubmit(left))) return;
+      submitting = true;
+      clearTimeout(saveTimer);
+      if (timeUp) app.insertAdjacentHTML('afterbegin', `<div class="alert alert-warning fw-bold">${T.timeUp}</div>`);
+      for (let tries = 0; tries < 4; tries += 1) {
+        try {
+          const result = await api('POST', `/api/portal/student/quizzes/${QUIZ_ID}/submit`, { answers });
+          if (result.success || result.submitted) {
+            try { localStorage.removeItem(backupKey()); } catch (_) { /* */ }
+            cleanupTaking();
+            submitting = false;
+            window.scrollTo({ top: 0 });
+            await load();
+            return;
+          }
+          alert(result.message || T.error);
+          break;
+        } catch (_) {
+          await new Promise(r => setTimeout(r, 2000 * (tries + 1)));
+        }
+      }
+      submitting = false;
+      setSaveState(T.offline);
+    }
+
+    // ============ النتيجة ============
+    function renderResult() {
+      const a = data.attempt;
+      const q = data.quiz;
+      const pct = a.maxScore ? Math.round((a.score / a.maxScore) * 100) : 0;
+      const qs = data.questions || [];
+      const results = a.results || {};
+      const ans = a.answers || {};
+      const verdictOf = (question) => {
+        const r = results[question.id];
+        if (!r) return null;
+        if (r.pending) return 'wait';
+        if (question.type === 'bonus' || (question.type === 'essay' && !question.requiresAnswer)) return 'full';
+        return r.correct || r.earned > 0 ? 'right' : 'wrong';
+      };
+      app.innerHTML = `
+        <div class="qz-card qz-hero">
+          <div class="small fw-bold" style="color:var(--sf-muted)">${T.resultTitle}</div>
+          <div class="qz-score" style="--p:${pct}"><div><b>${a.score}<small style="font-size:1rem;color:var(--sf-muted)"> / ${a.maxScore}</small></b><span>${pct}%</span></div></div>
+          ${a.pendingCount ? `<p class="fw-bold" style="color:var(--sf-warm)">${T.pending(a.pendingCount)}</p>` : ''}
+          ${a.autoSubmitted ? `<p class="small" style="color:var(--sf-muted)">${T.autoSubmitted}</p>` : ''}
+          ${q.redoAvailable ? `<div class="alert alert-info small mt-2">${T.redoNote}</div><button class="qz-btn-ghost" id="startBtn" onclick="startQuiz()">${T.redo}</button>` : ''}
+        </div>
+        ${q.answerVideoUrl ? `
+          <div class="qz-card" id="videoCard">
+            <h5 class="fw-bold mb-2">${T.videoTitle}</h5>
+            <div id="videoBox" class="mb-3 d-none"></div>
+            <div class="d-grid gap-2">
+              <button class="qz-btn" id="watchBtn" onclick="showVideo()">${T.watchNow}</button>
+              <a class="qz-btn-ghost text-center text-decoration-none" href="${weekLink()}">${T.watchLater}</a>
+            </div>
+            <p class="small mt-2 mb-0" style="color:var(--sf-muted)">${T.videoStays}</p>
+          </div>` : `
+          <div class="qz-card d-grid"><a class="qz-btn text-center text-decoration-none" href="${weekLink()}">${T.openWeek}</a></div>`}
+        <h5 class="fw-bold mt-4 mb-2">${T.review}</h5>
+        <div class="qz-nav">${qs.map((question, i) => {
+          const v = verdictOf(question);
+          return `<button type="button" class="${v === 'full' ? 'auto' : v || ''}" onclick="document.getElementById('q-${question.id}').scrollIntoView({behavior:'smooth',block:'center'})">${i + 1}</button>`;
+        }).join('')}</div>
+        ${qs.map((question, i) => reviewHtml(question, i, results[question.id], ans[question.id], verdictOf(question))).join('')}`;
+    }
+
+    function reviewHtml(q, i, r, a, verdict) {
+      let body = '';
+      if (q.type === 'mcq') {
+        const chosen = a && Number.isInteger(a.choice) ? a.choice : null;
+        body = `<div class="qz-choices">${q.choices.map((c, ci) => {
+          const cls = ci === q.correctIndex ? 'right' : (ci === chosen ? 'wrong' : '');
+          return `<button type="button" class="qz-choice ${cls}" disabled>
+            <span class="letter">${LETTERS[ci]}</span>
+            <span class="body">${rich(c.text)}${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy">` : ''}</span>
+          </button>`;
+        }).join('')}</div>`;
+      } else if (q.type === 'essay' && q.requiresAnswer) {
+        body = a && (a.text || a.image) ? `<div class="qz-instructions mt-3"><div class="small fw-bold mb-1">${T.yourAnswer}</div>${a.text ? esc(a.text).replace(/\n/g, '<br>') : ''}${a.image ? `<img class="qz-img" src="${esc(a.image)}" alt="">` : ''}</div>` : '';
+      }
+      const label = !r ? '' : verdict === 'wait' ? T.waiting : verdict === 'full' ? T.full : r.unanswered ? T.unanswered : verdict === 'right' ? T.right : T.wrong;
+      const cls = verdict === 'full' ? 'right' : verdict;
+      return `
+        <div class="qz-card" id="q-${q.id}">
+          <div class="qz-qhead"><span class="qz-qnum">${LANG === 'en' ? 'Question' : 'سؤال'} ${i + 1}</span><span class="qz-marks">${q.marks} ${T.marks}</span></div>
+          ${q.text ? `<div class="qz-text">${rich(q.text)}</div>` : ''}
+          ${q.image ? `<img class="qz-img" src="${esc(q.image)}" alt="" loading="lazy">` : ''}
+          ${body}
+          ${r ? `<div class="qz-verdict ${cls}"><span>${label}</span><span dir="ltr">${verdict === 'wait' ? '—' : r.earned} / ${r.max}</span></div>` : ''}
+        </div>`;
+    }
+
+    function showVideo() {
+      const box = document.getElementById('videoBox');
+      box.classList.remove('d-none');
+      box.innerHTML = '';
+      const frame = document.createElement('div');
+      frame.className = 'qz-video';
+      frame.appendChild(buildEmbedElement({ sourceType: 'url', videoUrl: data.quiz.answerVideoUrl }, API_BASE_URL));
+      box.appendChild(frame);
+      const link = document.createElement('a');
+      link.href = data.quiz.answerVideoUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'small d-inline-block mt-2';
+      link.textContent = LANG === 'en' ? 'Not showing? Open the link' : 'مش ظاهر؟ افتح اللينك';
+      box.appendChild(link);
+      document.getElementById('watchBtn').classList.add('d-none');
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // تكبير الصور
+    document.addEventListener('click', (e) => {
+      const target = e.target.closest('.qz-img, .qz-zoomable');
+      if (!target) return;
+      const zoom = document.getElementById('zoom');
+      zoom.querySelector('img').src = target.src;
+      zoom.classList.add('show');
+    });
+
+    if (!QUIZ_ID) location.href = 'lessons.html';
+    else load();
+  </script>
+</body>
+</html>

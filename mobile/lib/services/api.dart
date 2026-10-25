@@ -131,6 +131,29 @@ class PortalApi {
     return ((body['lessons'] as List?) ?? []).cast<Map<String, dynamic>>();
   }
 
+  /// الدروس + اختبار المنصة (quizMode / quizzes لو مفعّل للمادة)
+  static Future<Map<String, dynamic>> lessonsFull() => _get('/api/portal/student/lessons');
+
+  // ===== اختبار المنصة =====
+
+  static Future<Map<String, dynamic>> quiz(int id) => _get('/api/portal/student/quizzes/$id');
+  static Future<Map<String, dynamic>> startQuiz(int id) => _post('/api/portal/student/quizzes/$id/start', {}, true);
+  static Future<Map<String, dynamic>> saveQuiz(int id, Map<String, dynamic> answers) =>
+      _post('/api/portal/student/quizzes/$id/save', {'answers': answers}, true);
+  static Future<Map<String, dynamic>> submitQuiz(int id, Map<String, dynamic> answers) =>
+      _post('/api/portal/student/quizzes/$id/submit', {'answers': answers}, true);
+
+  /// صورة حل سؤال مقالي — السيرفر بيرفعها على هوستينجر ويرجّع اللينك
+  static Future<String> uploadQuizAnswerImage(int id, File image) async {
+    final body = await _authed((h) async {
+      final req = http.MultipartRequest('POST', _uri('/api/portal/student/quizzes/$id/answer-image'))
+        ..headers.addAll(h)
+        ..files.add(await http.MultipartFile.fromPath('image', image.path));
+      return http.Response.fromStream(await client.send(req));
+    });
+    return '${body['url']}';
+  }
+
   /// نتايج الأسئلة المنبثقة لكل درس (بتظهر على كارت الدرس)
   static Future<Map<String, dynamic>> popupResults() async {
     final body = await _get('/api/portal/student/popup-results');

@@ -1,0 +1,151 @@
+<%- include('partials/header') %>
+
+<style>
+  .pq-subject { border: 1px solid var(--sf-border, rgba(0,0,0,.08)); border-radius: var(--sf-radius); background: var(--sf-card-bg); box-shadow: var(--sf-shadow); margin-bottom: 18px; overflow: hidden; }
+  .pq-subject-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--sf-border, rgba(0,0,0,.08)); }
+  .pq-subject-head h5 { margin: 0; font-weight: 800; }
+  .pq-mode { font-size: .85rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .pq-mode.on { background: rgba(20,184,166,.15); color: var(--sf-accent-dark); }
+  .pq-mode.off { background: rgba(107,114,128,.14); color: var(--sf-muted); }
+  .pq-switch { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .pq-switch .form-check-input { width: 3.2em; height: 1.6em; cursor: pointer; }
+  .pq-row { display: grid; grid-template-columns: 90px 1fr auto; gap: 12px; align-items: center; padding: 12px 18px; border-bottom: 1px dashed var(--sf-border, rgba(0,0,0,.08)); }
+  .pq-row:last-child { border-bottom: 0; }
+  .pq-week { font-weight: 800; color: var(--sf-primary); background: var(--sf-primary-light); border-radius: 12px; text-align: center; padding: 8px 4px; line-height: 1.2; }
+  .pq-week small { display: block; font-weight: 600; font-size: .7rem; color: var(--sf-muted); }
+  .pq-title { font-weight: 700; }
+  .pq-meta { font-size: .82rem; color: var(--sf-muted); display: flex; gap: 12px; flex-wrap: wrap; margin-top: 2px; }
+  .pq-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+  .pq-empty { padding: 14px 18px; color: var(--sf-muted); font-size: .9rem; }
+  @media (max-width: 640px) {
+    .pq-row { grid-template-columns: 64px 1fr; }
+    .pq-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-1">📝 <span class="ar-only">اختبارات المنصة</span><span class="en-only" style="display:none;">Platform Quizzes</span></h3>
+    <p class="text-muted mb-0 small">
+      <span class="ar-only">اختبار بيتعمل جوه المنصة بدل جوجل فورم، بيتصحح تلقائي، وبيقفل حصص الأسبوع لحد ما الطالب يحله.</span>
+      <span class="en-only" style="display:none;">Quizzes built on the platform instead of Google Forms: auto-marked, and they lock the week until submitted.</span>
+    </p>
+  </div>
+  <a href="/admin/platform-quizzes/new" class="btn btn-primary">➕ <span class="ar-only">اختبار جديد</span><span class="en-only" style="display:none;">New quiz</span></a>
+</div>
+
+<% if (!uploadReady) { %>
+  <div class="alert alert-warning small">
+    ⚠️ <span class="ar-only">رفع الصور على هوستينجر لسه مش متظبط (QUIZ_UPLOAD_SECRET) — تقدر تعمل أسئلة مكتوبة بس لحد ما يتظبط.</span>
+    <span class="en-only" style="display:none;">Hostinger image upload is not configured yet (QUIZ_UPLOAD_SECRET) — text-only questions until then.</span>
+  </div>
+<% } %>
+
+<div class="alert alert-info small">
+  <strong><span class="ar-only">إزاي بيشتغل؟</span><span class="en-only" style="display:none;">How it works</span></strong>
+  <ol class="mb-0 mt-1 ar-only">
+    <li>شغّل الزرار للمادة: الاختبار الجديد بيحل محل روابط جوجل فورم وفيديو الإجابة القديمة للمادة دي. لو قفلته كل حاجة بترجع زي ما كانت.</li>
+    <li>اختبار الأسبوع الأول بيتحط في <strong>الأسبوع التاني</strong>: حصص الأسبوع التاني مش هتفتح غير لما الطالب يسلّم.</li>
+    <li>الاختبار مبيظهرش للطلاب غير لما تضغط <strong>نشر</strong>.</li>
+  </ol>
+  <ol class="mb-0 mt-1 en-only" style="display:none;">
+    <li>Turn the switch on for a subject: the new quiz replaces that subject's Google Form and answer-video links. Turn it off and everything goes back.</li>
+    <li>Week 1's quiz goes in <strong>week 2</strong>: week 2's sessions open only after the student submits.</li>
+    <li>Students see a quiz only after you press <strong>Publish</strong>.</li>
+  </ol>
+</div>
+
+<% subjects.forEach(subject => {
+     const on = enabledIds.includes(subject.id);
+     const list = quizzes.filter(q => q.SubjectId === subject.id);
+     const centerName = new Map(subject.centers.map(c => [c.id, c.name]));
+%>
+  <div class="pq-subject" id="subject-<%= subject.id %>">
+    <div class="pq-subject-head">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h5><%- sf.subject({ id: subject.id, name: subject.name }, subject.name) %></h5>
+        <span class="pq-mode <%= on ? 'on' : 'off' %>" data-mode-label="<%= subject.id %>">
+          <%= on ? 'الاختبار الجديد شغال' : 'النظام القديم (جوجل فورم)' %>
+        </span>
+      </div>
+      <label class="pq-switch form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" <%= on ? 'checked' : '' %> onchange="toggleSubject(<%= subject.id %>, this)">
+        <span class="ar-only">الاختبار الجديد</span><span class="en-only" style="display:none;">New quiz</span>
+      </label>
+    </div>
+    <% if (!list.length) { %>
+      <div class="pq-empty"><span class="ar-only">مفيش اختبارات للمادة دي لسه.</span><span class="en-only" style="display:none;">No quizzes for this subject yet.</span></div>
+    <% } %>
+    <% list.forEach(q => { %>
+      <div class="pq-row">
+        <div class="pq-week"><small>الأسبوع</small><%= q.week %></div>
+        <div>
+          <div class="pq-title"><%= q.title %></div>
+          <div class="pq-meta">
+            <span>❓ <%= q.questions %> سؤال</span>
+            <span>👥 <%= q.submitted %> سلّم</span>
+            <% if (q.pending) { %><span class="text-warning fw-bold">⏳ <%= q.pending %> مقالي مستني تصحيح</span><% } %>
+            <% if (q.timeLimit) { %><span>⏱ <%= q.timeLimit %> دقيقة</span><% } %>
+            <span>🏫 <%= q.centerIds ? q.centerIds.map(id => centerName.get(id) || ('#' + id)).join('، ') : 'كل السناتر' %></span>
+          </div>
+        </div>
+        <div class="pq-actions">
+          <label class="form-check form-switch mb-0 small fw-bold" title="نشر للطلاب">
+            <input class="form-check-input" type="checkbox" <%= q.published ? 'checked' : '' %> onchange="togglePublish(<%= q.id %>, this)">
+            <span data-publish-label="<%= q.id %>"><%= q.published ? 'منشور' : 'مسودة' %></span>
+          </label>
+          <a href="/admin/platform-quizzes/<%= q.id %>/edit" class="btn btn-sm btn-outline-primary">✏️ تعديل</a>
+          <a href="/admin/platform-quizzes/<%= q.id %>/results" class="btn btn-sm btn-outline-success">📊 النتايج</a>
+          <form action="/admin/platform-quizzes/<%= q.id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('حذف الاختبار ده بكل نتايج الطلاب؟ مينفعش ترجعه.')">
+            <button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash3"></i></button>
+          </form>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% }) %>
+
+<script>
+  async function postJson(url, body) {
+    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+    const data = await response.json().catch(() => ({ success: false, message: 'رد غير متوقع' }));
+    if (!response.ok || !data.success) throw new Error(data.message || 'حصلت مشكلة');
+    return data;
+  }
+
+  async function toggleSubject(subjectId, input) {
+    const enabled = input.checked;
+    const msg = enabled
+      ? 'تشغيل الاختبار الجديد للمادة دي؟\nروابط جوجل فورم القديمة هتختفي عند الطلاب، والاختبارات المنشورة هتقفل أسابيعها لحد ما تتحل.'
+      : 'رجوع للنظام القديم (جوجل فورم) للمادة دي؟\nالحصص هتفتح عادي ونتايج الاختبارات الجديدة هتفضل محفوظة.';
+    if (!confirm(msg)) { input.checked = !enabled; return; }
+    input.disabled = true;
+    try {
+      await postJson(`/admin/platform-quizzes/settings/${subjectId}`, { enabled });
+      const label = document.querySelector(`[data-mode-label="${subjectId}"]`);
+      label.className = 'pq-mode ' + (enabled ? 'on' : 'off');
+      label.textContent = enabled ? 'الاختبار الجديد شغال' : 'النظام القديم (جوجل فورم)';
+    } catch (error) {
+      input.checked = !enabled;
+      alert('❌ ' + error.message);
+    } finally {
+      input.disabled = false;
+    }
+  }
+
+  async function togglePublish(quizId, input) {
+    const published = input.checked;
+    input.disabled = true;
+    try {
+      await postJson(`/admin/platform-quizzes/${quizId}/publish`, { published });
+      document.querySelector(`[data-publish-label="${quizId}"]`).textContent = published ? 'منشور' : 'مسودة';
+    } catch (error) {
+      input.checked = !published;
+      alert('❌ ' + error.message);
+    } finally {
+      input.disabled = false;
+    }
+  }
+</script>
+
+<%- include('partials/footer') %>

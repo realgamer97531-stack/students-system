@@ -14,6 +14,7 @@ import '../../widgets/common.dart';
 import '../../widgets/popup_question.dart';
 import '../../widgets/video_source.dart';
 import 'lesson_view_screen.dart';
+import 'quiz_screen.dart';
 import 'video_screen.dart';
 
 const _statusLabels = {
@@ -25,10 +26,17 @@ const _statusLabels = {
 };
 
 class LessonsData {
-  LessonsData(this.lessons, this.popupResults);
+  LessonsData(this.lessons, this.popupResults, {this.quizMode = false, this.quizzes = const []});
   final List<Map<String, dynamic>> lessons;
   final Map<String, dynamic> popupResults;
+  // اختبار المنصة: لو مفعّل للمادة كارت الاختبار بيحل محل روابط جوجل فورم، والأسبوع بيتقفل لحد ما يتحل
+  final bool quizMode;
+  final List<Map<String, dynamic>> quizzes;
+
+  List<Map<String, dynamic>> quizzesForWeek(int? week) => quizzes.where((q) => week != null && asInt(q['weekNumber']) == week).toList();
 }
+
+List<Map<String, dynamic>> _maps(dynamic list) => ((list as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
 
 class _Week {
   _Week(this.number, this.label);
@@ -37,8 +45,13 @@ class _Week {
   final List<Map<String, dynamic>> lessons = [];
 }
 
-List<_Week> _buildWeeks(List<Map<String, dynamic>> lessons) {
+List<_Week> _buildWeeks(List<Map<String, dynamic>> lessons, [List<Map<String, dynamic>> quizzes = const []]) {
   final map = <String, _Week>{};
+  // أسبوع فيه اختبار ولسه مفيهوش فيديوهات بيظهر برضه
+  for (final q in quizzes) {
+    final n = asInt(q['weekNumber']);
+    if (n != null && n > 0) map.putIfAbsent('w$n', () => _Week(n, 'الأسبوع $n'));
+  }
   for (final l in lessons) {
     final n = asInt(l['weekNumber'] ?? l['week_number']);
     final week = n != null && n > 0 ? n : null;
@@ -81,14 +94,15 @@ class _LessonsScreenState extends State<LessonsScreen> {
   }
 
   static Future<dynamic> _fetch() async {
-    final lessons = await PortalApi.lessons();
+    final body = await PortalApi.lessonsFull();
+    final lessons = _maps(body['lessons']);
     Map<String, dynamic> popup = {};
     try {
       popup = await PortalApi.popupResults();
     } catch (_) {
       popup = ((await Cache.read('lessons'))?.data as Map?)?['popup'] as Map<String, dynamic>? ?? {};
     }
-    return {'lessons': lessons, 'popup': popup};
+    return {'lessons': lessons, 'popup': popup, 'quizMode': body['quizMode'] == true, 'quizzes': body['quizzes'] ?? []};
   }
 
   @override
@@ -101,23 +115,34 @@ class _LessonsScreenState extends State<LessonsScreen> {
         fetch: _fetch,
         onUnauthorized: widget.onUnauthorized,
         decode: (j) => LessonsData(
-          (((j as Map)['lessons'] as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList(),
+          _maps((j as Map)['lessons']),
           (j['popup'] as Map?)?.cast<String, dynamic>() ?? {},
+          quizMode: j['quizMode'] == true,
+          quizzes: _maps(j['quizzes']),
         ),
         builder: (context, data, refresh) {
-          if (data.lessons.isEmpty) return const EmptyView('لا يوجد دروس فيديو متاحة حاليًا', icon: Icons.ondemand_video_outlined);
-          final weeks = _buildWeeks(data.lessons);
+          if (data.lessons.isEmpty && data.quizzes.isEmpty) return const EmptyView('لا يوجد دروس فيديو متاحة حاليًا', icon: Icons.ondemand_video_outlined);
+          final weeks = _buildWeeks(data.lessons, data.quizzes);
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 260, mainAxisExtent: 150, crossAxisSpacing: 12, mainAxisSpacing: 12),
             itemCount: weeks.length,
             itemBuilder: (context, i) {
               final w = weeks[i];
+              final weekQuizzes = data.quizzesForWeek(w.number);
               return Card(
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => WeekScreen(title: w.label, lessons: w.lessons, popupResults: data.popupResults, onChanged: refresh),
+                    builder: (_) => WeekScreen(
+                      title: w.label,
+                      lessons: w.lessons,
+                      popupResults: data.popupResults,
+                      onChanged: refresh,
+                      weekNumber: w.number,
+                      quizMode: data.quizMode,
+                      quizzes: weekQuizzes,
+                    ),
                   )),
                   child: Container(
                     decoration: BoxDecoration(
@@ -129,6 +154,14 @@ class _LessonsScreenState extends State<LessonsScreen> {
                       const SizedBox(height: 10),
                       Text(w.label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                       Text('${w.lessons.length} حصة', style: const TextStyle(color: AppColors.muted)),
+                      if (weekQuizzes.any((q) => q['locked'] == true))
+                        const Padding(padding: EdgeInsets.only(top: 6), child: Pill('🔒 محتاج اختبار', AppColors.warningSoft, AppColors.warningText))
+                      else
+                        for (final q in weekQuizzes)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Pill('📝 ${q['score']} / ${q['maxScore']}', AppColors.successSoft, AppColors.successText),
+                          ),
                     ]),
                   ),
                 ),
@@ -185,17 +218,32 @@ Future<bool> ensureLessonAccess(BuildContext context, int videoId) async {
 }
 
 class WeekScreen extends StatefulWidget {
-  const WeekScreen({super.key, required this.title, required this.lessons, required this.popupResults, required this.onChanged});
+  const WeekScreen({
+    super.key,
+    required this.title,
+    required this.lessons,
+    required this.popupResults,
+    required this.onChanged,
+    this.weekNumber,
+    this.quizMode = false,
+    this.quizzes = const [],
+  });
   final String title;
   final List<Map<String, dynamic>> lessons;
   final Map<String, dynamic> popupResults;
   final Future<void> Function() onChanged;
+  final int? weekNumber;
+  final bool quizMode;
+  final List<Map<String, dynamic>> quizzes;
   @override
   State<WeekScreen> createState() => _WeekScreenState();
 }
 
 class _WeekScreenState extends State<WeekScreen> {
   Timer? _tick;
+  late List<Map<String, dynamic>> _lessons = widget.lessons;
+  late List<Map<String, dynamic>> _quizzes = widget.quizzes;
+  late bool _quizMode = widget.quizMode;
 
   @override
   void initState() {
@@ -211,6 +259,78 @@ class _WeekScreenState extends State<WeekScreen> {
   void dispose() {
     _tick?.cancel();
     super.dispose();
+  }
+
+  /// بعد حل الاختبار: نجيب الأسبوع من جديد (الحصص بتتفتح وكارت فيديو الشرح بيظهر)
+  Future<void> _reloadWeek() async {
+    try {
+      final body = await PortalApi.lessonsFull();
+      if (!mounted) return;
+      setState(() {
+        _quizMode = body['quizMode'] == true;
+        _lessons = _maps(body['lessons']).where((l) => asInt(l['weekNumber']) == widget.weekNumber).toList()
+          ..sort((a, b) => (asInt(a['lessonNumber']) ?? 0).compareTo(asInt(b['lessonNumber']) ?? 0));
+        _quizzes = _maps(body['quizzes']).where((q) => widget.weekNumber != null && asInt(q['weekNumber']) == widget.weekNumber).toList();
+      });
+    } on ApiException catch (_) {
+      // النت فاصل: الشاشة بتفضل زي ما هي
+    }
+    widget.onChanged();
+  }
+
+  Future<void> _openQuiz(int quizId, String title) async {
+    final changed = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => QuizScreen(quizId: quizId, title: title)));
+    if (mounted && changed != false) await _reloadWeek();
+  }
+
+  Widget _quizCard(Map<String, dynamic> q) {
+    final locked = q['locked'] == true;
+    final status = '${q['status']}';
+    final action = status == 'in_progress' ? 'كمّل الاختبار' : status == 'submitted' ? 'شوف نتيجتك' : 'ابدأ الاختبار';
+    final minutes = asInt(q['timeLimitMinutes']);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: locked ? AppColors.warning : AppColors.accent.withValues(alpha: 0.5), width: 2)),
+      child: InkWell(
+        onTap: () => _openQuiz(asInt(q['id'])!, '${q['title'] ?? ''}'),
+        child: Container(
+          decoration: BoxDecoration(gradient: LinearGradient(colors: [AppColors.primary.withValues(alpha: 0.08), AppColors.accent.withValues(alpha: 0.08)])),
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.accent, AppColors.primary]), borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.quiz_outlined, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Pill('اختبار الأسبوع', Color(0x1A4F46E5), AppColors.primary),
+                const SizedBox(height: 4),
+                Text('${q['title'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                Text('${q['questionCount']} سؤال${minutes != null && minutes > 0 ? ' · ⏱ $minutes دقيقة' : ''}', style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+                if (locked)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text('🔒 حصص الأسبوع ده هتفتح بعد ما تحل الاختبار', style: TextStyle(color: AppColors.warningText, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  ),
+                if (status == 'submitted')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'درجتك: ${q['score']} / ${q['maxScore']}${(asInt(q['pendingCount']) ?? 0) > 0 ? ' · ⏳ مقالي بيتصحح' : ''}${q['redoAvailable'] == true ? ' · ↻ متاح تحل تاني' : ''}',
+                      style: const TextStyle(color: AppColors.successText, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            Text(action, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 13)),
+          ]),
+        ),
+      ),
+    );
   }
 
   Future<void> _openLesson(Map<String, dynamic> lesson) async {
@@ -289,12 +409,32 @@ class _WeekScreenState extends State<WeekScreen> {
   @override
   Widget build(BuildContext context) {
     final cards = <Widget>[];
-    for (final l in widget.lessons) {
+    for (final q in _quizzes) {
+      cards.add(_quizCard(q));
+      final video = '${q['answerVideoUrl'] ?? ''}';
+      if (video.isNotEmpty) {
+        cards.add(_card(
+          top: AppColors.warning,
+          badge: const Pill('فيديو شرح الاختبار', AppColors.warningSoft, AppColors.warningText),
+          number: 'الأسبوع ${widget.weekNumber ?? ''}',
+          icon: Icons.play_arrow_rounded,
+          iconColors: const [AppColors.warning, Color(0xFFEF4444)],
+          title: 'فيديو شرح الاختبار',
+          date: '${q['title'] ?? ''}',
+          onTap: () => openVideoOrLink(context, video, 'فيديو شرح الاختبار'),
+        ));
+      }
+    }
+    for (final l in _lessons) {
+      // الأسبوع مقفول لحد ما الطالب يحل اختباره: الكارت بيوديه على الاختبار
+      final quizLocked = _quizMode && l['quizLocked'] == true;
       final number = 'حصة ${l['lessonNumber']}';
       final date = '${l['date'] ?? '-'}';
       final status = '${l['status'] ?? 'locked'}';
       final label = _statusLabels[status];
-      final badge = label == null ? const SizedBox.shrink() : Pill(label.$1, label.$2, label.$3);
+      final badge = quizLocked
+          ? const Pill('🔒 حل الاختبار الأول', AppColors.warningSoft, AppColors.warningText)
+          : (label == null ? const SizedBox.shrink() : Pill(label.$1, label.$2, label.$3));
       final expires = l['accessExpiresAt'] == null ? null : DateTime.tryParse('${l['accessExpiresAt']}');
       final extra = <Widget>[
         if (status == 'expired')
@@ -320,9 +460,9 @@ class _WeekScreenState extends State<WeekScreen> {
         title: '${l['title'] ?? ''}',
         date: date,
         extra: extra,
-        onTap: () => _openLesson(l),
+        onTap: () => quizLocked && asInt(l['quizId']) != null ? _openQuiz(asInt(l['quizId'])!, '') : _openLesson(l),
       ));
-      if (l['hasQuestions'] == true && (l['questionsDisplay'] == 'outside' || l['questionsDisplay'] == 'both')) {
+      if (!quizLocked && l['hasQuestions'] == true && (l['questionsDisplay'] == 'outside' || l['questionsDisplay'] == 'both')) {
         cards.add(_card(
           top: const Color(0xFFEC4899),
           badge: badge,
@@ -334,7 +474,8 @@ class _WeekScreenState extends State<WeekScreen> {
           onTap: () => _openQuestions(l),
         ));
       }
-      final examUrl = '${l['examUrl'] ?? l['exam_url'] ?? ''}';
+      // وضع اختبار المنصة: الروابط القديمة مبتظهرش (كارت الاختبار فوق مكانها)
+      final examUrl = _quizMode ? '' : '${l['examUrl'] ?? l['exam_url'] ?? ''}';
       if (examUrl.isNotEmpty) {
         cards.add(_card(
           top: const Color(0xFF4F46E5),
@@ -347,7 +488,7 @@ class _WeekScreenState extends State<WeekScreen> {
           onTap: () => launchUrl(Uri.parse(examUrl), mode: LaunchMode.externalApplication),
         ));
       }
-      final examVideo = '${l['examVideoUrl'] ?? l['exam_video_url'] ?? ''}';
+      final examVideo = _quizMode ? '' : '${l['examVideoUrl'] ?? l['exam_video_url'] ?? ''}';
       if (examVideo.isNotEmpty) {
         cards.add(_card(
           top: AppColors.warning,
@@ -360,7 +501,7 @@ class _WeekScreenState extends State<WeekScreen> {
           onTap: () => openVideoOrLink(context, examVideo, 'فيديو إجابة الاختبار'),
         ));
       }
-      if (_homeworkVideos(l).isNotEmpty) {
+      if (!quizLocked && _homeworkVideos(l).isNotEmpty) {
         cards.add(_card(
           top: const Color(0xFF10B3A3),
           badge: const Pill('فيديو الواجب', AppColors.successSoft, AppColors.successText),

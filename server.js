@@ -60,6 +60,7 @@ const PaymentVerification = require('./models/PaymentVerification');
 const ensureBookletReservationSchema = require('./utils/ensureBookletReservationSchema');
 const ensureLessonAccessSchema = require('./utils/ensureLessonAccessSchema');
 const ensurePopupQuestionSchema = require('./utils/ensurePopupQuestionSchema');
+const ensurePlatformQuizSchema = require('./utils/ensurePlatformQuizSchema');
 const {
   ensureDeletedStudentArchiveSchema, archiveAndDeleteStudent, restoreArchivedStudent, listArchivedStudents,
 } = require('./utils/studentArchive');
@@ -72,6 +73,8 @@ const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
 const entityColors = require('./utils/entityColors');
 const centerMove = require('./utils/centerMove');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
+const registerPlatformQuizRoutes = require('./routes/platformQuiz');
+const { studentQuizContext, quizLockForSession } = registerPlatformQuizRoutes;
 const registerFarahAppRoutes = require('./routes/farahApp');
 const syncServer = require('./utils/sync/server');
 // برنامج الديسكتوب (أوفلاين) بيشغل نفس السيرفر ده على الجهاز مع DESKTOP_MODE=1
@@ -6404,6 +6407,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       homeworkAssignments,
       homeworkParts,
       subjects,
+      quizContext,
     ] = await Promise.all([
       allVideoAccess ? [] : Session.findAll({
         where: { SubjectId: student.SubjectId, CenterId: student.CenterId },
@@ -6435,6 +6439,11 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         order: [['order_index', 'ASC']],
       }),
       Subject.findAll({ attributes: ['id', 'name'] }),
+      // اختبار المنصة: لو مفعّل للمادة بيحل محل روابط الاختبار القديمة وبيقفل أسبوعه لحد ما يتحل
+      studentQuizContext(student).catch((error) => {
+        console.error('Platform quiz context failed:', error.message);
+        return { enabled: false, quizzes: [], lockedWeeks: new Set() };
+      }),
     ]);
     const studentLessonNumbers = [...new Set(studentSessions.map(s => s.lesson_number))];
     // نفس نتيجة استعلام "حصص المجموعة اللي رقمها ضمن أرقام حصص المجموعة" (الحصص اللي رقمها null مش بتدخل)
@@ -6472,7 +6481,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       ? null
       : [...new Set([...groupVideoIds, ...individualVideoIds])];
 
-    if (!allVideoAccess && allAccessibleVideoIds.length === 0) return res.json({ success: true, lessons: [] });
+    const quizResponse = quizContext.enabled ? { quizMode: true, quizzes: quizContext.quizzes } : {};
+    if (!allVideoAccess && allAccessibleVideoIds.length === 0) return res.json({ success: true, lessons: [], ...quizResponse });
 
     const [videos, grants] = await Promise.all([
       Video.findAll({
@@ -6715,6 +6725,17 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         homeworkVideos.push({ id: null, sourceType: 'url', videoUrl: session.homework_video_url, filePath: null });
       }
 
+      // وضع اختبار المنصة: الروابط القديمة بتختفي، والأبلكيشن القديم بياخد لينك صفحة الاختبار مكانها
+      const lessonWeek = Number(session.week_number);
+      const weekQuiz = quizContext.enabled ? quizContext.quizzes.find(q => Number(q.weekNumber) === lessonWeek) : null;
+      const quizLocked = !allVideoAccess && quizContext.lockedWeeks.has(lessonWeek);
+      const oldExamUrl = ownCenterLessonNumbers.has(session.lesson_number)
+        ? (ownCenterExamLinksByLesson.get(session.lesson_number)?.examUrl || null)
+        : (linkedExamSession?.exam_url || examLinksByLesson.get(session.lesson_number)?.examUrl || null);
+      const oldExamVideoUrl = ownCenterLessonNumbers.has(session.lesson_number)
+        ? (ownCenterExamLinksByLesson.get(session.lesson_number)?.examVideoUrl || null)
+        : (linkedExamSession?.exam_video_url || examLinksByLesson.get(session.lesson_number)?.examVideoUrl || null);
+
       return {
         videoId: v.id,
         title: v.title,
@@ -6731,12 +6752,9 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
         realHomeworkUrl, // NEW: only real homework for this lesson (for card display)
         homeworkVideos, // كل فيديوهات الواجب للدرس (الإصدارات القديمة من الأبلكيشن بتستخدم realHomeworkUrl)
         homeworkItems,
-        examUrl: ownCenterLessonNumbers.has(session.lesson_number)
-          ? (ownCenterExamLinksByLesson.get(session.lesson_number)?.examUrl || null)
-          : (linkedExamSession?.exam_url || examLinksByLesson.get(session.lesson_number)?.examUrl || null),
-        examVideoUrl: ownCenterLessonNumbers.has(session.lesson_number)
-          ? (ownCenterExamLinksByLesson.get(session.lesson_number)?.examVideoUrl || null)
-          : (linkedExamSession?.exam_video_url || examLinksByLesson.get(session.lesson_number)?.examVideoUrl || null),
+        examUrl: quizContext.enabled ? (weekQuiz ? weekQuiz.url : null) : oldExamUrl,
+        examVideoUrl: quizContext.enabled ? (weekQuiz ? weekQuiz.answerVideoUrl : null) : oldExamVideoUrl,
+        ...(quizContext.enabled ? { quizLocked, quizId: weekQuiz ? weekQuiz.id : null } : {}),
         hasQuestions: questionsVideoIdSet.has(v.id),
         questionsDisplay: v.questions_display,
       };
@@ -6744,7 +6762,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
 
     // الفيديوهات اللي الطالب ده اتشال منها بالذات
     const blockedVideoIds = await blockedVideoIdsFor(student.id);
-    res.json({ success: true, lessons: blockedVideoIds.size ? lessons.filter(lesson => !blockedVideoIds.has(Number(lesson.videoId))) : lessons });
+    res.json({ success: true, lessons: blockedVideoIds.size ? lessons.filter(lesson => !blockedVideoIds.has(Number(lesson.videoId))) : lessons, ...quizResponse });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
@@ -6785,6 +6803,12 @@ app.post('/api/portal/student/lessons/:videoId/access', verifyPortalToken('stude
 
     if (allVideoAccess) {
       return res.json({ success: true, unlimited: true });
+    }
+
+    // اختبار المنصة: حصص الأسبوع مقفولة لحد ما الطالب يسلّم اختباره (قبل أي خصم فلوس)
+    const quizLock = await quizLockForSession(student, session);
+    if (quizLock) {
+      return res.status(403).json({ success: false, quizLocked: true, quizId: quizLock.id, message: `لازم تحل "${quizLock.title}" الأول عشان حصص الأسبوع ده تفتح` });
     }
 
     // 1) الحالة المجانية للجميع - فتح فوري بلا حدود + تسجيل حضور
@@ -7043,6 +7067,13 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
       ? [video.Session, ...(video.VideoSessions || []).map(videoSession => videoSession.Session)].find(Boolean)
       : undefined);
     if (!session && !allVideoAccess) return res.status(404).json({ success: false, message: 'الحصة المرتبطة بالدرس غير موجودة' });
+
+    if (!allVideoAccess) {
+      const quizLock = await quizLockForSession(student, session);
+      if (quizLock) {
+        return res.status(403).json({ success: false, quizLocked: true, quizId: quizLock.id, message: `لازم تحل "${quizLock.title}" الأول عشان حصص الأسبوع ده تفتح` });
+      }
+    }
 
     // تأكيد إن عنده صلاحية فعلية (مجاني، أو غرانت فيه مشاهدات متاحة، أو حضور فعلي حالي)
     if (!allVideoAccess && !session.is_free_for_all) {
@@ -12123,6 +12154,10 @@ registerPopupQuestionRoutes(app, {
   adImageUpload, Student, Video, VideoPart, Session, VideoSession, VideoStudentAccess,
 });
 
+registerPlatformQuizRoutes(app, {
+  requirePermissionOrAdmin, verifyPortalToken, Student, Subject, Center, Session,
+});
+
 // آخر حاجة: أي خطأ مش متوقع في صفحة بيتسجل في اللوج وبيظهر برسالة مفهومة (بدل "Internal Server Error" من غير سبب)
 app.use((err, req, res, next) => {
   console.error(`❌ Unhandled error on ${req.method} ${req.originalUrl}:`, err);
@@ -12164,6 +12199,7 @@ async function startServer() {
     await ensureBookletReservationSchema(sequelize);
     await ensureLessonAccessSchema(sequelize);
     await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
+    await ensurePlatformQuizSchema().catch((e) => console.error('⚠️ تجهيز جداول اختبار المنصة فشل:', e.message));
     await ensureDeletedStudentArchiveSchema().catch((e) => console.error('⚠️ تجهيز جدول أرشيف الطلاب المحذوفين فشل:', e.message));
     if (!desktopRuntime) await syncServer.ensureSyncSchema(sequelize).catch((e) => console.error('⚠️ تجهيز جداول مزامنة الديسكتوب فشل:', e.message));
     normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));
@@ -12229,6 +12265,7 @@ async function startServer() {
           await ensureBookletReservationSchema(sequelize);
           await ensureLessonAccessSchema(sequelize);
           await ensurePopupQuestionSchema().catch((e) => console.error('⚠️ تجهيز جداول الأسئلة المنبثقة فشل:', e.message));
+          await ensurePlatformQuizSchema().catch((e) => console.error('⚠️ تجهيز جداول اختبار المنصة فشل:', e.message));
           await ensureDeletedStudentArchiveSchema().catch((e) => console.error('⚠️ تجهيز جدول أرشيف الطلاب المحذوفين فشل:', e.message));
           if (!desktopRuntime) await syncServer.ensureSyncSchema(sequelize).catch((e) => console.error('⚠️ تجهيز جداول مزامنة الديسكتوب فشل:', e.message));
           normalizeStudentPhones().catch((e) => console.error('⚠️ تنضيف أرقام التليفون فشل:', e.message));

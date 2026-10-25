@@ -36,6 +36,7 @@ const ONLINE_ONLY_ANY_METHOD = [
   /^\/admin\/deleted-students(\/|$)/,
   /^\/admin\/sync-devices(\/|$)/,
   /^\/admin\/recharge-codes(\/|$)/,
+  /^\/admin\/platform-quizzes(\/|$)/, // صور على هوستينجر + نتايج الطلاب على السيرفر بس
   /^\/settings\/(export-database|import-database|clear-)/,
   /^\/api\/(portal|public|internal)\//,
 ];

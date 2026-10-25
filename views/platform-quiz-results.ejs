@@ -1,0 +1,175 @@
+<%- include('partials/header') %>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script src="/quiz-render.js?v=1"></script>
+
+<style>
+  .pr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .pr-stat { background: var(--sf-card-bg); border-radius: var(--sf-radius); box-shadow: var(--sf-shadow); padding: 14px 16px; }
+  .pr-stat .v { font-size: 1.6rem; font-weight: 800; color: var(--sf-primary); }
+  .pr-stat .l { font-size: .85rem; color: var(--sf-muted); font-weight: 600; }
+  .pr-essay { border: 1px solid var(--sf-border, rgba(0,0,0,.1)); border-radius: 14px; padding: 14px; margin-bottom: 12px; background: var(--sf-card-bg); }
+  .pr-essay img { max-width: 100%; max-height: 360px; border-radius: 10px; margin-top: 8px; cursor: zoom-in; }
+  .pr-answer { background: var(--sf-bg); border-radius: 10px; padding: 10px 12px; margin-top: 8px; white-space: pre-wrap; }
+  .qz-math { direction: ltr; unicode-bidi: isolate; }
+  .qz-math-block { display: block; text-align: center; overflow-x: auto; }
+  .pr-filter button.active { background: var(--sf-primary); color: #fff; }
+  .pr-table td, .pr-table th { white-space: nowrap; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-1">📊 <%= quiz.title %></h3>
+    <div class="text-muted small"><%= subjectName %> · الأسبوع <%= quiz.week %> · <%= totalMarks %> درجة <%= quiz.published ? '' : '· (مسودة — مش ظاهر للطلاب)' %></div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/admin/platform-quizzes" class="btn btn-outline-secondary">⬅ رجوع</a>
+    <a href="/admin/platform-quizzes/<%= quiz.id %>/edit" class="btn btn-outline-primary">✏️ تعديل الأسئلة</a>
+    <button type="button" class="btn btn-outline-warning" onclick="regrade()">🔄 إعادة التصحيح</button>
+    <% if (quiz.redoAllAt) { %>
+      <button type="button" class="btn btn-outline-danger" onclick="redoAll(true)">✕ إلغاء الإعادة للكل</button>
+    <% } else { %>
+      <button type="button" class="btn btn-warning" onclick="redoAll(false)">↻ إعادة للكل</button>
+    <% } %>
+  </div>
+</div>
+
+<% const submitted = rows.filter(r => r.score !== null); %>
+<div class="pr-stats">
+  <div class="pr-stat"><div class="v"><%= submitted.length %> / <%= rows.length %></div><div class="l">سلّموا</div></div>
+  <div class="pr-stat"><div class="v"><%= average === null ? '—' : average %></div><div class="l">المتوسط من <%= totalMarks %></div></div>
+  <div class="pr-stat"><div class="v"><%= rows.filter(r => r.status === 'in_progress').length %></div><div class="l">بيحلوا دلوقتي</div></div>
+  <div class="pr-stat"><div class="v text-warning"><%= pendingItems.length %></div><div class="l">مقالي مستني تصحيح</div></div>
+</div>
+
+<% if (quiz.redoAllAt) { %>
+  <div class="alert alert-warning small">↻ الإعادة متاحة للكل: أي طالب سلّم قبل <%= new Date(quiz.redoAllAt).toLocaleString('ar-EG') %> يقدر يحل تاني مرة واحدة (آخر محاولة هي اللي بتتحسب).</div>
+<% } %>
+
+<% if (pendingItems.length) { %>
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">✍️ تصحيح المقالي (<%= pendingItems.length %>)</h5>
+      <% pendingItems.forEach(item => { %>
+        <div class="pr-essay" id="essay-<%= item.attemptId %>-<%= item.questionId %>">
+          <div class="d-flex justify-content-between flex-wrap gap-2">
+            <strong><%= item.studentName %> <span class="text-muted small">(<%= item.studentCode %>)</span></strong>
+            <span class="badge bg-secondary">سؤال <%= item.order %> · من <%= item.max %></span>
+          </div>
+          <div class="small text-muted mt-2" data-render="<%= item.questionText %>"></div>
+          <% if (item.answerText) { %><div class="pr-answer" data-render="<%= item.answerText %>"></div><% } %>
+          <% if (item.answerImage) { %><a href="<%= item.answerImage %>" target="_blank" rel="noopener"><img src="<%= item.answerImage %>" alt="إجابة الطالب" loading="lazy"></a><% } %>
+          <div class="d-flex gap-2 align-items-center flex-wrap mt-3">
+            <button type="button" class="btn btn-sm btn-success" onclick="grade(<%= item.attemptId %>, <%= item.questionId %>, <%= item.max %>)">✔ الدرجة كاملة (<%= item.max %>)</button>
+            <input type="number" class="form-control form-control-sm" style="width:90px" min="0" max="<%= item.max %>" step="0.5" placeholder="درجة" id="m-<%= item.attemptId %>-<%= item.questionId %>">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="grade(<%= item.attemptId %>, <%= item.questionId %>, document.getElementById('m-<%= item.attemptId %>-<%= item.questionId %>').value)">حفظ الدرجة</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="grade(<%= item.attemptId %>, <%= item.questionId %>, 0)">✕ صفر</button>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+<% } %>
+
+<div class="card">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h5 class="fw-bold mb-0">👥 الطلاب</h5>
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <input type="search" class="form-control form-control-sm" style="width:200px" placeholder="🔍 اسم أو كود" oninput="filterRows()" id="prSearch">
+        <div class="btn-group btn-group-sm pr-filter" role="group">
+          <button type="button" class="btn btn-outline-secondary active" data-f="all" onclick="setFilter('all')">الكل</button>
+          <button type="button" class="btn btn-outline-secondary" data-f="done" onclick="setFilter('done')">سلّموا</button>
+          <button type="button" class="btn btn-outline-secondary" data-f="not" onclick="setFilter('not')">لسه</button>
+        </div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle pr-table mb-0">
+        <thead><tr><th>الطالب</th><th>الكود</th><th>السنتر</th><th>الحالة</th><th>الدرجة</th><th>وقت التسليم</th><th>إعادة</th></tr></thead>
+        <tbody>
+          <% rows.forEach(r => { %>
+            <tr data-row data-done="<%= r.score !== null ? 1 : 0 %>" data-q="<%= (String(r.name || '') + ' ' + String(r.code || '') + ' ' + String(r.phone || '')).toLowerCase() %>">
+              <td class="fw-semibold"><%= r.name %></td>
+              <td><%= r.code %></td>
+              <td><%= r.center %></td>
+              <td>
+                <% if (r.score !== null) { %><span class="badge bg-success">سلّم<%= r.autoSubmitted ? ' (الوقت خلص)' : '' %></span>
+                <% } else if (r.status === 'in_progress') { %><span class="badge bg-info">بيحل</span>
+                <% } else { %><span class="badge bg-secondary">لسه</span><% } %>
+                <% if (r.attempts > 1) { %><span class="badge bg-light text-dark">محاولة <%= r.attempts %></span><% } %>
+              </td>
+              <td class="fw-bold">
+                <% if (r.score !== null) { %><%= r.score %> / <%= r.maxScore %><% if (r.pending) { %> <span class="text-warning small">(⏳ <%= r.pending %>)</span><% } %><% } else { %>—<% } %>
+              </td>
+              <td class="small text-muted"><%= r.submittedAt ? new Date(r.submittedAt).toLocaleString('ar-EG') : '' %></td>
+              <td>
+                <% if (r.score !== null) { %>
+                  <% if (r.redoOwn) { %>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="redo(<%= r.id %>, false)">✕ إلغاء الإعادة</button>
+                  <% } else if (r.redoAllowed) { %>
+                    <span class="small text-warning">متاحة (للكل)</span>
+                  <% } else { %>
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="redo(<%= r.id %>, true)">↻ إعادة</button>
+                  <% } %>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('[data-render]').forEach(el => { el.innerHTML = QuizRender.html(el.getAttribute('data-render')); });
+
+  const QUIZ_ID = <%- JSON.stringify(quiz.id) %>;
+  async function postJson(url, body) {
+    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body || {}) });
+    const data = await response.json().catch(() => ({ success: false, message: 'رد غير متوقع' }));
+    if (!response.ok || !data.success) throw new Error(data.message || 'حصلت مشكلة');
+    return data;
+  }
+  async function grade(attemptId, questionId, marks) {
+    if (marks === '' || marks === null || marks === undefined) { alert('اكتب الدرجة'); return; }
+    try {
+      await postJson(`/admin/platform-quizzes/${QUIZ_ID}/grade`, { attempt_id: attemptId, question_id: questionId, marks: Number(marks) });
+      const box = document.getElementById(`essay-${attemptId}-${questionId}`);
+      if (box) { box.style.opacity = '.4'; box.querySelectorAll('button, input').forEach(el => { el.disabled = true; }); }
+    } catch (error) { alert('❌ ' + error.message); }
+  }
+  async function redo(studentId, allow) {
+    if (allow && !confirm('تسمح للطالب ده يحل الاختبار تاني؟ آخر محاولة هي اللي هتتحسب.')) return;
+    try { await postJson(`/admin/platform-quizzes/${QUIZ_ID}/redo`, { student_id: studentId, allow }); location.reload(); }
+    catch (error) { alert('❌ ' + error.message); }
+  }
+  async function redoAll(cancel) {
+    if (!confirm(cancel ? 'إلغاء الإعادة للكل؟ (اللي بدأ يحل تاني هيكمّل عادي)' : 'تسمح لكل الطلاب اللي سلّموا يحلوا تاني مرة؟ آخر محاولة هي اللي هتتحسب.')) return;
+    try { await postJson(`/admin/platform-quizzes/${QUIZ_ID}/redo-all`, { cancel }); location.reload(); }
+    catch (error) { alert('❌ ' + error.message); }
+  }
+  async function regrade() {
+    if (!confirm('إعادة تصحيح كل المحاولات بالإجابات الصحيحة والدرجات الحالية؟ (تصحيحك اليدوي للمقالي هيفضل زي ما هو)')) return;
+    try { const d = await postJson(`/admin/platform-quizzes/${QUIZ_ID}/regrade`); alert(`✅ اتعاد تصحيح ${d.count} محاولة`); location.reload(); }
+    catch (error) { alert('❌ ' + error.message); }
+  }
+  let rowFilter = 'all';
+  function setFilter(f) {
+    rowFilter = f;
+    document.querySelectorAll('.pr-filter button').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+    filterRows();
+  }
+  function filterRows() {
+    const q = document.getElementById('prSearch').value.trim().toLowerCase();
+    document.querySelectorAll('[data-row]').forEach(tr => {
+      const done = tr.dataset.done === '1';
+      const okFilter = rowFilter === 'all' || (rowFilter === 'done' ? done : !done);
+      tr.style.display = okFilter && (!q || tr.dataset.q.includes(q)) ? '' : 'none';
+    });
+  }
+</script>
+
+<%- include('partials/footer') %>
