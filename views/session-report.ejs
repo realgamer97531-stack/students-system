@@ -233,11 +233,20 @@
                 <% } %>
               </td>
               <% if (userRole === 'admin') { %>
-              <td>
+              <td style="min-width: 150px;">
                 <% if (row.payment > 0) { %>
-                  <span class="text-success"><%= row.payment %> ج</span>
+                  <span class="text-success fw-bold"><%= row.payment %> ج</span>
                 <% } else { %>
                   <span class="text-muted small">-</span>
+                <% } %>
+                <% (row.paymentLines || []).forEach(line => { %>
+                  <div class="small text-muted" style="font-size: 0.7rem; line-height: 1.3;" title="<%= line.userName || '' %> — <%= new Date(line.time).toLocaleString('ar-EG') %>">
+                    +<%= line.amount %> ج<%= line.reason ? ': ' + line.reason : '' %>
+                  </div>
+                <% }) %>
+                <% if (row.location !== 'أونلاين') { %>
+                  <button type="button" class="btn btn-xs btn-outline-success mt-1 add-payment-btn" style="font-size:0.65rem; padding: 2px 6px;"
+                    data-attendance-id="<%= row.attendanceId %>" data-student-name="<%= row.student.name %>">+ 💵 <span class="ar-only">فلوس</span><span class="en-only" style="display:none;">Money</span></button>
                 <% } %>
               </td>
               <% } %>
@@ -600,5 +609,80 @@
     });
   });
 </script>
+
+<% if (userRole === 'admin') { %>
+<div class="modal fade" id="addPaymentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content card">
+      <div class="modal-header">
+        <h5 class="modal-title">💵 <span class="ar-only">إضافة فلوس لـ</span><span class="en-only" style="display:none;">Add money for</span> <span id="addPaymentStudent"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted"><span class="ar-only">المبلغ بيتضاف لرصيد الطالب وعلى "دفع وقت الحضور" بتاع الحصة دي، وكل مبلغ بسببه في سجل الطالب.</span><span class="en-only" style="display:none;">Added to the student's balance and to this session's paid amount.</span></p>
+        <div id="addPaymentLines"></div>
+        <button type="button" class="btn btn-link btn-sm px-0" id="addPaymentMore">+ <span class="ar-only">مبلغ تاني بسبب تاني</span><span class="en-only" style="display:none;">Another amount</span></button>
+        <div id="addPaymentError" class="text-danger small"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" id="addPaymentSave">💵 <span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const modalEl = document.getElementById('addPaymentModal');
+    const linesBox = document.getElementById('addPaymentLines');
+    const errorBox = document.getElementById('addPaymentError');
+    const saveBtn = document.getElementById('addPaymentSave');
+    let attendanceId = null;
+
+    function addLine() {
+      const row = document.createElement('div');
+      row.className = 'row g-1 mb-1 pay-line';
+      row.innerHTML = '<div class="col-4"><input type="number" step="any" min="0" class="form-control form-control-sm pay-amount" placeholder="المبلغ"></div>'
+        + '<div class="col-8"><input type="text" maxlength="150" class="form-control form-control-sm pay-reason" placeholder="سبب الدفع (اختياري)"></div>';
+      linesBox.appendChild(row);
+      return row;
+    }
+    document.getElementById('addPaymentMore').addEventListener('click', addLine);
+
+    document.addEventListener('click', function (event) {
+      const btn = event.target.closest('.add-payment-btn');
+      if (!btn) return;
+      attendanceId = btn.dataset.attendanceId;
+      document.getElementById('addPaymentStudent').textContent = btn.dataset.studentName;
+      linesBox.innerHTML = '';
+      errorBox.textContent = '';
+      addLine();
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      setTimeout(() => { const first = linesBox.querySelector('.pay-amount'); if (first) first.focus(); }, 300);
+    });
+
+    saveBtn.addEventListener('click', async function () {
+      const extra = Array.from(linesBox.querySelectorAll('.pay-line'))
+        .map(row => ({ amount: row.querySelector('.pay-amount').value, reason: row.querySelector('.pay-reason').value.trim() }))
+        .filter(line => Number(line.amount) > 0);
+      if (!extra.length) { errorBox.textContent = 'اكتب مبلغ أكبر من صفر'; return; }
+      saveBtn.disabled = true;
+      try {
+        const res = await fetch('/attendance/' + attendanceId + '/add-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ extra_payments: extra, response_format: 'json' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) { errorBox.textContent = data.message || 'حصلت مشكلة'; return; }
+        location.reload();
+      } catch (error) {
+        errorBox.textContent = 'حصلت مشكلة في الاتصال، حاول تاني';
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+  })();
+</script>
+<% } %>
 
 <%- include('partials/footer') %>

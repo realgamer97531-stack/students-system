@@ -309,6 +309,18 @@
                       <button class="btn btn-sm btn-outline-primary"><span class="ar-only">حفظ</span><span class="en-only" style="display:none;">Save</span></button>
                     </div>
                   </form>
+                  <form action="/admin/videos/<%= video.id %>/grant/<%= student.id %>" method="POST" class="row g-1 align-items-center mt-1 expiry-form">
+                    <input type="hidden" name="session_id" value="<%= grant ? grant.SessionId : video.SessionId %>">
+                    <input type="hidden" name="expires_at">
+                    <div class="col-auto">
+                      <input type="datetime-local" class="form-control form-control-sm expiry-local" style="width:200px;" required
+                        title="تاريخ ووقت انتهاء الإتاحة — الفيديو بيقفل للطالب ده في الميعاد ده بالظبط"
+                        <% if (grantExpiry && !grantWaiting) { %>data-current="<%= grantExpiry.toISOString() %>"<% } %>>
+                    </div>
+                    <div class="col-auto">
+                      <button class="btn btn-sm btn-outline-secondary">📅 <span class="ar-only">ينتهي في</span><span class="en-only" style="display:none;">Expires at</span></button>
+                    </div>
+                  </form>
                 </td>
                 <td>
                   <form action="/admin/videos/<%= video.id %>/remove-student-access-by-student/<%= student.id %>" method="POST"
@@ -351,6 +363,28 @@
     const term = this.value.toLowerCase().trim();
     document.querySelectorAll('#studentsTable tbody tr').forEach(row => {
       row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+    });
+  });
+
+  // "ينتهي في": الوقت المكتوب بتوقيت جهازك، وبيتبعت للسيرفر ISO عشان يتحفظ صح مهما كان توقيت السيرفر
+  function toLocalInputValue(date) {
+    const pad = n => String(n).padStart(2, '0');
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+  document.querySelectorAll('.expiry-form').forEach(form => {
+    const input = form.querySelector('.expiry-local');
+    const current = input.dataset.current ? new Date(input.dataset.current) : null;
+    const now = new Date();
+    input.min = toLocalInputValue(now);
+    input.value = toLocalInputValue(current && current > now ? current : new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000));
+    form.addEventListener('submit', event => {
+      const picked = new Date(input.value);
+      if (Number.isNaN(picked.getTime()) || picked <= new Date()) {
+        event.preventDefault();
+        alert('اختار تاريخ ووقت بعد دلوقتي');
+        return;
+      }
+      form.querySelector('input[name="expires_at"]').value = picked.toISOString();
     });
   });
 

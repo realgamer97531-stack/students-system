@@ -148,6 +148,7 @@ class _StudentDetailsState extends State<StudentDetails> {
   String? _liveError;
   bool _loading = false;
   final _walletOp = OnlineOp();
+  final _paymentOp = OnlineOp();
   final _bookletOps = <int, OnlineOp>{};
   final _attendanceOp = OnlineOp();
 
@@ -196,6 +197,66 @@ class _StudentDetailsState extends State<StudentDetails> {
     if (!res.ok) return toast(context, res.message, error: true);
     toast(context, '✅ اتضاف ${fmtNum(input.$1)} ج للمحفظة');
     _loadLive();
+  }
+
+  /// فلوس دفعها الطالب (بسببها): بتتضاف لرصيده وتظهر في "الفلوس اللي دفعها"
+  Future<void> _recordPayment() async {
+    final input = await _askAmount(context, title: '💵 تسجيل فلوس دفعها', subtitle: 'الرصيد الحالي: ${fmtNum(widget.student.balance)} ج', noteLabel: 'سبب الدفع (اختياري)');
+    if (input == null || !mounted) return;
+    final res = await _paymentOp.send(
+      context,
+      '/students/${widget.student.id}/payment',
+      {'payment_collected': input.$1, 'payment_reason': input.$2, 'response_format': 'json'},
+      user: widget.user,
+    );
+    if (res == null || !mounted) return;
+    if (!res.ok) return toast(context, res.message, error: true);
+    toast(context, '✅ اتسجل ${fmtNum(input.$1)} ج');
+    _loadLive();
+  }
+
+  Widget _payments() {
+    final list = ((_live?['payments'] as List?) ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
+    final total = (_live?['paymentsTotal'] as num?) ?? 0;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const Icon(Icons.payments_outlined, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('الفلوس اللي دفعها', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+            Text('${fmtNum(total)} ج', textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.successText)),
+          ]),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(onPressed: _recordPayment, icon: const Icon(Icons.add), label: const Text('تسجيل فلوس دفعها')),
+          if (list.isEmpty)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('لسه مفيش فلوس متسجلة', style: TextStyle(color: AppColors.muted)))
+          else
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              initiallyExpanded: list.length <= 5,
+              title: Text('كل المدفوعات (${list.length})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              children: [
+                for (final p in list)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${p['reason'] ?? '-'}', maxLines: 2, overflow: TextOverflow.ellipsis),
+                    subtitle: Text([
+                      '${p['kind']}',
+                      if (p['session'] != null) '${p['session']}',
+                      fmtDate(p['createdAt'], withTime: true),
+                      if (p['user'] != null) '${p['user']}',
+                    ].join(' • ')),
+                    trailing: Text('+${fmtNum(p['amount'])} ج',
+                        textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.successText)),
+                  ),
+              ],
+            ),
+        ]),
+      ),
+    );
   }
 
   Future<void> _payBooklet(Map<String, dynamic> b) async {
@@ -436,7 +497,7 @@ class _StudentDetailsState extends State<StudentDetails> {
           _phone('تليفون ولي الأمر', s.parentPhone),
           const SizedBox(height: 4),
           _liveStatus(),
-          if (_live != null) ...[_wallet(), _booklets()],
+          if (_live != null) ...[_wallet(), _payments(), _booklets()],
           const SizedBox(height: 8),
           const Text('آخر الحصص (من البيانات المحفوظة)', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),

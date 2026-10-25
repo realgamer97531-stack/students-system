@@ -1017,6 +1017,50 @@ async function recordAttendanceCharge(student, userId, reason = 'رسوم الح
   return amount;
 }
 
+// ===== فلوس الطالب اللي دفعها في الحصة =====
+// كل مبلغ بيتسجل حركة رصيد لوحده مربوطة بالحصة (SessionId) وسببها بيبدأ بـ ATTENDANCE_PAYMENT_REASON
+// (+ السبب اللي اتكتب جنبه). attendances.payment_collected = مجموع المبالغ دي للحصة.
+const {
+  ATTENDANCE_PAYMENT_REASON,
+  MANUAL_PAYMENT_REASON,
+  attendancePaymentLines,
+  studentPaymentsFromTransactions,
+} = require('./utils/studentPayments');
+
+async function recordAttendancePayments(student, sessionId, lines, userId) {
+  const total = lines.reduce((sum, line) => sum + line.amount, 0);
+  if (total <= 0) return 0;
+  await adjustStudentBalance(student, total);
+  await BalanceTransaction.bulkCreate(lines.map(line => ({
+    StudentId: student.id,
+    SessionId: sessionId || null,
+    amount: line.amount,
+    reason: line.reason ? `${ATTENDANCE_PAYMENT_REASON} — ${line.reason}` : ATTENDANCE_PAYMENT_REASON,
+    UserId: userId,
+  })));
+  return total;
+}
+
+// مجموع اللي الطالب دفعه في الحصة دي (بما فيهم محاولة حضور اترفضت لنقص الرصيد والفلوس فضلت في رصيده)
+async function sessionPaymentsTotal(studentId, sessionId) {
+  const total = await BalanceTransaction.sum('amount', {
+    where: {
+      StudentId: studentId,
+      SessionId: sessionId,
+      amount: { [Op.gt]: 0 },
+      reason: { [Op.like]: `${ATTENDANCE_PAYMENT_REASON}%` },
+    },
+  });
+  return Number(total) || 0;
+}
+
+// الرصيد الأولي وقت تسجيل طالب جديد = فلوس دفعها: بتتسجل في سجل رصيده (قبل كده مكانتش بتتسجل خالص).
+// لو اتسجل حضوره في نفس الوقت، الحركة بتترَبط بالحصة (تحت).
+async function recordRegistrationPayment(student, amount, userId) {
+  if (!(amount > 0)) return null;
+  return BalanceTransaction.create({ StudentId: student.id, amount, reason: 'دفع وقت التسجيل (رصيد أولي)', UserId: userId });
+}
+
 function getEffectiveSessionPayment(attendance) {
   const manualAmount = parseFloat(attendance?.payment_collected || 0);
   const sessionFee = parseFloat(attendance?.Student?.price_per_session || 0);
@@ -2479,6 +2523,7 @@ app.get('/students/:id', async (req, res) => {
       }),
       BalanceTransaction.findAll({
         where: { StudentId: student.id },
+        include: [{ model: User, attributes: ['id', 'name'] }, { model: Session, attributes: ['id', 'lesson_number', 'serial_number', 'CenterId'], include: [{ model: Center, attributes: ['id', 'name'] }] }],
         order: [['createdAt', 'DESC']],
       }),
       Warning.findAll({
@@ -2529,6 +2574,8 @@ app.get('/students/:id', async (req, res) => {
     const attendanceUserByLesson = {};
     const attendanceTimeByLesson = {};
     const attendanceIdByLesson = {};
+    const attendancePaymentByLesson = {};
+    const attendanceSessionIdByLesson = {};
     attendanceRecords.forEach(a => {
       if (a && a.Session && a.Session.SubjectId === student.SubjectId) {
         const key = Number(a.Session.lesson_number);
@@ -2540,6 +2587,8 @@ app.get('/students/:id', async (req, res) => {
           attendanceUserByLesson[key] = a.User ? a.User.name : '-';
           attendanceTimeByLesson[key] = a.attended_at;
           attendanceIdByLesson[key] = a.id;
+          attendancePaymentByLesson[key] = Number(a.payment_collected) || 0;
+          attendanceSessionIdByLesson[key] = a.SessionId;
         }
       }
     });
@@ -2618,6 +2667,8 @@ app.get('/students/:id', async (req, res) => {
         attendanceUser: attendanceUserByLesson[lessonNumber] || null,
         attendanceTime: attendanceTimeByLesson[lessonNumber] || null,
         attendanceId: attendanceIdByLesson[lessonNumber] || null,
+        attendancePayment: attendancePaymentByLesson[lessonNumber] || 0,
+        attendanceSessionId: attendanceSessionIdByLesson[lessonNumber] || null,
         homeworkStatus: homeworkByLesson[lessonNumber] || null,
         homeworkUser: homeworkUserByLesson[lessonNumber] || null,
         homeworkTime: homeworkTimeByLesson[lessonNumber] || null,
@@ -2650,12 +2701,15 @@ app.get('/students/:id', async (req, res) => {
 
     const profilePhotoUrl = student.profile_photo_url || null;
 
+    const payments = studentPaymentsFromTransactions(transactions);
     res.render('student-profile', {
       student,
       centers,
       subjects,
       attendanceRows,
-      transactions,
+      transactions: transactions.filter(t => !String(t.reason || '').startsWith('نقاط:')),
+      payments,
+      paymentsTotal: payments.reduce((sum, p) => sum + p.amount, 0),
       examResults: examResults.filter(r => !r.Exam.Session),
       videoWatchData,
       warnings,
@@ -2749,6 +2803,43 @@ app.post('/students/:id/balance', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+// تسجيل فلوس دفعها الطالب من ملفه: كذا مبلغ وكل مبلغ جنبه سببه. لو اختار حصة هو حاضرها
+// المبلغ بيتضاف على "دفع وقت الحضور" بتاع الحصة دي (ويظهر في تقرير الحصة)
+app.post('/students/:id/payment', async (req, res) => {
+  const wantsJson = req.body.response_format === 'json' || /json/i.test(req.get('content-type') || '');
+  const reply = (status, message) => (wantsJson
+    ? res.status(status).json({ success: status < 400, message })
+    : res.redirect(`/students/${req.params.id}?attendance_msg=${encodeURIComponent(message)}`));
+  try {
+    const student = await Student.findByPk(req.params.id);
+    if (!student) return reply(404, '❌ الطالب غير موجود');
+    const lines = attendancePaymentLines(req.body);
+    if (!lines.length) return reply(400, '❌ اكتب مبلغ أكبر من صفر');
+    const total = lines.reduce((sum, line) => sum + line.amount, 0);
+
+    const attendanceId = Number.parseInt(req.body.attendance_id, 10);
+    if (attendanceId) {
+      const attendance = await Attendance.findOne({ where: { id: attendanceId, StudentId: student.id }, include: [Session] });
+      if (!attendance) return reply(400, '❌ الحصة المختارة مش من حضور الطالب ده');
+      await recordAttendancePayments(student, attendance.SessionId, lines, req.session.userId);
+      await Attendance.increment({ payment_collected: total }, { where: { id: attendance.id } });
+      return reply(200, `💵 اتسجل ${total} ج على حصة ${attendance.Session ? attendance.Session.lesson_number : ''} — الرصيد دلوقتي ${student.balance} ج`);
+    }
+
+    await adjustStudentBalance(student, total);
+    await BalanceTransaction.bulkCreate(lines.map(line => ({
+      StudentId: student.id,
+      amount: line.amount,
+      reason: line.reason ? `${MANUAL_PAYMENT_REASON} — ${line.reason}` : MANUAL_PAYMENT_REASON,
+      UserId: req.session.userId,
+    })));
+    return reply(200, `💵 اتسجل ${total} ج — الرصيد دلوقتي ${student.balance} ج`);
+  } catch (error) {
+    console.error('Student payment failed:', error);
+    return reply(500, '❌ حصلت مشكلة: ' + error.message);
   }
 });
 
@@ -2899,6 +2990,7 @@ app.post('/students', async (req, res) => {
       SubjectId: subject_id,
       UserId: req.session.userId,
     });
+    const registrationPayment = await recordRegistrationPayment(student, initialBalance, req.session.userId);
 
     let attendanceNote = null;
 
@@ -2937,6 +3029,7 @@ app.post('/students', async (req, res) => {
             comment: comment || null,
             payment_collected: initialBalance,
           });
+          if (registrationPayment) await registrationPayment.update({ SessionId: sessionId, reason: `${ATTENDANCE_PAYMENT_REASON} — وقت التسجيل` });
           await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
           attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
         }
@@ -3397,6 +3490,39 @@ app.get('/sessions/:id/report', async (req, res) => {
         examTime: exam ? exam.time : null,
       };
     });
+
+    // تفاصيل الفلوس اللي اتدفعت في الحصة دي (كل مبلغ بسببه) + البوكليتس اللي اتدفعت فيها
+    const sessionMoneyRows = await BalanceTransaction.findAll({
+      where: {
+        SessionId: session.id,
+        amount: { [Op.gt]: 0 },
+        [Op.or]: [
+          { reason: { [Op.like]: `${ATTENDANCE_PAYMENT_REASON}%` } },
+          { reason: { [Op.like]: 'دفع بوكليت:%' } },
+        ],
+      },
+      include: [{ model: User, attributes: ['id', 'name'] }],
+      order: [['createdAt', 'ASC']],
+    });
+    const moneyByStudent = {};
+    sessionMoneyRows.forEach(t => {
+      const entry = moneyByStudent[t.StudentId] || (moneyByStudent[t.StudentId] = { lines: [], booklet: 0 });
+      const isBooklet = String(t.reason || '').startsWith('دفع بوكليت:');
+      if (isBooklet) entry.booklet += Number(t.amount) || 0;
+      entry.lines.push({
+        amount: Number(t.amount) || 0,
+        reason: isBooklet ? t.reason : (String(t.reason).slice(ATTENDANCE_PAYMENT_REASON.length).replace(/^s*—s*/, '') || null),
+        isBooklet,
+        userName: t.User ? t.User.name : null,
+        time: t.createdAt,
+      });
+    });
+    attendedRows.forEach(row => {
+      const money = moneyByStudent[row.student.id];
+      row.paymentLines = money ? money.lines : [];
+      row.bookletPaid = money ? money.booklet : 0;
+    });
+    onlineAttendedRows.forEach(row => { row.paymentLines = []; row.bookletPaid = 0; });
 
     // Combine both attended rows
     const allAttendedRows = [...attendedRows, ...onlineAttendedRows];
@@ -4107,6 +4233,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
       SubjectId: subject_id,
       UserId: req.session.userId,
     });
+    const registrationPayment = await recordRegistrationPayment(student, initialBalance, req.session.userId);
 
     if (paidAmount > 0) {
       const booklet = await Booklet.findOne({
@@ -4143,6 +4270,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
             comment: comment || null,
             payment_collected: initialBalance,
           });
+          if (registrationPayment) await registrationPayment.update({ SessionId: sessionId, reason: `${ATTENDANCE_PAYMENT_REASON} — وقت التسجيل` });
           await addPoints(student.id, 2, 'حضور حصة', req.session.userId);
           attendanceNote = '✅ تم تسجيل حضور الطالب في الحصة الحالية.';
         }
@@ -4268,8 +4396,17 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       });
     }
 
-    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId }, attributes: ['id'] });
-    if (existing) return res.json({ success: false, message: `${student.name} مسجل حضوره من قبل` });
+    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId }, attributes: ['id', 'payment_collected'] });
+    if (existing) {
+      // alreadyRecorded: الشاشة بتعرض "ضيف فلوس بس" عشان المبلغ يتضاف على حضوره
+      return res.json({
+        success: false,
+        alreadyRecorded: true,
+        message: `${student.name} مسجل حضوره من قبل`,
+        student: { id: student.id, name: student.name, code: student.student_code, balance: student.balance },
+        paidInSession: Number(existing.payment_collected) || 0,
+      });
+    }
 
     // كل البيانات دي مستقلة عن بعض، فبتتجاب في نفس الوقت
     const [
@@ -4420,7 +4557,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
 
 app.post('/attendance/scan', async (req, res) => {
   try {
-    const { student_code, comment, payment_collected, booklet_delivered } = req.body;
+    const { student_code, comment, booklet_delivered } = req.body;
     const sessionId = req.session.activeSessionId;
 
     if (!sessionId) {
@@ -4448,7 +4585,8 @@ app.post('/attendance/scan', async (req, res) => {
       return res.json({ success: false, message: `⛔ الطالب ${student.name} محظور من النظام. تواصل مع الأدمن.` });
     }
 
-    const paymentAmount = parseFloat(payment_collected) || 0;
+    const paymentLines = attendancePaymentLines(req.body);
+    const paymentAmount = paymentLines.reduce((sum, line) => sum + line.amount, 0);
 
     // Claim the attendance slot atomically (single findOrCreate call) instead of a
     // separate findOne-then-create, so two near-simultaneous submits (double-tap,
@@ -4465,32 +4603,32 @@ app.post('/attendance/scan', async (req, res) => {
     });
 
     if (!attendanceCreated) {
+      // الطالب متسجل خلاص: المبلغ مش بيتضاف هنا (ممكن تكون ضغطة مكررة) — الشاشة بتعرض "ضيف فلوس بس"
+      // اللي بيبعت لـ /attendance/scan/add-payment
       return res.json({
         success: false,
-        message: `الطالب ${student.name} مسجل حضوره في هذه الحصة من قبل`,
+        alreadyRecorded: true,
+        message: paymentAmount > 0
+          ? `الطالب ${student.name} مسجل حضوره في هذه الحصة من قبل — المبلغ متسجلش. استخدم "ضيف فلوس بس" لو عايز تضيفه`
+          : `الطالب ${student.name} مسجل حضوره في هذه الحصة من قبل`,
       });
     }
 
-    // لو فيه مبلغ مدفوع وقت الحضور، يتضاف للرصيد ويتسجل في سجل المعاملات.
-    // بيتحفظ في الرصيد فورًا: قبل كده لو الرصيد فضل ناقص بعد الدفع، المعاملة كانت بتتسجل
-    // والفلوس مكانتش بتتضاف للرصيد خالص.
-    if (paymentAmount > 0) {
-      await adjustStudentBalance(student, paymentAmount);
-      await BalanceTransaction.create({
-        StudentId: student.id,
-        amount: paymentAmount,
-        reason: 'دفع نقدي وقت الحضور',
-        UserId: req.session.userId,
-      });
-    }
+    // لو فيه مبلغ مدفوع وقت الحضور، يتضاف للرصيد ويتسجل في سجل المعاملات مربوط بالحصة.
+    // بيتحفظ في الرصيد فورًا: لو الرصيد فضل ناقص بعد الدفع الفلوس بتفضل في رصيده،
+    // ولما يتسجل بعدين (عادي أو بالقوة) بتتحسب في اللي دفعه في الحصة دي.
+    await recordAttendancePayments(student, sessionId, paymentLines, req.session.userId);
 
     if (student.balance < student.price_per_session) {
       await attendanceRecord.destroy();
       return res.json({
         success: false,
-        message: `رصيد الطالب ${student.name} غير كافٍ (الرصيد الحالي: ${student.balance} ج)`,
+        message: `رصيد الطالب ${student.name} غير كافٍ (الرصيد الحالي: ${student.balance} ج)${paymentAmount > 0 ? ` — المبلغ اللي دفعه (${paymentAmount} ج) اتضاف لرصيده` : ''}`,
       });
     }
+
+    const paidInSession = await sessionPaymentsTotal(student.id, sessionId);
+    if (paidInSession > paymentAmount) await attendanceRecord.update({ payment_collected: paidInSession });
 
     await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
     if (booklet_delivered) {
@@ -4512,6 +4650,38 @@ app.post('/attendance/scan', async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
+  }
+});
+
+// "ضيف فلوس بس": طالب متسجل حضوره في الحصة الشغالة، والمبلغ (بأسبابه) بيتضاف لرصيده
+// وعلى "دفع وقت الحضور" بتاع الحصة دي — من شاشة الحضور في الموقع/البرنامج/الموبايل
+app.post('/attendance/scan/add-payment', async (req, res) => {
+  try {
+    const sessionId = req.session.activeSessionId;
+    if (!sessionId) return res.json({ success: false, message: 'مفيش حصة شغالة دلوقتي' });
+    const student = await findStudentByCode(req.body.student_code);
+    if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
+    const lines = attendancePaymentLines(req.body);
+    if (!lines.length) return res.json({ success: false, message: 'اكتب مبلغ أكبر من صفر' });
+
+    const attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
+    if (!attendance) {
+      return res.json({ success: false, notRecorded: true, message: `${student.name} مش متسجل حضوره في الحصة دي — سجّل حضوره الأول والمبلغ معاه` });
+    }
+
+    const added = await recordAttendancePayments(student, sessionId, lines, req.session.userId);
+    await Attendance.increment({ payment_collected: added }, { where: { id: attendance.id } });
+    await attendance.reload();
+    res.json({
+      success: true,
+      message: `💵 اتضاف ${added} ج لـ ${student.name} (إجمالي اللي دفعه في الحصة دي: ${attendance.payment_collected} ج)`,
+      student_name: student.name,
+      remaining_balance: student.balance,
+      paidInSession: Number(attendance.payment_collected) || 0,
+    });
+  } catch (error) {
+    console.error('Add scan payment failed:', error);
     res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
   }
 });
@@ -4545,7 +4715,7 @@ app.post('/attendance/scan/force', requirePermission('attendance_scan'), async (
 
     // Atomic claim (see /attendance/scan above) instead of findOne-then-create,
     // to avoid duplicate rows from a double-tap/double-submit.
-    const [, attendanceCreated] = await Attendance.findOrCreate({
+    const [forcedAttendance, attendanceCreated] = await Attendance.findOrCreate({
       where: { StudentId: student.id, SessionId: sessionId },
       defaults: {
         StudentId: student.id,
@@ -4557,6 +4727,9 @@ app.post('/attendance/scan/force', requirePermission('attendance_scan'), async (
     if (!attendanceCreated) {
       return res.json({ success: false, message: 'الطالب مسجل حضوره من قبل' });
     }
+    // الفلوس اللي دفعها في محاولة الحضور اللي اترفضت (اتضافت لرصيده) تظهر في تقرير الحصة
+    const paidInSession = await sessionPaymentsTotal(student.id, sessionId);
+    if (paidInSession > 0) await forcedAttendance.update({ payment_collected: paidInSession });
 
     await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور (قوة)');
 
@@ -8323,6 +8496,28 @@ app.post('/admin/videos/:id/grant/:studentId', requirePermissionOrAdmin('admin_v
   }
 
   let expiresAt = created ? grant.access_expires_at : null;
+  // expires_at: "تاريخ انتهاء" بدل الساعات — الإتاحة بتخلص في الميعاد ده بالظبط (ISO من المتصفح/الموبايل)
+  const explicitExpiry = req.body.expires_at ? new Date(req.body.expires_at) : null;
+  if (explicitExpiry && !Number.isNaN(explicitExpiry.getTime())) {
+    const now = new Date();
+    if (explicitExpiry <= now) {
+      const message = '❌ تاريخ الانتهاء لازم يكون بعد دلوقتي';
+      if (req.body.response_format === 'json') return res.status(400).json({ success: false, message });
+      return res.status(400).send(message);
+    }
+    // العد بيبدأ من دلوقتي لو لسه مبدأش (أو لو الفيديو لسه فاضي) عشان التاريخ ميتغيرش أول ما يفتح
+    const window = getGrantAccessWindow(grant, session);
+    const keepStart = !created && !grantWaitingForContent(grant, firstPartAt) && window.startedAt && window.startedAt <= now;
+    const startedAt = keepStart ? window.startedAt : now;
+    expiresAt = explicitExpiry;
+    await VideoAccessGrant.update({
+      access_duration_hours: Math.max(1, Math.round((expiresAt - startedAt) / HOUR)),
+      access_started_at: startedAt,
+      access_expires_at: expiresAt,
+    }, { where: { id: grant.id } });
+    if (req.body.response_format === 'json') return res.json({ success: true, expiresAt });
+    return res.redirect('/admin/videos/' + req.params.id + '/access');
+  }
   if (!created && grantWaitingForContent(grant, firstPartAt)) {
     // العد لسه مبدأش (فتح الدرس وهو فاضي): بنغير المدة بس، والعد يبدأ أول ما يفتح الفيديو
     const hours = extendHours ? Number(grant.access_duration_hours || durationHours) + extendHours : durationHours;
@@ -8913,6 +9108,37 @@ app.post('/students/:id/unblock', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+// إضافة فلوس لطالب متسجل حضوره خلاص (من تقرير الحصة أو ملف الطالب): المبلغ بيتضاف لرصيده
+// وعلى "دفع وقت الحضور" بتاع الحصة دي، وكل مبلغ بسببه في سجل الرصيد
+app.post('/attendance/:id/add-payment', requireAdmin, async (req, res) => {
+  const wantsJson = req.body.response_format === 'json' || /json/i.test(req.get('content-type') || '');
+  const redirectTo = /^\/(?!\/)/.test(String(req.body.redirect_to || '')) ? req.body.redirect_to : null;
+  const reply = (status, message, extra = {}) => (wantsJson
+    ? res.status(status).json({ success: status < 400, message, ...extra })
+    : (status < 400 ? res.redirect(redirectTo || '/students/' + (extra.studentId || '')) : res.status(status).send(message)));
+  try {
+    const attendance = await Attendance.findByPk(req.params.id);
+    if (!attendance) return reply(404, '❌ سجل الحضور غير موجود');
+    const lines = attendancePaymentLines(req.body);
+    if (!lines.length) return reply(400, '❌ اكتب مبلغ أكبر من صفر');
+    const student = await Student.findByPk(attendance.StudentId);
+    if (!student) return reply(404, '❌ الطالب غير موجود');
+
+    const added = await recordAttendancePayments(student, attendance.SessionId, lines, req.session.userId);
+    await Attendance.increment({ payment_collected: added }, { where: { id: attendance.id } });
+    await attendance.reload();
+    return reply(200, `💵 اتضاف ${added} ج لـ ${student.name}`, {
+      studentId: student.id,
+      added,
+      payment: Number(attendance.payment_collected) || 0,
+      balance: student.balance,
+    });
+  } catch (error) {
+    console.error('Add attendance payment failed:', error);
+    return reply(500, '❌ حصلت مشكلة: ' + error.message);
   }
 });
 

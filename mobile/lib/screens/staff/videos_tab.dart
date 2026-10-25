@@ -290,6 +290,31 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
         done: '✅ اتحفظت المدة');
   }
 
+  /// "ينتهي في": تاريخ ووقت انتهاء الإتاحة بالظبط (بدل الساعات)
+  Future<void> _setExpiry(Map<String, dynamic> s) async {
+    final grant = s['grant'] as Map?;
+    final now = DateTime.now();
+    final current = grant?['expiresAt'] == null ? null : DateTime.tryParse('${grant!['expiresAt']}')?.toLocal();
+    final initial = current != null && current.isAfter(now) ? current : now.add(const Duration(days: 3));
+    final day = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 730)),
+      helpText: 'الفيديو يقفل لـ ${s['name']} يوم',
+    );
+    if (day == null || !mounted) return;
+    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(initial), helpText: 'الساعة كام؟');
+    if (time == null) return;
+    final expiry = DateTime(day.year, day.month, day.day, time.hour, time.minute);
+    if (!expiry.isAfter(DateTime.now())) {
+      if (mounted) toast(context, 'اختار ميعاد بعد دلوقتي', error: true);
+      return;
+    }
+    await _send('expiry:${s['id']}', '$_base/grant/${s['id']}', {..._grantBody(s), 'expires_at': expiry.toUtc().toIso8601String(), 'response_format': 'json'},
+        done: '✅ الفيديو هيقفل لـ ${s['name']} يوم ${fmtDate(expiry.toIso8601String(), withTime: true)}');
+  }
+
   Future<void> _removeStudent(Map<String, dynamic> s) async {
     if (!await confirmDialog(context, title: 'إلغاء الوصول الفردي؟', message: '${s['name']} مش هيشوف الفيديو ده تاني (لو مش من طلاب الحصة).', ok: 'إلغاء الوصول')) return;
     await _send('remove-student:${s['id']}', '/admin/videos/$_id/remove-student-access-by-student/${s['id']}', {}, done: '✅ اتلغى الوصول');
@@ -358,11 +383,13 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
           onSelected: (v) {
             if (v == 'extend') _extend(s);
             if (v == 'hours') _setHours(s);
+            if (v == 'expiry') _setExpiry(s);
             if (v == 'remove') _removeStudent(s);
           },
           itemBuilder: (_) => [
             const PopupMenuItem(value: 'extend', child: Text('زوّد وقت...')),
             const PopupMenuItem(value: 'hours', child: Text('حدد مدة الإتاحة...')),
+            const PopupMenuItem(value: 'expiry', child: Text('حدد تاريخ الانتهاء...')),
             if (s['individual'] == true) const PopupMenuItem(value: 'remove', child: Text('إلغاء الوصول الفردي', style: TextStyle(color: AppColors.danger))),
           ],
         ),

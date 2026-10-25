@@ -197,6 +197,53 @@
             </form>
           </div>
         </div>
+
+        <div class="card shadow-sm mb-4" id="paymentsCard">
+          <div class="card-body">
+            <h5 class="card-title mb-3 border-bottom pb-2">
+              💵 <span class="ar-only">الفلوس اللي دفعها:</span><span class="en-only" style="display:none;">Money paid:</span>
+              <span class="text-success"><%= Math.round(paymentsTotal * 100) / 100 %> ج</span>
+            </h5>
+            <form action="/students/<%= student.id %>/payment" method="POST" id="paymentForm">
+              <div id="paymentLines">
+                <div class="row g-1 mb-1 payment-line">
+                  <div class="col-4"><input type="number" step="any" min="0" name="payment_collected" class="form-control form-control-sm" placeholder="المبلغ" required></div>
+                  <div class="col-8"><input type="text" name="payment_reason" maxlength="150" class="form-control form-control-sm" placeholder="سبب الدفع (مثال: حصة 5، ملزمة، باقي الشهر)"></div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-link btn-sm px-0" id="addPaymentLine">+ <span class="ar-only">مبلغ تاني بسبب تاني</span><span class="en-only" style="display:none;">Another amount</span></button>
+              <div class="mb-2">
+                <select name="attendance_id" class="form-select form-select-sm">
+                  <option value=""><span class="ar-only">مش مربوط بحصة (يتضاف للرصيد بس)</span></option>
+                  <% attendanceRows.filter(row => row.attendanceId).slice().reverse().forEach(row => { %>
+                    <option value="<%= row.attendanceId %>">حصة <%= row.session.lesson_number %><%= row.attendedElsewhere ? ' (' + row.attendedElsewhere + ')' : '' %> — دفع فيها <%= row.attendancePayment %> ج</option>
+                  <% }) %>
+                </select>
+                <div class="form-text small"><span class="ar-only">لو اخترت حصة حضرها: المبلغ بيتضاف على اللي دفعه في الحصة دي ويظهر في تقرير الحصة</span></div>
+              </div>
+              <button type="submit" class="btn btn-success btn-sm w-100">💵 <span class="ar-only">تسجيل الفلوس</span><span class="en-only" style="display:none;">Record payment</span></button>
+            </form>
+            <% if (payments.length === 0) { %>
+              <p class="text-muted small mt-3 mb-0"><span class="ar-only">لسه مفيش فلوس متسجلة</span><span class="en-only" style="display:none;">No payments yet</span></p>
+            <% } else { %>
+              <ul class="list-group list-group-flush mt-3" style="max-height: 300px; overflow-y: auto;">
+                <% payments.forEach(p => { %>
+                  <li class="list-group-item d-flex justify-content-between small px-0 py-2">
+                    <div>
+                      <span class="badge bg-light text-dark border"><%= p.kind %></span>
+                      <% if (p.sessionLabel) { %><span class="badge bg-primary-subtle text-primary-emphasis border"><%= p.sessionLabel %></span><% } %>
+                      <br><span><%= p.reason || '-' %></span><br>
+                      <span class="text-muted" style="font-size: 0.65rem;">
+                        <%= new Date(p.createdAt).toLocaleString('ar-EG') %><%= p.userName ? ' — ' + p.userName : '' %>
+                      </span>
+                    </div>
+                    <span class="text-success fw-bold text-nowrap">+<%= p.amount %> ج</span>
+                  </li>
+                <% }) %>
+              </ul>
+            <% } %>
+          </div>
+        </div>
       </div>
 
       <div class="col-lg-6">
@@ -417,7 +464,7 @@
         </h5>
         <% const canMarkAttendance = userRole === 'admin' || userPermissions.includes('attendance_scan'); %>
         <% if (locals.attendanceMessage) { %>
-          <div class="alert <%= attendanceMessage.startsWith('✅') ? 'alert-success' : 'alert-warning' %> py-2 small"><%= attendanceMessage %></div>
+          <div class="alert <%= /^(✅|💵)/u.test(attendanceMessage) ? 'alert-success' : 'alert-warning' %> py-2 small"><%= attendanceMessage %></div>
         <% } %>
         <% if (canMarkAttendance && attendanceRows.some(row => row.attendanceStatus === 'absent' && row.session.id)) { %>
           <form id="markAttendanceForm" action="/students/<%= student.id %>/attendance/mark" method="POST" class="d-flex flex-wrap align-items-center gap-2 mb-3 p-2 rounded border bg-light">
@@ -461,6 +508,9 @@
                         <span class="ar-only">سجّله:</span><span class="en-only" style="display:none;">Recorded by:</span> <%= row.attendanceUser %><br>
                         <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
                       </span>
+                      <% if (row.attendancePayment > 0) { %>
+                        <span class="badge bg-success-subtle text-success-emphasis border mt-1">💵 <span class="ar-only">دفع</span><span class="en-only" style="display:none;">Paid</span> <%= row.attendancePayment %> ج</span>
+                      <% } %>
                       <% if (userRole === 'admin' && row.attendanceId) { %>
                         <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟')">
                           <button type="submit" class="btn btn-xs btn-outline-danger mt-1" style="font-size:0.65rem; padding: 2px 6px;">
@@ -474,6 +524,9 @@
                         <span class="ar-only">سجّله:</span><span class="en-only" style="display:none;">Recorded by:</span> <%= row.attendanceUser %><br>
                         <%= row.attendanceTime ? new Date(row.attendanceTime).toLocaleString('ar-EG') : '' %>
                       </span>
+                      <% if (row.attendancePayment > 0) { %>
+                        <span class="badge bg-success-subtle text-success-emphasis border mt-1">💵 <span class="ar-only">دفع</span><span class="en-only" style="display:none;">Paid</span> <%= row.attendancePayment %> ج</span>
+                      <% } %>
                       <% if (userRole === 'admin' && row.attendanceId) { %>
                         <form action="/attendance/<%= row.attendanceId %>/delete" method="POST" onsubmit="return confirm('متأكد من حذف سجل الحضور ده؟ سيتم استرجاع المبلغ للطالب.')">
                           <input type="hidden" name="redirect_to" value="/students/<%= student.id %>">
@@ -538,6 +591,24 @@
 </div>
 
 <script>
+  // كارت الفلوس: كل "مبلغ تاني" بيتبعت extra_payments[n][amount] + [reason]
+  (function () {
+    const addBtn = document.getElementById('addPaymentLine');
+    if (!addBtn) return;
+    let extraIndex = 0;
+    addBtn.addEventListener('click', function () {
+      const row = document.createElement('div');
+      row.className = 'row g-1 mb-1 payment-line';
+      row.innerHTML = `
+        <div class="col-4"><input type="number" step="any" min="0" name="extra_payments[${extraIndex}][amount]" class="form-control form-control-sm" placeholder="المبلغ"></div>
+        <div class="col-7"><input type="text" maxlength="150" name="extra_payments[${extraIndex}][reason]" class="form-control form-control-sm" placeholder="سبب الدفع"></div>
+        <div class="col-1"><button type="button" class="btn btn-sm btn-outline-danger w-100 px-0" title="شيل">×</button></div>`;
+      row.querySelector('button').addEventListener('click', () => row.remove());
+      document.getElementById('paymentLines').appendChild(row);
+      extraIndex += 1;
+    });
+  })();
+
   // تسجيل حضور من ملف الطالب: حصة واحدة من زرارها، أو المحدد كله من الزرار اللي فوق الجدول
   function selectedAttendanceIds() {
     return Array.from(document.querySelectorAll('.att-pick:checked')).map(box => box.value);

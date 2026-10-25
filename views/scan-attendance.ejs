@@ -48,8 +48,13 @@
       <div id="bookletPaymentsBox"></div>
       <div class="mt-3">
         <div class="mb-2 text-start">
-          <label class="form-label small fw-bold">💵 <span class="ar-only">مبلغ الحصة (اختياري)</span><span class="en-only" style="display:none;">Session Amount (optional)</span></label>
-          <input type="number" id="paymentInput" class="form-control form-control-sm" placeholder="0">
+          <label class="form-label small fw-bold">💵 <span class="ar-only">المبلغ اللي دفعه (اختياري)</span><span class="en-only" style="display:none;">Amount paid (optional)</span></label>
+          <div class="row g-1">
+            <div class="col-4"><input type="number" step="any" min="0" id="paymentInput" class="form-control form-control-sm" placeholder="0"></div>
+            <div class="col-8"><input type="text" id="paymentReasonInput" maxlength="150" class="form-control form-control-sm" placeholder="سبب الدفع (اختياري)"></div>
+          </div>
+          <div id="extraPaymentLines"></div>
+          <button type="button" class="btn btn-link btn-sm px-0" onclick="addExtraPaymentLine('extraPaymentLines')">+ <span class="ar-only">مبلغ تاني بسبب تاني</span><span class="en-only" style="display:none;">Another amount</span></button>
         </div>
         <div class="mb-2 text-start">
           <label class="form-label small fw-bold">💬 <span class="ar-only">كومنت (اختياري)</span><span class="en-only" style="display:none;">Comment (optional)</span></label>
@@ -62,6 +67,22 @@
     </div>
 
     <div id="resultBox" class="mt-3"></div>
+
+    <!-- الطالب متسجل خلاص: ضيف فلوس بس على حضوره في الحصة دي -->
+    <div id="addPaymentOnlyBox" class="card p-3 mt-2" style="display:none;">
+      <div class="fw-bold mb-1">💵 <span class="ar-only">ضيف فلوس بس لـ</span><span class="en-only" style="display:none;">Add money only for</span> <span id="addPaymentOnlyName"></span></div>
+      <div class="small text-muted mb-2" id="addPaymentOnlyInfo"></div>
+      <div class="row g-1">
+        <div class="col-4"><input type="number" step="any" min="0" id="addOnlyAmount" class="form-control form-control-sm" placeholder="المبلغ"></div>
+        <div class="col-8"><input type="text" id="addOnlyReason" maxlength="150" class="form-control form-control-sm" placeholder="سبب الدفع (اختياري)"></div>
+      </div>
+      <div id="addOnlyExtraLines"></div>
+      <button type="button" class="btn btn-link btn-sm px-0" onclick="addExtraPaymentLine('addOnlyExtraLines')">+ <span class="ar-only">مبلغ تاني بسبب تاني</span><span class="en-only" style="display:none;">Another amount</span></button>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-success btn-sm flex-grow-1" id="addOnlySaveBtn" onclick="submitAddPaymentOnly()">💵 <span class="ar-only">ضيف الفلوس</span><span class="en-only" style="display:none;">Add money</span></button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="hideAddPaymentOnly()"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>
+      </div>
+    </div>
 
     <% if (userRole === 'admin' || userRole === 'assistant') { %>
       <hr style="border-color: var(--sf-input-border);">
@@ -191,8 +212,10 @@
         if (!data.success) {
           if (data.subjectMismatch) triggerSubjectMismatchAlarm();
           resultBox.innerHTML = `<div class="alert ${data.subjectMismatch ? 'alert-danger' : 'alert-warning'}">${data.message}</div>`;
+          if (data.alreadyRecorded) showAddPaymentOnly(code, data);
           return;
         }
+        hideAddPaymentOnly();
         showSummary(data);
       })
       .catch(() => {
@@ -429,6 +452,70 @@
     document.getElementById('manualCode').closest('.input-group').style.display = 'flex';
   }
 
+  // خانات "مبلغ تاني بسبب تاني"
+  function addExtraPaymentLine(boxId) {
+    const row = document.createElement('div');
+    row.className = 'row g-1 mt-1 extra-pay-line';
+    row.innerHTML = '<div class="col-4"><input type="number" step="any" min="0" class="form-control form-control-sm extra-pay-amount" placeholder="المبلغ"></div>'
+      + '<div class="col-7"><input type="text" maxlength="150" class="form-control form-control-sm extra-pay-reason" placeholder="سبب الدفع"></div>'
+      + '<div class="col-1"><button type="button" class="btn btn-sm btn-outline-danger w-100 px-0" title="شيل">×</button></div>';
+    row.querySelector('button').addEventListener('click', () => row.remove());
+    document.getElementById(boxId).appendChild(row);
+  }
+
+  function readExtraPaymentLines(boxId) {
+    return Array.from(document.querySelectorAll('#' + boxId + ' .extra-pay-line'))
+      .map(row => ({ amount: row.querySelector('.extra-pay-amount').value.trim(), reason: row.querySelector('.extra-pay-reason').value.trim() }))
+      .filter(line => Number(line.amount) > 0);
+  }
+
+  // الطالب متسجل خلاص في الحصة: "ضيف فلوس بس" (المبلغ بيتضاف لرصيده وعلى اللي دفعه في الحصة)
+  let addOnlyCode = null;
+  function showAddPaymentOnly(code, data) {
+    addOnlyCode = code;
+    document.getElementById('addPaymentOnlyName').textContent = data.student ? data.student.name : code;
+    document.getElementById('addPaymentOnlyInfo').textContent = 'متسجل حضوره في الحصة دي — دفع فيها لحد دلوقتي: ' + (data.paidInSession || 0) + ' ج'
+      + (data.student ? ' • الرصيد: ' + data.student.balance + ' ج' : '');
+    document.getElementById('addOnlyAmount').value = '';
+    document.getElementById('addOnlyReason').value = '';
+    document.getElementById('addOnlyExtraLines').innerHTML = '';
+    document.getElementById('addPaymentOnlyBox').style.display = 'block';
+  }
+
+  function hideAddPaymentOnly() {
+    addOnlyCode = null;
+    document.getElementById('addPaymentOnlyBox').style.display = 'none';
+  }
+
+  function submitAddPaymentOnly() {
+    const btn = document.getElementById('addOnlySaveBtn');
+    if (btn.disabled) return;
+    const amount = document.getElementById('addOnlyAmount').value.trim();
+    const extra = readExtraPaymentLines('addOnlyExtraLines');
+    if (!addOnlyCode || (!(Number(amount) > 0) && !extra.length)) {
+      alert('اكتب مبلغ أكبر من صفر');
+      return;
+    }
+    btn.disabled = true;
+    fetch('/attendance/scan/add-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_code: addOnlyCode,
+        payment_collected: amount,
+        payment_reason: document.getElementById('addOnlyReason').value.trim(),
+        extra_payments: extra,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        resultBox.innerHTML = '<div class="alert ' + (data.success ? 'alert-success' : 'alert-warning') + '">' + data.message + (data.success ? '<br>الرصيد دلوقتي: <strong>' + data.remaining_balance + ' ج</strong>' : '') + '</div>';
+        if (data.success) hideAddPaymentOnly();
+      })
+      .catch(() => { resultBox.innerHTML = '<div class="alert alert-danger">حصلت مشكلة في الاتصال، حاول تاني</div>'; })
+      .finally(() => { btn.disabled = false; });
+  }
+
   function confirmAttendance() {
     const confirmBtn = document.getElementById('confirmAttendanceBtn');
     if (confirmBtn.disabled) return;
@@ -436,6 +523,8 @@
 
     const comment = document.getElementById('commentInput').value.trim();
     const payment = document.getElementById('paymentInput').value.trim();
+    const paymentReason = document.getElementById('paymentReasonInput').value.trim();
+    const extraPayments = readExtraPaymentLines('extraPaymentLines');
     const bookletPayments = [];
     document.querySelectorAll('.booklet-payment-input').forEach(input => {
       const amount = parseFloat(input.value) || 0;
@@ -449,6 +538,8 @@
         student_code: pendingCode,
         comment,
         payment_collected: payment,
+        payment_reason: paymentReason,
+        extra_payments: extraPayments,
         booklet_payments: bookletPayments,
         booklet_delivered: scanBookletDelivered,
       }),
@@ -467,9 +558,12 @@
         } else {
           if (data.subjectMismatch) triggerSubjectMismatchAlarm();
           resultBox.innerHTML = `<div class="alert ${data.subjectMismatch ? 'alert-danger' : 'alert-warning'}">${data.message}</div>`;
+          if (data.alreadyRecorded) showAddPaymentOnly(pendingCode, data);
         }
         document.getElementById('commentInput').value = '';
         document.getElementById('paymentInput').value = '';
+        document.getElementById('paymentReasonInput').value = '';
+        document.getElementById('extraPaymentLines').innerHTML = '';
         pendingCode = null;
         confirmBtn.disabled = false;
       })

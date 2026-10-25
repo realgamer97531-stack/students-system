@@ -145,7 +145,10 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
     final pre = StaffStore.snapshot.value;
     final preStudent = pre?.student(code);
     final by = preStudent == null ? null : pre!.attendanceBy['${preStudent.id}:$sessionId'];
-    if (by != null) return show('${preStudent!.name} مسجل حضوره من قبل ($by)', 'warn');
+    if (by != null) {
+      show('${preStudent!.name} مسجل حضوره من قبل ($by)', 'warn');
+      return _offerAddMoney(code, preStudent.name);
+    }
     Map<String, dynamic>? online;
     try {
       final r = await StaffApi.call('/attendance/scan/lookup', {'student_code': code}, userId: ctx.user.id, activeSessionId: sessionId);
@@ -153,6 +156,10 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
       if (!r.ok) {
         if (r.data['subjectMismatch'] == true) _alarm();
         show(r.message, r.data['subjectMismatch'] == true ? 'error' : 'warn');
+        if (r.data['alreadyRecorded'] == true) {
+          final st = (r.data['student'] as Map?)?.cast<String, dynamic>() ?? {};
+          return _offerAddMoney(code, '${st['name'] ?? code}', paid: r.data['paidInSession'] as num?);
+        }
         return;
       }
       online = r.data;
@@ -182,7 +189,8 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
       }
       if (snap.attendance.contains('${s.id}:$sessionId')) {
         final who = snap.attendanceBy['${s.id}:$sessionId'];
-        return show('${s.name} مسجل حضوره من قبل${who == null ? '' : ' ($who)'}', 'warn');
+        show('${s.name} مسجل حضوره من قبل${who == null ? '' : ' ($who)'}', 'warn');
+        return _offerAddMoney(code, s.name);
       }
       info = {
         'offline': true,
@@ -224,6 +232,34 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
       if (res.data['subjectMismatch'] == true) _alarm();
       if (res.message.contains('غير كاف')) _forceCode = code;
       show(res.message, 'warn');
+      if (res.data['alreadyRecorded'] == true) await _offerAddMoney(code, '${st['name']}');
+    }
+  }
+
+  /// الطالب متسجل خلاص: "ضيف فلوس بس" — المبلغ بيتضاف لرصيده وعلى اللي دفعه في الحصة دي
+  Future<void> _offerAddMoney(String code, String name, {num? paid}) async {
+    if (!mounted) return;
+    final form = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _AddMoneySheet(name: name, paid: paid),
+    );
+    if (form == null) return;
+    setState(() => loading = true);
+    try {
+      final op = newOp('payment', '/attendance/scan/add-payment', {'student_code': code, ...form}, 'فلوس: $name');
+      final res = await StaffStore.submit(op);
+      if (res == null) {
+        show('📴 مفيش نت — الفلوس اتحفظت على الموبايل وهتتبعت لوحدها أول ما النت يرجع', 'queued');
+      } else {
+        show(res.ok ? '${res.message}\nالرصيد دلوقتي: ${res.data['remaining_balance'] ?? '-'} ج' : res.message, res.ok ? 'ok' : 'warn');
+      }
+    } on ApiException catch (e) {
+      show(e.message, 'error');
+    } finally {
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -275,6 +311,120 @@ class _AttendanceTabState extends _ScanTabState<AttendanceTab> {
       ]);
 }
 
+/// خانات الفلوس: مبلغ + سببه، و"مبلغ تاني بسبب تاني"
+class PaymentLinesEditor extends StatelessWidget {
+  const PaymentLinesEditor({super.key, required this.amount, required this.reason, required this.extra, required this.onChanged});
+  final TextEditingController amount;
+  final TextEditingController reason;
+  final List<(TextEditingController, TextEditingController)> extra;
+  final VoidCallback onChanged;
+
+  Widget _row(TextEditingController a, TextEditingController r, {String label = 'المبلغ', VoidCallback? onRemove}) => Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Row(children: [
+          Expanded(
+            flex: 2,
+            child: TextField(controller: a, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: label, isDense: true)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(flex: 3, child: TextField(controller: r, decoration: const InputDecoration(labelText: 'سبب الدفع (اختياري)', isDense: true))),
+          if (onRemove != null) IconButton(onPressed: onRemove, icon: const Icon(Icons.close, size: 18), visualDensity: VisualDensity.compact),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _row(amount, reason, label: 'المبلغ المدفوع الآن (اختياري)'),
+        for (final line in [...extra])
+          _row(line.$1, line.$2, onRemove: () {
+            extra.remove(line);
+            line.$1.dispose();
+            line.$2.dispose();
+            onChanged();
+          }),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            onPressed: () {
+              extra.add((TextEditingController(), TextEditingController()));
+              onChanged();
+            },
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('مبلغ تاني بسبب تاني'),
+          ),
+        ),
+      ]);
+}
+
+List<Map<String, dynamic>> paymentExtraLines(List<(TextEditingController, TextEditingController)> extra) => [
+      for (final (a, r) in extra)
+        if ((num.tryParse(a.text.trim()) ?? 0) > 0) {'amount': a.text.trim(), 'reason': r.text.trim()},
+    ];
+
+class _AddMoneySheet extends StatefulWidget {
+  const _AddMoneySheet({required this.name, this.paid});
+  final String name;
+  final num? paid;
+  @override
+  State<_AddMoneySheet> createState() => _AddMoneySheetState();
+}
+
+class _AddMoneySheetState extends State<_AddMoneySheet> {
+  final _amount = TextEditingController();
+  final _reason = TextEditingController();
+  final List<(TextEditingController, TextEditingController)> _extra = [];
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _reason.dispose();
+    for (final (a, r) in _extra) {
+      a.dispose();
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SafeArea(
+          child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+            Text('💵 ضيف فلوس بس لـ ${widget.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(
+              'متسجل حضوره في الحصة دي${widget.paid == null ? '' : ' — دفع فيها لحد دلوقتي ${fmtNum(widget.paid!)} ج'}. المبلغ بيتضاف لرصيده وعلى اللي دفعه في الحصة.',
+              style: const TextStyle(color: AppColors.muted),
+            ),
+            PaymentLinesEditor(amount: _amount, reason: _reason, extra: _extra, onChanged: () => setState(() {})),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء'))),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  onPressed: () {
+                    final extra = paymentExtraLines(_extra);
+                    if ((num.tryParse(_amount.text.trim()) ?? 0) <= 0 && extra.isEmpty) {
+                      toast(context, 'اكتب مبلغ أكبر من صفر', error: true);
+                      return;
+                    }
+                    Navigator.pop(context, {
+                      'payment_collected': _amount.text.trim(),
+                      'payment_reason': _reason.text.trim(),
+                      'extra_payments': extra,
+                    });
+                  },
+                  child: const Text('💵 ضيف الفلوس'),
+                ),
+              ),
+            ]),
+          ]),
+        ),
+      );
+}
+
 class _AttendanceSheet extends StatefulWidget {
   const _AttendanceSheet({required this.info, required this.isAdmin, required this.ctx});
   final Map<String, dynamic> info;
@@ -287,6 +437,8 @@ class _AttendanceSheet extends StatefulWidget {
 class _AttendanceSheetState extends State<_AttendanceSheet> {
   final _comment = TextEditingController();
   final _payment = TextEditingController();
+  final _paymentReason = TextEditingController();
+  final List<(TextEditingController, TextEditingController)> _extra = [];
   final Map<String, TextEditingController> _booklets = {};
   final Set<String> _delivered = {};
   bool _bookletDelivered = false;
@@ -298,6 +450,11 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
   void dispose() {
     _comment.dispose();
     _payment.dispose();
+    _paymentReason.dispose();
+    for (final (a, r) in _extra) {
+      a.dispose();
+      r.dispose();
+    }
     for (final c in _booklets.values) {
       c.dispose();
     }
@@ -401,7 +558,7 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
                 subtitle: const Text('هيتحفظ مع تأكيد الحضور'),
               ),
             const SizedBox(height: 12),
-            TextField(controller: _payment, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'المبلغ المدفوع الآن (اختياري)', isDense: true)),
+            PaymentLinesEditor(amount: _payment, reason: _paymentReason, extra: _extra, onChanged: () => setState(() {})),
             const SizedBox(height: 10),
             TextField(controller: _comment, decoration: const InputDecoration(labelText: 'تعليق (اختياري)', isDense: true)),
             const SizedBox(height: 14),
@@ -420,6 +577,8 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
                     Navigator.pop(context, {
                       'comment': _comment.text.trim(),
                       'payment_collected': _payment.text.trim(),
+                      'payment_reason': _paymentReason.text.trim(),
+                      'extra_payments': paymentExtraLines(_extra),
                       'booklet_payments': payments,
                       'booklet_delivered': _bookletDelivered,
                     });

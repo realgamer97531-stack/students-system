@@ -322,6 +322,19 @@ class StaffStore {
     }
   }
 
+  /// كل الفلوس اللي في العملية: المبلغ الأساسي + "مبلغ تاني بسبب تاني"
+  static num _paid(dynamic body) {
+    if (body is! Map) return 0;
+    var total = _num(body['payment_collected']);
+    final extra = body['extra_payments'];
+    if (extra is List) {
+      for (final line in extra) {
+        if (line is Map) total += _num(line['amount']);
+      }
+    }
+    return total;
+  }
+
   static String _hhmm(dynamic ms) {
     if (ms is! num) return '';
     final t = DateTime.fromMillisecondsSinceEpoch(ms.toInt());
@@ -345,7 +358,7 @@ class StaffStore {
       _applyOp(snap, op, by: '${d['user'] ?? 'جهاز تاني'} ${_hhmm(d['ct'])}'.trim());
       // الرصيد التقريبي: مرة واحدة بس، وللعمليات اللي لسه مارفعتش (اللي اترفعت السيرفر حسبها في النسخة الجاية)
       if ((d['kind'] == 'attendance') && !already && student != null && state == OpState.pending) {
-        student.balance = student.balance + _num((d['body'] as Map)['payment_collected']) - student.price;
+        student.balance = student.balance + _paid(d['body']) - student.price;
       }
       changed = true;
     }
@@ -397,7 +410,12 @@ class StaffStore {
     if (op['kind'] == 'attendance' && snap != null) {
       // الرصيد التقريبي بعد الحضور (عشان الفحص أوفلاين بعد كده)
       final s = snap.student('${op['body']['student_code']}');
-      if (s != null) s.balance = s.balance + _num(op['body']['payment_collected']) - s.price;
+      if (s != null) s.balance = s.balance + _paid(op['body']) - s.price;
+    }
+    if (op['kind'] == 'payment' && snap != null) {
+      // "ضيف فلوس بس": الرصيد التقريبي بيزيد بالمبلغ
+      final s = snap.student('${op['body']['student_code']}');
+      if (s != null) s.balance = s.balance + _paid(op['body']);
     }
   }
 

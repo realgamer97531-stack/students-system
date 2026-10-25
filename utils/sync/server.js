@@ -16,6 +16,7 @@ const { judgeOutcome } = require('./outcome');
 const entityColors = require('../entityColors');
 const mesh = require('./mesh');
 const { buildMobileDetails } = require('./mobileDetails');
+const { studentPaymentsFromTransactions } = require('../studentPayments');
 
 // جداول مش بتنزل على الأجهزة
 const EXCLUDED_TABLES = new Set(['sync_devices', 'sync_applied_ops', 'deleted_student_archive', 'mobile_app_users', 'web_sessions']);
@@ -647,14 +648,21 @@ function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin 
   // الدفع نفسه بيتبعت لنفس صفحات السيستم (/students/:id/booklet-payment و /students/:id/balance).
   app.get('/api/sync/mobile/student/:id', requireDevice(sequelize), async (req, res) => {
     try {
-      const { Student, Booklet, StudentBooklet, BalanceTransaction } = sequelize.models;
+      const { Student, Booklet, StudentBooklet, BalanceTransaction, Session, Center, User } = sequelize.models;
       const student = await Student.findByPk(req.params.id, { attributes: ['id', 'balance', 'SubjectId', 'booklet_status'], raw: true });
       if (!student) return res.status(404).json({ success: false, message: 'الطالب غير موجود' });
-      const [booklets, owned, transactions] = await Promise.all([
+      const [booklets, owned, transactions, allTransactions] = await Promise.all([
         Booklet.findAll({ where: { SubjectId: student.SubjectId, is_active: true }, order: [['order_index', 'ASC'], ['id', 'ASC']], raw: true }),
         StudentBooklet.findAll({ where: { StudentId: student.id }, raw: true }),
         BalanceTransaction.findAll({ where: { StudentId: student.id }, order: [['createdAt', 'DESC']], limit: 15, raw: true }),
+        // كارت "الفلوس اللي دفعها" (نفس صفحة الطالب في الموقع)
+        BalanceTransaction.findAll({
+          where: { StudentId: student.id },
+          include: [{ model: User, attributes: ['id', 'name'] }, { model: Session, attributes: ['id', 'lesson_number'], include: [{ model: Center, attributes: ['id', 'name'] }] }],
+          order: [['createdAt', 'DESC']],
+        }),
       ]);
+      const payments = studentPaymentsFromTransactions(allTransactions);
       res.json({
         success: true,
         student: { id: student.id, balance: Number(student.balance) || 0, hasBooklet: !!student.booklet_status },
@@ -677,6 +685,8 @@ function installMobileRoutes(app, { sequelize, User, bcrypt, onMobileStaffLogin 
           };
         }),
         transactions: transactions.map(t => ({ amount: Number(t.amount) || 0, reason: t.reason, createdAt: t.createdAt })),
+        payments: payments.map(p => ({ amount: p.amount, reason: p.reason, kind: p.kind, session: p.sessionLabel, user: p.userName, createdAt: p.createdAt })),
+        paymentsTotal: payments.reduce((sum, p) => sum + p.amount, 0),
       });
     } catch (error) {
       console.error('Mobile student details error:', error);
