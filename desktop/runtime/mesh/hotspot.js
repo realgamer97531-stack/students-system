@@ -115,13 +115,27 @@ function Bring-Up {
   return $false
 }
 
+# الويندوز بيقفل شبكة Wi-Fi Direct لوحده كل ما الواي فاي العادي بتاع الكمبيوتر يفصل أو يغيّر شبكة
+# (يعني بالظبط لما النت/الراوتر يقطع) والـ publisher بيفضل يقول Started — فبنبص على الكارت نفسه:
+# لو مفيش كارت Wi-Fi Direct شغال 10 ثواني يبقى الشبكة وقعت ونشغلها تاني.
+$downSince = $null
+function Wfd-Adapter-Up {
+  try { return @(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object { $_.InterfaceDescription -like '*Wi-Fi Direct*' -and "$($_.Status)" -eq 'Up' }).Count -gt 0 } catch { return $true }
+}
+
 function Is-Up {
-  if ($script:pub) { return "$($script:pub.Status)" -eq 'Started' }
+  if ($script:pub) {
+    if ("$($script:pub.Status)" -ne 'Started') { return $false }
+    if (Wfd-Adapter-Up) { $script:downSince = $null; return $true }
+    if (-not $script:downSince) { $script:downSince = [DateTime]::Now }
+    return ([DateTime]::Now - $script:downSince).TotalSeconds -lt 10
+  }
   if ($script:tm) { return "$($script:tm.TetheringOperationalState)" -eq 'On' }
   return $false
 }
 
 function Tear-Down {
+  $script:downSince = $null
   if ($script:pub) { try { $script:pub.Stop() } catch {}; $script:pub = $null }
   if ($script:tm) { try { AwaitOp ($script:tm.StopTetheringAsync()) ([Windows.Networking.NetworkOperators.NetworkOperatorTetheringOperationResult]) | Out-Null } catch {}; $script:tm = $null }
 }
@@ -139,7 +153,7 @@ while ($true) {
   if (-not $up -and [DateTime]::Now -ge $nextTry) {
     Tear-Down
     $up = Bring-Up
-    if (-not $up) { Say @{ state = 'error'; message = $lastError }; $nextTry = [DateTime]::Now.AddSeconds(15) }
+    if (-not $up) { Say @{ state = 'error'; message = $lastError }; $nextTry = [DateTime]::Now.AddSeconds(8) }
   }
   if ($up -ne $wasUp) {
     if ($up) {
