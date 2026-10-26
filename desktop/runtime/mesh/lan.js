@@ -25,7 +25,7 @@ function broadcastTargets() {
 }
 
 class LanTransport extends EventEmitter {
-  constructor({ discoveryPort = DISCOVERY_PORT, tcpPort = 0, alwaysConnect = true, probeEveryMs = 4000, targets, probePorts } = {}) {
+  constructor({ discoveryPort = DISCOVERY_PORT, tcpPort = 0, alwaysConnect = true, probeEveryMs = 4000, targets, probePorts, extraTargets } = {}) {
     super();
     this.discoveryPort = discoveryPort;
     this.probePorts = probePorts || [discoveryPort]; // للاختبارات: كذا جهاز على نفس الكمبيوتر
@@ -33,6 +33,8 @@ class LanTransport extends EventEmitter {
     this.alwaysConnect = alwaysConnect; // الكمبيوتر هو اللي بيبدأ الاتصال
     this.probeEveryMs = probeEveryMs;
     this.targets = targets;
+    // عناوين نبعتلها مباشرة كمان (الموبايلات اللي داخلة واي فاي الكمبيوتر — أندرويد كتير بيرمي الـ broadcast وهو موفر طاقة)
+    this.extraTargets = extraTargets || (() => []);
     this.maxBytes = 1024 * 1024;
     this.sockets = new Map(); // endpointId -> socket
     this.found = new Map(); // endpointId -> { host, port, at }
@@ -84,7 +86,9 @@ class LanTransport extends EventEmitter {
   probe() {
     if (!this.udp) return;
     const msg = Buffer.from(JSON.stringify({ t: '?', adv: this.advertName, tcp: this.tcpPort }));
-    for (const target of this.targets || broadcastTargets()) {
+    let extra = [];
+    try { extra = this.extraTargets() || []; } catch (e) { /* مفيش */ }
+    for (const target of new Set([...(this.targets || broadcastTargets()), ...extra])) {
       for (const port of this.probePorts) this.udp.send(msg, port, target, () => {});
     }
     const now = Date.now();

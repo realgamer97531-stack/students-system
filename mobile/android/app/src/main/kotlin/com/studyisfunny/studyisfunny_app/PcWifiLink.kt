@@ -98,13 +98,15 @@ class PcWifiLink(private val context: Context, private val emit: (Map<String, An
     }
 
     /** الموبايل داخل شبكة الكمبيوتر أصلًا (دخلها يدوي أو أندرويد قديم) */
+    @SuppressLint("MissingPermission")
     private fun findExisting(): Network? {
         return try {
+            @Suppress("DEPRECATION") val joinedByName = wifi.connectionInfo?.ssid == "\"$ssid\""
             cm.allNetworks.firstOrNull { n ->
                 val caps = cm.getNetworkCapabilities(n)
                 val props = cm.getLinkProperties(n)
-                caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
-                    props != null && props.linkAddresses.any { a -> a.address is Inet4Address && a.address.hostAddress?.startsWith("192.168.137.") == true }
+                caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) && props != null &&
+                    (joinedByName || props.linkAddresses.any { a -> a.address is Inet4Address && a.address.hostAddress?.startsWith("192.168.137.") == true })
             }
         } catch (e: Exception) { null }
     }
@@ -197,6 +199,7 @@ class PcWifiLink(private val context: Context, private val emit: (Map<String, An
         if (s == null) return
         Thread({ receiveLoop(s) }, "sf-pc-wifi").apply { isDaemon = true; start() }
         announce()
+        main.postDelayed({ announce() }, 2000)
     }
 
     private fun detach() {
@@ -207,16 +210,47 @@ class PcWifiLink(private val context: Context, private val emit: (Map<String, An
 
     private fun message(t: String) = JSONObject().put("t", t).put("adv", advert).put("tcp", tcpPort).toString().toByteArray(Charsets.UTF_8)
 
-    /** بنعرّف الكمبيوتر بنفسنا (لو الفايروول بتاعه سايبها تعدي) — الأساس إننا بنرد على اكتشافه */
+    /**
+     * عناوين الكمبيوتر على الشبكة دي: الراوتر (gateway) وسيرفر الـ DHCP = الكمبيوتر نفسه، و broadcast الشبكة.
+     * 192.168.137.1 احتياطي (الويندوز غالبًا بيستخدمه) — بس منعتمدش عليه لوحده.
+     */
+    private fun pcTargets(n: Network): Set<InetAddress> {
+        val out = linkedSetOf<InetAddress>()
+        try {
+            val props = cm.getLinkProperties(n)
+            props?.routes?.forEach { r -> r.gateway?.let { g -> if (g is Inet4Address && !g.isAnyLocalAddress) out.add(g) } }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) props?.dhcpServerAddress?.let { out.add(it) }
+            props?.linkAddresses?.forEach { la ->
+                val a = la.address
+                if (a is Inet4Address && la.prefixLength in 8..30) {
+                    val ip = a.address
+                    val bits = la.prefixLength
+                    val b = ByteArray(4) { i ->
+                        val keep = (bits - i * 8).coerceIn(0, 8)
+                        val mask = if (keep == 0) 0 else (0xFF shl (8 - keep)) and 0xFF
+                        ((ip[i].toInt() and mask) or (mask.inv() and 0xFF)).toByte()
+                    }
+                    out.add(InetAddress.getByAddress(b))
+                }
+            }
+        } catch (e: Exception) {}
+        try {
+            out.add(InetAddress.getByName("192.168.137.1"))
+            out.add(InetAddress.getByName("192.168.137.255"))
+        } catch (e: Exception) {}
+        return out
+    }
+
+    /** بنعرّف الكمبيوتر بنفسنا (لو الفايروول بتاعه سايبها تعدي) — والكمبيوتر كمان بيبعتلنا مباشرة واحنا بنرد */
     private fun announce() {
         val s = socket ?: return
+        val n = network ?: return
         if (tcpPort == 0) return
         Thread {
-            try {
-                val data = message("?")
-                s.send(DatagramPacket(data, data.size, InetAddress.getByName("192.168.137.1"), 47821))
-                s.send(DatagramPacket(data, data.size, InetAddress.getByName("192.168.137.255"), 47821))
-            } catch (e: Exception) {}
+            val data = message("?")
+            for (target in pcTargets(n)) {
+                try { s.send(DatagramPacket(data, data.size, target, 47821)) } catch (e: Exception) {}
+            }
         }.start()
     }
 

@@ -57,6 +57,11 @@
       <button id="wifiToggle"></button>
     </div>
     <div class="row" style="margin-top:10px" id="wifiCreds"></div>
+    <div class="row" style="margin-top:10px" id="wifiClients"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="firewallBtn">🛡️ اسمح للموبايلات في الفايروول</button>
+      <span class="muted" id="firewallSub">الويندوز هيسأل صلاحية أدمن مرة واحدة — اختار Yes</span>
+    </div>
   </div>
 
   <div class="card">
@@ -135,6 +140,15 @@
     $('wifiCreds').innerHTML = wifiOn && w.ssid
       ? `<span class="pill">اسم الشبكة: <b>${esc(w.ssid)}</b></span><span class="pill">الباسورد: <b>${esc(w.password)}</b></span><span class="muted">(لو موبايل مش بيدخل لوحده دخّله يدوي)</span>`
       : '';
+    // كام موبايل داخل واي فاي الكمبيوتر: لو صفر يبقى الموبايل مدخلش الواي فاي أصلًا، ولو فيه ومفيش أجهزة تحت يبقى الفايروول
+    const direct = v.peers.filter(p => p.direct && p.online).length;
+    $('wifiClients').innerHTML = !wifiOn ? ''
+      : !w.clients ? '<span class="pill warn">مفيش موبايل داخل واي فاي الكمبيوتر لسه</span><span class="muted">(على الموبايل: الشبكة شغالة + الموقع Location مفتوح + وافق على "توصيل بالجهاز")</span>'
+      : `<span class="pill ok">داخل الواي فاي: ${w.clients} موبايل</span>`
+        + (!direct ? '<span class="muted">داخلين بس لسه مااتكلموش مع البرنامج — دوس "اسمح للموبايلات في الفايروول"</span>' : '');
+    if (w.acceptError) $('wifiClients').innerHTML += `<span class="pill warn">${esc('قبول الموبايلات: ' + w.acceptError)}</span>`;
+    $('firewallBtn').textContent = v.firewall ? '🛡️ الفايروول مسموح ✓ (اعمله تاني)' : '🛡️ اسمح للموبايلات في الفايروول';
+    $('firewallBtn').className = v.firewall ? '' : 'primary';
 
     $('reviewBox').style.display = v.review.length ? '' : 'none';
     $('review').innerHTML = v.review.map(r => `<div class="card review">
@@ -177,6 +191,13 @@
   $('toggle').onclick = () => act(data && data.running ? 'disable' : 'enable');
   $('reconnect').onclick = () => act('reconnect');
   $('wifiToggle').onclick = () => data && act('hotspot', { on: data.hotspot ? 'false' : 'true' });
+  $('firewallBtn').onclick = async () => {
+    $('firewallSub').textContent = 'وافق على رسالة الويندوز (Yes)...';
+    let r = null;
+    try { r = await window.desktop.mesh.action('firewall', {}); } catch (e) { r = { success: false, message: e.message }; }
+    $('firewallSub').textContent = r && r.success ? '✔ تمام — الموبايلات تقدر تكلم البرنامج' : (r && r.message) || 'ماتمش';
+    refresh();
+  };
   $('makeUploader').onclick = () => data && act('uploader', { node: data.me.node });
   $('uploadNow').onclick = () => act('upload-now');
   $('review').onclick = (e) => {

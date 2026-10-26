@@ -4,6 +4,9 @@
 //   - لو كارت الواي فاي مش راضي: "Mobile hotspot" بتاع الويندوز بنفس الاسم والباسورد
 // الشغل نفسه في PowerShell (WinRT) — عملية صغيرة بتفضل شغالة طول ما الشبكة شغالة، ولو اتقفلت بنشغلها تاني.
 // الاسم والباسورد من مفتاح الشبكة (pcWifiCredentials) فالموبايلات بتعرفهم وبتدخل لوحدها.
+// مهم: في Wi-Fi Direct الويندوز مش بيقبل الموبايل لوحده — لازم البرنامج يرد على ConnectionRequested
+// ويفتح الجهاز (FromIdAsync) وإلا الموبايل بيدخل وبيتشال قبل ما ياخد عنوان. PowerShell مش بيعرف يسمع
+// أحداث WinRT، فبنعمل كلاس C# صغير وقت التشغيل (SfWfdAccept) هو اللي بيقبل.
 const { spawn } = require('child_process');
 
 const SCRIPT = String.raw`
@@ -16,7 +19,60 @@ $asTask0 = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
 function AwaitOp($op, $type) { $t = $asTask1.MakeGenericMethod($type).Invoke($null, @($op)); [void]$t.Wait(30000); $t.Result }
 function AwaitAction($op) { $t = $asTask0.Invoke($null, @($op)); [void]$t.Wait(30000) }
 
-$pub = $null; $tm = $null; $mode = ''; $lastError = ''
+$pub = $null; $tm = $null; $mode = ''; $lastError = ''; $acceptError = ''
+
+$acceptSrc = @'
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using Windows.Foundation;
+using Windows.Devices.WiFiDirect;
+public static class SfWfdAccept {
+  static WiFiDirectConnectionListener listener;
+  static readonly List<WiFiDirectDevice> devices = new List<WiFiDirectDevice>();
+  public static string LastError = "";
+  public static void Start() {
+    listener = new WiFiDirectConnectionListener();
+    listener.ConnectionRequested += OnRequest;
+  }
+  static void OnRequest(WiFiDirectConnectionListener sender, WiFiDirectConnectionRequestedEventArgs args) {
+    try {
+      var id = args.GetConnectionRequest().DeviceInformation.Id;
+      ThreadPool.QueueUserWorkItem(_ => {
+        try {
+          var op = WiFiDirectDevice.FromIdAsync(id);
+          for (int i = 0; i < 600 && op.Status == AsyncStatus.Started; i++) Thread.Sleep(50);
+          if (op.Status != AsyncStatus.Completed) { LastError = "accept: " + op.Status; return; }
+          lock (devices) devices.Add(op.GetResults());
+        } catch (Exception e) { LastError = e.Message; }
+      });
+    } catch (Exception e) { LastError = e.Message; }
+  }
+  public static int Connected() {
+    lock (devices) {
+      devices.RemoveAll(d => { try { return d.ConnectionStatus != WiFiDirectConnectionStatus.Connected; } catch { return true; } });
+      return devices.Count;
+    }
+  }
+}
+'@
+try {
+  $fw = [System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
+  $wm = "$env:windir\System32\WinMetadata"
+  $cp = New-Object System.CodeDom.Compiler.CompilerParameters
+  $cp.GenerateInMemory = $true
+  foreach ($r in @('System.dll', "$fw\System.Runtime.WindowsRuntime.dll", "$fw\System.Runtime.dll", "$fw\System.Runtime.InteropServices.WindowsRuntime.dll", "$wm\Windows.Devices.winmd", "$wm\Windows.Foundation.winmd")) { [void]$cp.ReferencedAssemblies.Add($r) }
+  $cr = (New-Object Microsoft.CSharp.CSharpCodeProvider).CompileAssemblyFromSource($cp, $acceptSrc)
+  if ($cr.Errors.HasErrors) { throw (($cr.Errors | Select-Object -First 1).ToString()) }
+  [SfWfdAccept]::Start()
+} catch { $acceptError = "$($_.Exception.Message)" }
+
+function Clients {
+  $n = 0
+  if ($script:pub -and -not $acceptError) { try { $n = [SfWfdAccept]::Connected() } catch {} }
+  $ips = @(Get-NetNeighbor -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -like '192.168.137.*' -and $_.IPAddress -ne '192.168.137.255' -and $_.IPAddress -ne '192.168.137.1' -and "$($_.State)" -in @('Reachable', 'Stale', 'Delay', 'Probe') } | ForEach-Object { $_.IPAddress } | Sort-Object -Unique)
+  return @{ n = [Math]::Max($n, $ips.Count); ips = $ips }
+}
 
 function Start-Wfd {
   $null = [Windows.Devices.WiFiDirect.WiFiDirectAdvertisementPublisher, Windows.Devices.WiFiDirect, ContentType = WindowsRuntime]
@@ -75,7 +131,7 @@ $stdin = [Console]::OpenStandardInput()
 $buf = New-Object byte[] 1
 $stopTask = $stdin.ReadAsync($buf, 0, 1)
 
-$wasUp = $false; $nextTry = [DateTime]::MinValue
+$wasUp = $false; $nextTry = [DateTime]::MinValue; $lastClients = ''; $ip = ''
 while ($true) {
   if ($stopTask.IsCompleted) { break }
   if (-not (Get-Process -Id $parentPid -ErrorAction SilentlyContinue)) { break }
@@ -88,9 +144,19 @@ while ($true) {
   if ($up -ne $wasUp) {
     if ($up) {
       $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -like '192.168.137.*' } | Select-Object -First 1).IPAddress
-      Say @{ state = 'on'; mode = $mode; ip = "$ip" }
+      $lastClients = ''
     } elseif ($wasUp) { Say @{ state = 'error'; message = 'الواي فاي وقف — بنشغله تاني' } }
     $wasUp = $up
+  }
+  if ($up) {
+    # كام موبايل داخل الواي فاي دلوقتي + عناوينهم (الكمبيوتر بيبعتلهم مباشرة — الموبايلات كتير بتتجاهل الـ broadcast)
+    if (-not $ip) { $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -like '192.168.137.*' } | Select-Object -First 1).IPAddress }
+    $c = Clients
+    $key = "$ip|$($c.n)|$($c.ips -join ',')"
+    if ($key -ne $lastClients) {
+      Say @{ state = 'on'; mode = $mode; ip = "$ip"; clients = $c.n; ips = @($c.ips); acceptError = $acceptError }
+      $lastClients = $key
+    }
   }
   Start-Sleep -Milliseconds 1500
 }
@@ -102,7 +168,7 @@ class PcHotspot {
   constructor() {
     this.child = null;
     this.wanted = null; // { ssid, password }
-    this.status = { state: 'off', mode: '', ip: '', message: '' };
+    this.status = { state: 'off', mode: '', ip: '', message: '', clients: 0, ips: [], acceptError: '' };
     this.restartTimer = null;
   }
 
@@ -147,7 +213,10 @@ class PcHotspot {
         if (!line.startsWith('{')) continue;
         try {
           const msg = JSON.parse(line);
-          this.status = { state: msg.state || 'error', mode: msg.mode || this.status.mode, ip: msg.ip || '', message: msg.message || '' };
+          this.status = {
+            state: msg.state || 'error', mode: msg.mode || this.status.mode, ip: msg.ip || '', message: msg.message || '',
+            clients: Number(msg.clients) || 0, ips: Array.isArray(msg.ips) ? msg.ips.filter(ip => /^192\.168\.137\.\d+$/.test(ip)) : [], acceptError: msg.acceptError || '',
+          };
         } catch (e) { /* سطر ناقص */ }
       }
     });
@@ -166,6 +235,9 @@ class PcHotspot {
     });
   }
 
+  /** عناوين الموبايلات اللي داخلة واي فاي الكمبيوتر (الاكتشاف بيبعتلهم مباشرة) */
+  clientIps() { return this.status.state === 'on' ? this.status.ips : []; }
+
   stop() {
     clearTimeout(this.restartTimer);
     this.wanted = null;
@@ -180,4 +252,36 @@ class PcHotspot {
   }
 }
 
-module.exports = { PcHotspot };
+// الفايروول: الويندوز بيسأل "السماح بالوصول" أول مرة، ولو اتقفل أو اختاروا "إلغاء" بيعمل قاعدة حظر للبرنامج
+// والموبايلات مش بتعرف تكلم الكمبيوتر. ده بيطلب صلاحية أدمن مرة واحدة (رسالة الويندوز) ويسمح للبرنامج
+// ولبورت الاكتشاف، ويقفل قواعد الحظر اللي على البرنامج.
+const FIREWALL_RULE = 'Shady Elsharkawy - device network';
+
+function allowInFirewall(exePath) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') { resolve({ success: false, message: 'ويندوز بس' }); return; }
+    const exe = String(exePath).replace(/'/g, "''");
+    const inner = [
+      `$exe = '${exe}'; $name = '${FIREWALL_RULE}'`,
+      'Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue | Remove-NetFirewallRule',
+      'New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Program $exe -Profile Any | Out-Null',
+      'New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Protocol UDP -LocalPort 47821 -Profile Any | Out-Null',
+      "Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule | Where-Object { \"$($_.Action)\" -eq 'Block' } | Disable-NetFirewallRule",
+    ].join('\n');
+    const innerEncoded = Buffer.from(inner, 'utf16le').toString('base64');
+    const outer = `try { $p = Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand','${innerEncoded}'; exit $p.ExitCode } catch { exit 5 }`;
+    let child;
+    try {
+      child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(outer, 'utf16le').toString('base64')], { windowsHide: true, stdio: 'ignore' });
+    } catch (error) {
+      resolve({ success: false, message: error.message });
+      return;
+    }
+    child.on('error', error => resolve({ success: false, message: error.message }));
+    child.on('exit', code => resolve(code === 0
+      ? { success: true }
+      : { success: false, message: code === 5 ? 'اتلغى — لازم توافق على رسالة الويندوز (Yes)' : `ماتمش (كود ${code})` }));
+  });
+}
+
+module.exports = { PcHotspot, allowInFirewall };

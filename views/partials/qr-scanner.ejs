@@ -1,0 +1,43 @@
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script>
+  // كاميرا المسح: بعد ما تقرا كود بتقف لحد ما الصفحة تقول resume()،
+  // ونفس الكارت لو لسه قدام الكاميرا مش بيتقري تاني (لازم يبعد ثانيتين ونص الأول)
+  // — من غير كده كاميرا اللابتوب كانت بتقرا الكارت 10 مرات في الثانية وتبعت لوحدها.
+  window.sfQrScanner = function (elementId, onCode) {
+    const SAME_CARD_GAP_MS = 2500;
+    let scanner = null;
+    let paused = false;
+    let lastCode = null;
+    let lastSeenAt = 0;
+
+    function pause() {
+      paused = true;
+      try { if (scanner) scanner.pause(true); } catch (e) {}
+    }
+
+    function resume() {
+      paused = false;
+      lastSeenAt = Date.now();
+      try { if (scanner) scanner.resume(); } catch (e) {}
+    }
+
+    function handle(text) {
+      const code = String(text || '').trim();
+      if (!code || paused) return;
+      const now = Date.now();
+      const sameCardStillThere = code === lastCode && now - lastSeenAt < SAME_CARD_GAP_MS;
+      lastCode = code;
+      lastSeenAt = now;
+      if (sameCardStillThere) return;
+      pause();
+      onCode(code);
+    }
+
+    try {
+      scanner = new Html5Qrcode(elementId);
+      scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, handle).catch(() => {});
+    } catch (e) {}
+
+    return { pause, resume };
+  };
+</script>

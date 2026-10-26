@@ -113,7 +113,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<%- include('partials/qr-scanner') %>
 <script>
   const STORAGE_KEY = 'pending_attendance_scans';
   const resultBox = document.getElementById('resultBox');
@@ -198,6 +198,7 @@
     if (isProcessing) return;
     isProcessing = true;
     pendingCode = code;
+    qrScanner.pause();
 
     resultBox.innerHTML = `<div class="alert alert-info">⏳ <span class="ar-only">بيتم التحقق من:</span><span class="en-only" style="display:none;">Verifying:</span> ${code}</div>`;
 
@@ -213,6 +214,7 @@
           if (data.subjectMismatch) triggerSubjectMismatchAlarm();
           resultBox.innerHTML = `<div class="alert ${data.subjectMismatch ? 'alert-danger' : 'alert-warning'}">${data.message}</div>`;
           if (data.alreadyRecorded) showAddPaymentOnly(code, data);
+          qrScanner.resume();
           return;
         }
         hideAddPaymentOnly();
@@ -220,6 +222,7 @@
       })
       .catch(() => {
         isProcessing = false;
+        qrScanner.resume();
         resultBox.innerHTML = `<div class="alert alert-danger">❌ <span class="ar-only">حصلت مشكلة في الاتصال</span><span class="en-only" style="display:none;">A connection error occurred</span></div>`;
       });
   }
@@ -450,6 +453,7 @@
   function showScannerUI() {
     document.getElementById('reader').style.display = 'block';
     document.getElementById('manualCode').closest('.input-group').style.display = 'flex';
+    qrScanner.resume();
   }
 
   // خانات "مبلغ تاني بسبب تاني"
@@ -615,14 +619,7 @@
       });
   }
 
-  const html5QrCode = new Html5Qrcode("reader");
-  html5QrCode.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    onScanSuccess
-  ).catch(() => {
-    // Fail-safe handling for cameras
-  });
+  const qrScanner = sfQrScanner('reader', onScanSuccess);
 </script>
 
 <div class="modal fade" id="newStudentModal" tabindex="-1">

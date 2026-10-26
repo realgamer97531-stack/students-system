@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { MeshLog, MeshNode, computeStatuses, OpState, hmacHex, pcWifiCredentials } = require('./core');
 const { LanTransport } = require('./lan');
-const { PcHotspot } = require('./hotspot');
+const { PcHotspot, allowInFirewall } = require('./hotspot');
 
 const SCAN_PATHS = new Set(['/attendance/scan', '/homework/scan/save']);
 const sha = v => crypto.createHash('sha256').update(String(v)).digest('hex');
@@ -23,6 +23,7 @@ const state = {
   meshKey: '',
   nodeId: null,
   hotspot: true, // الكمبيوتر يعمل واي فاي بنفسه للموبايلات (تقدر تقفله لو فيه راوتر)
+  firewall: false, // اتعمل "سماح في الفايروول" على الجهاز ده
 };
 
 const hotspot = new PcHotspot();
@@ -240,7 +241,7 @@ async function startNode() {
     if (!state.meshKey) state.message = 'لازم البرنامج يتصل بالسيرفر مرة (فيه نت) عشان ياخد مفتاح الشبكة';
     return;
   }
-  const transport = new LanTransport({ alwaysConnect: true });
+  const transport = new LanTransport({ alwaysConnect: true, extraTargets: () => hotspot.clientIps() });
   node = new MeshNode(transport, host, { nodeId: state.nodeId, log, maxDirect: 12 });
   node.on('change', dirty);
   try {
@@ -276,6 +277,7 @@ async function init(dependencies) {
   state.meshKey = (await deps.store.getKv('mesh_key', '')) || '';
   state.enabled = (await deps.store.getKv('mesh_enabled', false)) === true;
   state.hotspot = (await deps.store.getKv('mesh_hotspot', true)) !== false;
+  state.firewall = (await deps.store.getKv('mesh_firewall', false)) === true;
   process.once('exit', () => hotspot.stop());
   state.ready = true;
   let lastPull = deps.engine.state.lastPullAt;
@@ -347,6 +349,14 @@ async function action(name, body = {}) {
       await deps.store.setKv('mesh_hotspot', state.hotspot);
       syncHotspot();
       return { success: true };
+    case 'firewall': {
+      const r = await allowInFirewall(process.execPath);
+      if (r.success) {
+        state.firewall = true;
+        await deps.store.setKv('mesh_firewall', true);
+      }
+      return r;
+    }
     case 'take-all':
       return { success: Boolean(node && node.requestSnapshot()) };
     case 'uploader':

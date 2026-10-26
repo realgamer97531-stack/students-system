@@ -52,7 +52,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<%- include('partials/qr-scanner') %>
 <script>
   const STORAGE_KEY = 'pending_homework_scans';
   const resultBox = document.getElementById('resultBox');
@@ -132,6 +132,7 @@
   function selectCode(code) {
     if (!scanning) return;
     scanning = false;
+    qrScanner.pause();
     selectedCode = code;
     currentCode.textContent = code;
     studentBox.style.display = 'block';
@@ -173,6 +174,7 @@
     readerBox.style.display = 'block';
     document.getElementById('homeworkSummaryBox').style.display = 'none';
     scanning = true;
+    qrScanner.resume();
   }
 
   function submitManual() {
@@ -209,6 +211,7 @@
         document.getElementById('homeworkSummaryBox').style.display = 'none';
         scanning = true;
         selectedCode = null;
+        qrScanner.resume();
       });
   }
 
@@ -216,12 +219,7 @@
     selectCode(decodedText);
   }
 
-  const html5QrCode = new Html5Qrcode("reader");
-  html5QrCode.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    onScanSuccess
-  ).catch(() => {});
+  const qrScanner = sfQrScanner('reader', onScanSuccess);
 </script>
 
 <%- include('partials/student-picker') %>
