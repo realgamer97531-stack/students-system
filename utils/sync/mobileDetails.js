@@ -30,9 +30,9 @@ async function buildMobileDetails(sequelize) {
     reservations,
     followUps,
   ] = await Promise.all([
-    // [طالب, رقم الحصة, السنتر اللي حضر فيه] لنفس مادة الطالب
+    // [طالب, رقم الحصة, السنتر اللي حضر فيه, 1 لو حضور المنصة] لنفس مادة الطالب (الخانة الرابعة جديدة — الإصدارات القديمة بتتجاهلها)
     sequelize.query(
-      `SELECT a.StudentId, s.lesson_number, s.CenterId FROM ${t(Attendance)} a
+      `SELECT a.StudentId, s.lesson_number, s.CenterId, (a.UserId IS NULL AND a.comment LIKE '📹%') AS platform FROM ${t(Attendance)} a
        JOIN ${t(Session)} s ON s.id = a.SessionId
        JOIN students st ON st.id = a.StudentId AND st.SubjectId = s.SubjectId`,
     ),
@@ -72,7 +72,7 @@ async function buildMobileDetails(sequelize) {
 
   return {
     v: 1,
-    history: history.map(r => [r.StudentId, r.lesson_number, r.CenterId]),
+    history: history.map(r => [r.StudentId, r.lesson_number, r.CenterId, Number(r.platform) ? 1 : 0]),
     groups: groups.map(r => [r.CenterId, r.SubjectId, r.lesson_number]),
     exams: exams.map(r => [r.StudentId, r['Exam.name'], num(r.score), num(r['Exam.max_score']), r['Exam.exam_date']]),
     booklets: booklets.map(b => [b.id, b.SubjectId, b.name, num(b.sell_price)]),

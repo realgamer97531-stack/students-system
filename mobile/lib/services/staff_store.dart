@@ -97,7 +97,12 @@ class Snapshot {
     if (details is Map) {
       hasDetails = true;
       for (final r in (details['history'] as List? ?? [])) {
-        (_history[_int(r[0])!] ??= {})[_int(r[1])!] = _int(r[2]);
+        // حضور المنصة = -1 (بيظهر "المنصة") — والحضور الفعلي في سنتر أولى منه لو الاتنين موجودين
+        final lessons = _history[_int(r[0])!] ??= {};
+        final lesson = _int(r[1])!;
+        final platform = r.length > 3 && _int(r[3]) == 1;
+        if (platform && lessons.containsKey(lesson)) continue;
+        lessons[lesson] = platform ? -1 : _int(r[2]);
       }
       for (final r in (details['groups'] as List? ?? [])) {
         (_groupLessons['${r[0]}:${r[1]}'] ??= {}).add(_int(r[2])!);
@@ -161,7 +166,7 @@ class Snapshot {
           {
             'lessonNumber': n,
             'attended': attended.containsKey(n),
-            'attendedWhere': attended.containsKey(n) ? (centers[attended[n]] ?? '') : null,
+            'attendedWhere': attended.containsKey(n) ? (attended[n] == -1 ? 'المنصة (أونلاين)' : (centers[attended[n]] ?? '')) : null,
             'parts': const [],
           },
       ],

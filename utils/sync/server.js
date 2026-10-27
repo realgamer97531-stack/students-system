@@ -584,7 +584,8 @@ async function buildMobileSnapshot(sequelize, { meshKey, excludeLocalIds = false
       rowsAsArray: true,
     }),
     sessionIds.length
-      ? db.query({ sql: 'SELECT StudentId, SessionId FROM attendances WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })
+      // حضور المنصة (📹 من غير موظف) مش حضور في السنتر — المسح لازم يسجله ويخصم (زي /attendance/scan)
+      ? db.query({ sql: "SELECT StudentId, SessionId FROM attendances WHERE SessionId IN (?) AND NOT (UserId IS NULL AND comment LIKE '📹%')", values: [sessionIds], rowsAsArray: true })
       : [[]],
     sessionIds.length
       ? db.query({ sql: 'SELECT StudentId, SessionId, status FROM homeworkchecks WHERE SessionId IN (?)', values: [sessionIds], rowsAsArray: true })

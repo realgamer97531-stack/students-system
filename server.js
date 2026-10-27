@@ -982,6 +982,18 @@ async function findStudentByCode(rawCode, options = {}) {
 // الحصة المختارة على حساب الموظف بتفضل محفوظة أيام (الدخول بيفضل 30 يوم)، فلما يضيف طالب جديد يوم مفيهوش
 // حصة كان الطالب بيتسجل حاضر ويتخصم منه في حصة قديمة (أو حصة مادة تانية). الحضور مع التسجيل بقى بس لو الحصة
 // المختارة بتاعة النهارده (يوم العملية نفسها لو جاية من جهاز كان أوفلاين) ومن نفس مادة الطالب.
+// الحضور اللي المنصة عاملاه (فتح/دفع فيديو — ensureAttendance) بيتسجل في حصة سنتر الطالب عشان صلاحيات الفيديو،
+// فمكان الحضور الحقيقي "المنصة" مش سنتره. بنعرفه من الكومنت 📹 ومن إن مفيش موظف سجله.
+const PLATFORM_ATTENDANCE_LABEL = 'المنصة (أونلاين)';
+function isPlatformAttendance(attendance) {
+  return Boolean(attendance) && !attendance.UserId && String(attendance.comment || '').startsWith('📹');
+}
+function attendanceWhere(attendance, fallbackCenterName = null) {
+  if (!attendance) return null;
+  if (isPlatformAttendance(attendance)) return PLATFORM_ATTENDANCE_LABEL;
+  return attendance.Session?.Center?.name || fallbackCenterName || null;
+}
+
 async function registrationAttendanceSession(activeSessionId, student) {
   if (!activeSessionId) return { note: '⚠️ لا توجد حصة شغالة الآن لتسجيل حضور الطالب.' };
   const session = await Session.findByPk(activeSessionId);
@@ -2576,12 +2588,17 @@ app.get('/students/:id', async (req, res) => {
     const attendanceIdByLesson = {};
     const attendancePaymentByLesson = {};
     const attendanceSessionIdByLesson = {};
+    const attendancePlatformByLesson = {};
     attendanceRecords.forEach(a => {
       if (a && a.Session && a.Session.SubjectId === student.SubjectId) {
         const key = Number(a.Session.lesson_number);
         const current = attendanceByLesson[key];
         const currentAttendance = current ? { Session: current, SessionId: current.id } : null;
-        const selectedAttendance = choosePreferredAttendanceRecord(currentAttendance, a, ownSessionIds);
+        const currentPlatform = Boolean(current) && attendancePlatformByLesson[key];
+        // الحضور الفعلي (موظف سجله) أولى من فتح المنصة لنفس الحصة
+        const selectedAttendance = current && currentPlatform !== isPlatformAttendance(a)
+          ? (currentPlatform ? a : currentAttendance)
+          : choosePreferredAttendanceRecord(currentAttendance, a, ownSessionIds);
         if (!current || selectedAttendance === a) {
           attendanceByLesson[key] = a.Session;
           attendanceUserByLesson[key] = a.User ? a.User.name : '-';
@@ -2589,6 +2606,7 @@ app.get('/students/:id', async (req, res) => {
           attendanceIdByLesson[key] = a.id;
           attendancePaymentByLesson[key] = Number(a.payment_collected) || 0;
           attendanceSessionIdByLesson[key] = a.SessionId;
+          attendancePlatformByLesson[key] = isPlatformAttendance(a);
         }
       }
     });
@@ -2648,7 +2666,11 @@ app.get('/students/:id', async (req, res) => {
       let attendanceStatus, attendedElsewhere = null;
 
       if (attendedSession) {
-        if (ownSession && attendedSession.CenterId === ownSession.CenterId) {
+        if (attendancePlatformByLesson[lessonNumber]) {
+          // اتفتحتله على المنصة (مش حضور في السنتر)
+          attendanceStatus = 'attended_elsewhere';
+          attendedElsewhere = PLATFORM_ATTENDANCE_LABEL;
+        } else if (ownSession && attendedSession.CenterId === ownSession.CenterId) {
           attendanceStatus = 'attended';
         } else {
           attendanceStatus = 'attended_elsewhere';
@@ -4396,8 +4418,9 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       });
     }
 
-    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId }, attributes: ['id', 'payment_collected'] });
-    if (existing) {
+    const existing = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId }, attributes: ['id', 'payment_collected', 'UserId', 'comment'] });
+    // حضور المنصة (فتح الفيديو) مش حضور في السنتر: المسح بيكمل عادي ويخصم سعر الحصة
+    if (existing && !isPlatformAttendance(existing)) {
       // alreadyRecorded: الشاشة بتعرض "ضيف فلوس بس" عشان المبلغ يتضاف على حضوره
       return res.json({
         success: false,
@@ -4442,7 +4465,7 @@ app.post('/attendance/scan/lookup', async (req, res) => {
       getFollowUpAssistantForStudent(student.id),
       Video.findAll({
         where: { SubjectId: student.SubjectId },
-        include: [VideoPart],
+        include: [VideoPart, { model: VideoSession, required: false, attributes: ['SessionId'] }],
       }),
       WatchProgress.findAll({ where: { StudentId: student.id }, attributes: ['VideoPartId', 'watched_seconds'] }),
       Booklet.findAll({
@@ -4454,7 +4477,10 @@ app.post('/attendance/scan/lookup', async (req, res) => {
 
     const attByLesson = {};
     attendanceRecords.forEach(a => {
-      if (a.Session.SubjectId === student.SubjectId) attByLesson[a.Session.lesson_number] = a.Session;
+      if (a.Session.SubjectId !== student.SubjectId) return;
+      // لو حضر نفس الحصة في مكانين، الحضور الفعلي (موظف سجله) أولى من حضور المنصة
+      const prev = attByLesson[a.Session.lesson_number];
+      if (!prev || (isPlatformAttendance(prev) && !isPlatformAttendance(a))) attByLesson[a.Session.lesson_number] = a;
     });
 
     // نجمع كل أرقام الحصص: من مجموعته + أي حصص حضرها في مكان تاني (زي أونلاين)
@@ -4463,8 +4489,22 @@ app.post('/attendance/scan/lookup', async (req, res) => {
     Object.keys(attByLesson).forEach(n => lessonNumbersSet.add(parseInt(n)));
     const lessonNumbers = Array.from(lessonNumbersSet).sort((a, b) => a - b);
 
-    const videoBySessionId = {};
-    videos.forEach(v => { videoBySessionId[v.SessionId] = v; });
+    // فيديوهات كل حصة (برقم الحصة): الفيديو ممكن يكون مربوط بحصة سنتر تاني أو بكذا حصة (VideoSessions)،
+    // فوقت المشاهدة بيظهر حتى لو شافه على المنصة من غير ما يتمسح أو الفيديو مربوط بسنتر تاني
+    const linkedSessionIds = new Set();
+    videos.forEach(v => {
+      if (v.SessionId) linkedSessionIds.add(v.SessionId);
+      (v.VideoSessions || []).forEach(vs => linkedSessionIds.add(vs.SessionId));
+    });
+    const lessonBySessionId = new Map((linkedSessionIds.size
+      ? await Session.findAll({ where: { id: [...linkedSessionIds], SubjectId: student.SubjectId }, attributes: ['id', 'lesson_number'] })
+      : []).map(s => [s.id, s.lesson_number]));
+    const videosByLesson = {};
+    videos.forEach(v => {
+      const lessons = new Set([v.SessionId, ...(v.VideoSessions || []).map(vs => vs.SessionId)]
+        .map(id => lessonBySessionId.get(id)).filter(n => n != null));
+      lessons.forEach(n => { (videosByLesson[n] = videosByLesson[n] || []).push(v); });
+    });
 
     const watchMap = {};
     watchRecords.forEach(w => { watchMap[w.VideoPartId] = w.watched_seconds; });
@@ -4473,21 +4513,18 @@ app.post('/attendance/scan/lookup', async (req, res) => {
 
     const summary = lessonNumbers.map(lessonNumber => {
       const att = attByLesson[lessonNumber];
-      let parts = [];
-      if (att) {
-        const video = videoBySessionId[att.id];
-        if (video) {
-          parts = video.VideoParts.map(p => ({
-            category: categoryLabels[p.category] || p.category,
-            watchedSeconds: watchMap[p.id] || 0,
-            durationSeconds: p.duration_seconds,
-          }));
-        }
-      }
+      const parts = [];
+      (videosByLesson[lessonNumber] || []).forEach(video => {
+        [...(video.VideoParts || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).forEach(p => parts.push({
+          category: categoryLabels[p.category] || p.category,
+          watchedSeconds: watchMap[p.id] || 0,
+          durationSeconds: p.duration_seconds,
+        }));
+      });
       return {
         lessonNumber,
         attended: !!att,
-        attendedWhere: att ? att.Center.name : null,
+        attendedWhere: attendanceWhere(att),
         parts,
       };
     });
@@ -4602,7 +4639,18 @@ app.post('/attendance/scan', async (req, res) => {
       },
     });
 
-    if (!attendanceCreated) {
+    // الطالب فاتح الحصة على المنصة (حضور 📹 في حصة سنتره من غير خصم) وجه السنتر: ده حضوره الفعلي،
+    // فبنحوّل السجل ده لحضور عادي ونخصم سعر الحصة. التحويل ذري (UserId لسه null) عشان ضغطتين مايخصموش مرتين.
+    let platformRecord = null;
+    if (!attendanceCreated && isPlatformAttendance(attendanceRecord)) {
+      const [claimed] = await Attendance.update(
+        { UserId: req.session.userId, comment: comment || null, payment_collected: paymentAmount, attended_at: new Date() },
+        { where: { id: attendanceRecord.id, UserId: null } },
+      );
+      if (claimed === 1) platformRecord = { comment: attendanceRecord.comment };
+    }
+
+    if (!attendanceCreated && !platformRecord) {
       // الطالب متسجل خلاص: المبلغ مش بيتضاف هنا (ممكن تكون ضغطة مكررة) — الشاشة بتعرض "ضيف فلوس بس"
       // اللي بيبعت لـ /attendance/scan/add-payment
       return res.json({
@@ -4620,7 +4668,9 @@ app.post('/attendance/scan', async (req, res) => {
     await recordAttendancePayments(student, sessionId, paymentLines, req.session.userId);
 
     if (student.balance < student.price_per_session) {
-      await attendanceRecord.destroy();
+      // سجل المنصة بيرجع زي ما كان (عشان صلاحية الفيديو)، والسجل الجديد بيتمسح
+      if (platformRecord) await Attendance.update({ UserId: null, comment: platformRecord.comment, payment_collected: 0 }, { where: { id: attendanceRecord.id } });
+      else await attendanceRecord.destroy();
       return res.json({
         success: false,
         message: `رصيد الطالب ${student.name} غير كافٍ (الرصيد الحالي: ${student.balance} ج)${paymentAmount > 0 ? ` — المبلغ اللي دفعه (${paymentAmount} ج) اتضاف لرصيده` : ''}`,
@@ -4628,7 +4678,7 @@ app.post('/attendance/scan', async (req, res) => {
     }
 
     const paidInSession = await sessionPaymentsTotal(student.id, sessionId);
-    if (paidInSession > paymentAmount) await attendanceRecord.update({ payment_collected: paidInSession });
+    if (paidInSession > paymentAmount) await Attendance.update({ payment_collected: paidInSession }, { where: { id: attendanceRecord.id } });
 
     await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
     if (booklet_delivered) {
@@ -4724,7 +4774,13 @@ app.post('/attendance/scan/force', requirePermission('attendance_scan'), async (
         comment: '⚠️ تسجيل حضور بالقوة من الأدمن رغم نقص الرصيد',
       },
     });
-    if (!attendanceCreated) {
+    // حضور المنصة (📹) في نفس الحصة: بيتحول لحضور فعلي بالخصم (نفس /attendance/scan)
+    const platformClaimed = !attendanceCreated && isPlatformAttendance(forcedAttendance)
+      && (await Attendance.update(
+        { UserId: req.session.userId, comment: '⚠️ تسجيل حضور بالقوة من الأدمن رغم نقص الرصيد', attended_at: new Date() },
+        { where: { id: forcedAttendance.id, UserId: null } },
+      ))[0] === 1;
+    if (!attendanceCreated && !platformClaimed) {
       return res.json({ success: false, message: 'الطالب مسجل حضوره من قبل' });
     }
     // الفلوس اللي دفعها في محاولة الحضور اللي اترفضت (اتضافت لرصيده) تظهر في تقرير الحصة
@@ -11150,7 +11206,12 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       attributes: ['id'],
     });
     const equivalentAttendanceSessionIds = equivalentAttendanceSessions.map(session => session.id);
-    const video = await Video.findOne({ where: { SessionId: equivalentAttendanceSessionIds }, include: [{ model: VideoPart, order: [['order_index', 'ASC']] }] });
+    // الفيديو ممكن يكون مربوط بالحصة كحصة إضافية (VideoSessions) مش الحصة الأساسية بتاعته
+    const linkedVideoIds = (await VideoSession.findAll({ where: { SessionId: equivalentAttendanceSessionIds }, attributes: ['VideoId'] })).map(vs => vs.VideoId);
+    const video = await Video.findOne({
+      where: linkedVideoIds.length ? { [Op.or]: [{ SessionId: equivalentAttendanceSessionIds }, { id: linkedVideoIds }] } : { SessionId: equivalentAttendanceSessionIds },
+      include: [{ model: VideoPart, order: [['order_index', 'ASC']] }],
+    });
 
     const [attendanceRecords, hwRecords, examResults, sessionComments, missingExamFilter] = await Promise.all([
       Attendance.findAll({
@@ -11172,7 +11233,10 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
     const { missingExam, gradedStudentIds } = missingExamFilter;
 
     const attendanceMap = {};
-    attendanceRecords.forEach(att => { attendanceMap[att.StudentId] = att; });
+    attendanceRecords.forEach(att => {
+      // الحضور الفعلي أولى من فتح المنصة لنفس الحصة
+      if (!attendanceMap[att.StudentId] || isPlatformAttendance(attendanceMap[att.StudentId])) attendanceMap[att.StudentId] = att;
+    });
 
     const hwMap = {};
     hwRecords.forEach(hw => { hwMap[hw.StudentId] = hw; });
@@ -11204,7 +11268,7 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
       const row = {
         student,
         attended: !!attendance,
-        attendedWhere: attendance ? (attendance.Session?.Center?.name || selectedSession.Center?.name || null) : null,
+        attendedWhere: attendanceWhere(attendance, selectedSession.Center?.name),
         attendanceTime: attendance ? attendance.attended_at : null,
         hwStatus: hw ? hw.status : null,
         examScore: examResult ? examResult.score : null,
@@ -11469,7 +11533,10 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     const effectiveMissingExamId = missingExam ? String(missingExam.id) : '';
 
     const attendanceMap = {};
-    attendanceRecords.forEach(att => { attendanceMap[att.StudentId] = att; });
+    attendanceRecords.forEach(att => {
+      // الحضور الفعلي أولى من فتح المنصة لنفس الحصة
+      if (!attendanceMap[att.StudentId] || isPlatformAttendance(attendanceMap[att.StudentId])) attendanceMap[att.StudentId] = att;
+    });
 
     const hwMap = {};
     hwRecords.forEach(hw => { hwMap[hw.StudentId] = hw; });
@@ -11502,7 +11569,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
       const row = {
         student,
         attended: !!attendance,
-        attendedWhere: attendance ? (attendance.Session?.Center?.name || selectedSession.Center?.name || null) : null,
+        attendedWhere: attendanceWhere(attendance, selectedSession.Center?.name),
         attendanceTime: attendance ? attendance.attended_at : null,
         attendedBy: attendance ? attendance.User?.name : null,
         hwStatus: hw ? hw.status : null,
@@ -11653,7 +11720,11 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
     attendances.forEach(a => {
       if (a.Session && a.Session.SubjectId === student.SubjectId) {
         const key = Number(a.Session.lesson_number);
-        attMap[key] = choosePreferredLessonRecord(attMap[key], a, ownSessionIds);
+        const prev = attMap[key];
+        // الحضور الفعلي أولى من فتح المنصة لنفس الحصة
+        attMap[key] = prev && isPlatformAttendance(prev) !== isPlatformAttendance(a)
+          ? (isPlatformAttendance(prev) ? a : prev)
+          : choosePreferredLessonRecord(prev, a, ownSessionIds);
       }
     });
 
@@ -11707,7 +11778,7 @@ app.get('/follow-up-dashboard/student/:id', requireFollowUp, async (req, res) =>
       return {
         session: s,
         attended: !!att,
-        attendedWhere: att ? att.Session?.Center?.name : null,
+        attendedWhere: attendanceWhere(att),
         attendanceTime: att ? att.attended_at : null,
         attendedBy: att ? att.User?.name : null,
         hwStatus: hw ? hw.status : null,
