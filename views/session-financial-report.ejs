@@ -57,6 +57,11 @@
       <h4 style="color:var(--sf-primary);"><%= totalBooklets.toLocaleString() %> ج</h4>
     </div>
   </div>
+  <% if (typeof totalOther !== 'undefined' && totalOther > 0) { %>
+  <div class="col-12">
+    <div class="small text-muted text-center">🧾 <span class="ar-only">فلوس لأسباب تانية (مش في الرصيد):</span><span class="en-only" style="display:none;">Other payments (not in balance):</span> <strong><%= totalOther.toLocaleString() %> ج</strong> — <span class="ar-only">داخلة في الإجمالي الكلي</span><span class="en-only" style="display:none;">included in the grand total</span></div>
+  </div>
+  <% } %>
   <div class="col-md-4">
     <div class="card p-3 text-center shadow-sm" style="border-top:4px solid var(--sf-warning);">
       <div class="small text-muted"><span class="ar-only">الإجمالي الكلي</span><span class="en-only" style="display:none;">Grand Total</span></div>

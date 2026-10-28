@@ -54,7 +54,7 @@
             <div class="col-8"><input type="text" id="paymentReasonInput" maxlength="150" class="form-control form-control-sm" placeholder="سبب الدفع (اختياري)"></div>
           </div>
           <div id="extraPaymentLines"></div>
-          <button type="button" class="btn btn-link btn-sm px-0" onclick="addExtraPaymentLine('extraPaymentLines')">+ <span class="ar-only">مبلغ تاني بسبب تاني</span><span class="en-only" style="display:none;">Another amount</span></button>
+          <button type="button" class="btn btn-link btn-sm px-0" onclick="addExtraPaymentLine('extraPaymentLines')">+ <span class="ar-only">فلوس لسبب تاني (مش رصيد)</span><span class="en-only" style="display:none;">Other payment (not balance)</span></button>
         </div>
         <div class="mb-2 text-start">
           <label class="form-label small fw-bold">💬 <span class="ar-only">كومنت (اختياري)</span><span class="en-only" style="display:none;">Comment (optional)</span></label>
@@ -77,7 +77,7 @@
         <div class="col-8"><input type="text" id="addOnlyReason" maxlength="150" class="form-control form-control-sm" placeholder="سبب الدفع (اختياري)"></div>
       </div>
       <div id="addOnlyExtraLines"></div>
-      <button type="button" class="btn btn-link btn-sm px-0" onclick="addExtraPaymentLine('addOnlyExtraLines')">+ <span class="ar-only">مبلغ تاني بسبب تاني</span><span class="en-only" style="display:none;">Another amount</span></button>
+      <button type="button" class="btn btn-link btn-sm px-0" onclick="addExtraPaymentLine('addOnlyExtraLines')">+ <span class="ar-only">فلوس لسبب تاني (مش رصيد)</span><span class="en-only" style="display:none;">Other payment (not balance)</span></button>
       <div class="d-flex gap-2">
         <button type="button" class="btn btn-success btn-sm flex-grow-1" id="addOnlySaveBtn" onclick="submitAddPaymentOnly()">💵 <span class="ar-only">ضيف الفلوس</span><span class="en-only" style="display:none;">Add money</span></button>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="hideAddPaymentOnly()"><span class="ar-only">إلغاء</span><span class="en-only" style="display:none;">Cancel</span></button>

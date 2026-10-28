@@ -327,17 +327,10 @@ class StaffStore {
     }
   }
 
-  /// كل الفلوس اللي في العملية: المبلغ الأساسي + "مبلغ تاني بسبب تاني"
+  /// الفلوس اللي بتدخل الرصيد: المبلغ الأساسي بس — "مبلغ تاني بسبب تاني" بيتسجل من غير ما يدخل الرصيد (زي السيرفر)
   static num _paid(dynamic body) {
     if (body is! Map) return 0;
-    var total = _num(body['payment_collected']);
-    final extra = body['extra_payments'];
-    if (extra is List) {
-      for (final line in extra) {
-        if (line is Map) total += _num(line['amount']);
-      }
-    }
-    return total;
+    return _num(body['payment_collected']);
   }
 
   static String _hhmm(dynamic ms) {

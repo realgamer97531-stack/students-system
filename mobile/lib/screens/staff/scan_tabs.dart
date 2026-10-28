@@ -350,7 +350,7 @@ class PaymentLinesEditor extends StatelessWidget {
               onChanged();
             },
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('مبلغ تاني بسبب تاني'),
+            label: const Text('فلوس لسبب تاني (مش رصيد)'),
           ),
         ),
       ]);

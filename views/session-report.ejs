@@ -55,6 +55,16 @@
     <h6 class="mb-3">💵 <span class="ar-only">تقفيل نقدية الحصة</span><span class="en-only" style="display:none;">Session Cash Closing</span></h6>
     <p class="small text-muted mb-1"><span class="ar-only">إجمالي المبالغ النقدية المدفوعة فعليًا وقت تسجيل الحضور (بدون أي مبالغ مخصومة من رصيد سابق):</span><span class="en-only" style="display:none;">Total cash amounts actually paid at attendance time (excluding amounts deducted from a previous balance):</span></p>
     <h4 class="text-success"><%= totalCashCollected %> ج</h4>
+    <% const bookletTotal = typeof totalBookletCollected !== 'undefined' ? totalBookletCollected : 0; %>
+    <% const otherTotal = typeof totalOtherCollected !== 'undefined' ? totalOtherCollected : 0; %>
+    <% if (bookletTotal > 0 || otherTotal > 0) { %>
+      <div class="d-flex flex-wrap gap-3 small mt-2">
+        <span>📚 <span class="ar-only">بوكليتات اتدفعت في الحصة:</span><span class="en-only" style="display:none;">Booklets paid in this session:</span> <strong><%= bookletTotal %> ج</strong></span>
+        <span>🧾 <span class="ar-only">فلوس لأسباب تانية:</span><span class="en-only" style="display:none;">Other payments:</span> <strong><%= otherTotal %> ج</strong></span>
+        <span>💰 <span class="ar-only">إجمالي الكاش في الحصة:</span><span class="en-only" style="display:none;">Total cash in this session:</span> <strong><%= totalCashCollected + bookletTotal + otherTotal %> ج</strong></span>
+      </div>
+      <div class="small text-muted mt-1"><span class="ar-only">البوكليت والأسباب التانية مش بيدخلوا رصيد الطالب.</span><span class="en-only" style="display:none;">Booklet and other payments do not go into the student's balance.</span></div>
+    <% } %>
   </div>
 </div>
 <a href="/sessions/<%= session.id %>/financial-report" class="btn btn-sm btn-outline-success">💰 <span class="ar-only">التقرير المالي</span><span class="en-only" style="display:none;">Financial Report</span></a>
@@ -236,12 +246,18 @@
               <td style="min-width: 150px;">
                 <% if (row.payment > 0) { %>
                   <span class="text-success fw-bold"><%= row.payment %> ج</span>
-                <% } else { %>
+                <% } else if (!row.bookletPaid && !row.otherPaid) { %>
                   <span class="text-muted small">-</span>
+                <% } %>
+                <% if (row.bookletPaid > 0) { %>
+                  <div><span class="badge bg-primary-subtle text-primary-emphasis border">📚 <span class="ar-only">بوكليت</span><span class="en-only" style="display:none;">Booklet</span> <%= row.bookletPaid %> ج</span></div>
+                <% } %>
+                <% if (row.otherPaid > 0) { %>
+                  <div><span class="badge bg-secondary-subtle text-secondary-emphasis border">🧾 <span class="ar-only">أسباب تانية</span><span class="en-only" style="display:none;">Other</span> <%= row.otherPaid %> ج</span></div>
                 <% } %>
                 <% (row.paymentLines || []).forEach(line => { %>
                   <div class="small text-muted" style="font-size: 0.7rem; line-height: 1.3;" title="<%= line.userName || '' %> — <%= new Date(line.time).toLocaleString('ar-EG') %>">
-                    +<%= line.amount %> ج<%= line.reason ? ': ' + line.reason : '' %>
+                    +<%= line.amount %> ج<%= line.reason ? ': ' + line.reason : '' %><%= line.kind === 'other' ? ' (مش في الرصيد)' : '' %>
                   </div>
                 <% }) %>
                 <% if (row.location !== 'أونلاين') { %>
@@ -621,7 +637,7 @@
       <div class="modal-body">
         <p class="small text-muted"><span class="ar-only">المبلغ بيتضاف لرصيد الطالب وعلى "دفع وقت الحضور" بتاع الحصة دي، وكل مبلغ بسببه في سجل الطالب.</span><span class="en-only" style="display:none;">Added to the student's balance and to this session's paid amount.</span></p>
         <div id="addPaymentLines"></div>
-        <button type="button" class="btn btn-link btn-sm px-0" id="addPaymentMore">+ <span class="ar-only">مبلغ تاني بسبب تاني</span><span class="en-only" style="display:none;">Another amount</span></button>
+        <button type="button" class="btn btn-link btn-sm px-0" id="addPaymentMore">+ <span class="ar-only">فلوس لسبب تاني (مش رصيد)</span><span class="en-only" style="display:none;">Other payment (not balance)</span></button>
         <div id="addPaymentError" class="text-danger small"></div>
       </div>
       <div class="modal-footer">

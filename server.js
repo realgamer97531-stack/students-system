@@ -994,14 +994,17 @@ function attendanceWhere(attendance, fallbackCenterName = null) {
   return attendance.Session?.Center?.name || fallbackCenterName || null;
 }
 
-async function registrationAttendanceSession(activeSessionId, student) {
+// الحصة المختارة بتفضل على الحساب أيام (جلسة 30 يوم)، فعشان مانسجلش/نخصم في حصة قديمة الحصة لازم تكون
+// "حصة النهارده": تاريخها النهارده، أو اتعملت النهارده، أو اتختارت كحصة شغالة النهارده (activatedAt)
+async function registrationAttendanceSession(activeSessionId, student, activatedAt = null) {
   if (!activeSessionId) return { note: '⚠️ لا توجد حصة شغالة الآن لتسجيل حضور الطالب.' };
   const session = await Session.findByPk(activeSessionId);
   if (!session || session.status === 'cancelled') return { note: '⚠️ الحصة الحالية غير متاحة للتسجيل.' };
   const ctx = require('./utils/sync/context').current();
   const now = new Date(Date.now() + ((ctx && ctx.shiftMs) || 0));
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  if (String(session.session_date || '').slice(0, 10) !== today) {
+  const today = localDateString(now);
+  const isToday = (value) => Boolean(value) && localDateString(value) === today;
+  if (String(session.session_date || '').slice(0, 10) !== today && !isToday(session.createdAt) && !isToday(activatedAt)) {
     return { note: '⚠️ مفيش حصة شغالة النهارده — الطالب اتسجل من غير حضور ومن غير خصم.' };
   }
   if (Number(session.SubjectId) !== Number(student.SubjectId)) {
@@ -1035,9 +1038,26 @@ async function recordAttendanceCharge(student, userId, reason = 'رسوم الح
 const {
   ATTENDANCE_PAYMENT_REASON,
   MANUAL_PAYMENT_REASON,
+  OTHER_PAYMENT_REASON,
   attendancePaymentLines,
+  otherPaymentLines,
+  otherPaymentReason,
   studentPaymentsFromTransactions,
 } = require('./utils/studentPayments');
+
+// "مبلغ تاني بسبب تاني": بيتسجل بسببه (ومربوط بالحصة لو فيه) من غير ما يغيّر رصيد الطالب
+async function recordOtherPayments(studentId, sessionId, lines, userId) {
+  const total = lines.reduce((sum, line) => sum + line.amount, 0);
+  if (total <= 0) return 0;
+  await BalanceTransaction.bulkCreate(lines.map(line => ({
+    StudentId: studentId,
+    SessionId: sessionId || null,
+    amount: line.amount,
+    reason: otherPaymentReason(line.reason),
+    UserId: userId,
+  })));
+  return total;
+}
 
 async function recordAttendancePayments(student, sessionId, lines, userId) {
   const total = lines.reduce((sum, line) => sum + line.amount, 0);
@@ -2839,26 +2859,35 @@ app.post('/students/:id/payment', async (req, res) => {
     const student = await Student.findByPk(req.params.id);
     if (!student) return reply(404, '❌ الطالب غير موجود');
     const lines = attendancePaymentLines(req.body);
-    if (!lines.length) return reply(400, '❌ اكتب مبلغ أكبر من صفر');
+    const others = otherPaymentLines(req.body);
+    if (!lines.length && !others.length) return reply(400, '❌ اكتب مبلغ أكبر من صفر');
     const total = lines.reduce((sum, line) => sum + line.amount, 0);
+    const otherTotal = others.reduce((sum, line) => sum + line.amount, 0);
+    const otherNote = otherTotal > 0 ? ` + ${otherTotal} ج لأسباب تانية (مش في الرصيد)` : '';
 
     const attendanceId = Number.parseInt(req.body.attendance_id, 10);
     if (attendanceId) {
       const attendance = await Attendance.findOne({ where: { id: attendanceId, StudentId: student.id }, include: [Session] });
       if (!attendance) return reply(400, '❌ الحصة المختارة مش من حضور الطالب ده');
       await recordAttendancePayments(student, attendance.SessionId, lines, req.session.userId);
-      await Attendance.increment({ payment_collected: total }, { where: { id: attendance.id } });
-      return reply(200, `💵 اتسجل ${total} ج على حصة ${attendance.Session ? attendance.Session.lesson_number : ''} — الرصيد دلوقتي ${student.balance} ج`);
+      if (total > 0) await Attendance.increment({ payment_collected: total }, { where: { id: attendance.id } });
+      await recordOtherPayments(student.id, attendance.SessionId, others, req.session.userId);
+      await student.reload({ attributes: ['balance'] });
+      return reply(200, `💵 اتسجل ${total} ج على حصة ${attendance.Session ? attendance.Session.lesson_number : ''}${otherNote} — الرصيد دلوقتي ${student.balance} ج`);
     }
 
-    await adjustStudentBalance(student, total);
-    await BalanceTransaction.bulkCreate(lines.map(line => ({
-      StudentId: student.id,
-      amount: line.amount,
-      reason: line.reason ? `${MANUAL_PAYMENT_REASON} — ${line.reason}` : MANUAL_PAYMENT_REASON,
-      UserId: req.session.userId,
-    })));
-    return reply(200, `💵 اتسجل ${total} ج — الرصيد دلوقتي ${student.balance} ج`);
+    if (total > 0) {
+      await adjustStudentBalance(student, total);
+      await BalanceTransaction.bulkCreate(lines.map(line => ({
+        StudentId: student.id,
+        amount: line.amount,
+        reason: line.reason ? `${MANUAL_PAYMENT_REASON} — ${line.reason}` : MANUAL_PAYMENT_REASON,
+        UserId: req.session.userId,
+      })));
+    }
+    await recordOtherPayments(student.id, null, others, req.session.userId);
+    await student.reload({ attributes: ['balance'] });
+    return reply(200, `💵 اتسجل ${total} ج${otherNote} — الرصيد دلوقتي ${student.balance} ج`);
   } catch (error) {
     console.error('Student payment failed:', error);
     return reply(500, '❌ حصلت مشكلة: ' + error.message);
@@ -3029,7 +3058,7 @@ app.post('/students', async (req, res) => {
     }
 
     if (register_attendance === 'on') {
-      const { session: activeSession, note } = await registrationAttendanceSession(req.session.activeSessionId, student);
+      const { session: activeSession, note } = await registrationAttendanceSession(req.session.activeSessionId, student, req.session.activeSessionAt);
       const sessionId = activeSession && activeSession.id;
       if (!activeSession) {
         attendanceNote = note;
@@ -3186,7 +3215,7 @@ async function createSessionsForCenters(req, res, centerIds) {
     created.push({ session, center });
   }
 
-  if (created.length) req.session.activeSessionId = created[0].session.id;
+  if (created.length) { req.session.activeSessionId = created[0].session.id; req.session.activeSessionAt = Date.now(); }
   const message = [
     created.length ? `✅ اتعملت حصة ${lessonNumber} في ${created.length} سنتر: ${created.map(row => `${row.center.name} (سيريال ${row.session.serial_number})`).join('، ')}` : '❌ متعملتش ولا حصة',
     skipped.length ? `⚠️ اتسابت: ${skipped.join('، ')}` : '',
@@ -3271,6 +3300,7 @@ app.post('/sessions', async (req, res) => {
 
     // تخزين رقم الحصة الشغالة في جلسة الأسيستانت
     req.session.activeSessionId = newSession.id;
+    req.session.activeSessionAt = Date.now();
 
     if (req.body.response_format === 'json') {
       return res.json({
@@ -3392,12 +3422,14 @@ app.get('/sessions', requirePermission('sessions_view'), async (req, res) => {
 // تفعيل حصة موجودة كـ "الشغالة دلوقتي"
 app.post('/sessions/:id/activate', (req, res) => {
   req.session.activeSessionId = req.params.id;
+  req.session.activeSessionAt = Date.now();
   res.redirect('/sessions');
 });
 
 // تبديل سريع للحصة الشغالة (خاص بجهاز المستخدم بس) من أي صفحة
 app.post('/sessions/switch', (req, res) => {
   req.session.activeSessionId = req.body.session_id;
+  req.session.activeSessionAt = Date.now();
   res.redirect(req.body.redirect_to || '/sessions');
 });
 
@@ -3521,20 +3553,29 @@ app.get('/sessions/:id/report', async (req, res) => {
         [Op.or]: [
           { reason: { [Op.like]: `${ATTENDANCE_PAYMENT_REASON}%` } },
           { reason: { [Op.like]: 'دفع بوكليت:%' } },
+          { reason: { [Op.like]: `${OTHER_PAYMENT_REASON}%` } },
         ],
       },
       include: [{ model: User, attributes: ['id', 'name'] }],
       order: [['createdAt', 'ASC']],
     });
+    // كل سطر: فلوس الحصة (في الرصيد) / بوكليت / سبب تاني (الاتنين الأخيرين مش في الرصيد)
     const moneyByStudent = {};
+    const stripPrefix = (reason, prefix) => String(reason || '').slice(prefix.length).replace(/^\s*—\s*/, '') || null;
     sessionMoneyRows.forEach(t => {
-      const entry = moneyByStudent[t.StudentId] || (moneyByStudent[t.StudentId] = { lines: [], booklet: 0 });
-      const isBooklet = String(t.reason || '').startsWith('دفع بوكليت:');
-      if (isBooklet) entry.booklet += Number(t.amount) || 0;
+      const entry = moneyByStudent[t.StudentId] || (moneyByStudent[t.StudentId] = { lines: [], booklet: 0, other: 0 });
+      const text = String(t.reason || '');
+      const kind = text.startsWith('دفع بوكليت:') ? 'booklet' : text.startsWith(OTHER_PAYMENT_REASON) ? 'other' : 'session';
+      const amount = Number(t.amount) || 0;
+      if (kind === 'booklet') entry.booklet += amount;
+      if (kind === 'other') entry.other += amount;
       entry.lines.push({
-        amount: Number(t.amount) || 0,
-        reason: isBooklet ? t.reason : (String(t.reason).slice(ATTENDANCE_PAYMENT_REASON.length).replace(/^s*—s*/, '') || null),
-        isBooklet,
+        amount,
+        kind,
+        reason: kind === 'booklet' ? text.replace(/^دفع بوكليت:\s*/, '📚 ')
+          : kind === 'other' ? stripPrefix(text, OTHER_PAYMENT_REASON)
+            : stripPrefix(text, ATTENDANCE_PAYMENT_REASON),
+        isBooklet: kind === 'booklet',
         userName: t.User ? t.User.name : null,
         time: t.createdAt,
       });
@@ -3543,8 +3584,13 @@ app.get('/sessions/:id/report', async (req, res) => {
       const money = moneyByStudent[row.student.id];
       row.paymentLines = money ? money.lines : [];
       row.bookletPaid = money ? money.booklet : 0;
+      row.otherPaid = money ? money.other : 0;
     });
-    onlineAttendedRows.forEach(row => { row.paymentLines = []; row.bookletPaid = 0; });
+    onlineAttendedRows.forEach(row => { row.paymentLines = []; row.bookletPaid = 0; row.otherPaid = 0; });
+    // بوكليت/أسباب تانية اتدفعت في الحصة (حتى لو الطالب مش في قايمة الحضور)
+    let totalBookletCollected = 0;
+    let totalOtherCollected = 0;
+    Object.values(moneyByStudent).forEach(m => { totalBookletCollected += m.booklet; totalOtherCollected += m.other; });
 
     // Combine both attended rows
     const allAttendedRows = [...attendedRows, ...onlineAttendedRows];
@@ -3640,6 +3686,8 @@ app.get('/sessions/:id/report', async (req, res) => {
       hasLinkedExam: !!linkedExam,
       closing: { normalCount, reducedCount, freeCount, totalRevenue, totalCost },
       totalCashCollected,
+      totalBookletCollected,
+      totalOtherCollected,
       assistantAttendances,
       allUsers,
       callCenterIntegrationEnabled: callCenterButtonsVisible(),
@@ -3835,6 +3883,13 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
     bookletTransactions.forEach(t => {
       bookletPaymentMap[t.StudentId] = (bookletPaymentMap[t.StudentId] || 0) + Number(t.amount || 0);
     });
+    const otherPaymentMap = {};
+    (await BalanceTransaction.findAll({
+      where: { SessionId: session.id, reason: { [Op.like]: `${OTHER_PAYMENT_REASON}%` } },
+      attributes: ['StudentId', 'amount'],
+    })).forEach(t => {
+      otherPaymentMap[t.StudentId] = (otherPaymentMap[t.StudentId] || 0) + Number(t.amount || 0);
+    });
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('الحاضرين');
@@ -3852,6 +3907,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
       { header: 'دفع وقت الحضور', key: 'payment', width: 15 },
       { header: 'دفع البوكليت', key: 'booklet_payment', width: 15 },
       { header: 'إجمالي دفع البوكليت والحصة', key: 'total_payment', width: 25 },
+      { header: 'فلوس لأسباب تانية (مش في الرصيد)', key: 'other_payment', width: 25 },
       { header: 'سجّل الحضور', key: 'user', width: 18 },
     ];
 
@@ -3874,6 +3930,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
         payment: a.payment_collected || 0,
         booklet_payment: bookletPaymentMap[a.StudentId] || 0,
         total_payment: Number(a.payment_collected || 0) + (bookletPaymentMap[a.StudentId] || 0),
+        other_payment: otherPaymentMap[a.StudentId] || 0,
         user: a.User ? a.User.name : '-',
       });
     });
@@ -3893,6 +3950,7 @@ app.get('/sessions/:id/report/export-attendance', async (req, res) => {
         payment: 0,
         booklet_payment: bookletPaymentMap[a.StudentId] || 0,
         total_payment: (bookletPaymentMap[a.StudentId] || 0),
+        other_payment: otherPaymentMap[a.StudentId] || 0,
         user: a.User ? a.User.name : '-',
       });
     });
@@ -4271,7 +4329,7 @@ app.post('/students/quick-add', requirePermission('attendance_scan'), async (req
 
     let attendanceNote = null;
     if (register_attendance === 'on') {
-      const { session: activeSession, note } = await registrationAttendanceSession(req.session.activeSessionId, student);
+      const { session: activeSession, note } = await registrationAttendanceSession(req.session.activeSessionId, student, req.session.activeSessionAt);
       const sessionId = activeSession && activeSession.id;
       if (!activeSession) {
         attendanceNote = note;
@@ -4624,6 +4682,7 @@ app.post('/attendance/scan', async (req, res) => {
 
     const paymentLines = attendancePaymentLines(req.body);
     const paymentAmount = paymentLines.reduce((sum, line) => sum + line.amount, 0);
+    const otherLines = otherPaymentLines(req.body);
 
     // Claim the attendance slot atomically (single findOrCreate call) instead of a
     // separate findOne-then-create, so two near-simultaneous submits (double-tap,
@@ -4681,6 +4740,7 @@ app.post('/attendance/scan', async (req, res) => {
     if (paidInSession > paymentAmount) await Attendance.update({ payment_collected: paidInSession }, { where: { id: attendanceRecord.id } });
 
     await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
+    await recordOtherPayments(student.id, sessionId, otherLines, req.session.userId);
     if (booklet_delivered) {
       await markDefaultBookletDelivered(student);
     }
@@ -4713,7 +4773,8 @@ app.post('/attendance/scan/add-payment', async (req, res) => {
     const student = await findStudentByCode(req.body.student_code);
     if (!student) return res.json({ success: false, message: 'كود الطالب غير صحيح' });
     const lines = attendancePaymentLines(req.body);
-    if (!lines.length) return res.json({ success: false, message: 'اكتب مبلغ أكبر من صفر' });
+    const others = otherPaymentLines(req.body);
+    if (!lines.length && !others.length) return res.json({ success: false, message: 'اكتب مبلغ أكبر من صفر' });
 
     const attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
     if (!attendance) {
@@ -4721,11 +4782,12 @@ app.post('/attendance/scan/add-payment', async (req, res) => {
     }
 
     const added = await recordAttendancePayments(student, sessionId, lines, req.session.userId);
-    await Attendance.increment({ payment_collected: added }, { where: { id: attendance.id } });
+    if (added > 0) await Attendance.increment({ payment_collected: added }, { where: { id: attendance.id } });
+    const otherAdded = await recordOtherPayments(student.id, sessionId, others, req.session.userId);
     await attendance.reload();
     res.json({
       success: true,
-      message: `💵 اتضاف ${added} ج لـ ${student.name} (إجمالي اللي دفعه في الحصة دي: ${attendance.payment_collected} ج)`,
+      message: `💵 اتضاف ${added} ج لـ ${student.name}${otherAdded > 0 ? ` + ${otherAdded} ج لأسباب تانية (مش في الرصيد)` : ''} (إجمالي اللي دفعه في الحصة دي: ${attendance.payment_collected} ج)`,
       student_name: student.name,
       remaining_balance: student.balance,
       paidInSession: Number(attendance.payment_collected) || 0,
@@ -9179,14 +9241,16 @@ app.post('/attendance/:id/add-payment', requireAdmin, async (req, res) => {
     const attendance = await Attendance.findByPk(req.params.id);
     if (!attendance) return reply(404, '❌ سجل الحضور غير موجود');
     const lines = attendancePaymentLines(req.body);
-    if (!lines.length) return reply(400, '❌ اكتب مبلغ أكبر من صفر');
+    const others = otherPaymentLines(req.body);
+    if (!lines.length && !others.length) return reply(400, '❌ اكتب مبلغ أكبر من صفر');
     const student = await Student.findByPk(attendance.StudentId);
     if (!student) return reply(404, '❌ الطالب غير موجود');
 
     const added = await recordAttendancePayments(student, attendance.SessionId, lines, req.session.userId);
-    await Attendance.increment({ payment_collected: added }, { where: { id: attendance.id } });
+    if (added > 0) await Attendance.increment({ payment_collected: added }, { where: { id: attendance.id } });
+    const otherAdded = await recordOtherPayments(student.id, attendance.SessionId, others, req.session.userId);
     await attendance.reload();
-    return reply(200, `💵 اتضاف ${added} ج لـ ${student.name}`, {
+    return reply(200, `💵 اتضاف ${added} ج لـ ${student.name}${otherAdded > 0 ? ` + ${otherAdded} ج لأسباب تانية` : ''}`, {
       studentId: student.id,
       added,
       payment: Number(attendance.payment_collected) || 0,
@@ -10445,6 +10509,7 @@ app.post('/schedule/:id/start-session', requirePermission('sessions_create'), as
     });
 
     req.session.activeSessionId = newSession.id;
+    req.session.activeSessionAt = Date.now();
     res.redirect('/sessions');
   } catch (e) {
     console.error(e);
@@ -10758,9 +10823,15 @@ app.post('/students/:studentId/booklet-payment', requirePermissionOrAdmin('stude
       await student.save();
     }
 
+    // لو الطالب حاضر الحصة الشغالة دلوقتي، الدفع بيتربط بيها ويظهر في تقرير الحصة
+    const activeSessionId = Number(req.session.activeSessionId) || null;
+    const inActiveSession = activeSessionId
+      ? await Attendance.findOne({ where: { StudentId: student.id, SessionId: activeSessionId }, attributes: ['id'] })
+      : null;
     await BalanceTransaction.create({
       StudentId: student.id,
       amount: parseFloat(paid_amount),
+      SessionId: inActiveSession ? activeSessionId : null,
       reason: `دفع بوكليت: ${booklet.name}`,
       UserId: req.session.userId,
     });
@@ -11052,10 +11123,17 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
       include: [Student, User],
     });
 
+    // فلوس لأسباب تانية اتدفعت في الحصة (مش في الرصيد)
+    const otherTransactions = await BalanceTransaction.findAll({
+      where: { SessionId: session.id, reason: { [Op.like]: `${OTHER_PAYMENT_REASON}%` } },
+      attributes: ['amount'],
+    });
+
     const allUsers = await User.findAll({ order: [['name', 'ASC']] });
 
     const totalSession = rows.reduce((s, r) => s + r.sessionPayment, 0);
     const totalBooklets = bookletTransactions.reduce((s, t) => s + t.amount, 0);
+    const totalOther = otherTransactions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const assistantMap = new Map();
 
     const ensureAssistantBucket = (user) => {
@@ -11086,7 +11164,7 @@ app.get('/sessions/:id/financial-report', requireAdmin, async (req, res) => {
 
     res.render('session-financial-report', {
       session, rows, bookletTransactions, allUsers,
-      totalSession, totalBooklets, totalAll: totalSession + totalBooklets,
+      totalSession, totalBooklets, totalOther, totalAll: totalSession + totalBooklets + totalOther,
       assistantBreakdown,
       filters: { filter_user, filter_type: filter_type || 'all' },
     });
