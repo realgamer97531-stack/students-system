@@ -1,12 +1,14 @@
 // نقل درجات الواجب و/أو الامتحانات من حصة لحصة تانية (من الإعدادات)
 //   الواجب: صفوف HomeworkCheck (طالب + حصة) بتتنقل للحصة الجديدة. لو الطالب عنده واجب متسجل بالفعل في الحصة
-//           الجديدة، بنسيب الاتنين زي ما هما (مبنمسحش درجة حد) وبنعرضهم في المعاينة.
+//           الجديدة، الواجب المنقول بيحل محله (الواجب القديم في الجديدة بيتمسح ونقاطه بتترجع) — بنعرضهم في المعاينة.
 //   الامتحان: كل امتحان مربوط بالحصة القديمة بيتربط بالجديدة، ودرجات الطلاب بتمشي معاه.
-// النقاط مش بتتغير: نقاط الواجب اتحسبت وقت التسجيل ومش مربوطة برقم الحصة.
+// نقاط الواجب المنقول مش بتتغير (اتحسبت وقت التسجيل ومش مربوطة برقم الحصة).
 const { Op } = require('sequelize');
 
 const KINDS = ['homework', 'exam', 'both'];
 const STATUS_LABELS = { complete: 'كامل', incomplete: 'مش كامل', no_steps: 'من غير خطوات', not_done: 'مش محلول' };
+// نفس نقاط تسجيل الواجب في /homework/scan/save
+const HOMEWORK_POINTS = { complete: 3, incomplete: 1, no_steps: 0, not_done: -2 };
 
 function describe(session) {
   return `حصة ${session.lesson_number} - ${session.Subject ? session.Subject.name : ''} - ${session.Center ? session.Center.name : ''} (سيريال ${session.serial_number}${session.session_date ? `، ${session.session_date}` : ''})`;
@@ -41,8 +43,10 @@ async function buildPreview(models, { fromId, toId, kind }, transaction) {
     ]);
     const targetBy = new Map(target.map(c => [c.StudentId, c]));
     const attendedSet = new Set(attended.map(a => a.StudentId));
-    const move = source.filter(c => !targetBy.has(c.StudentId));
     const conflicts = source.filter(c => targetBy.has(c.StudentId)).map(c => ({
+      studentId: c.StudentId,
+      replaceId: targetBy.get(c.StudentId).id,
+      replaceStatus: targetBy.get(c.StudentId).status,
       name: c.Student ? c.Student.name : `#${c.StudentId}`,
       code: c.Student ? c.Student.student_code : '',
       oldStatus: STATUS_LABELS[c.status] || c.status,
@@ -50,10 +54,10 @@ async function buildPreview(models, { fromId, toId, kind }, transaction) {
     }));
     out.homework = {
       total: source.length,
-      moveIds: move.map(c => c.id),
-      move: move.length,
+      moveIds: source.map(c => c.id),
+      move: source.length,
       conflicts,
-      notAttendedInTarget: move.filter(c => !attendedSet.has(c.StudentId)).length,
+      notAttendedInTarget: source.filter(c => !attendedSet.has(c.StudentId)).length,
       alreadyInTarget: target.length,
     };
   }
@@ -80,11 +84,28 @@ async function buildPreview(models, { fromId, toId, kind }, transaction) {
   return out;
 }
 
-async function executeMove(sequelize, models, params) {
+async function executeMove(sequelize, models, params, { userId = null } = {}) {
   return sequelize.transaction(async (transaction) => {
     const preview = await buildPreview(models, params, transaction);
     if (preview.error) return preview;
-    const moved = { homework: 0, exams: 0, results: 0, conflicts: 0 };
+    const moved = { homework: 0, exams: 0, results: 0, replaced: 0 };
+    if (preview.homework && preview.homework.conflicts.length) {
+      // الواجب اللي في الحصة الجديدة بيتشال والمنقول بيحل محله، ونقاط اللي اتشال بترجع (زي ما لو اتسجل مرة واحدة بس)
+      const conflicts = preview.homework.conflicts;
+      await models.HomeworkCheck.destroy({ where: { id: { [Op.in]: conflicts.map(c => c.replaceId) }, SessionId: preview.to.id }, transaction });
+      for (const c of conflicts) {
+        const back = -(HOMEWORK_POINTS[c.replaceStatus] || 0);
+        if (!back) continue;
+        const student = await models.Student.findByPk(c.studentId, { attributes: ['id', 'points'], transaction, lock: transaction.LOCK.UPDATE });
+        if (!student) continue;
+        await models.Student.update({ points: (Number(student.points) || 0) + back }, { where: { id: student.id }, transaction });
+        await models.BalanceTransaction.create({
+          StudentId: student.id, amount: back, UserId: userId,
+          reason: `نقاط: واجب مكرر اتشال (${STATUS_LABELS[c.replaceStatus] || c.replaceStatus}) — اتنقل مكانه واجب ${preview.from.label}`,
+        }, { transaction });
+      }
+      moved.replaced = conflicts.length;
+    }
     if (preview.homework && preview.homework.moveIds.length) {
       const [n] = await models.HomeworkCheck.update(
         { SessionId: preview.to.id },
@@ -92,7 +113,6 @@ async function executeMove(sequelize, models, params) {
       );
       moved.homework = n;
     }
-    if (preview.homework) moved.conflicts = preview.homework.conflicts.length;
     if (preview.exam && preview.exam.exams.length) {
       const [n] = await models.Exam.update(
         { SessionId: preview.to.id },
@@ -101,7 +121,7 @@ async function executeMove(sequelize, models, params) {
       moved.exams = n;
       moved.results = preview.exam.results;
     }
-    if (!moved.homework && !moved.exams) return { error: 'مفيش حاجة تتنقل من الحصة دي' + (moved.conflicts ? ` (${moved.conflicts} طالب عندهم واجب في الحصة الجديدة بالفعل)` : '') };
+    if (!moved.homework && !moved.exams) return { error: 'مفيش حاجة تتنقل من الحصة دي' };
     return { preview, moved };
   });
 }

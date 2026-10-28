@@ -316,7 +316,7 @@
           <p class="text-muted small mb-3">
             لو درجات الواجب أو الامتحان اتسجلت على حصة غلط: اختار الحصة القديمة والحصة الصح، اعمل معاينة، وبعدين انقل.
             الحصتين لازم يكونوا من نفس المادة. النقاط مش بتتغير، وبتتعمل نسخة احتياطية قبل النقل.
-            لو طالب عنده واجب متسجل بالفعل في الحصة الجديدة، درجته مبتتمسحش وواجبه القديم بيفضل مكانه.
+            لو طالب عنده واجب متسجل بالفعل في الحصة الجديدة، الواجب المنقول بيحل محله ونقاط الواجب اللي اتشال بترجع.
           </p>
           <form action="/settings/move-grades" method="POST" class="row g-2 align-items-end" id="moveGradesForm">
             <div class="col-md-3">
@@ -409,8 +409,8 @@
                 html += '<hr class="my-2">📘 الواجب: <b>' + h.move + '</b> طالب هيتنقلوا (من ' + h.total + ' في الحصة القديمة)';
                 if (h.notAttendedInTarget) html += '<br><span class="text-warning">⚠️ ' + h.notAttendedInTarget + ' منهم مش متسجلين حضور في الحصة الجديدة.</span>';
                 if (h.conflicts.length) {
-                  html += '<br><span class="text-danger">⚠️ ' + h.conflicts.length + ' طالب عندهم واجب في الحصة الجديدة بالفعل — هيفضلوا زي ما هما:</span><ul class="mb-0">' +
-                    h.conflicts.slice(0, 30).map(c => '<li>' + esc(c.name) + (c.code ? ' (' + esc(c.code) + ')' : '') + ': القديم ' + esc(c.oldStatus) + ' / الجديد ' + esc(c.newStatus) + '</li>').join('') +
+                  html += '<br><span class="text-danger">⚠️ ' + h.conflicts.length + ' طالب عندهم واجب في الحصة الجديدة بالفعل — الواجب المنقول هيحل محله:</span><ul class="mb-0">' +
+                    h.conflicts.slice(0, 30).map(c => '<li>' + esc(c.name) + (c.code ? ' (' + esc(c.code) + ')' : '') + ': اللي في الجديدة ' + esc(c.newStatus) + ' ← هيبقى ' + esc(c.oldStatus) + '</li>').join('') +
                     (h.conflicts.length > 30 ? '<li>و ' + (h.conflicts.length - 30) + ' كمان</li>' : '') + '</ul>';
                 }
               }
