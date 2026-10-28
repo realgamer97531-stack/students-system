@@ -4264,7 +4264,16 @@ app.post('/sessions/:id/delete', requireAdmin, async (req, res) => {
     const examCount = await Exam.count({ where: { SessionId: sessionId } });
 
     if (attendanceCount > 0 || homeworkCount > 0 || examCount > 0) {
-      return res.status(400).send('❌ مينفعش تحذف الحصة دي لأن فيها بيانات حضور/واجب/امتحان مسجلة. استخدم "إلغاء" بدلاً من الحذف.');
+      // نقول بالظبط إيه اللي لسه في الحصة (حضور المنصة 📹 بيتسجل لوحده من مشاهدة الفيديو)
+      const attendanceRows = attendanceCount
+        ? await Attendance.findAll({ where: { SessionId: sessionId }, attributes: ['UserId', 'comment'], raw: true })
+        : [];
+      const platformCount = attendanceRows.filter(isPlatformAttendance).length;
+      const parts = [];
+      if (attendanceCount) parts.push(`${attendanceCount} حضور${platformCount ? ` (منهم ${platformCount} حضور ${PLATFORM_ATTENDANCE_LABEL})` : ''}`);
+      if (homeworkCount) parts.push(`${homeworkCount} واجب`);
+      if (examCount) parts.push(`${examCount} امتحان`);
+      return res.status(400).send(`❌ مينفعش تحذف الحصة دي لأن لسه فيها: ${parts.join('، ')}. لو الواجب أو الامتحان اتسجل عليها غلط انقله من الإعدادات (📝 نقل درجات الواجب أو الامتحان)، وإلا استخدم "إلغاء" بدلاً من الحذف.`);
     }
 
     await Session.destroy({ where: { id: sessionId } });
