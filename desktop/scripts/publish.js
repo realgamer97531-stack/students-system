@@ -57,8 +57,14 @@ async function uploadWithRetry(release, url, name, file, attempts = 4) {
     } catch (error) {
       if (i === attempts) throw new Error(`upload of ${name} failed after ${attempts} tries`);
       console.log(`upload try ${i} failed — retrying...`);
-      const assets = (await gh('GET', `/repos/${owner}/${repo}/releases/${release.id}/assets`)) || [];
-      for (const asset of assets.filter((a) => a.name === name)) await gh('DELETE', `/repos/${owner}/${repo}/releases/assets/${asset.id}`);
+      // النت بطيء/بيقطع: نستنى شوية، والتنضيف نفسه لو فشل منوقفش عليه (المحاولة الجاية بتنضف تاني)
+      await new Promise((resolve) => setTimeout(resolve, 15000 * i));
+      try {
+        const assets = (await gh('GET', `/repos/${owner}/${repo}/releases/${release.id}/assets`)) || [];
+        for (const asset of assets.filter((a) => a.name === name)) await gh('DELETE', `/repos/${owner}/${repo}/releases/assets/${asset.id}`);
+      } catch (cleanupError) {
+        console.log(`cleanup before retry failed (${cleanupError.message}) — trying the upload anyway`);
+      }
     }
   }
 }
