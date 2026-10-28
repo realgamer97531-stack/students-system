@@ -72,6 +72,7 @@ const {
 const normalizeStudentPhones = require('./utils/normalizeStudentPhones');
 const entityColors = require('./utils/entityColors');
 const centerMove = require('./utils/centerMove');
+const gradeMove = require('./utils/gradeMove');
 const registerPopupQuestionRoutes = require('./routes/popupQuestions');
 const registerPlatformQuizRoutes = require('./routes/platformQuiz');
 const { studentQuizContext, quizLockForSession } = registerPlatformQuizRoutes;
@@ -1662,6 +1663,54 @@ app.post('/settings/session-lesson-number', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error(error);
     back('lesson_error', '❌ ' + error.message);
+  }
+});
+
+// ===== نقل درجات الواجب/الامتحان من حصة لحصة (utils/gradeMove.js) =====
+// معاينة (من غير تعديل) → تأكيد → نسخة احتياطية → النقل في transaction واحدة
+function gradeMoveModels() {
+  return { sequelize, Session, Center, Subject, Student, Attendance, HomeworkCheck, Exam, ExamResult };
+}
+function gradeMoveParams(source) {
+  return { fromId: Number(source.from) || 0, toId: Number(source.to) || 0, kind: String(source.kind || '') };
+}
+
+app.get('/settings/move-grades/preview', requireAdmin, async (req, res) => {
+  try {
+    const preview = await gradeMove.buildPreview(gradeMoveModels(), gradeMoveParams(req.query));
+    if (preview.error) return res.json({ success: false, message: '❌ ' + preview.error });
+    if (preview.homework) delete preview.homework.moveIds;
+    res.json({ success: true, preview });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: '❌ ' + error.message });
+  }
+});
+
+app.post('/settings/move-grades', requireAdmin, async (req, res) => {
+  const back = (key, message) => res.redirect(`/settings?${key}=${encodeURIComponent(message)}#move-grades-tool`);
+  try {
+    const params = gradeMoveParams(req.body);
+    const check = await gradeMove.buildPreview(gradeMoveModels(), params);
+    if (check.error) return back('lesson_error', '❌ ' + check.error);
+    try {
+      await backupBeforeDestructiveAction('before-grade-move');
+    } catch (backupError) {
+      return back('lesson_error', '❌ متنقلش حاجة: فشلت النسخة الاحتياطية قبل النقل (' + backupError.message + ')');
+    }
+    const result = await gradeMove.executeMove(sequelize, gradeMoveModels(), params);
+    if (result.error) return back('lesson_error', '❌ ' + result.error);
+    const { preview, moved } = result;
+    const parts = [];
+    if (preview.homework) parts.push(`${moved.homework} واجب`);
+    if (preview.exam) parts.push(`${moved.exams} امتحان (${moved.results} درجة)`);
+    const skipped = moved.conflicts ? ` — ${moved.conflicts} طالب اتسابوا في الحصة القديمة لأن عندهم واجب في الجديدة بالفعل` : '';
+    const message = `✅ اتنقل ${parts.join(' و ')} من ${preview.from.label} إلى ${preview.to.label}${skipped}`;
+    console.log(`📝 ${req.session.userName || 'admin'}: ${message}`);
+    back('lesson_changed', message);
+  } catch (error) {
+    console.error('Grade move failed:', error);
+    back('lesson_error', '❌ متنقلش حاجة (اتلغى كله): ' + error.message);
   }
 });
 

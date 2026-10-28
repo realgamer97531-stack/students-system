@@ -310,6 +310,146 @@
           fill();
         })();
       </script>
+      <div class="card mb-4 shadow-sm" id="move-grades-tool">
+        <div class="card-body">
+          <h5 class="mb-2">📝 نقل درجات الواجب أو الامتحان لحصة تانية</h5>
+          <p class="text-muted small mb-3">
+            لو درجات الواجب أو الامتحان اتسجلت على حصة غلط: اختار الحصة القديمة والحصة الصح، اعمل معاينة، وبعدين انقل.
+            الحصتين لازم يكونوا من نفس المادة. النقاط مش بتتغير، وبتتعمل نسخة احتياطية قبل النقل.
+            لو طالب عنده واجب متسجل بالفعل في الحصة الجديدة، درجته مبتتمسحش وواجبه القديم بيفضل مكانه.
+          </p>
+          <form action="/settings/move-grades" method="POST" class="row g-2 align-items-end" id="moveGradesForm">
+            <div class="col-md-3">
+              <label class="form-label" for="mgCenter">السنتر</label>
+              <select id="mgCenter" class="form-select">
+                <option value="">كل السناتر</option>
+                <% lessonToolCenters.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="mgSubject">المادة</label>
+              <select id="mgSubject" class="form-select">
+                <option value="">كل المواد</option>
+                <% lessonToolSubjects.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label d-block">انقل إيه</label>
+              <div class="btn-group" role="group">
+                <input type="radio" class="btn-check" name="kind" id="mgKindHw" value="homework" checked>
+                <label class="btn btn-outline-primary" for="mgKindHw">الواجب</label>
+                <input type="radio" class="btn-check" name="kind" id="mgKindExam" value="exam">
+                <label class="btn btn-outline-primary" for="mgKindExam">الامتحان</label>
+                <input type="radio" class="btn-check" name="kind" id="mgKindBoth" value="both">
+                <label class="btn btn-outline-primary" for="mgKindBoth">الاتنين</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="mgFrom">من الحصة (القديمة)</label>
+              <select id="mgFrom" name="from" class="form-select" required></select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="mgTo">إلى الحصة (الصح)</label>
+              <select id="mgTo" name="to" class="form-select" required></select>
+            </div>
+            <div class="col-12">
+              <div id="mgPreview" class="small mb-2"></div>
+              <button type="button" class="btn btn-outline-secondary" id="mgPreviewBtn">👁️ معاينة</button>
+              <button type="submit" class="btn btn-primary" id="mgSubmit" disabled>📝 انقل الدرجات</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <script>
+        (function () {
+          const sessions = <%- JSON.stringify(lessonToolSessions).replace(/</g, '\\u003c') %>;
+          const center = document.getElementById('mgCenter');
+          const subject = document.getElementById('mgSubject');
+          const from = document.getElementById('mgFrom');
+          const to = document.getElementById('mgTo');
+          const out = document.getElementById('mgPreview');
+          const submit = document.getElementById('mgSubmit');
+          const form = document.getElementById('moveGradesForm');
+          let previewed = null;
+          function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+          function kind() { return (form.querySelector('input[name="kind"]:checked') || {}).value || 'homework'; }
+          function options(list, keep) {
+            return '<option value="">' + (list.length ? 'اختار الحصة' : 'مفيش حصص') + '</option>' + list.map(s =>
+              '<option value="' + s.id + '"' + (String(s.id) === keep ? ' selected' : '') + ' data-sf-session="1" data-sf-subject="' + esc(s.subject) + '" data-sf-center="' + esc(s.center) + '" data-sf-c1="' + esc(s.c1) + '" data-sf-c2="' + esc(s.c2) +
+              '" data-sf-lesson="' + esc(s.lesson) + '" data-sf-serial="' + esc(s.serial) + '" data-sf-date="' + esc(s.date || '') + '" data-sf-status="' + (s.cancelled ? 'cancelled' : '') + '">' +
+              esc('حصة ' + s.lesson + ' | ' + s.subject + ' | ' + s.center + ' | سيريال ' + s.serial + ' | ' + (s.date || '') + (s.cancelled ? ' | ملغاة' : '')) + '</option>').join('');
+          }
+          function fill() {
+            const list = sessions.filter(s => (!center.value || String(s.centerId) === center.value) && (!subject.value || String(s.subjectId) === subject.value));
+            from.innerHTML = options(list, from.value);
+            fillTo();
+          }
+          // الحصة الجديدة: نفس المادة بتاعة القديمة (أي سنتر)
+          function fillTo() {
+            const src = sessions.find(s => String(s.id) === from.value);
+            const list = sessions.filter(s => (src ? s.subjectId === src.subjectId && s.id !== src.id : (!subject.value || String(s.subjectId) === subject.value)));
+            to.innerHTML = options(list, to.value);
+            reset();
+          }
+          function reset() { previewed = null; submit.disabled = true; out.innerHTML = ''; }
+          async function preview() {
+            reset();
+            if (!from.value || !to.value) { out.innerHTML = '<span class="text-danger">اختار الحصتين الأول</span>'; return; }
+            out.innerHTML = '<span class="text-muted">بيحسب...</span>';
+            try {
+              const r = await fetch('/settings/move-grades/preview?from=' + from.value + '&to=' + to.value + '&kind=' + kind(), { headers: { accept: 'application/json' } });
+              const data = await r.json();
+              if (!data.success) { out.innerHTML = '<span class="text-danger fw-bold">' + esc(data.message) + '</span>'; return; }
+              const p = data.preview;
+              let html = '<div class="border rounded p-2 bg-light">من: <b>' + esc(p.from.label) + '</b><br>إلى: <b>' + esc(p.to.label) + '</b>';
+              let something = false;
+              if (p.homework) {
+                const h = p.homework;
+                something = something || h.move > 0;
+                html += '<hr class="my-2">📘 الواجب: <b>' + h.move + '</b> طالب هيتنقلوا (من ' + h.total + ' في الحصة القديمة)';
+                if (h.notAttendedInTarget) html += '<br><span class="text-warning">⚠️ ' + h.notAttendedInTarget + ' منهم مش متسجلين حضور في الحصة الجديدة.</span>';
+                if (h.conflicts.length) {
+                  html += '<br><span class="text-danger">⚠️ ' + h.conflicts.length + ' طالب عندهم واجب في الحصة الجديدة بالفعل — هيفضلوا زي ما هما:</span><ul class="mb-0">' +
+                    h.conflicts.slice(0, 30).map(c => '<li>' + esc(c.name) + (c.code ? ' (' + esc(c.code) + ')' : '') + ': القديم ' + esc(c.oldStatus) + ' / الجديد ' + esc(c.newStatus) + '</li>').join('') +
+                    (h.conflicts.length > 30 ? '<li>و ' + (h.conflicts.length - 30) + ' كمان</li>' : '') + '</ul>';
+                }
+              }
+              if (p.exam) {
+                const e = p.exam;
+                something = something || e.exams.length > 0;
+                html += '<hr class="my-2">📝 الامتحان: ' + (e.exams.length
+                  ? e.exams.map(x => '<b>' + esc(x.name) + '</b> (' + x.results + ' درجة من ' + esc(x.maxScore) + ')').join('، ')
+                  : 'مفيش امتحان مربوط بالحصة القديمة');
+                if (e.targetExams.length) html += '<br><span class="text-warning">⚠️ الحصة الجديدة مربوط بيها بالفعل: ' + esc(e.targetExams.join('، ')) + '</span>';
+              }
+              html += '</div>';
+              out.innerHTML = html;
+              if (something) { previewed = from.value + '>' + to.value + '>' + kind(); submit.disabled = false; }
+              else out.innerHTML += '<div class="text-danger fw-bold mt-1">مفيش حاجة تتنقل.</div>';
+            } catch (err) {
+              out.innerHTML = '<span class="text-danger">❌ ' + esc(err.message) + '</span>';
+            }
+          }
+          center.addEventListener('change', fill);
+          subject.addEventListener('change', fill);
+          from.addEventListener('change', fillTo);
+          to.addEventListener('change', reset);
+          form.querySelectorAll('input[name="kind"]').forEach(r => r.addEventListener('change', reset));
+          // القوايم Select2: بتبعت change بتاع jQuery مش العادي
+          document.addEventListener('DOMContentLoaded', function () {
+            if (!window.jQuery) return;
+            jQuery(from).on('select2:select select2:clear', fillTo);
+            jQuery(to).on('select2:select select2:clear', reset);
+          });
+          document.getElementById('mgPreviewBtn').addEventListener('click', preview);
+          form.addEventListener('submit', (e) => {
+            if (previewed !== from.value + '>' + to.value + '>' + kind()) { e.preventDefault(); preview(); return; }
+            if (!confirm('متأكد إنك عايز تنقل الدرجات للحصة الجديدة؟')) { e.preventDefault(); return; }
+            submit.disabled = true;
+          });
+          fill();
+        })();
+      </script>
       <div class="card mb-4 shadow-sm">
         <div class="card-body">
           <h5 class="mb-2">📚 البوكليتس</h5>
