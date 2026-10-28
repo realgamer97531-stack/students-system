@@ -611,6 +611,26 @@ async function ensureVideoPartUrlLength() {
   }
 }
 
+async function ensureVideoVisibleColumn() {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable('videos');
+    if (!tableInfo.is_visible) {
+      await queryInterface.addColumn('videos', 'is_visible', {
+        type: sequelize.Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      });
+      console.log('✅ Added is_visible column to videos table');
+    }
+  } catch (error) {
+    if (error.message && error.message.includes('does not exist')) {
+      return;
+    }
+    console.error('Failed to ensure videos.is_visible column:', error.message);
+  }
+}
+
 async function ensureVideoQuestionsDisplayColumn() {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -7773,10 +7793,31 @@ async function removeStudentFromVideo(video, student) {
   return 'removed';
 }
 
+// الدروس اللي الطالب مايشوفهاش: اللي اتشال منها بالذات + الدروس المستخبية عن كل الطلاب (زرار "ظاهر للطلاب")
 async function blockedVideoIdsFor(studentId) {
-  const rows = await VideoStudentBlock.findAll({ where: { StudentId: studentId }, attributes: ['VideoId'], raw: true });
-  return new Set(rows.map(row => Number(row.VideoId)));
+  const [rows, hidden] = await Promise.all([
+    VideoStudentBlock.findAll({ where: { StudentId: studentId }, attributes: ['VideoId'], raw: true }),
+    Video.findAll({ where: { is_visible: false }, attributes: ['id'], raw: true }),
+  ]);
+  return new Set([...rows.map(row => Number(row.VideoId)), ...hidden.map(row => Number(row.id))]);
 }
+
+// إظهار/إخفاء الدرس عن الطلاب (من صفحة الفيديوهات أو الأبلكيشن)
+app.post('/admin/videos/:id/visibility', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
+  try {
+    const video = await Video.findByPk(req.params.id, { attributes: ['id', 'title', 'is_visible'] });
+    if (!video) return res.status(404).json({ success: false, message: '❌ الدرس غير موجود' });
+    const raw = String(req.body.visible == null ? '' : req.body.visible).toLowerCase();
+    if (!['1', '0', 'true', 'false'].includes(raw)) return res.status(400).json({ success: false, message: '❌ اختيار غير صحيح' });
+    const visible = raw === '1' || raw === 'true';
+    await video.update({ is_visible: visible });
+    console.log(`👁️ ${req.session.userName || 'admin'}: "${video.title}" ${visible ? 'ظاهر' : 'مستخبي'} للطلاب`);
+    res.json({ success: true, visible, message: visible ? '✅ الدرس ظاهر للطلاب' : '🙈 الدرس اتخبى عن الطلاب' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: '❌ حصلت مشكلة: ' + error.message });
+  }
+});
 
 app.post('/admin/videos/:id/add-student-access', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
@@ -8338,7 +8379,7 @@ function sessionLabelForApp(session) {
 app.get('/api/staff/videos', requirePermissionOrAdmin('admin_videos'), async (req, res) => {
   try {
     const videos = await Video.findAll({
-      attributes: ['id', 'title', 'SessionId', 'createdAt'],
+      attributes: ['id', 'title', 'SessionId', 'createdAt', 'is_visible'],
       include: [
         { model: Session, required: false, attributes: ['id', 'lesson_number', 'is_free_for_all', 'video_price_center', 'video_price_online'], include: [{ model: Center, attributes: ['name'] }, { model: Subject, attributes: ['name'] }] },
         { model: VideoSession, required: false, attributes: ['SessionId'] },
@@ -8362,6 +8403,7 @@ app.get('/api/staff/videos', requirePermissionOrAdmin('admin_videos'), async (re
         parts: partCounts.get(video.id) || 0,
         free: !!(video.Session && video.Session.is_free_for_all),
         customPrice: !!(video.Session && (video.Session.video_price_center !== null || video.Session.video_price_online !== null)),
+        visible: video.is_visible !== false,
       })),
     });
   } catch (error) {
@@ -8383,7 +8425,7 @@ app.get('/api/staff/videos/:id', requirePermissionOrAdmin('admin_videos'), async
     const now = Date.now();
     res.json({
       success: true,
-      video: { id: video.id, title: video.title, mainSessionId: video.SessionId },
+      video: { id: video.id, title: video.title, mainSessionId: video.SessionId, visible: video.is_visible !== false },
       settings: {
         isFreeForAll: !!main.is_free_for_all,
         viewsIfAttended: main.views_if_attended ?? 2,
@@ -12625,6 +12667,7 @@ async function startServer() {
     await ensureSessionVideoPriceColumns();
     await ensureStudentBookletCustomPriceColumn();
     await ensureVideoQuestionsDisplayColumn();
+    await ensureVideoVisibleColumn();
     await ensureVideoPartUrlLength();
     await ensureBalanceTransactionSessionColumn();
     await ensureHomeworkAssignmentShowForAllColumn();
@@ -12694,6 +12737,7 @@ async function startServer() {
           await ensureSessionVideoPriceColumns();
           await ensureStudentBookletCustomPriceColumn();
           await ensureVideoQuestionsDisplayColumn();
+          await ensureVideoVisibleColumn();
           await ensureVideoPartUrlLength();
           await ensureUserProfilePhotoColumn();
           await ensureStudentOfferColumn();

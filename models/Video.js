@@ -16,6 +16,11 @@ const Video = sequelize.define('Video', {
     allowNull: false,
     defaultValue: 'inside', // فين تظهر فيديوهات الأسئلة: جوه الدرس / برا جنب الحصة / الاتنين
   },
+  is_visible: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true, // false = الدرس مستخبي عن الطلاب (البوابة والأبلكيشن)، والموظفين لسه شايفينه
+  },
 }, {
   tableName: 'videos',
 });

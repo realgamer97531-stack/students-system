@@ -115,6 +115,7 @@ class _VideosTabState extends State<VideosTab> {
                             Pill('${v['linkedSessions']} حصة', AppColors.neutralSoft, AppColors.text, fontSize: 11),
                             if (v['free'] == true) const Pill('مجاني للكل', AppColors.successSoft, AppColors.successText, fontSize: 11),
                             if (v['customPrice'] == true) const Pill('💰 سعر خاص', AppColors.warningSoft, AppColors.warningText, fontSize: 11),
+                            if (v['visible'] == false) const Pill('🙈 مستخبي عن الطلاب', AppColors.dangerSoft, AppColors.dangerText, fontSize: 11),
                           ]),
                         ]),
                         trailing: const Icon(Icons.chevron_left),
@@ -189,6 +190,12 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
     final title = await _askText(context, 'اسم الفيديو', initial: '${_video['title']}');
     if (title == null || title.isEmpty) return;
     await _send('title', '$_base/update-title', {'title': title}, done: '✅ اتغير اسم الفيديو');
+  }
+
+  // ===== الظهور للطلاب =====
+  Future<void> _toggleVisible(bool visible) async {
+    if (!visible && !await confirmDialog(context, title: 'إخفاء الدرس؟', message: 'الدرس مش هيظهر لأي طالب في البوابة ولا الأبلكيشن لحد ما ترجعه.', ok: 'اخفيه')) return;
+    await _send('visible:$visible', '$_base/visibility', {'visible': visible ? '1' : '0'}, done: visible ? '✅ الدرس ظاهر للطلاب' : '🙈 الدرس اتخبى عن الطلاب');
   }
 
   // ===== الإعدادات =====
@@ -437,6 +444,17 @@ class _VideoManageScreenState extends State<VideoManageScreen> {
 
     return CustomScrollView(slivers: [
       const SliverToBoxAdapter(child: SizedBox(height: 12)),
+      SliverToBoxAdapter(
+        child: Card(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: SwitchListTile(
+            title: const Text('ظاهر للطلاب', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(_video['visible'] == false ? '🙈 مستخبي: مش ظاهر في البوابة ولا الأبلكيشن' : 'الطلاب شايفين الدرس عادي'),
+            value: _video['visible'] != false,
+            onChanged: _busy ? null : _toggleVisible,
+          ),
+        ),
+      ),
       SliverToBoxAdapter(
         child: _section('الإعدادات العامة', Icons.tune, [
           _kv('مجاني للكل', settings['isFreeForAll'] == true ? 'أيوه' : 'لأ'),

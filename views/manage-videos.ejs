@@ -52,11 +52,17 @@
   .vl-link form { display: inline-flex; margin: 0; }
   .vl-link button { border: none; background: var(--sf-card-bg); color: var(--sf-danger); padding: 3px 8px; font-size: 0.75rem; }
   .vl-link button:hover { background: var(--sf-danger-soft-bg); }
-  .vl-actions { display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
+  .vl-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .vl-actions .vl-visible-row { flex-basis: 100%; }
   .vl-actions .btn { white-space: nowrap; }
   .vl-cards .vl-actions .btn { flex: 1; }
   .vl-del { border: none; background: none; color: var(--sf-muted); padding: 4px 6px; border-radius: 8px; }
   .vl-del:hover { background: var(--sf-danger-soft-bg); color: var(--sf-danger); }
+  .vl-visible { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 600; }
+  .vl-visible .form-check-input { width: 2.4em; height: 1.25em; margin: 0; cursor: pointer; }
+  .vl-hidden-badge { display: none; font-size: 12px; font-weight: 700; color: var(--sf-danger); background: var(--sf-danger-soft-bg); border-radius: 999px; padding: 2px 10px; }
+  .vl-item.is-hidden .vl-hidden-badge { display: inline-block; }
+  .vl-item.is-hidden .vl-title, .vl-item.is-hidden .vl-sessions, .vl-item.is-hidden .vl-exam { opacity: .55; }
 </style>
 
 <div class="vl-head">
@@ -259,7 +265,7 @@
     <% const examSession = linkedSessions.find(session => session.exam_url || session.exam_video_url); %>
     <% const examUrl = examSession?.exam_url || ''; %>
     <% const examVideoUrl = examSession?.exam_video_url || ''; %>
-    <div class="vl-item video-card-col" data-centers="<%= cardCenterIds %>" data-subjects="<%= cardSubjectIds %>" data-title="<%= String(v.title || '').toLowerCase() %>">
+    <div class="vl-item video-card-col<%= v.is_visible === false ? ' is-hidden' : '' %>" data-centers="<%= cardCenterIds %>" data-subjects="<%= cardSubjectIds %>" data-title="<%= String(v.title || '').toLowerCase() %>">
       <div class="vl-title">
         <form action="/admin/videos/<%= v.id %>/update-title" method="POST" class="vl-title-form">
           <textarea name="title" rows="1" class="form-control form-control-sm video-title-input" required title="اضغط عشان تعدل الاسم"><%= v.title %></textarea>
@@ -302,6 +308,13 @@
         <% } %>
       </div>
       <div class="vl-actions">
+        <div class="vl-visible-row d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <label class="form-check form-switch vl-visible" title="لو اتقفل، الدرس بيختفي من البوابة والأبلكيشن عند كل الطلاب">
+            <input class="form-check-input vl-visible-toggle" type="checkbox" role="switch" data-video-id="<%= v.id %>" <%= v.is_visible === false ? '' : 'checked' %>>
+            <span><span class="ar-only">ظاهر للطلاب</span><span class="en-only" style="display:none;">Visible to students</span></span>
+          </label>
+          <span class="vl-hidden-badge">🙈 <span class="ar-only">مستخبي</span><span class="en-only" style="display:none;">Hidden</span></span>
+        </div>
         <a href="/admin/videos/<%= v.id %>" class="btn btn-sm btn-outline-primary">🎞️ <span class="ar-only">الفيديوهات</span><span class="en-only" style="display:none;">Videos</span></a>
         <a href="/admin/videos/<%= v.id %>/access" class="btn btn-sm btn-outline-secondary">🔐 <span class="ar-only">التحكم</span><span class="en-only" style="display:none;">Control</span></a>
       </div>
@@ -366,6 +379,31 @@
       if (e.key === 'Enter') { e.preventDefault(); box.form.requestSubmit ? box.form.requestSubmit() : box.form.submit(); }
     });
     fit();
+  });
+  // زرار "ظاهر للطلاب": بيتحفظ على طول من غير ما الصفحة تتحمل تاني
+  document.querySelectorAll('.vl-visible-toggle').forEach(function (box) {
+    box.addEventListener('change', async function () {
+      const card = box.closest('.vl-item');
+      const want = box.checked;
+      if (!want && !confirm('إخفاء الدرس ده عن كل الطلاب؟ (مش هيظهر في البوابة ولا الأبلكيشن لحد ما ترجعه)')) { box.checked = true; return; }
+      box.disabled = true;
+      try {
+        const r = await fetch('/admin/videos/' + box.dataset.videoId + '/visibility', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ visible: want ? '1' : '0' }),
+        });
+        const data = await r.json().catch(function () { return {}; });
+        if (!r.ok || !data.success) throw new Error(data.message || ('HTTP ' + r.status));
+        card.classList.toggle('is-hidden', !data.visible);
+        box.checked = !!data.visible;
+      } catch (e) {
+        box.checked = !want;
+        alert('❌ متحفظش: ' + e.message);
+      } finally {
+        box.disabled = false;
+      }
+    });
   });
   function refitTitles() {
     document.querySelectorAll('.video-title-input').forEach(function (box) { if (box._fitTitle) box._fitTitle(); });
