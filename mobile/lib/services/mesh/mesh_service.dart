@@ -219,6 +219,15 @@ class MeshService implements MeshHost {
 
   ({String ssid, String password})? get pcWifiInfo => pcWifiCredentials(meshKey);
 
+  /// بيفتح قايمة الواي فاي عشان يدخل شبكة الكمبيوتر يدوي (لو الزرار ملقاش الشبكة)
+  Future<void> openWifiSettings() async {
+    try {
+      await _channel.invokeMethod('openWifiSettings');
+    } catch (_) {}
+    // أول ما يرجع للتطبيق وهو داخل الشبكة، PcWifiLink بيلاقيها لوحده (بالاسم)
+    unawaited(joinPcWifi());
+  }
+
   Future<void> stop() async {
     await _changesSub?.cancel();
     _changesSub = null;

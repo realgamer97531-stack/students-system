@@ -138,6 +138,18 @@ class _NetworkTabState extends State<NetworkTab> {
                 label: const Text('اتصل بواي فاي الكمبيوتر'),
               ),
             ),
+            const SizedBox(height: 6),
+            const Text('لو الزرار فضل يحمّل ومظهرش حاجة: افتح الواي فاي واختار الشبكة اللي اسمها فوق واكتب الباسورد، وارجع للتطبيق',
+                style: TextStyle(color: AppColors.muted, fontSize: 12)),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () => mesh.openWifiSettings(),
+                icon: const Icon(Icons.settings),
+                label: const Text('افتح إعدادات الواي فاي (دخول يدوي)'),
+              ),
+            ),
           ],
         ]),
       ),

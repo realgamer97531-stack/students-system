@@ -148,6 +148,16 @@ class MeshPlugin(private val context: Context, messenger: BinaryMessenger) : Met
             }
             "pcWifiLeave" -> { pcWifi.leave(); result.success(true) }
             "pcWifiStatus" -> result.success(pcWifi.status())
+            // دخول واي فاي الكمبيوتر يدوي: بيفتح قايمة الواي فاي (لوحة صغيرة في أندرويد 10+)
+            "openWifiSettings" -> {
+                try {
+                    val action = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) android.provider.Settings.Panel.ACTION_WIFI else android.provider.Settings.ACTION_WIFI_SETTINGS
+                    context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
             else -> result.notImplemented()
         }
     }

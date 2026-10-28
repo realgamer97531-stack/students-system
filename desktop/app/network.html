@@ -147,6 +147,11 @@
       : `<span class="pill ok">داخل الواي فاي: ${w.clients} موبايل</span>`
         + (!direct ? '<span class="muted">داخلين بس لسه مااتكلموش مع البرنامج — دوس "اسمح للموبايلات في الفايروول"</span>' : '');
     if (w.acceptError) $('wifiClients').innerHTML += `<span class="pill warn">${esc('قبول الموبايلات: ' + w.acceptError)}</span>`;
+    // محاولات الدخول: لو فيه محاولات ومحدش اتقبل يبقى المشكلة في قبول الويندوز للموبايل
+    if (wifiOn && (w.requests || w.joinError)) {
+      $('wifiClients').innerHTML += `<span class="pill ${w.accepted ? 'ok' : 'warn'}">محاولات دخول: ${w.requests} • اتقبل: ${w.accepted}</span>`
+        + (w.joinError ? `<span class="pill warn">${esc('آخر مشكلة: ' + w.joinError)}</span>` : '');
+    }
     $('firewallBtn').textContent = v.firewall ? '🛡️ الفايروول مسموح ✓ (اعمله تاني)' : '🛡️ اسمح للموبايلات في الفايروول';
     $('firewallBtn').className = v.firewall ? '' : 'primary';
 

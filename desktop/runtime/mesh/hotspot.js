@@ -31,12 +31,15 @@ public static class SfWfdAccept {
   static WiFiDirectConnectionListener listener;
   static readonly List<WiFiDirectDevice> devices = new List<WiFiDirectDevice>();
   public static string LastError = "";
+  public static int Requests;
+  public static int Accepted;
   public static void Start() {
     listener = new WiFiDirectConnectionListener();
     listener.ConnectionRequested += OnRequest;
   }
   static void OnRequest(WiFiDirectConnectionListener sender, WiFiDirectConnectionRequestedEventArgs args) {
     try {
+      Interlocked.Increment(ref Requests);
       var id = args.GetConnectionRequest().DeviceInformation.Id;
       ThreadPool.QueueUserWorkItem(_ => {
         try {
@@ -44,6 +47,7 @@ public static class SfWfdAccept {
           for (int i = 0; i < 600 && op.Status == AsyncStatus.Started; i++) Thread.Sleep(50);
           if (op.Status != AsyncStatus.Completed) { LastError = "accept: " + op.Status; return; }
           lock (devices) devices.Add(op.GetResults());
+          Interlocked.Increment(ref Accepted);
         } catch (Exception e) { LastError = e.Message; }
       });
     } catch (Exception e) { LastError = e.Message; }
@@ -71,7 +75,9 @@ function Clients {
   $n = 0
   if ($script:pub -and -not $acceptError) { try { $n = [SfWfdAccept]::Connected() } catch {} }
   $ips = @(Get-NetNeighbor -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -like '192.168.137.*' -and $_.IPAddress -ne '192.168.137.255' -and $_.IPAddress -ne '192.168.137.1' -and "$($_.State)" -in @('Reachable', 'Stale', 'Delay', 'Probe') } | ForEach-Object { $_.IPAddress } | Sort-Object -Unique)
-  return @{ n = [Math]::Max($n, $ips.Count); ips = $ips }
+  $req = 0; $acc = 0; $err = ''
+  if (-not $acceptError) { try { $req = [SfWfdAccept]::Requests; $acc = [SfWfdAccept]::Accepted; $err = [SfWfdAccept]::LastError } catch {} }
+  return @{ n = [Math]::Max($n, $ips.Count); ips = $ips; req = $req; acc = $acc; err = "$err" }
 }
 
 function Start-Wfd {
@@ -166,9 +172,9 @@ while ($true) {
     # كام موبايل داخل الواي فاي دلوقتي + عناوينهم (الكمبيوتر بيبعتلهم مباشرة — الموبايلات كتير بتتجاهل الـ broadcast)
     if (-not $ip) { $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -like '192.168.137.*' } | Select-Object -First 1).IPAddress }
     $c = Clients
-    $key = "$ip|$($c.n)|$($c.ips -join ',')"
+    $key = "$ip|$($c.n)|$($c.ips -join ',')|$($c.req)|$($c.acc)|$($c.err)"
     if ($key -ne $lastClients) {
-      Say @{ state = 'on'; mode = $mode; ip = "$ip"; clients = $c.n; ips = @($c.ips); acceptError = $acceptError }
+      Say @{ state = 'on'; mode = $mode; ip = "$ip"; clients = $c.n; ips = @($c.ips); acceptError = $acceptError; requests = $c.req; accepted = $c.acc; joinError = $c.err }
       $lastClients = $key
     }
   }
@@ -182,7 +188,7 @@ class PcHotspot {
   constructor() {
     this.child = null;
     this.wanted = null; // { ssid, password }
-    this.status = { state: 'off', mode: '', ip: '', message: '', clients: 0, ips: [], acceptError: '' };
+    this.status = { state: 'off', mode: '', ip: '', message: '', clients: 0, ips: [], acceptError: '', requests: 0, accepted: 0, joinError: '' };
     this.restartTimer = null;
   }
 
@@ -211,7 +217,9 @@ class PcHotspot {
     this.status = { state: 'starting', mode: '', ip: '', message: '' };
     let child;
     try {
-      child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+      // -MTA: طلب دخول الموبايل (حدث WinRT) بيوصل على thread تاني. في STA (الافتراضي) ومع Start-Sleep
+      // مفيش حد بيستقبل الرسايل، فالطلب ممكن مايوصلش خالص والويندوز يرفض الموبايل
+      child = spawn('powershell.exe', ['-MTA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (error) {
       this.status = { state: 'error', mode: '', ip: '', message: error.message };
       return;
@@ -230,6 +238,7 @@ class PcHotspot {
           this.status = {
             state: msg.state || 'error', mode: msg.mode || this.status.mode, ip: msg.ip || '', message: msg.message || '',
             clients: Number(msg.clients) || 0, ips: Array.isArray(msg.ips) ? msg.ips.filter(ip => /^192\.168\.137\.\d+$/.test(ip)) : [], acceptError: msg.acceptError || '',
+            requests: Number(msg.requests) || 0, accepted: Number(msg.accepted) || 0, joinError: msg.joinError || '',
           };
         } catch (e) { /* سطر ناقص */ }
       }
