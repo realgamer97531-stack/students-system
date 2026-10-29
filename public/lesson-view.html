@@ -594,7 +594,11 @@
         video.style.maxHeight = '600px';
         video.src = source.url;
         playerFrame.appendChild(video);
-        video.currentTime = part.watchedSeconds || 0;
+        // نكمّل من آخر مكان بس لو جوه الفيديو (لو بعد النهاية الشاشة بتفضل سودا)
+        video.addEventListener('loadedmetadata', () => {
+          const resume = part.watchedSeconds || 0;
+          if (resume > 0 && (!Number.isFinite(video.duration) || resume < video.duration - 3)) video.currentTime = resume;
+        }, { once: true });
         let lastSent = 0;
         popupControls = { pause: () => video.pause(), resume: () => { video.play().catch(() => {}); } };
         video.ontimeupdate = () => {
@@ -613,7 +617,9 @@
             height: '600', width: '100%', videoId: source.id,
             events: {
               onReady: (e) => {
-                if (part.watchedSeconds) e.target.seekTo(part.watchedSeconds, true);
+                let ytDuration = 0;
+                try { ytDuration = e.target.getDuration() || 0; } catch (_) {}
+                if (part.watchedSeconds && (!ytDuration || part.watchedSeconds < ytDuration - 3)) e.target.seekTo(part.watchedSeconds, true);
                 popupControls = { pause: () => { try { ytPlayer.pauseVideo(); } catch (_) {} }, resume: () => { try { ytPlayer.playVideo(); } catch (_) {} } };
               },
               onStateChange: (e) => {

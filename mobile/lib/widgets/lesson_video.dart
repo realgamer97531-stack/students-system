@@ -123,7 +123,9 @@ class _LessonVideoState extends State<LessonVideo> with WidgetsBindingObserver {
     _native = c;
     try {
       await c.initialize();
-      if (widget.startAt > 0) await c.seekTo(Duration(seconds: widget.startAt));
+      // نكمّل من آخر مكان بس لو جوه الفيديو (لو بعد النهاية الشاشة بتفضل سودا)
+      final length = c.value.duration.inSeconds;
+      if (widget.startAt > 0 && (length <= 0 || widget.startAt < length - 3)) await c.seekTo(Duration(seconds: widget.startAt));
       c.addListener(_onNativeTick);
       if (widget.muted) await c.setVolume(0);
       if (widget.loop) await c.setLooping(true);
@@ -228,7 +230,8 @@ class _LessonVideoState extends State<LessonVideo> with WidgetsBindingObserver {
         return '$head<div id="p"></div><script>$send'
             'var player;'
             'function onYouTubeIframeAPIReady(){player=new YT.Player("p",{width:"100%",height:"100%",videoId:${jsonEncode(_src.id)},playerVars:${jsonEncode(vars)},'
-            'events:{onStateChange:function(e){var t=0;try{t=player.getCurrentTime()}catch(x){}'
+            'events:{onReady:function(){try{var d=player.getDuration();if($start>0&&d>0&&$start>=d-3)player.seekTo(0,true)}catch(x){}},'
+            'onStateChange:function(e){var t=0;try{t=player.getCurrentTime()}catch(x){}'
             'if(e.data==1)send({e:"play",t:t});if(e.data==2)send({e:"pause",t:t});if(e.data==0)send({e:"ended",t:t});}}});'
             'setInterval(function(){try{if(player.getPlayerState()==1)send({e:"time",t:player.getCurrentTime(),d:player.getDuration(),p:true})}catch(x){}},1000);}'
             'window.cmd=function(c){try{if(c=="pause")player.pauseVideo();if(c=="play")player.playVideo();}catch(e){}};'

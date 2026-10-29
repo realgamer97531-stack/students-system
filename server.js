@@ -7434,6 +7434,18 @@ async function ensureAttendance(studentId, sessionId, comment) {
 }
 
 // جلب فيديوهات الدرس (شرح/أسئلة/حل واجب) - بعد التأكد من وجود صلاحية فعلية
+// المشغل بيكمّل من آخر مكان وقف عنده الطالب. لو المكان ده عند آخر الفيديو أو بعده (الوقت المتقدّر للـ iframe بيكبر
+// طول ما الصفحة مفتوحة، أو الفيديو اتغير بواحد أقصر) المشغل بيروح بعد النهاية والشاشة بتفضل سودا — فبنبدأ من الأول.
+// وقت المشاهدة المتسجل نفسه مابيتغيرش (التقارير).
+const MAX_UNKNOWN_RESUME_SECONDS = 5 * 3600;
+function resumeSeconds(watched, duration) {
+  const w = Number(watched) || 0;
+  const d = Number(duration) || 0;
+  if (w <= 0) return 0;
+  if (d > 0) return w >= d - 5 ? 0 : w;
+  return w > MAX_UNKNOWN_RESUME_SECONDS ? 0 : w;
+}
+
 app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student'), async (req, res) => {
   try {
     const student = await Student.findByPk(req.portalStudentId);
@@ -7546,7 +7558,7 @@ app.get('/api/portal/student/lessons/:videoId/parts', verifyPortalToken('student
         videoUrl: p.video_url,
         filePath: p.file_path,
         durationSeconds: p.duration_seconds,
-        watchedSeconds: watchMap[p.id] || 0,
+        watchedSeconds: resumeSeconds(watchMap[p.id] || 0, p.duration_seconds),
       });
     });
 
