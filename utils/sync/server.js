@@ -411,6 +411,10 @@ function deviceRequestMiddleware({ sequelize, User }) {
       return syncContext.run(syncContext.newContext({ device }), next);
     }
 
+    // الجهاز قبل العملية دي عنده (أوفلاين): الطالب دخل الحصة فعلًا / الفلوس اتقبضت فعلًا —
+    // السيرفر بيحترم ده حتى لو بياناته مختلفة (زي رصيد اتغير من جهاز تاني)
+    req.syncReplay = { localOk: context.localOk === true };
+
     const clientTime = Number(context.clientTime) || null;
     let claim;
     try {

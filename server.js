@@ -4807,7 +4807,18 @@ app.post('/attendance/scan', async (req, res) => {
     // ولما يتسجل بعدين (عادي أو بالقوة) بتتحسب في اللي دفعه في الحصة دي.
     await recordAttendancePayments(student, sessionId, paymentLines, req.session.userId);
 
-    if (student.balance < student.price_per_session) {
+    // حضور اتسجل أوفلاين على جهاز (الطالب دخل الحصة فعلًا) والرصيد هنا على السيرفر طلع ناقص (اتغير من مكان تاني
+    // أو بيانات الجهاز كانت قديمة): بنسجله برضه والرصيد بيبقى بالسالب، زي التسجيل بالقوة — بدل ما العملية تقف
+    // والفلوس اللي اتضافت بعدها ("ضيف فلوس بس") تترفض كمان
+    const offlineShortBalance = student.balance < student.price_per_session && !!(req.syncReplay && req.syncReplay.localOk);
+    if (offlineShortBalance) {
+      await Attendance.update(
+        { comment: [comment, '⚠️ اتسجل أوفلاين — الرصيد على السيرفر كان ناقص'].filter(Boolean).join(' • ') },
+        { where: { id: attendanceRecord.id } },
+      );
+    }
+
+    if (student.balance < student.price_per_session && !offlineShortBalance) {
       // سجل المنصة بيرجع زي ما كان (عشان صلاحية الفيديو)، والسجل الجديد بيتمسح
       if (platformRecord) await Attendance.update({ UserId: null, comment: platformRecord.comment, payment_collected: 0 }, { where: { id: attendanceRecord.id } });
       else await attendanceRecord.destroy();
@@ -4820,7 +4831,7 @@ app.post('/attendance/scan', async (req, res) => {
     const paidInSession = await sessionPaymentsTotal(student.id, sessionId);
     if (paidInSession > paymentAmount) await Attendance.update({ payment_collected: paidInSession }, { where: { id: attendanceRecord.id } });
 
-    await recordAttendanceCharge(student, req.session.userId, 'رسوم الحضور');
+    await recordAttendanceCharge(student, req.session.userId, offlineShortBalance ? 'رسوم الحضور (أوفلاين — الرصيد كان ناقص)' : 'رسوم الحضور');
     await recordOtherPayments(student.id, sessionId, otherLines, req.session.userId);
     if (booklet_delivered) {
       await markDefaultBookletDelivered(student);
@@ -4859,6 +4870,19 @@ app.post('/attendance/scan/add-payment', async (req, res) => {
 
     const attendance = await Attendance.findOne({ where: { StudentId: student.id, SessionId: sessionId } });
     if (!attendance) {
+      // فلوس اتقبضت أوفلاين على جهاز: مينفعش نرفضها (الفلوس في إيد السنتر). بتتضاف لرصيده ومربوطة بالحصة
+      // حتى لو حضوره مااتسجلش هنا على السيرفر
+      if (req.syncReplay && req.syncReplay.localOk) {
+        const added = await recordAttendancePayments(student, sessionId, lines, req.session.userId);
+        const otherAdded = await recordOtherPayments(student.id, sessionId, others, req.session.userId);
+        return res.json({
+          success: true,
+          message: `💵 اتضاف ${added} ج لرصيد ${student.name}${otherAdded > 0 ? ` + ${otherAdded} ج لأسباب تانية` : ''} (حضوره مش متسجل في الحصة دي على السيرفر)`,
+          student_name: student.name,
+          remaining_balance: student.balance,
+          paidInSession: 0,
+        });
+      }
       return res.json({ success: false, notRecorded: true, message: `${student.name} مش متسجل حضوره في الحصة دي — سجّل حضوره الأول والمبلغ معاه` });
     }
 

@@ -236,7 +236,8 @@ async function sendOp(op) {
     'content-type': 'application/json',
     accept: payload.headers?.accept || '*/*',
     'x-sync-op-id': op.op_id,
-    'x-sync-context': Buffer.from(JSON.stringify({ ...context, clientTime: Number(op.client_time) }), 'utf8').toString('base64'),
+    // localOk: البرنامج قبل العملية دي وهو أوفلاين (الطالب دخل / الفلوس اتقبضت) — السيرفر بيحترمها لو رصيده مختلف
+    'x-sync-context': Buffer.from(JSON.stringify({ ...context, clientTime: Number(op.client_time), localOk: op.local_ok === null || Number(op.local_ok) === 1 }), 'utf8').toString('base64'),
   };
   if (payload.headers?.['x-requested-with']) headers['x-requested-with'] = payload.headers['x-requested-with'];
 

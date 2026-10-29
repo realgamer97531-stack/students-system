@@ -62,7 +62,8 @@ function replayLocally(op, device) {
   const port = Number(process.env.PORT) || 3000;
   const production = process.env.NODE_ENV === 'production';
   const lib = production ? http : https;
-  const context = Buffer.from(JSON.stringify({ userId: op.userId, activeSessionId: op.activeSessionId, clientTime: op.clientTime })).toString('base64');
+  // عمليات الموبايلات اللي بتتنقل هنا كلها من طابورها = الموبايل قبلها أوفلاين (localOk)
+  const context = Buffer.from(JSON.stringify({ userId: op.userId, activeSessionId: op.activeSessionId, clientTime: op.clientTime, localOk: true })).toString('base64');
   const payload = JSON.stringify(op.body);
   return new Promise((resolve) => {
     const req = lib.request({

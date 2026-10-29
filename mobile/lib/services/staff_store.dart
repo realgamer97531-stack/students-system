@@ -486,7 +486,7 @@ class StaffStore {
     final oldId = '${problem['id']}';
     String? failure;
     try {
-      final result = await _send(op);
+      final result = await _send(op, localOk: true);
       Connection.report(true);
       await MeshService.instance.recordOwn(op);
       MeshService.instance.receipt('${op['id']}', ok: result.ok, message: result.message, duplicate: result.duplicate);
@@ -545,13 +545,15 @@ class StaffStore {
     }
   }
 
-  static Future<OpResult> _send(Map<String, dynamic> op) => StaffApi.call(
+  /// localOk: العملية اتقبلت على الموبايل أوفلاين (من الطابور) — مش للإرسال الأونلاين المباشر (السيرفر هو اللي يقرر)
+  static Future<OpResult> _send(Map<String, dynamic> op, {bool localOk = false}) => StaffApi.call(
         '${op['path']}',
         (op['body'] as Map).cast<String, dynamic>(),
         userId: op['userId'] as int,
         activeSessionId: op['activeSessionId'] as int?,
         opId: '${op['id']}',
         clientTime: DateTime.fromMillisecondsSinceEpoch(op['clientTime'] as int),
+        localOk: localOk,
       );
 
   static bool _flushing = false;
@@ -575,7 +577,7 @@ class StaffStore {
           continue;
         }
         try {
-          final result = await _send(op);
+          final result = await _send(op, localOk: true);
           Connection.report(true);
           MeshService.instance.receipt('${op['id']}', ok: result.ok, message: result.message, duplicate: result.duplicate);
           if (!result.ok) await addProblem(op, result.message);

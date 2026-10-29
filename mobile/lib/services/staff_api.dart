@@ -128,12 +128,15 @@ class StaffApi {
     int? activeSessionId,
     String? opId,
     DateTime? clientTime,
+    bool localOk = false,
   }) async {
     final headers = await _deviceHeaders();
     final context = base64Encode(utf8.encode(jsonEncode({
       'userId': userId,
       'activeSessionId': ?activeSessionId,
       'clientTime': (clientTime ?? DateTime.now()).millisecondsSinceEpoch,
+      // العملية اتقبلت على الموبايل وهو أوفلاين (الطالب دخل / الفلوس اتقبضت): السيرفر بيحترمها لو رصيده مختلف
+      if (localOk) 'localOk': true,
     })));
     final response = await Net.raw(() => client.post(
           _uri(path),
