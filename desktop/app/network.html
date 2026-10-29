@@ -62,6 +62,10 @@
       <button id="firewallBtn">🛡️ اسمح للموبايلات في الفايروول</button>
       <span class="muted" id="firewallSub">الويندوز هيسأل صلاحية أدمن مرة واحدة — اختار Yes</span>
     </div>
+    <div class="row" style="margin-top:10px">
+      <button id="repairBtn">🔧 صلّح واي فاي الكمبيوتر</button>
+      <span class="muted" id="repairSub">لو الموبايلات مش شايفة الشبكة: بيعمل restart للواي فاي بتاع الويندوز (النت بيقطع ثواني) — وافق على رسالة الويندوز</span>
+    </div>
   </div>
 
   <div class="card">
@@ -133,8 +137,9 @@
     $('wifiSub').textContent = !v.hotspot ? 'الموبايلات هتكلم الكمبيوتر بس لو على نفس الراوتر'
       : !v.running ? 'بيشتغل لوحده مع الشبكة'
       : !v.meshKey ? 'محتاج مفتاح الشبكة الأول (نت مرة واحدة)'
-      : w.state === 'on' ? `الموبايلات بتدخله لوحدها${w.mode === 'mobile-hotspot' ? ' (عن طريق Mobile hotspot)' : ''}`
-      : w.state === 'error' ? `مش راضي يشتغل: ${w.message || ''} — اتأكد إن الواي فاي بتاع الكمبيوتر مفتوح (مش وضع الطيران)`
+      : w.repairing ? 'بيصلّح الواي فاي... (وافق على رسالة الويندوز)'
+      : w.state === 'on' ? `الموبايلات بتدخله لوحدها${w.mode === 'mobile-hotspot' ? ` (Mobile hotspot${w.band === 'TwoPointFourGigahertz' ? ' • 2.4GHz' : ''})` : ' (Wi-Fi Direct)'}`
+      : w.state === 'error' ? `مش راضي يشتغل: ${w.message || ''} — اتأكد إن الواي فاي بتاع الكمبيوتر مفتوح (مش وضع الطيران)${w.stuck ? ' — جرّب "🔧 صلّح واي فاي الكمبيوتر"' : ''}`
       : 'بيشغل الواي فاي...';
     $('wifiToggle').textContent = v.hotspot ? 'اقفله' : 'شغله';
     $('wifiCreds').innerHTML = wifiOn && w.ssid
@@ -154,6 +159,8 @@
     }
     $('firewallBtn').textContent = v.firewall ? '🛡️ الفايروول مسموح ✓ (اعمله تاني)' : '🛡️ اسمح للموبايلات في الفايروول';
     $('firewallBtn').className = v.firewall ? '' : 'primary';
+    $('repairBtn').disabled = !v.hotspot || !!w.repairing;
+    $('repairBtn').className = w.state === 'error' && w.stuck ? 'primary' : '';
 
     $('reviewBox').style.display = v.review.length ? '' : 'none';
     $('review').innerHTML = v.review.map(r => `<div class="card review">
@@ -201,6 +208,14 @@
     let r = null;
     try { r = await window.desktop.mesh.action('firewall', {}); } catch (e) { r = { success: false, message: e.message }; }
     $('firewallSub').textContent = r && r.success ? '✔ تمام — الموبايلات تقدر تكلم البرنامج' : (r && r.message) || 'ماتمش';
+    refresh();
+  };
+  $('repairBtn').onclick = async () => {
+    $('repairSub').textContent = 'وافق على رسالة الويندوز (Yes)... وبعدين استنى ثواني';
+    $('repairBtn').disabled = true;
+    let r = null;
+    try { r = await window.desktop.mesh.action('repair-wifi', {}); } catch (e) { r = { success: false, message: e.message }; }
+    $('repairSub').textContent = r && r.success ? '✔ اتصلّح — الشبكة بتشتغل من الأول، استنى 15 ثانية وبص على الموبايل' : (r && r.message) || 'ماتمش';
     refresh();
   };
   $('makeUploader').onclick = () => data && act('uploader', { node: data.me.node });

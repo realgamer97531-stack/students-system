@@ -357,6 +357,10 @@ async function action(name, body = {}) {
       }
       return r;
     }
+    case 'repair-wifi': {
+      if (!state.hotspot) return { success: false, message: 'شغّل واي فاي الكمبيوتر الأول' };
+      return hotspot.repair();
+    }
     case 'take-all':
       return { success: Boolean(node && node.requestSnapshot()) };
     case 'uploader':

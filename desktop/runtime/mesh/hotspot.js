@@ -1,7 +1,9 @@
 // الواي فاي اللي الكمبيوتر بيعمله بنفسه: عشان الموبايلات تتوصل بالكمبيوتر من غير راوتر ولا نت ولا هوت سبوت موبايل.
-//   - الطريقة الأساسية: Wi-Fi Direct في وضع "legacy" — الكمبيوتر بيطلع شبكة واي فاي عادية (اسم + باسورد)
-//     والكمبيوتر نفسه بيفضل متوصل بالواي فاي بتاعه لو فيه. عنوان الكمبيوتر عليها 192.168.137.1
-//   - لو كارت الواي فاي مش راضي: "Mobile hotspot" بتاع الويندوز بنفس الاسم والباسورد
+//   - الطريقة الأساسية: "Mobile hotspot" بتاع الويندوز على 2.4GHz (كل الموبايلات بتشوفها). بيشتغل من غير نت كمان:
+//     بنديله أي شبكة متسجلة على الجهاز. عنوان الكمبيوتر عليها 192.168.137.1
+//   - لو مرضيش: Wi-Fi Direct في وضع "legacy" بنفس الاسم والباسورد (مبيختارش الباند — كروت كتير بتطلعه 5GHz
+//     والموبايلات مش بتشوفه، وده اللي كان بيحصل)
+//   - الشبكة "شغالة" بس لما الكمبيوتر يبقى واخد 192.168.137.x فعلًا — الكارت ممكن يقول Up وهو واقف
 // الشغل نفسه في PowerShell (WinRT) — عملية صغيرة بتفضل شغالة طول ما الشبكة شغالة، ولو اتقفلت بنشغلها تاني.
 // الاسم والباسورد من مفتاح الشبكة (pcWifiCredentials) فالموبايلات بتعرفهم وبتدخل لوحدها.
 // مهم: في Wi-Fi Direct الويندوز مش بيقبل الموبايل لوحده — لازم البرنامج يرد على ConnectionRequested
@@ -96,48 +98,70 @@ function Start-Wfd {
   return $p
 }
 
+$band = ''
 function Start-Tether {
   $null = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager, Windows.Networking.NetworkOperators, ContentType = WindowsRuntime]
+  $null = [Windows.Networking.NetworkOperators.TetheringWiFiBand, Windows.Networking.NetworkOperators, ContentType = WindowsRuntime]
   $null = [Windows.Networking.Connectivity.NetworkInformation, Windows.Networking.Connectivity, ContentType = WindowsRuntime]
-  $prof = [Windows.Networking.Connectivity.NetworkInformation]::GetInternetConnectionProfile()
-  if (-not $prof) { $prof = [Windows.Networking.Connectivity.NetworkInformation]::GetConnectionProfiles() | Select-Object -First 1 }
-  if (-not $prof) { throw 'Mobile hotspot: no network adapter' }
-  $m = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile($prof)
-  $cfg = $m.GetCurrentAccessPointConfiguration()
-  if ($cfg.Ssid -ne $ssid -or $cfg.Passphrase -ne $pass) {
-    $cfg.Ssid = $ssid; $cfg.Passphrase = $pass
-    AwaitAction ($m.ConfigureAccessPointAsync($cfg))
+  $NI = [Windows.Networking.Connectivity.NetworkInformation]
+  $TM = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]
+  # الشبكة اللي عليها نت الأول، ومن غير نت أي شبكة متسجلة (الويندوز بيشغل الهوت سبوت عادي من غير نت)
+  $profiles = @()
+  $inet = $NI::GetInternetConnectionProfile()
+  if ($inet) { $profiles += $inet }
+  $profiles += @($NI::GetConnectionProfiles() | Where-Object { -not $inet -or $_.ProfileName -ne $inet.ProfileName })
+  $last = 'no network adapter'
+  foreach ($prof in ($profiles | Select-Object -First 8)) {
+    try {
+      if ("$($TM::GetTetheringCapabilityFromConnectionProfile($prof))" -ne 'Enabled') { continue }
+      $m = $TM::CreateFromConnectionProfile($prof)
+      $bands = @('Auto')
+      try { if ($m.GetCurrentAccessPointConfiguration().IsBandSupported([Windows.Networking.NetworkOperators.TetheringWiFiBand]::TwoPointFourGigahertz)) { $bands = @('TwoPointFourGigahertz', 'Auto') } } catch {}
+      foreach ($b in $bands) {
+        $cfg = $m.GetCurrentAccessPointConfiguration()
+        $same = $cfg.Ssid -eq $ssid -and $cfg.Passphrase -eq $pass -and "$($cfg.Band)" -eq $b
+        if ("$($m.TetheringOperationalState)" -eq 'On') {
+          if ($same) { $script:band = $b; return $m }
+          AwaitOp ($m.StopTetheringAsync()) ([Windows.Networking.NetworkOperators.NetworkOperatorTetheringOperationResult]) | Out-Null
+        }
+        if (-not $same) {
+          $cfg.Ssid = $ssid; $cfg.Passphrase = $pass
+          try { $cfg.Band = [Windows.Networking.NetworkOperators.TetheringWiFiBand]::$b } catch {}
+          AwaitAction ($m.ConfigureAccessPointAsync($cfg))
+        }
+        $r = AwaitOp ($m.StartTetheringAsync()) ([Windows.Networking.NetworkOperators.NetworkOperatorTetheringOperationResult])
+        if ($r -and "$($r.Status)" -eq 'Success') { $script:band = $b; return $m }
+        $last = "$($r.Status) $($r.AdditionalErrorMessage)".Trim()
+      }
+    } catch { $last = "$($_.Exception.Message)" }
   }
-  if ("$($m.TetheringOperationalState)" -ne 'On') {
-    $r = AwaitOp ($m.StartTetheringAsync()) ([Windows.Networking.NetworkOperators.NetworkOperatorTetheringOperationResult])
-    if (-not $r -or "$($r.Status)" -ne 'Success') { throw "Mobile hotspot: $($r.Status) $($r.AdditionalErrorMessage)" }
-  }
-  return $m
+  throw "Mobile hotspot: $last"
 }
 
 function Bring-Up {
-  try { $script:pub = Start-Wfd; $script:mode = 'wifi-direct'; return $true } catch { $script:lastError = "$($_.Exception.Message)" }
-  try { $script:tm = Start-Tether; $script:mode = 'mobile-hotspot'; return $true } catch { $script:lastError = "$script:lastError | $($_.Exception.Message)" }
+  $script:lastError = ''
+  try { $script:tm = Start-Tether; $script:mode = 'mobile-hotspot'; return $true } catch { $script:lastError = "$($_.Exception.Message)" }
+  try { $script:pub = Start-Wfd; $script:mode = 'wifi-direct'; $script:band = ''; return $true } catch { $script:lastError = "$script:lastError | $($_.Exception.Message)" }
   return $false
 }
 
-# الويندوز بيقفل شبكة Wi-Fi Direct لوحده كل ما الواي فاي العادي بتاع الكمبيوتر يفصل أو يغيّر شبكة
-# (يعني بالظبط لما النت/الراوتر يقطع) والـ publisher بيفضل يقول Started — فبنبص على الكارت نفسه:
-# لو مفيش كارت Wi-Fi Direct شغال 10 ثواني يبقى الشبكة وقعت ونشغلها تاني.
+# الشبكة شغالة بجد = الكمبيوتر واخد 192.168.137.x. الويندوز بيقفلها لوحده كل ما الواي فاي العادي يفصل أو يغيّر شبكة،
+# وساعات الكارت بيفضل "Up" والـ publisher بيقول Started وهي واقفة (ده اللي حصل) — فبنبص على العنوان نفسه:
+# لو مش موجود 12 ثانية (وقت التشغيل) يبقى وقعت ونشغلها تاني.
 $downSince = $null
-function Wfd-Adapter-Up {
-  try { return @(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object { $_.InterfaceDescription -like '*Wi-Fi Direct*' -and "$($_.Status)" -eq 'Up' }).Count -gt 0 } catch { return $true }
+function Has-PcIp {
+  try { return @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | Where-Object { $_.IPAddress -like '192.168.137.*' }).Count -gt 0 } catch { return $true }
 }
 
 function Is-Up {
-  if ($script:pub) {
-    if ("$($script:pub.Status)" -ne 'Started') { return $false }
-    if (Wfd-Adapter-Up) { $script:downSince = $null; return $true }
-    if (-not $script:downSince) { $script:downSince = [DateTime]::Now }
-    return ([DateTime]::Now - $script:downSince).TotalSeconds -lt 10
-  }
-  if ($script:tm) { return "$($script:tm.TetheringOperationalState)" -eq 'On' }
-  return $false
+  $ok = $false
+  if ($script:tm) { $ok = "$($script:tm.TetheringOperationalState)" -eq 'On' }
+  elseif ($script:pub) { $ok = "$($script:pub.Status)" -eq 'Started' }
+  else { return $false }
+  if (-not $ok) { return $false }
+  if (Has-PcIp) { $script:downSince = $null; return $true }
+  if (-not $script:downSince) { $script:downSince = [DateTime]::Now }
+  return ([DateTime]::Now - $script:downSince).TotalSeconds -lt 12
 }
 
 function Tear-Down {
@@ -151,7 +175,7 @@ $stdin = [Console]::OpenStandardInput()
 $buf = New-Object byte[] 1
 $stopTask = $stdin.ReadAsync($buf, 0, 1)
 
-$wasUp = $false; $nextTry = [DateTime]::MinValue; $lastClients = ''; $ip = ''
+$wasUp = $false; $nextTry = [DateTime]::MinValue; $lastClients = ''; $ip = ''; $fails = 0
 while ($true) {
   if ($stopTask.IsCompleted) { break }
   if (-not (Get-Process -Id $parentPid -ErrorAction SilentlyContinue)) { break }
@@ -159,7 +183,12 @@ while ($true) {
   if (-not $up -and [DateTime]::Now -ge $nextTry) {
     Tear-Down
     $up = Bring-Up
-    if (-not $up) { Say @{ state = 'error'; message = $lastError }; $nextTry = [DateTime]::Now.AddSeconds(8) }
+    if ($up) { $fails = 0 } else {
+      $fails++
+      # بعد كذا محاولة: غالبًا الواي فاي بتاع الويندوز علّق (حصل فعلًا) — زرار الإصلاح بيعمل restart للخدمة
+      Say @{ state = 'error'; message = $lastError; stuck = ($fails -ge 3) }
+      $nextTry = [DateTime]::Now.AddSeconds(8)
+    }
   }
   if ($up -ne $wasUp) {
     if ($up) {
@@ -174,7 +203,7 @@ while ($true) {
     $c = Clients
     $key = "$ip|$($c.n)|$($c.ips -join ',')|$($c.req)|$($c.acc)|$($c.err)"
     if ($key -ne $lastClients) {
-      Say @{ state = 'on'; mode = $mode; ip = "$ip"; clients = $c.n; ips = @($c.ips); acceptError = $acceptError; requests = $c.req; accepted = $c.acc; joinError = $c.err }
+      Say @{ state = 'on'; mode = $mode; band = $band; ip = "$ip"; clients = $c.n; ips = @($c.ips); acceptError = $acceptError; requests = $c.req; accepted = $c.acc; joinError = $c.err }
       $lastClients = $key
     }
   }
@@ -190,12 +219,13 @@ class PcHotspot {
     this.wanted = null; // { ssid, password }
     this.status = { state: 'off', mode: '', ip: '', message: '', clients: 0, ips: [], acceptError: '', requests: 0, accepted: 0, joinError: '' };
     this.restartTimer = null;
+    this.repairing = false;
   }
 
   get supported() { return process.platform === 'win32'; }
 
   view() {
-    return { ...this.status, ssid: this.wanted ? this.wanted.ssid : '', password: this.wanted ? this.wanted.password : '', supported: this.supported };
+    return { ...this.status, repairing: this.repairing, ssid: this.wanted ? this.wanted.ssid : '', password: this.wanted ? this.wanted.password : '', supported: this.supported };
   }
 
   start(creds) {
@@ -236,7 +266,7 @@ class PcHotspot {
         try {
           const msg = JSON.parse(line);
           this.status = {
-            state: msg.state || 'error', mode: msg.mode || this.status.mode, ip: msg.ip || '', message: msg.message || '',
+            state: msg.state || 'error', mode: msg.mode || this.status.mode, band: msg.band || '', stuck: msg.stuck === true, ip: msg.ip || '', message: msg.message || '',
             clients: Number(msg.clients) || 0, ips: Array.isArray(msg.ips) ? msg.ips.filter(ip => /^192\.168\.137\.\d+$/.test(ip)) : [], acceptError: msg.acceptError || '',
             requests: Number(msg.requests) || 0, accepted: Number(msg.accepted) || 0, joinError: msg.joinError || '',
           };
@@ -256,6 +286,21 @@ class PcHotspot {
       this.restartTimer = setTimeout(() => this.spawn(), 15 * 1000);
       if (this.restartTimer.unref) this.restartTimer.unref();
     });
+  }
+
+  /** إصلاح: restart لخدمة الواي فاي بتاعة الويندوز (WlanSvc) بصلاحية أدمن، وبعدين نشغل الشبكة من الأول.
+   *  ده اللي فك الكارت لما علّق ("Up" من غير شبكة) والموبايلات ماكانتش شايفة حاجة */
+  async repair() {
+    const wanted = this.wanted;
+    this.repairing = true;
+    this.stop();
+    try {
+      const r = await runElevated('Restart-Service WlanSvc -Force; Start-Sleep -Seconds 6');
+      return r;
+    } finally {
+      this.repairing = false;
+      if (wanted) this.start(wanted);
+    }
   }
 
   /** عناوين الموبايلات اللي داخلة واي فاي الكمبيوتر (الاكتشاف بيبعتلهم مباشرة) */
@@ -281,16 +326,20 @@ class PcHotspot {
 const FIREWALL_RULE = 'Shady Elsharkawy - device network';
 
 function allowInFirewall(exePath) {
+  const exe = String(exePath).replace(/'/g, "''");
+  return runElevated([
+    `$exe = '${exe}'; $name = '${FIREWALL_RULE}'`,
+    'Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue | Remove-NetFirewallRule',
+    'New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Program $exe -Profile Any | Out-Null',
+    'New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Protocol UDP -LocalPort 47821 -Profile Any | Out-Null',
+    "Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule | Where-Object { \"$($_.Action)\" -eq 'Block' } | Disable-NetFirewallRule",
+  ].join('\n'));
+}
+
+// أمر PowerShell بصلاحية أدمن (رسالة الويندوز: Yes)
+function runElevated(inner) {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') { resolve({ success: false, message: 'ويندوز بس' }); return; }
-    const exe = String(exePath).replace(/'/g, "''");
-    const inner = [
-      `$exe = '${exe}'; $name = '${FIREWALL_RULE}'`,
-      'Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue | Remove-NetFirewallRule',
-      'New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Program $exe -Profile Any | Out-Null',
-      'New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Protocol UDP -LocalPort 47821 -Profile Any | Out-Null',
-      "Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule | Where-Object { \"$($_.Action)\" -eq 'Block' } | Disable-NetFirewallRule",
-    ].join('\n');
     const innerEncoded = Buffer.from(inner, 'utf16le').toString('base64');
     const outer = `try { $p = Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand','${innerEncoded}'; exit $p.ExitCode } catch { exit 5 }`;
     let child;
