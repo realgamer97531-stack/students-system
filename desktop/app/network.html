@@ -64,6 +64,7 @@
     </div>
     <div class="row" style="margin-top:10px">
       <button id="repairBtn">🔧 صلّح واي فاي الكمبيوتر</button>
+      <button id="repairStop" style="display:none;background:#DC2626;color:#fff;border-color:#DC2626">⛔ وقّف الإصلاح</button>
       <span class="muted" id="repairSub">لو الموبايلات مش شايفة الشبكة: بيعمل restart للواي فاي بتاع الويندوز (النت بيقطع ثواني) — وافق على رسالة الويندوز</span>
     </div>
   </div>
@@ -160,6 +161,7 @@
     $('firewallBtn').textContent = v.firewall ? '🛡️ الفايروول مسموح ✓ (اعمله تاني)' : '🛡️ اسمح للموبايلات في الفايروول';
     $('firewallBtn').className = v.firewall ? '' : 'primary';
     $('repairBtn').disabled = !v.hotspot || !!w.repairing;
+    $('repairStop').style.display = w.repairing ? '' : 'none';
     $('repairBtn').className = w.state === 'error' && w.stuck ? 'primary' : '';
 
     $('reviewBox').style.display = v.review.length ? '' : 'none';
@@ -216,6 +218,11 @@
     let r = null;
     try { r = await window.desktop.mesh.action('repair-wifi', {}); } catch (e) { r = { success: false, message: e.message }; }
     $('repairSub').textContent = r && r.success ? '✔ اتصلّح — الشبكة بتشتغل من الأول، استنى 15 ثانية وبص على الموبايل' : (r && r.message) || 'ماتمش';
+    refresh();
+  };
+  $('repairStop').onclick = async () => {
+    try { await window.desktop.mesh.action('repair-cancel', {}); } catch (e) { /* */ }
+    $('repairSub').textContent = '⛔ اتوقف — الشبكة بتشتغل تاني';
     refresh();
   };
   $('makeUploader').onclick = () => data && act('uploader', { node: data.me.node });

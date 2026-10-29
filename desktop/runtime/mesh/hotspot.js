@@ -111,7 +111,8 @@ function Start-Tether {
   if ($inet) { $profiles += $inet }
   $profiles += @($NI::GetConnectionProfiles() | Where-Object { -not $inet -or $_.ProfileName -ne $inet.ProfileName })
   $last = 'no network adapter'
-  foreach ($prof in ($profiles | Select-Object -First 8)) {
+  # كل محاولة تشغيل بتقفل وتفتح الراديو — كتير منها بيعلّق درايفر الواي فاي (Intel 8265 حصل له كده). فبنحاول 3 شبكات بالكتير
+  foreach ($prof in ($profiles | Select-Object -First 3)) {
     try {
       if ("$($TM::GetTetheringCapabilityFromConnectionProfile($prof))" -ne 'Enabled') { continue }
       $m = $TM::CreateFromConnectionProfile($prof)
@@ -132,8 +133,10 @@ function Start-Tether {
         $r = AwaitOp ($m.StartTetheringAsync()) ([Windows.Networking.NetworkOperators.NetworkOperatorTetheringOperationResult])
         if ($r -and "$($r.Status)" -eq 'Success') { $script:band = $b; return $m }
         $last = "$($r.Status) $($r.AdditionalErrorMessage)".Trim()
+        # الكارت نفسه مش بيرد: مفيش فايدة من باقي الشبكات/الباندات
+        if ("$($r.Status)" -eq 'WiFiDeviceOff') { throw "Mobile hotspot: $last" }
       }
-    } catch { $last = "$($_.Exception.Message)" }
+    } catch { $last = "$($_.Exception.Message)"; if ($last -match 'WiFiDeviceOff') { break } }
   }
   throw "Mobile hotspot: $last"
 }
@@ -187,7 +190,9 @@ while ($true) {
       $fails++
       # بعد كذا محاولة: غالبًا الواي فاي بتاع الويندوز علّق (حصل فعلًا) — زرار الإصلاح بيعمل restart للخدمة
       Say @{ state = 'error'; message = $lastError; stuck = ($fails -ge 3) }
-      $nextTry = [DateTime]::Now.AddSeconds(8)
+      # كل ما يفشل نستنى أكتر (8 → 15 → 30 → 60 ثانية) عشان منضغطش على الدرايفر
+      $wait = @(8, 15, 30, 60)[[Math]::Min($fails - 1, 3)]
+      $nextTry = [DateTime]::Now.AddSeconds($wait)
     }
   }
   if ($up -ne $wasUp) {
@@ -288,19 +293,45 @@ class PcHotspot {
     });
   }
 
-  /** إصلاح: restart لخدمة الواي فاي بتاعة الويندوز (WlanSvc) بصلاحية أدمن، وبعدين نشغل الشبكة من الأول.
-   *  ده اللي فك الكارت لما علّق ("Up" من غير شبكة) والموبايلات ماكانتش شايفة حاجة */
+  /** إصلاح: بنقفل الشبكة ونستنى لحد ما تقفل فعلًا، وبعدين (بصلاحية أدمن) نعمل restart لكارت الواي فاي
+   *  (بيرجّع الدرايفر لو علّق) ولخدمة الواي فاي (WlanSvc)، وبعدين نشغل الشبكة من الأول.
+   *  كل خطوة ليها وقت أقصى، والإصلاح كله بيستسلم بعد 75 ثانية، و"وقّف الإصلاح" بيلغيه فورًا —
+   *  قبل كده كان بيستنى للأبد لو الدرايفر مش بيرد، والجهاز علّق */
   async repair() {
+    if (this.repairing) return { success: false, message: 'الإصلاح شغال بالفعل' };
     const wanted = this.wanted;
     this.repairing = true;
-    this.stop();
+    let cancel;
+    const cancelled = new Promise((resolve) => { cancel = resolve; });
+    this.cancelRepair = () => cancel({ success: false, message: 'اتوقف الإصلاح' });
     try {
-      const r = await runElevated('Restart-Service WlanSvc -Force; Start-Sleep -Seconds 6');
-      return r;
+      await this.stopAndWait();
+      return await Promise.race([
+        runElevated(REPAIR_SCRIPT, { timeoutMs: 75 * 1000 }),
+        cancelled,
+      ]);
     } finally {
+      this.cancelRepair = null;
       this.repairing = false;
-      if (wanted) this.start(wanted);
+      if (wanted && !this.wanted) this.start(wanted);
     }
+  }
+
+  /** "⛔ وقّف الإصلاح": منستناش الإصلاح، والشبكة بتشتغل تاني على طول */
+  cancel() {
+    if (this.cancelRepair) { this.cancelRepair(); return true; }
+    return false;
+  }
+
+  /** زي stop بس بيستنى لحد ما عملية الشبكة تقفل فعلًا (عشان منعملش restart للواي فاي وهي لسه شغالة) */
+  stopAndWait(maxMs = 10 * 1000) {
+    const child = this.child;
+    this.stop();
+    if (!child || child.exitCode !== null) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => { try { child.kill(); } catch (e) { /* خلص */ } resolve(); }, maxMs);
+      child.once('exit', () => { clearTimeout(timer); resolve(); });
+    });
   }
 
   /** عناوين الموبايلات اللي داخلة واي فاي الكمبيوتر (الاكتشاف بيبعتلهم مباشرة) */
@@ -336,10 +367,32 @@ function allowInFirewall(exePath) {
   ].join('\n'));
 }
 
-// أمر PowerShell بصلاحية أدمن (رسالة الويندوز: Yes)
-function runElevated(inner) {
+// الإصلاح (بيشتغل بصلاحية أدمن). كل خطوة جوه job ليها وقت أقصى: لو الدرايفر مش بيرد منعلقش — بنخرج بكود 7
+const REPAIR_SCRIPT = String.raw`
+function Within($sec, [scriptblock]$b) {
+  $j = Start-Job -ScriptBlock $b
+  if (Wait-Job $j -Timeout $sec) { Remove-Job $j -Force -ErrorAction SilentlyContinue; return $true }
+  Stop-Job $j -ErrorAction SilentlyContinue; return $false
+}
+$ok = Within 25 { Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceDescription -match 'Wireless|Wi-Fi|WiFi|WLAN|802\.11' } | Restart-NetAdapter -Confirm:$false -ErrorAction SilentlyContinue }
+if (-not $ok) { exit 7 }
+Start-Sleep -Seconds 3
+$ok = Within 25 { Restart-Service WlanSvc -Force -ErrorAction Stop }
+if (-not $ok) { exit 7 }
+Start-Sleep -Seconds 4
+exit 0
+`;
+
+// أمر PowerShell بصلاحية أدمن (رسالة الويندوز: Yes). timeoutMs: منستناش أكتر من كده (العملية نفسها بتقفل لوحدها)
+function runElevated(inner, { timeoutMs = 0 } = {}) {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') { resolve({ success: false, message: 'ويندوز بس' }); return; }
+    let done = false;
+    const finish = (r) => { if (!done) { done = true; resolve(r); } };
+    if (timeoutMs) {
+      const t = setTimeout(() => finish({ success: false, message: 'الإصلاح طوّل ووقفناه — غالبًا درايفر الواي فاي علّق: اعمل Restart للكمبيوتر' }), timeoutMs);
+      if (t.unref) t.unref();
+    }
     const innerEncoded = Buffer.from(inner, 'utf16le').toString('base64');
     const outer = `try { $p = Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand','${innerEncoded}'; exit $p.ExitCode } catch { exit 5 }`;
     let child;
@@ -349,10 +402,12 @@ function runElevated(inner) {
       resolve({ success: false, message: error.message });
       return;
     }
-    child.on('error', error => resolve({ success: false, message: error.message }));
-    child.on('exit', code => resolve(code === 0
+    child.on('error', error => finish({ success: false, message: error.message }));
+    child.on('exit', code => finish(code === 0
       ? { success: true }
-      : { success: false, message: code === 5 ? 'اتلغى — لازم توافق على رسالة الويندوز (Yes)' : `ماتمش (كود ${code})` }));
+      : { success: false, message: code === 5 ? 'اتلغى — لازم توافق على رسالة الويندوز (Yes)'
+        : code === 7 ? 'كارت الواي فاي مش بيرد (الدرايفر علّق) — اعمل Restart للكمبيوتر'
+        : `ماتمش (كود ${code})` }));
   });
 }
 

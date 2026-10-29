@@ -361,6 +361,8 @@ async function action(name, body = {}) {
       if (!state.hotspot) return { success: false, message: 'شغّل واي فاي الكمبيوتر الأول' };
       return hotspot.repair();
     }
+    case 'repair-cancel':
+      return { success: hotspot.cancel() };
     case 'take-all':
       return { success: Boolean(node && node.requestSnapshot()) };
     case 'uploader':
