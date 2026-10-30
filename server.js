@@ -3391,7 +3391,19 @@ app.post('/sessions', async (req, res) => {
       });
     }
 
-    res.render('session-started', { session: fullSession });
+    // تحويل مش render: إعادة تحميل الصفحة مكانتش تعيد إرسال الفورم وتعمل حصة زيادة بالرقم اللي بعده
+    res.redirect(`/sessions/${newSession.id}/started`);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('❌ حصلت مشكلة: ' + error.message);
+  }
+});
+
+app.get('/sessions/:id/started', requirePermission('sessions_create'), async (req, res) => {
+  try {
+    const session = await Session.findByPk(req.params.id, { include: [Center, Subject] });
+    if (!session) return res.redirect('/sessions'); // id مؤقت من الديسكتوب بعد ما الحصة اترفعت
+    res.render('session-started', { session });
   } catch (error) {
     console.error(error);
     res.status(500).send('❌ حصلت مشكلة: ' + error.message);
@@ -10653,36 +10665,6 @@ app.post('/schedule/:id/start-session', requirePermission('sessions_create'), as
   } catch (e) {
     console.error(e);
     res.status(500).send('❌ ' + e.message);
-  }
-});
-
-// Cron: تفعيل الحصص تلقائياً بالوقت المحدد
-cron.schedule('* * * * *', async () => {
-  try {
-    const now = new Date();
-    const currentDay = now.getDay();
-    const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
-
-    const entries = await ScheduleEntry.findAll({
-      where: { day_of_week: currentDay, start_time: currentTime, is_active: true },
-    });
-
-    for (const entry of entries) {
-      const series = await CenterSubjectSeries.findOne({ where: { CenterId: entry.CenterId, SubjectId: entry.SubjectId } });
-      if (!series) continue;
-
-      const finalLessonNumber = await nextLessonNumberFor(entry.CenterId, entry.SubjectId);
-      const serialNumber = series.base_number + finalLessonNumber;
-
-      await Session.create({
-        lesson_number: finalLessonNumber, serial_number: serialNumber,
-        CenterId: entry.CenterId, SubjectId: entry.SubjectId,
-      });
-
-      console.log(`✅ تم تفعيل حصة تلقائياً: مادة ${entry.SubjectId} - سنتر ${entry.CenterId}`);
-    }
-  } catch (e) {
-    console.error('Cron schedule error:', e.message);
   }
 });
 

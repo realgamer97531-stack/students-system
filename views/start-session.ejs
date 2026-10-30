@@ -193,7 +193,11 @@
           const skip = existing.length ? `\n(${existing.map(r => r.name).join('، ')} ${en ? 'already have it and will be skipped' : 'عندهم الحصة دي وهيتسابوا'})` : '';
           if (!confirm((en ? `Create lesson ${lessonInput.value} in: ` : `تعمل حصة ${lessonInput.value} في: `) + names + '؟' + skip)) e.preventDefault();
         }
+        // الضغطة التانية على "حصة جديدة" كانت بتعمل الحصة اللي بعدها
+        if (!e.defaultPrevented) document.getElementById('startSubmit').disabled = true;
       });
+      // الرجوع بزرار Back بيرجع الصفحة زي ما هي والزرار لسه مقفول
+      window.addEventListener('pageshow', () => { document.getElementById('startSubmit').disabled = false; });
       syncMode();
       schedule();
     })();
