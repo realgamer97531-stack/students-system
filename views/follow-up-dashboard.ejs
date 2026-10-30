@@ -4,7 +4,7 @@
   <div>
     <h3 class="mb-1">🎯 <span class="ar-only">لوحة متابعة الطلاب</span><span class="en-only" style="display:none;">Student Follow-up Dashboard</span></h3>
     <p class="text-muted small mb-0">
-      <%= filters.show_all ? (students.length + ' طالب') : (students.length + ' طالب مُسند إليك') %>
+      <%= filters.show_all || userRole === 'admin' ? (students.length + ' طالب') : (students.length + ' طالب مُسند إليك') %>
       <% if (selectedSession) { %> | <%- sf.session(selectedSession) %><% } %>
     </p>
   </div>
@@ -189,7 +189,7 @@
 <% if (!selectedSession && students && students.length > 0) { %>
   <div class="card shadow-sm mb-4">
     <div class="card-body">
-      <h6 class="mb-3"><span class="ar-only">الطلاب المسندين إليك</span><span class="en-only" style="display:none;">Students Assigned to You</span> (<%= students.length %>)</h6>
+      <h6 class="mb-3"><span class="ar-only"><%= userRole === 'admin' ? 'كل الطلاب' : 'الطلاب المسندين إليك' %></span><span class="en-only" style="display:none;"><%= userRole === 'admin' ? 'All Students' : 'Students Assigned to You' %></span> (<%= students.length %>)</h6>
       <div class="row g-2">
         <% students.forEach(s => { %>
           <div class="col-md-3 follow-up-search-item" data-search="<%= `${s.name} ${s.student_code}`.toLowerCase() %>">

@@ -11393,7 +11393,7 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
     const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
 
     let students = [];
-    if (show_all) {
+    if (show_all || req.session.userRole === 'admin') {
       const where = {};
       if (center_id) where.CenterId = center_id;
       if (subject_id) where.SubjectId = subject_id;
@@ -11409,9 +11409,10 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
     }
 
     const sessions = await Session.findAll({ order: [['lesson_number', 'DESC']], include: [Center, Subject] });
+    // الأدمن من غير اختيار حصة بيشوف كل الطلاب، والأسيستانت بيفتح على أحدث حصة
     const selectedSession = session_id
       ? sessions.find(s => String(s.id) === String(session_id))
-      : sessions[0];
+      : (req.session.userRole === 'admin' ? null : sessions[0]);
 
     if (selectedSession) {
       students = await Student.findAll({
@@ -11438,6 +11439,14 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
         { header: 'المركز', key: 'center', width: 20 },
         { header: 'المادة', key: 'subject', width: 20 },
       ];
+      students.forEach(s => sheet.addRow({
+        student_code: s.student_code,
+        name: s.name,
+        student_phone: s.phone,
+        parent_phone: s.parent_phone,
+        center: s.Center ? s.Center.name : '-',
+        subject: s.Subject ? s.Subject.name : '-',
+      }));
       sheet.getRow(1).font = { bold: true };
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=followup_students.xlsx');
@@ -11666,9 +11675,10 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     ]);
 
     // لو مفيش session مختار، اختار أحدث حصة
+    // الأدمن من غير اختيار حصة بيشوف كل الطلاب، والأسيستانت بيفتح على أحدث حصة
     const selectedSession = session_id
       ? sessions.find(s => String(s.id) === String(session_id))
-      : sessions[0];
+      : (req.session.userRole === 'admin' ? null : sessions[0]);
 
     let students = [];
     if (selectedSession) {
@@ -11682,7 +11692,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
         include: [Center, Subject],
         order: [['name', 'ASC']],
       });
-    } else if (show_all) {
+    } else if (show_all || req.session.userRole === 'admin') {
       // Decide which students to show: either all (with optional center/subject filters) or only assigned
       const where = {};
       if (center_id) where.CenterId = center_id;
