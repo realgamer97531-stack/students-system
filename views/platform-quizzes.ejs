@@ -31,7 +31,10 @@
       <span class="en-only" style="display:none;">Quizzes built on the platform instead of Google Forms: auto-marked, and they lock the week until submitted.</span>
     </p>
   </div>
-  <a href="/admin/platform-quizzes/new" class="btn btn-primary">➕ <span class="ar-only">اختبار جديد</span><span class="en-only" style="display:none;">New quiz</span></a>
+  <div class="d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-outline-secondary" id="syncMarksBtn" onclick="syncMarks()" title="بينقل درجات كل الاختبارات لجدول الطالب والمتابعة">🔄 <span class="ar-only">انقل الدرجات لجدول الطالب</span><span class="en-only" style="display:none;">Copy marks to student table</span></button>
+    <a href="/admin/platform-quizzes/new" class="btn btn-primary">➕ <span class="ar-only">اختبار جديد</span><span class="en-only" style="display:none;">New quiz</span></a>
+  </div>
 </div>
 
 <% if (!uploadReady) { %>
@@ -78,10 +81,11 @@
     <% } %>
     <% list.forEach(q => { %>
       <div class="pq-row">
-        <div class="pq-week"><small>الأسبوع</small><%= q.week %></div>
+        <div class="pq-week"><small><%= q.isShamel ? 'بعد أسبوع' : 'الأسبوع' %></small><%= q.week %></div>
         <div>
           <div class="pq-title"><%= q.title %></div>
           <div class="pq-meta">
+            <% if (q.isShamel) { %><span class="fw-bold">🎓 شامل · <%= q.price ? q.price + ' ج' : 'مجاني' %></span><% } %>
             <span>❓ <%= q.questions %> سؤال</span>
             <span>👥 <%= q.submitted %> سلّم</span>
             <% if (q.pending) { %><span class="text-warning fw-bold">⏳ <%= q.pending %> مقالي مستني تصحيح</span><% } %>
@@ -111,6 +115,19 @@
     const data = await response.json().catch(() => ({ success: false, message: 'رد غير متوقع' }));
     if (!response.ok || !data.success) throw new Error(data.message || 'حصلت مشكلة');
     return data;
+  }
+
+  async function syncMarks() {
+    const btn = document.getElementById('syncMarksBtn');
+    btn.disabled = true;
+    try {
+      const data = await postJson('/admin/platform-quizzes/sync-marks', {});
+      alert(`✅ اتنقلت درجات ${data.synced} طالب` + (data.skipped ? `\n⚠️ ${data.skipped} طالب أسبوع اختبارهم لسه مفيهوش حصص، هيتنقلوا بعد ما الحصص تتعمل.` : ''));
+    } catch (error) {
+      alert('❌ ' + error.message);
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   async function toggleSubject(subjectId, input) {

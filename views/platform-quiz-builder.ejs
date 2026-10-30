@@ -116,10 +116,21 @@
         <select id="fSubject" class="form-select"></select>
       </div>
       <div class="col-md-3 col-6">
-        <label class="form-label small fw-bold">يظهر ويقفل الأسبوع رقم</label>
+        <label class="form-label small fw-bold" id="fWeekLabel">يظهر ويقفل الأسبوع رقم</label>
         <input type="number" id="fWeek" class="form-control" min="1" list="weekList" placeholder="2">
         <datalist id="weekList"></datalist>
-        <div class="qb-hint mt-1">اختبار الأسبوع 1 ← حطه في الأسبوع 2</div>
+        <div class="qb-hint mt-1" id="fWeekHint">اختبار الأسبوع 1 ← حطه في الأسبوع 2</div>
+      </div>
+      <div class="col-md-8">
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="fShamel" onchange="toggleShamel(this.checked)">
+          <label class="form-check-label fw-bold" for="fShamel">🎓 امتحان شامل</label>
+        </div>
+        <div class="qb-hint mt-1">بيظهر لوحده بين أسبوعين مش جوه حصة، مبيقفلش أي حصة، وله سعر منفصل.</div>
+      </div>
+      <div class="col-md-4 d-none" id="fPriceBox">
+        <label class="form-label small fw-bold">سعر الامتحان الشامل (ج)</label>
+        <input type="number" id="fPrice" class="form-control" min="0" step="0.5" placeholder="فاضي = مجاني">
       </div>
       <div class="col-12">
         <label class="form-label small fw-bold mb-1">السناتر <span class="qb-hint fw-normal">(لو مختارتش أي سنتر = كل سناتر المادة)</span></label>
@@ -227,7 +238,7 @@
   // الافتراضي: 6 أسئلة، أول 3 اختياري، كل سؤال 2 درجة
   const state = INITIAL ? {
     id: INITIAL.id,
-    subjectId: INITIAL.subjectId, week: INITIAL.week, centerIds: INITIAL.centerIds || [],
+    subjectId: INITIAL.subjectId, week: INITIAL.week, isShamel: Boolean(INITIAL.isShamel), price: INITIAL.price, centerIds: INITIAL.centerIds || [],
     title: INITIAL.title, instructions: INITIAL.instructions, timeLimit: INITIAL.timeLimit, answerVideoUrl: INITIAL.answerVideoUrl,
     attemptCount: INITIAL.attemptCount || 0,
     questions: INITIAL.questions.map(q => ({
@@ -237,7 +248,7 @@
       correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : null,
     })),
   } : {
-    id: null, subjectId: SUBJECTS[0] ? SUBJECTS[0].id : null, week: '', centerIds: [], title: '', instructions: '',
+    id: null, subjectId: SUBJECTS[0] ? SUBJECTS[0].id : null, week: '', isShamel: false, price: '', centerIds: [], title: '', instructions: '',
     timeLimit: '', answerVideoUrl: '', attemptCount: 0,
     questions: ['mcq', 'mcq', 'mcq', 'essay', 'essay', 'essay'].map(newQuestion),
   };
@@ -252,10 +263,25 @@
     subjectSel.value = state.subjectId || '';
     document.getElementById('fTitle').value = state.title || '';
     document.getElementById('fWeek').value = state.week || '';
+    document.getElementById('fShamel').checked = Boolean(state.isShamel);
+    document.getElementById('fPrice').value = state.price || '';
+    paintShamel();
     document.getElementById('fTime').value = state.timeLimit || '';
     document.getElementById('fVideo').value = state.answerVideoUrl || '';
     document.getElementById('fInstructions').value = state.instructions || '';
     renderSubjectDetails();
+  }
+
+  function paintShamel() {
+    document.getElementById('fPriceBox').classList.toggle('d-none', !state.isShamel);
+    document.getElementById('fWeekLabel').textContent = state.isShamel ? 'يظهر بعد الأسبوع رقم' : 'يظهر ويقفل الأسبوع رقم';
+    document.getElementById('fWeekHint').textContent = state.isShamel ? 'بعد الأسبوع 4 ← يظهر للطالب بين الأسبوع 4 والأسبوع 5' : 'اختبار الأسبوع 1 ← حطه في الأسبوع 2';
+  }
+
+  function toggleShamel(on) {
+    state.isShamel = on;
+    paintShamel();
+    markDirty();
   }
 
   function renderSubjectDetails() {
@@ -279,7 +305,7 @@
     renderSubjectDetails();
     markDirty();
   });
-  [['fTitle', 'title'], ['fWeek', 'week'], ['fTime', 'timeLimit'], ['fVideo', 'answerVideoUrl'], ['fInstructions', 'instructions']].forEach(([el, key]) => {
+  [['fTitle', 'title'], ['fWeek', 'week'], ['fPrice', 'price'], ['fTime', 'timeLimit'], ['fVideo', 'answerVideoUrl'], ['fInstructions', 'instructions']].forEach(([el, key]) => {
     document.getElementById(el).addEventListener('input', (e) => { state[key] = e.target.value; markDirty(); });
   });
 
@@ -838,7 +864,7 @@
     btn.textContent = '⏳ بيتحفظ…';
     try {
       const payload = {
-        subject_id: state.subjectId, week_number: state.week, center_ids: state.centerIds, title: state.title,
+        subject_id: state.subjectId, week_number: state.week, is_shamel: Boolean(state.isShamel), price: state.price, center_ids: state.centerIds, title: state.title,
         instructions: state.instructions, time_limit_minutes: state.timeLimit, answer_video_url: state.answerVideoUrl,
         questions: state.questions.map(q => ({
           id: q.id, type: q.type, text: q.text, image: q.image, marks: q.marks, requiresAnswer: q.requiresAnswer,

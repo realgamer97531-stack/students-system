@@ -137,7 +137,9 @@ class PortalApi {
   // ===== اختبار المنصة =====
 
   static Future<Map<String, dynamic>> quiz(int id) => _get('/api/portal/student/quizzes/$id');
-  static Future<Map<String, dynamic>> startQuiz(int id) => _post('/api/portal/student/quizzes/$id/start', {}, true);
+  /// الشامل بسعر: بيرجع requiresPayment + رسالة لحد ما الطالب يأكد الدفع
+  static Future<Map<String, dynamic>> startQuiz(int id, {bool confirmPayment = false}) =>
+      _post('/api/portal/student/quizzes/$id/start', {if (confirmPayment) 'confirm_payment': true}, true);
   static Future<Map<String, dynamic>> saveQuiz(int id, Map<String, dynamic> answers) =>
       _post('/api/portal/student/quizzes/$id/save', {'answers': answers}, true);
   static Future<Map<String, dynamic>> submitQuiz(int id, Map<String, dynamic> answers) =>

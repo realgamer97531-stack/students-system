@@ -1514,11 +1514,13 @@ function requirePermission(key) {
   };
 }
 
+// key واحد أو قايمة (كفاية واحدة منهم)
 function requirePermissionOrAdmin(key) {
+  const keys = [].concat(key);
   return (req, res, next) => {
     if (req.session.userRole === 'admin') return next();
     const perms = req.session.userPermissions || [];
-    if (!perms.includes(key)) return res.status(403).send('⛔ لا تملك صلاحية الوصول');
+    if (!keys.some(item => perms.includes(item))) return res.status(403).send('⛔ لا تملك صلاحية الوصول');
     next();
   };
 }
@@ -6850,7 +6852,7 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       // اختبار المنصة: لو مفعّل للمادة بيحل محل روابط الاختبار القديمة وبيقفل أسبوعه لحد ما يتحل
       studentQuizContext(student).catch((error) => {
         console.error('Platform quiz context failed:', error.message);
-        return { enabled: false, quizzes: [], lockedWeeks: new Set() };
+        return { enabled: false, quizzes: [], shamelQuizzes: [], lockedWeeks: new Set() };
       }),
     ]);
     const studentLessonNumbers = [...new Set(studentSessions.map(s => s.lesson_number))];
@@ -6889,7 +6891,8 @@ app.get('/api/portal/student/lessons', verifyPortalToken('student'), async (req,
       ? null
       : [...new Set([...groupVideoIds, ...individualVideoIds])];
 
-    const quizResponse = quizContext.enabled ? { quizMode: true, quizzes: quizContext.quizzes } : {};
+    // الشامل في قايمة لوحده: الإصدارات القديمة من الموبايل بتتجاهله بدل ما تحطه جوه أسبوع
+    const quizResponse = quizContext.enabled ? { quizMode: true, quizzes: quizContext.quizzes, shamelQuizzes: quizContext.shamelQuizzes } : {};
     if (!allVideoAccess && allAccessibleVideoIds.length === 0) return res.json({ success: true, lessons: [], ...quizResponse });
 
     const [videos, grants] = await Promise.all([
@@ -11330,10 +11333,61 @@ function applyBlockedFilter(students, { show_blocked, only_blocked } = {}) {
   return students.filter((s) => s && !s.is_blocked);
 }
 
+const GOOD_STREAK = 3;
+
+// آخر 3 حصص (لحد الحصة المختارة) اللي اتسجل فيها واجب أو امتحان للمجموعة: الطالب لازم يكون كامل فيهم كلهم.
+// الحصة اللي مفيهاش تسجيل لحد متتحسبش، لكن الطالب الغايب عن حصة متسجلة بينقطع عنده التتابع.
+function streakStudentIds(records) {
+  const byLesson = new Map();
+  records.forEach(({ lesson, studentId, ok }) => {
+    if (!byLesson.has(lesson)) byLesson.set(lesson, new Map());
+    const row = byLesson.get(lesson);
+    row.set(studentId, Boolean(row.get(studentId) || ok));
+  });
+  const lastLessons = [...byLesson.keys()].sort((a, b) => b - a).slice(0, GOOD_STREAK);
+  if (lastLessons.length < GOOD_STREAK) return new Set();
+  const [first, ...rest] = lastLessons.map(lesson => byLesson.get(lesson));
+  return new Set([...first.keys()].filter(id => first.get(id) && rest.every(row => row.get(id))));
+}
+
+// الملتزمين: 3 امتحانات ورا بعض بالدرجة النهائية، أو 3 واجبات ورا بعض حالتها "كامل"
+async function goodStudentIdsFor(students, selectedSession) {
+  const studentIds = students.map(s => s.id);
+  if (!studentIds.length) return new Set();
+  const sessions = await Session.findAll({
+    where: { SubjectId: selectedSession.SubjectId, lesson_number: { [Op.lte]: selectedSession.lesson_number } },
+    attributes: ['id', 'lesson_number'],
+    raw: true,
+  });
+  const lessonBySession = new Map(sessions.map(s => [s.id, Number(s.lesson_number)]));
+  const sessionIds = [...lessonBySession.keys()];
+  const [homework, exams] = await Promise.all([
+    HomeworkCheck.findAll({ where: { StudentId: studentIds, SessionId: sessionIds }, attributes: ['StudentId', 'SessionId', 'status'], raw: true }),
+    Exam.findAll({ where: { SessionId: sessionIds }, attributes: ['id', 'SessionId', 'max_score'], raw: true }),
+  ]);
+  const examById = new Map(exams.map(exam => [exam.id, exam]));
+  const results = exams.length
+    ? await ExamResult.findAll({ where: { StudentId: studentIds, ExamId: exams.map(exam => exam.id) }, attributes: ['StudentId', 'ExamId', 'score'], raw: true })
+    : [];
+
+  const homeworkStreak = streakStudentIds(homework.map(h => ({ lesson: lessonBySession.get(h.SessionId), studentId: h.StudentId, ok: h.status === 'complete' })));
+  const examStreak = streakStudentIds(results.map((r) => {
+    const exam = examById.get(r.ExamId);
+    return { lesson: lessonBySession.get(exam.SessionId), studentId: r.StudentId, ok: Number(exam.max_score) > 0 && Number(r.score) >= Number(exam.max_score) };
+  }));
+  return new Set([...homeworkStreak, ...examStreak]);
+}
+
+async function applyGoodStudentsFilter(students, selectedSession, { hide_good, only_good } = {}) {
+  if (!selectedSession || (!hide_good && !only_good)) return students;
+  const goodIds = await goodStudentIdsFor(students, selectedSession);
+  return students.filter(s => (only_good ? goodIds.has(s.id) : !goodIds.has(s.id)));
+}
+
 // ===== الصفحة الرئيسية لأسيستانت المتابعة =====
 app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id, show_blocked, only_blocked } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id, show_blocked, only_blocked, hide_good, only_good } = req.query;
 
     const centersList = await Center.findAll({ order: [['name', 'ASC']] });
     const subjectsList = await Subject.findAll({ order: [['name', 'ASC']] });
@@ -11371,6 +11425,7 @@ app.get('/follow-up-dashboard/export', requireFollowUp, async (req, res) => {
     }
 
     students = applyBlockedFilter(students, { show_blocked, only_blocked });
+    students = await applyGoodStudentsFilter(students, selectedSession, { hide_good, only_good });
 
     if (!selectedSession || students.length === 0) {
       const workbook = new ExcelJS.Workbook();
@@ -11598,7 +11653,7 @@ app.post('/follow-up-dashboard/send-to-callcenter', requireFollowUp, async (req,
 
 app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
   try {
-    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id, show_blocked, only_blocked } = req.query;
+    const { filter_video_type = 'explanation', filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam, session_id, show_all, show_attended, show_only_attended, center_id, subject_id, show_blocked, only_blocked, hide_good, only_good } = req.query;
 
     // load centers & subjects for filters + sessions في نفس الوقت
     const [centersList, subjectsList, sessions] = await Promise.all([
@@ -11649,12 +11704,13 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     }
 
     students = applyBlockedFilter(students, { show_blocked, only_blocked });
+    students = await applyGoodStudentsFilter(students, selectedSession, { hide_good, only_good });
 
     // If there are no assigned students at all, render empty state immediately
     if (students.length === 0) {
       return res.render('follow-up-dashboard', {
         students: [], sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '', hide_good: hide_good || '', only_good: only_good || '' },
         absentStudents: [],
         unlinkedExams: [],
         missingExam: null,
@@ -11671,7 +11727,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
     if (!selectedSession) {
       return res.render('follow-up-dashboard', {
         students, sessionRows: [], sessions, selectedSession: null,
-        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '' },
+        filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: '', session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '', hide_good: hide_good || '', only_good: only_good || '' },
         absentStudents: [],
         unlinkedExams: [],
         missingExam: null,
@@ -11816,7 +11872,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
 
     res.render('follow-up-dashboard', {
       students, sessionRows: filteredRows, sessions, selectedSession,
-      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: effectiveMissingExamId, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '' },
+      filters: { filter_video_type, filter_video_max, filter_hw_status, filter_exam_max, filter_missing_exam: effectiveMissingExamId, session_id, show_all: show_all || '', show_attended: show_attended || '', show_only_attended: show_only_attended || '', center_id: center_id || '', subject_id: subject_id || '', show_blocked: show_blocked || '', only_blocked: only_blocked || '', hide_good: hide_good || '', only_good: only_good || '' },
       absentStudents: absentStudents,
       unlinkedExams,
       missingExam,
@@ -11839,7 +11895,7 @@ app.get('/follow-up-dashboard', requireFollowUp, async (req, res) => {
           center_id: center_id || '',
           subject_id: subject_id || '',
           show_blocked: show_blocked || '',
-          only_blocked: only_blocked || '',
+          only_blocked: only_blocked || '', hide_good: hide_good || '', only_good: only_good || '',
         }
       ),
     });
@@ -12651,7 +12707,7 @@ registerPopupQuestionRoutes(app, {
 });
 
 registerPlatformQuizRoutes(app, {
-  requirePermissionOrAdmin, verifyPortalToken, Student, Subject, Center, Session,
+  requirePermissionOrAdmin, verifyPortalToken, adjustStudentBalance, Student, Subject, Center, Session, BalanceTransaction,
 });
 
 // آخر حاجة: أي خطأ مش متوقع في صفحة بيتسجل في اللوج وبيظهر برسالة مفهومة (بدل "Internal Server Error" من غير سبب)

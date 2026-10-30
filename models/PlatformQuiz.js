@@ -6,7 +6,10 @@ const sequelize = require('../config/database');
 const PlatformQuiz = sequelize.define('PlatformQuiz', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   SubjectId: { type: DataTypes.INTEGER, allowNull: false },
-  week_number: { type: DataTypes.INTEGER, allowNull: false }, // الأسبوع اللي الاختبار بيظهر فيه وبيقفله
+  week_number: { type: DataTypes.INTEGER, allowNull: false }, // الأسبوع اللي الاختبار بيظهر فيه وبيقفله (الشامل: بيظهر بعده)
+  // شامل: بيظهر لوحده بين أسبوعين مش جوه حصة، مبيقفلش أي حصة، وله سعره
+  is_shamel: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+  price: { type: DataTypes.FLOAT, allowNull: true }, // الشامل بس. فاضي أو صفر = مجاني
   center_ids: { type: DataTypes.TEXT, allowNull: true }, // JSON [ids] — null = كل سناتر المادة
   title: { type: DataTypes.STRING(200), allowNull: false },
   instructions: { type: DataTypes.TEXT, allowNull: true },

@@ -149,7 +149,7 @@
     if (LANG === 'en') { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
     const T = {
       ar: {
-        back: 'الدروس', week: 'الأسبوع', questions: 'سؤال', marks: 'درجة', minutes: 'دقيقة', noLimit: 'من غير وقت',
+        back: 'الدروس', week: 'الأسبوع', shamel: '🎓 امتحان شامل', priceNote: (p) => `💰 سعر الامتحان ${p} ج من رصيدك، بتدفعهم مرة واحدة لما تبدأ.`, questions: 'سؤال', marks: 'درجة', minutes: 'دقيقة', noLimit: 'من غير وقت',
         start: '🚀 ابدأ الاختبار', startTimed: (m) => `الوقت (${m} دقيقة) هيبدأ أول ما تدوس ابدأ، ومينفعش يتوقف. جاهز؟`,
         startNote: 'معاك محاولة واحدة بس. إجاباتك بتتحفظ أول بأول.',
         lockNote: '🔒 حصص الأسبوع ده هتفتح أول ما تسلّم الاختبار.',
@@ -167,7 +167,7 @@
         notFound: 'الاختبار ده مش متاح ليك.', error: 'حصلت مشكلة، جرب تاني.', retry: 'حاول تاني', of: 'من',
       },
       en: {
-        back: 'Lessons', week: 'Week', questions: 'questions', marks: 'marks', minutes: 'min', noLimit: 'No time limit',
+        back: 'Lessons', week: 'Week', shamel: '🎓 Comprehensive exam', priceNote: (p) => `💰 This exam costs ${p} EGP from your balance, paid once when you start.`, questions: 'questions', marks: 'marks', minutes: 'min', noLimit: 'No time limit',
         start: '🚀 Start quiz', startTimed: (m) => `The ${m}-minute timer starts as soon as you press start and can't be paused. Ready?`,
         startNote: 'You have one attempt. Your answers are saved as you go.',
         lockNote: '🔒 This week\'s sessions open as soon as you submit.',
@@ -198,7 +198,7 @@
     let timerHandle = null;
     let submitting = false;
 
-    function weekLink() { return data && data.quiz ? `lessons.html?week=${data.quiz.weekNumber}` : 'lessons.html'; }
+    function weekLink() { return data && data.quiz && !data.quiz.isShamel ? `lessons.html?week=${data.quiz.weekNumber}` : 'lessons.html'; }
 
     async function api(method, path, body) {
       const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -248,12 +248,13 @@
       app.innerHTML = `
         <div class="qz-card qz-hero">
           <div class="icon">📝</div>
-          <div class="small fw-bold" style="color:var(--sf-muted)">${T.week} ${q.weekNumber}</div>
+          <div class="small fw-bold" style="color:var(--sf-muted)">${q.isShamel ? T.shamel : `${T.week} ${q.weekNumber}`}</div>
           <h2 class="mt-1">${esc(q.title)}</h2>
           ${factsHtml(q)}
           ${q.instructions ? `<div class="qz-instructions">${rich(q.instructions)}</div>` : ''}
           <p class="small mt-3 mb-1" style="color:var(--sf-muted)">${T.startNote}</p>
           ${q.locked ? `<p class="small fw-bold mb-3" style="color:var(--sf-warm)">${T.lockNote}</p>` : ''}
+          ${q.requiresPayment ? `<p class="small fw-bold mb-3" style="color:var(--sf-warm)">${T.priceNote(q.price)}</p>` : ''}
           <button class="qz-btn mt-2" id="startBtn" onclick="startQuiz()">${T.start}</button>
         </div>`;
     }
@@ -263,7 +264,12 @@
       if (q.timeLimitMinutes && !confirm(T.startTimed(q.timeLimitMinutes))) return;
       const btn = document.getElementById('startBtn');
       btn.disabled = true;
-      const result = await api('POST', `/api/portal/student/quizzes/${QUIZ_ID}/start`, {}).catch(() => ({ success: false }));
+      const start = (body) => api('POST', `/api/portal/student/quizzes/${QUIZ_ID}/start`, body).catch(() => ({ success: false }));
+      let result = await start({});
+      if (result.requiresPayment) {
+        if (!confirm(result.message)) { btn.disabled = false; return; }
+        result = await start({ confirm_payment: true });
+      }
       if (!result.success) { alert(result.message || T.error); btn.disabled = false; return; }
       await load();
     }
@@ -530,11 +536,11 @@
             <div id="videoBox" class="mb-3 d-none"></div>
             <div class="d-grid gap-2">
               <button class="qz-btn" id="watchBtn" onclick="showVideo()">${T.watchNow}</button>
-              <a class="qz-btn-ghost text-center text-decoration-none" href="${weekLink()}">${T.watchLater}</a>
+              <a class="qz-btn-ghost text-center text-decoration-none" href="${weekLink()}">${q.isShamel ? T.back : T.watchLater}</a>
             </div>
-            <p class="small mt-2 mb-0" style="color:var(--sf-muted)">${T.videoStays}</p>
+            ${q.isShamel ? '' : `<p class="small mt-2 mb-0" style="color:var(--sf-muted)">${T.videoStays}</p>`}
           </div>` : `
-          <div class="qz-card d-grid"><a class="qz-btn text-center text-decoration-none" href="${weekLink()}">${T.openWeek}</a></div>`}
+          <div class="qz-card d-grid"><a class="qz-btn text-center text-decoration-none" href="${weekLink()}">${q.isShamel ? T.back : T.openWeek}</a></div>`}
         <h5 class="fw-bold mt-4 mb-2">${T.review}</h5>
         <div class="qz-nav">${qs.map((question, i) => {
           const v = verdictOf(question);

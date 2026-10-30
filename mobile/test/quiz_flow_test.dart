@@ -48,6 +48,14 @@ class QuizServer {
         'redoAvailable': false, 'answerVideoUrl': submitted ? 'https://youtu.be/dQw4w9WgXcQ' : null, 'url': 'https://shadyelsharkawy.com/quiz.html?id=5',
       };
 
+  bool withShamel = false;
+  bool shamelPaid = false;
+  Map<String, dynamic> shamelSummary() => {
+        'id': 9, 'title': 'الامتحان الشامل الأول', 'weekNumber': 1, 'timeLimitMinutes': null, 'questionCount': 3, 'totalMarks': 6,
+        'status': shamelPaid ? 'in_progress' : 'not_started', 'locked': false, 'isShamel': true, 'price': 50, 'requiresPayment': !shamelPaid,
+        'score': null, 'maxScore': null, 'pendingCount': 0, 'redoAvailable': false, 'answerVideoUrl': null,
+      };
+
   late final client = MockClient((request) async {
     requests.add(request);
     final path = request.url.path;
@@ -69,7 +77,15 @@ class QuizServer {
           l['quizId'] = 5;
           l['examUrl'] = 'https://shadyelsharkawy.com/quiz.html?id=5';
         }
-        return json({...body, 'quizMode': true, 'quizzes': [summary()]});
+        return json({...body, 'quizMode': true, 'quizzes': [summary()], 'shamelQuizzes': [if (withShamel) shamelSummary()]});
+      case '/api/portal/student/quizzes/9':
+        return json({'success': true, 'serverNow': DateTime.now().toUtc().toIso8601String(), 'quiz': {...shamelSummary(), 'instructions': ''}, if (shamelPaid) 'attempt': {'id': 2, 'attemptNo': 1, 'status': 'in_progress', 'answers': {}, 'deadlineAt': null}, if (shamelPaid) 'questions': questions});
+      case '/api/portal/student/quizzes/9/start':
+        if ((jsonDecode(request.body) as Map)['confirm_payment'] != true) {
+          return json({'success': false, 'requiresPayment': true, 'price': 50, 'message': 'الاختبار الشامل ده بـ 50 ج. هل توافق على دفعهم من رصيدك؟'});
+        }
+        shamelPaid = true;
+        return json('{"success":true,"attemptId":2}');
       case '/api/portal/student/quizzes/5':
         final out = <String, dynamic>{'success': true, 'serverNow': DateTime.now().toUtc().toIso8601String(), 'quiz': {...summary(), 'instructions': 'ركز في الوحدات \\(g = 9.8\\)'}};
         if (submitted) {
@@ -195,5 +211,46 @@ void main() {
 
     final paths = server.requests.map((r) => '${r.method} ${r.url.path}').toList();
     expect(paths, containsAll(['POST /api/portal/student/quizzes/5/start', 'POST /api/portal/student/quizzes/5/save', 'POST /api/portal/student/quizzes/5/submit']));
+  });
+
+  testWidgets('Shamel shows as its own card between weeks and asks to pay before starting', (tester) async {
+    server.withShamel = true;
+    tester.view.physicalSize = const Size(412 * 2, 915 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const StudyisfunnyApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), '01000000001');
+    await tester.enterText(find.byType(TextFormField).at(1), 'STU-00001');
+    await tester.tap(find.text('دخول'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('الفيديوهات').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('🎓 امتحان شامل'), findsOneWidget);
+    expect(find.text('الامتحان الشامل الأول'), findsOneWidget);
+    expect(find.text('50 ج'), findsOneWidget);
+    final week = tester.getTopLeft(find.text('الأسبوع 1'));
+    final shamel = tester.getTopLeft(find.text('الامتحان الشامل الأول'));
+    expect(shamel.dy > week.dy || shamel.dx < week.dx, isTrue, reason: 'card comes after its week');
+
+    await tester.tap(find.text('الأسبوع 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('الامتحان الشامل الأول'), findsNothing, reason: 'not inside the week');
+    tester.state<NavigatorState>(find.byType(Navigator).last).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('الامتحان الشامل الأول'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('سعر الامتحان 50 ج'), findsOneWidget);
+    await tester.tap(find.text('ابدأ الاختبار'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('هل توافق على دفعهم'), findsOneWidget);
+    expect(server.shamelPaid, isFalse);
+    await tester.tap(find.text('موافق، ادفع وابدأ'));
+    await tester.pumpAndSettle();
+    expect(server.shamelPaid, isTrue);
+    expect(find.text('سؤال 1'), findsOneWidget);
   });
 }

@@ -11,7 +11,9 @@ const PlatformQuiz = require('../models/PlatformQuiz');
 const PlatformQuizQuestion = require('../models/PlatformQuizQuestion');
 const PlatformQuizAttempt = require('../models/PlatformQuizAttempt');
 const PlatformQuizSetting = require('../models/PlatformQuizSetting');
+const PlatformQuizPayment = require('../models/PlatformQuizPayment');
 const { uploadQuizImage, quizUploadConfigured } = require('../utils/quizImageUpload');
+const { syncQuizMarks, syncQuizMarksSafe, deleteQuizMarks } = require('../utils/platformQuizMarks');
 
 const QUESTION_TYPES = ['mcq', 'essay', 'bonus'];
 const MAX_QUESTIONS = 100;
@@ -132,6 +134,7 @@ async function finalizeAttempt(attempt, questions, answers, autoSubmitted) {
     pending_count: graded.pending,
     auto_submitted: Boolean(autoSubmitted),
   }, { where: { id: attempt.id, status: 'in_progress' } });
+  if (count > 0) await syncQuizMarksSafe(attempt.QuizId, attempt.StudentId);
   return PlatformQuizAttempt.findByPk(attempt.id).then((fresh) => ({ attempt: fresh, changed: count > 0 }));
 }
 
@@ -161,7 +164,11 @@ async function isSubjectEnabled(subjectId) {
   return Boolean(row && row.enabled);
 }
 
-function summarizeForStudent(quiz, attempts, questionCount, totalMarks) {
+function quizPrice(quiz) {
+  return quiz.is_shamel ? round2(quiz.price) : 0;
+}
+
+function summarizeForStudent(quiz, attempts, questionCount, totalMarks, paid = false) {
   const sorted = [...attempts].sort((a, b) => b.attempt_no - a.attempt_no);
   const latest = sorted[0] || null;
   const lastSubmitted = sorted.find((a) => a.status === 'submitted') || null;
@@ -174,7 +181,10 @@ function summarizeForStudent(quiz, attempts, questionCount, totalMarks) {
     questionCount,
     totalMarks: round2(totalMarks),
     status: inProgress ? 'in_progress' : (lastSubmitted ? 'submitted' : 'not_started'),
-    locked: !lastSubmitted, // الأسبوع مقفول لحد أول تسليم
+    locked: !quiz.is_shamel && !lastSubmitted, // الأسبوع مقفول لحد أول تسليم
+    isShamel: Boolean(quiz.is_shamel),
+    price: quizPrice(quiz),
+    requiresPayment: quizPrice(quiz) > 0 && !paid,
     score: lastSubmitted ? round2(lastSubmitted.score) : null,
     maxScore: lastSubmitted ? round2(lastSubmitted.max_score) : null,
     pendingCount: lastSubmitted ? lastSubmitted.pending_count : 0,
@@ -186,16 +196,18 @@ function summarizeForStudent(quiz, attempts, questionCount, totalMarks) {
 
 // كل اختبارات الطالب (لصفحة الدروس): المادة لازم تكون مفعلة والاختبار منشور
 async function studentQuizContext(student) {
-  if (!student || !(await isSubjectEnabled(student.SubjectId))) return { enabled: false, quizzes: [], lockedWeeks: new Set() };
+  if (!student || !(await isSubjectEnabled(student.SubjectId))) return { enabled: false, quizzes: [], shamelQuizzes: [], lockedWeeks: new Set() };
   const quizzes = (await PlatformQuiz.findAll({ where: { SubjectId: student.SubjectId, is_published: true } }))
     .filter((quiz) => quizAppliesToStudent(quiz, student));
-  if (!quizzes.length) return { enabled: true, quizzes: [], lockedWeeks: new Set() };
+  if (!quizzes.length) return { enabled: true, quizzes: [], shamelQuizzes: [], lockedWeeks: new Set() };
   const quizIds = quizzes.map((q) => q.id);
-  const [attemptsRaw, questions] = await Promise.all([
+  const [attemptsRaw, questions, payments] = await Promise.all([
     PlatformQuizAttempt.findAll({ where: { QuizId: quizIds, StudentId: student.id } }),
     PlatformQuizQuestion.findAll({ where: { QuizId: quizIds }, attributes: ['QuizId', 'marks'] }),
+    PlatformQuizPayment.findAll({ where: { QuizId: quizIds, StudentId: student.id }, attributes: ['QuizId'] }),
   ]);
   const attempts = await expireAttempts(attemptsRaw);
+  const paidQuizIds = new Set(payments.map((p) => p.QuizId));
   const summaries = quizzes.map((quiz) => {
     const own = questions.filter((q) => q.QuizId === quiz.id);
     return summarizeForStudent(
@@ -203,10 +215,16 @@ async function studentQuizContext(student) {
       attempts.filter((a) => a.QuizId === quiz.id),
       own.length,
       own.reduce((sum, q) => sum + Number(q.marks || 0), 0),
+      paidQuizIds.has(quiz.id),
     );
   }).sort((a, b) => a.weekNumber - b.weekNumber || a.id - b.id);
   const lockedWeeks = new Set(summaries.filter((s) => s.locked).map((s) => Number(s.weekNumber)));
-  return { enabled: true, quizzes: summaries, lockedWeeks };
+  return {
+    enabled: true,
+    quizzes: summaries.filter((s) => !s.isShamel),
+    shamelQuizzes: summaries.filter((s) => s.isShamel),
+    lockedWeeks,
+  };
 }
 
 // هل الحصة دي مقفولة على الطالب لحد ما يحل اختبار؟ (بيتنادي من فتح الفيديو/أجزاءه)
@@ -216,7 +234,7 @@ async function quizLockForSession(student, session) {
   if (!Number.isInteger(week) || week <= 0) return null;
   if (Number(session.SubjectId) !== Number(student.SubjectId)) return null;
   if (!(await isSubjectEnabled(student.SubjectId))) return null;
-  const quizzes = (await PlatformQuiz.findAll({ where: { SubjectId: student.SubjectId, week_number: week, is_published: true } }))
+  const quizzes = (await PlatformQuiz.findAll({ where: { SubjectId: student.SubjectId, week_number: week, is_published: true, is_shamel: false } }))
     .filter((quiz) => quizAppliesToStudent(quiz, student));
   if (!quizzes.length) return null;
   const attempts = await expireAttempts(await PlatformQuizAttempt.findAll({
@@ -242,7 +260,11 @@ function publicQuestion(q, reveal) {
 function readQuizBody(body) {
   const centerIds = [...new Set((Array.isArray(body.center_ids) ? body.center_ids : []).map(Number).filter(Boolean))];
   const time = Number.parseInt(body.time_limit_minutes, 10);
+  const isShamel = body.is_shamel === true || body.is_shamel === '1' || body.is_shamel === 'true';
+  const price = Number(body.price);
   return {
+    is_shamel: isShamel,
+    price: isShamel && Number.isFinite(price) && price > 0 ? round2(price) : null,
     SubjectId: Number(body.subject_id) || null,
     week_number: Number.parseInt(body.week_number, 10),
     center_ids: centerIds.length ? JSON.stringify(centerIds) : null,
@@ -294,8 +316,9 @@ function readQuestions(list) {
 }
 
 module.exports = function registerPlatformQuizRoutes(app, deps) {
-  const { requirePermissionOrAdmin, verifyPortalToken, Student, Subject, Center, Session } = deps;
-  const adminGuard = requirePermissionOrAdmin('admin_videos');
+  const { requirePermissionOrAdmin, verifyPortalToken, adjustStudentBalance, Student, Subject, Center, Session, BalanceTransaction } = deps;
+  // صلاحية "اختبارات المنصة" بتدي الصفحة كلها، واللي معاه إدارة الفيديوهات من قبل كده لسه داخل زي ما هو
+  const adminGuard = requirePermissionOrAdmin(['platform_quizzes', 'admin_videos']);
 
   // ================= الأدمن =================
 
@@ -338,6 +361,7 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
         enabledIds: [...enabled],
         quizzes: quizzes.map((q) => ({
           id: q.id, SubjectId: q.SubjectId, week: q.week_number, title: q.title, published: q.is_published,
+          isShamel: Boolean(q.is_shamel), price: quizPrice(q),
           centerIds: quizCenterIds(q), timeLimit: q.time_limit_minutes,
           questions: stats[q.id].questions, submitted: stats[q.id].students.size, pending: stats[q.id].pending,
         })),
@@ -375,6 +399,8 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
         id: quiz.id,
         subjectId: quiz.SubjectId,
         week: quiz.week_number,
+        isShamel: Boolean(quiz.is_shamel),
+        price: quiz.price || '',
         centerIds: quizCenterIds(quiz) || [],
         title: quiz.title,
         instructions: quiz.instructions || '',
@@ -450,10 +476,28 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
       if (removed.length) await PlatformQuizQuestion.destroy({ where: { id: removed, QuizId: quiz.id }, transaction });
       return { quizId: quiz.id, questionIds };
     });
+    if (existing) await syncQuizMarksSafe(saved.quizId); // الاسم أو الأسبوع أو الدرجة النهائية ممكن يكونوا اتغيروا
     // عدد المحاولات عشان صفحة التعديل تسأل عن إعادة التصحيح
     const attemptCount = await PlatformQuizAttempt.count({ where: { QuizId: saved.quizId, status: 'submitted' } });
     res.json({ success: true, id: saved.quizId, questionIds: saved.questionIds, attemptCount });
   }
+
+  // بينقل درجات كل الاختبارات لجدول الطالب (الدرجات القديمة + اللي أسبوعها مكانش فيه حصص وقت التسليم)
+  app.post('/admin/platform-quizzes/sync-marks', adminGuard, async (req, res) => {
+    try {
+      const quizzes = await PlatformQuiz.findAll({ attributes: ['id'] });
+      const total = { synced: 0, skipped: 0 };
+      for (const quiz of quizzes) {
+        const result = await syncQuizMarks(quiz.id);
+        total.synced += result.synced;
+        total.skipped += result.skipped;
+      }
+      res.json({ success: true, ...total });
+    } catch (error) {
+      console.error('Platform quiz marks sync failed:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
 
   app.post('/admin/platform-quizzes', adminGuard, async (req, res) => {
     try { await saveQuiz(req, res, null); } catch (error) {
@@ -493,6 +537,7 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
       const quiz = await PlatformQuiz.findByPk(req.params.id);
       if (!quiz) return res.redirect('/admin/platform-quizzes');
       await PlatformQuiz.sequelize.transaction(async (transaction) => {
+        await deleteQuizMarks(quiz.id, transaction);
         await PlatformQuizAttempt.destroy({ where: { QuizId: quiz.id }, transaction });
         await PlatformQuizQuestion.destroy({ where: { QuizId: quiz.id }, transaction });
         await quiz.destroy({ transaction });
@@ -571,7 +616,7 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
       const submittedRows = rows.filter((r) => r.score !== null);
       const average = submittedRows.length ? round2(submittedRows.reduce((sum, r) => sum + r.score, 0) / submittedRows.length) : null;
       res.render('platform-quiz-results', {
-        quiz: { id: quiz.id, title: quiz.title, week: quiz.week_number, published: quiz.is_published, redoAllAt: quiz.redo_all_at },
+        quiz: { id: quiz.id, title: quiz.title, week: quiz.week_number, isShamel: Boolean(quiz.is_shamel), published: quiz.is_published, redoAllAt: quiz.redo_all_at },
         subjectName: subject ? subject.name : '',
         totalMarks: round2(questions.reduce((sum, q) => sum + Number(q.marks || 0), 0)),
         rows, pendingItems, average,
@@ -599,6 +644,7 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
         score: round2(values.reduce((sum, r) => sum + Number(r.earned || 0), 0)),
         pending_count: values.filter((r) => r.pending).length,
       });
+      await syncQuizMarksSafe(attempt.QuizId, attempt.StudentId);
       res.json({ success: true, score: round2(attempt.score), pending: attempt.pending_count });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -641,6 +687,7 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
         const graded = gradeAttempt(questions, parseJson(attempt.answers, {}), parseJson(attempt.results, {}));
         await attempt.update({ results: JSON.stringify(graded.results), score: graded.score, max_score: graded.maxScore, pending_count: graded.pending });
       }
+      await syncQuizMarksSafe(req.params.id);
       res.json({ success: true, count: attempts.length });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -689,7 +736,7 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
       const student = await Student.findByPk(req.portalStudentId);
       if (!student) return res.status(404).json({ success: false, message: 'غير موجود' });
       const context = await studentQuizContext(student);
-      res.json({ success: true, enabled: context.enabled, quizzes: context.quizzes });
+      res.json({ success: true, enabled: context.enabled, quizzes: context.quizzes, shamelQuizzes: context.shamelQuizzes });
     } catch (error) {
       console.error('Student quizzes failed:', error);
       res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
@@ -701,11 +748,15 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
       const loaded = await loadStudentQuiz(req, res);
       if (!loaded) return;
       const { student, quiz } = loaded;
-      const [questions, attempts] = await Promise.all([loadQuestions(quiz.id), studentAttempts(quiz.id, student.id)]);
+      const [questions, attempts, payment] = await Promise.all([
+        loadQuestions(quiz.id),
+        studentAttempts(quiz.id, student.id),
+        PlatformQuizPayment.findOne({ where: { QuizId: quiz.id, StudentId: student.id }, attributes: ['id'] }),
+      ]);
       const latest = attempts[0] || null;
       const lastSubmitted = attempts.find((a) => a.status === 'submitted') || null;
       const inProgress = latest && latest.status === 'in_progress' ? latest : null;
-      const summary = summarizeForStudent(quiz, attempts, questions.length, questions.reduce((sum, q) => sum + Number(q.marks || 0), 0));
+      const summary = summarizeForStudent(quiz, attempts, questions.length, questions.reduce((sum, q) => sum + Number(q.marks || 0), 0), Boolean(payment));
       const payload = {
         success: true,
         serverNow: new Date().toISOString(),
@@ -734,6 +785,14 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
       const latest = attempts[0] || null;
       if (latest && latest.status === 'in_progress') return res.json({ success: true, attemptId: latest.id });
       if (latest && !canRedo(quiz, latest)) return res.status(409).json({ success: false, message: 'انت حليت الاختبار ده قبل كده' });
+      const price = quizPrice(quiz);
+      if (price > 0 && !(await PlatformQuizPayment.findOne({ where: { QuizId: quiz.id, StudentId: student.id }, attributes: ['id'] }))) {
+        if (!(req.body && req.body.confirm_payment)) {
+          return res.json({ success: false, requiresPayment: true, price, message: `الاختبار الشامل ده بـ ${price} ج. هل توافق على دفعهم من رصيدك؟` });
+        }
+        const payment = await payForQuiz(quiz, student);
+        if (payment.insufficient) return res.json({ success: false, message: 'رصيدك غير كافٍ لدفع ثمن الاختبار ده' });
+      }
       const now = new Date();
       try {
         const attempt = await PlatformQuizAttempt.create({
@@ -759,6 +818,21 @@ module.exports = function registerPlatformQuizRoutes(app, deps) {
       res.status(500).json({ success: false, message: 'حصلت مشكلة في السيرفر' });
     }
   });
+
+  // دفع الشامل مرة واحدة من رصيد الطالب. نفس طريقة دفع الفيديو: قفل على صف الطالب عشان ضغطتين ميخصموش مرتين
+  async function payForQuiz(quiz, student) {
+    const price = quizPrice(quiz);
+    return PlatformQuiz.sequelize.transaction(async (transaction) => {
+      const locked = await Student.findByPk(student.id, { transaction, lock: transaction.LOCK.UPDATE });
+      const already = await PlatformQuizPayment.findOne({ where: { QuizId: quiz.id, StudentId: student.id }, transaction });
+      if (already) return { paid: true };
+      if (Number(locked.balance) < price) return { insufficient: true };
+      await adjustStudentBalance(locked, -price, transaction);
+      await BalanceTransaction.create({ StudentId: student.id, amount: -price, reason: `اختبار شامل: ${quiz.title}` }, { transaction });
+      await PlatformQuizPayment.create({ QuizId: quiz.id, StudentId: student.id, amount: price }, { transaction });
+      return { paid: true };
+    });
+  }
 
   async function currentAttempt(quizId, studentId) {
     return PlatformQuizAttempt.findOne({ where: { QuizId: quizId, StudentId: studentId, status: 'in_progress' } });

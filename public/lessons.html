@@ -432,6 +432,9 @@ html[dir="ltr"] .whatsapp-float {
         examVideoBtn: "فيديو إجابة الاختبار",
         questionsBtn: "الأسئلة",
         quizTitle: "اختبار الأسبوع",
+        shamelTitle: "امتحان شامل",
+        shamelFree: "مجاني",
+        shamelCurrency: "ج",
         quizStart: "ابدأ الاختبار",
         quizContinue: "كمّل الاختبار",
         quizShowResult: "شوف نتيجتك",
@@ -477,6 +480,9 @@ html[dir="ltr"] .whatsapp-float {
         examVideoBtn: "Quiz Answer Video",
         questionsBtn: "Questions",
         quizTitle: "Weekly quiz",
+        shamelTitle: "Comprehensive exam",
+        shamelFree: "Free",
+        shamelCurrency: "EGP",
         quizStart: "Start quiz",
         quizContinue: "Continue quiz",
         quizShowResult: "See your result",
@@ -776,8 +782,9 @@ html[dir="ltr"] .whatsapp-float {
       // اختبار المنصة (لو مفعّل للمادة): كارت الاختبار جوه أسبوعه بدل روابط جوجل فورم
       const quizMode = Boolean(result.success && result.quizMode);
       const quizzes = quizMode && Array.isArray(result.quizzes) ? result.quizzes : [];
+      const shamelQuizzes = quizMode && Array.isArray(result.shamelQuizzes) ? result.shamelQuizzes : [];
 
-      if (!result.success || ((!result.lessons || result.lessons.length === 0) && quizzes.length === 0)) {
+      if (!result.success || ((!result.lessons || result.lessons.length === 0) && quizzes.length === 0 && shamelQuizzes.length === 0)) {
         container.innerHTML = `<div class="col-12"><p class="text-muted text-center py-5">${translations[currentLang].noLessons}</p></div>`;
         return;
       }
@@ -939,7 +946,17 @@ html[dir="ltr"] .whatsapp-float {
         return;
       }
 
-      weeks.forEach((week, weekIndex) => {
+      // الشامل كارت لوحده بين الأسابيع: بعد الأسبوع اللي اتحدد (الأسابيع من غير رقم في الآخر)
+      const gridItems = [
+        ...weeks.map(week => ({ week, position: week.number === null ? Infinity : week.number, order: 0 })),
+        ...shamelQuizzes.map(quiz => ({ quiz, position: Number(quiz.weekNumber), order: 1 })),
+      ].sort((a, b) => a.position - b.position || a.order - b.order);
+
+      gridItems.forEach(({ week, quiz }, weekIndex) => {
+        if (quiz) {
+          container.innerHTML += shamelCardHtml(quiz, currentLang, weekIndex);
+          return;
+        }
         container.innerHTML += `
           <div class="col-md-3 col-sm-6 col-12 fade-in-up" style="animation-delay: ${weekIndex * 0.1}s">
             <div class="card lesson-card h-100" onclick="window.location.href='lessons.html?week=${week.key}'" style="border: 1px solid var(--sf-border); background: linear-gradient(135deg, rgba(79,70,229,0.06), rgba(16,179,163,0.05)); min-height: 190px; display: flex; align-items: center; justify-content: center; text-align: center;">
@@ -965,6 +982,27 @@ html[dir="ltr"] .whatsapp-float {
       if (!weekQuizzes.length) return '';
       if (weekQuizzes.some(quiz => quiz.locked)) return `<span class="badge bg-warning text-dark mt-2">${translations[lang].quizWeekNeeds}</span>`;
       return weekQuizzes.map(quiz => `<span class="badge mt-2" style="background: rgba(16,179,163,0.14); color: #0f766e;" dir="ltr">📝 ${quiz.score} / ${quiz.maxScore}</span>`).join(' ');
+    }
+
+    function shamelCardHtml(quiz, lang, index) {
+      const t = translations[lang];
+      const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+      const status = quiz.status === 'submitted'
+        ? `<span class="badge mt-2" style="background: rgba(16,179,163,0.14); color: #0f766e;" dir="ltr">📝 ${quiz.score} / ${quiz.maxScore}</span>`
+        : `<span class="badge mt-2" style="background: rgba(245,158,11,0.16); color: #B45309;">${quiz.price > 0 ? `${quiz.price} ${t.shamelCurrency}` : t.shamelFree}</span>`;
+      return `
+        <div class="col-md-3 col-sm-6 col-12 fade-in-up" style="animation-delay: ${index * 0.1}s">
+          <div class="card lesson-card h-100" onclick="openQuiz(${quiz.id})" style="border: 2px solid #F59E0B; background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(239,68,68,0.06)); min-height: 190px; display: flex; align-items: center; justify-content: center; text-align: center;">
+            <div class="card-body p-4 w-100">
+              <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                <span class="badge mb-3" style="background: rgba(245,158,11,0.16); color: #B45309;">🎓 ${t.shamelTitle}</span>
+                <h5 class="fw-bold mb-1">${esc(quiz.title)}</h5>
+                <p class="mb-0 small" style="color: var(--sf-muted);">${quiz.questionCount} ${t.quizQuestions}</p>
+                ${status}
+              </div>
+            </div>
+          </div>
+        </div>`;
     }
 
     function quizCardHtml(quiz, lang) {

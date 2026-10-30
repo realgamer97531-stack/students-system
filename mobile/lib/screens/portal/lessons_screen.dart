@@ -26,12 +26,14 @@ const _statusLabels = {
 };
 
 class LessonsData {
-  LessonsData(this.lessons, this.popupResults, {this.quizMode = false, this.quizzes = const []});
+  LessonsData(this.lessons, this.popupResults, {this.quizMode = false, this.quizzes = const [], this.shamelQuizzes = const []});
   final List<Map<String, dynamic>> lessons;
   final Map<String, dynamic> popupResults;
   // اختبار المنصة: لو مفعّل للمادة كارت الاختبار بيحل محل روابط جوجل فورم، والأسبوع بيتقفل لحد ما يتحل
   final bool quizMode;
   final List<Map<String, dynamic>> quizzes;
+  // الشامل: كارت لوحده بين الأسابيع، مش جوه أسبوع
+  final List<Map<String, dynamic>> shamelQuizzes;
 
   List<Map<String, dynamic>> quizzesForWeek(int? week) => quizzes.where((q) => week != null && asInt(q['weekNumber']) == week).toList();
 }
@@ -70,6 +72,52 @@ List<_Week> _buildWeeks(List<Map<String, dynamic>> lessons, [List<Map<String, dy
   return weeks;
 }
 
+/// الأسابيع + كروت الشامل، كل شامل بعد الأسبوع اللي اتحدد له (الأسابيع من غير رقم في الآخر)
+List<Object> _gridItems(List<_Week> weeks, List<Map<String, dynamic>> shamel) {
+  final items = <(int, int, Object)>[
+    for (final w in weeks) (w.number ?? 1 << 30, 0, w),
+    for (final q in shamel) (asInt(q['weekNumber']) ?? 0, 1, q),
+  ];
+  items.sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+  return [for (final item in items) item.$3];
+}
+
+class _ShamelCard extends StatelessWidget {
+  const _ShamelCard({required this.quiz, required this.onChanged});
+  final Map<String, dynamic> quiz;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final submitted = '${quiz['status']}' == 'submitted';
+    final price = (quiz['price'] as num?) ?? 0;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.warning, width: 2)),
+      child: InkWell(
+        onTap: () async {
+          await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => QuizScreen(quizId: asInt(quiz['id'])!, title: '${quiz['title'] ?? ''}')));
+          onChanged();
+        },
+        child: Container(
+          decoration: const BoxDecoration(color: AppColors.warningSoft),
+          padding: const EdgeInsets.all(12),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Pill('🎓 امتحان شامل', AppColors.warningSoft, AppColors.warningText),
+            const SizedBox(height: 8),
+            Text('${quiz['title'] ?? ''}', textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            if (submitted)
+              Pill('📝 ${quiz['score']} / ${quiz['maxScore']}', AppColors.successSoft, AppColors.successText)
+            else
+              Text(price > 0 ? '$price ج' : 'مجاني', style: const TextStyle(color: AppColors.warningText, fontWeight: FontWeight.w700)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 String formatRemaining(int seconds) {
   final s = seconds < 0 ? 0 : seconds;
   final d = s ~/ 86400, h = (s % 86400) ~/ 3600, m = (s % 3600) ~/ 60;
@@ -102,7 +150,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
     } catch (_) {
       popup = ((await Cache.read('lessons'))?.data as Map?)?['popup'] as Map<String, dynamic>? ?? {};
     }
-    return {'lessons': lessons, 'popup': popup, 'quizMode': body['quizMode'] == true, 'quizzes': body['quizzes'] ?? []};
+    return {'lessons': lessons, 'popup': popup, 'quizMode': body['quizMode'] == true, 'quizzes': body['quizzes'] ?? [], 'shamelQuizzes': body['shamelQuizzes'] ?? []};
   }
 
   @override
@@ -119,16 +167,20 @@ class _LessonsScreenState extends State<LessonsScreen> {
           (j['popup'] as Map?)?.cast<String, dynamic>() ?? {},
           quizMode: j['quizMode'] == true,
           quizzes: _maps(j['quizzes']),
+          shamelQuizzes: _maps(j['shamelQuizzes']),
         ),
         builder: (context, data, refresh) {
-          if (data.lessons.isEmpty && data.quizzes.isEmpty) return const EmptyView('لا يوجد دروس فيديو متاحة حاليًا', icon: Icons.ondemand_video_outlined);
+          if (data.lessons.isEmpty && data.quizzes.isEmpty && data.shamelQuizzes.isEmpty) return const EmptyView('لا يوجد دروس فيديو متاحة حاليًا', icon: Icons.ondemand_video_outlined);
           final weeks = _buildWeeks(data.lessons, data.quizzes);
+          final items = _gridItems(weeks, data.shamelQuizzes);
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 260, mainAxisExtent: 150, crossAxisSpacing: 12, mainAxisSpacing: 12),
-            itemCount: weeks.length,
+            itemCount: items.length,
             itemBuilder: (context, i) {
-              final w = weeks[i];
+              final item = items[i];
+              if (item is Map<String, dynamic>) return _ShamelCard(quiz: item, onChanged: refresh);
+              final w = item as _Week;
               final weekQuizzes = data.quizzesForWeek(w.number);
               return Card(
                 clipBehavior: Clip.antiAlias,

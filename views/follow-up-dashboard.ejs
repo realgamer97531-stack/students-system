@@ -19,7 +19,7 @@
         <% }) %>
       </select>
     </form>
-    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', show_only_attended: filters.show_only_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '', filter_missing_exam: filters.filter_missing_exam || '', show_blocked: filters.show_blocked || '', only_blocked: filters.only_blocked || '' }).toString(); %>
+    <% const exportQuery = new URLSearchParams({ session_id: filters.session_id || '', show_all: filters.show_all || '', show_attended: filters.show_attended || '', show_only_attended: filters.show_only_attended || '', center_id: filters.center_id || '', subject_id: filters.subject_id || '', filter_video_type: filters.filter_video_type || '', filter_video_max: filters.filter_video_max || '', filter_hw_status: filters.filter_hw_status || '', filter_exam_max: filters.filter_exam_max || '', filter_missing_exam: filters.filter_missing_exam || '', show_blocked: filters.show_blocked || '', only_blocked: filters.only_blocked || '', hide_good: filters.hide_good || '', only_good: filters.only_good || '' }).toString(); %>
     <a href="/follow-up-dashboard/export?<%= exportQuery %>" class="btn btn-success btn-sm">📥 <span class="ar-only">تصدير</span><span class="en-only" style="display:none;">Export</span> Excel</a>
     <% if (callCenterIntegrationEnabled && selectedSession && sessionRows.length > 0) { %>
       <button type="button" id="sendFollowUpToCallcenter" class="btn btn-outline-primary btn-sm">☎️ <span class="ar-only">إرسال الظاهرين للاتصال</span><span class="en-only" style="display:none;">Send Visible to Call Center</span></button>
@@ -44,7 +44,9 @@
       center_id: filters.center_id || '',
       subject_id: filters.subject_id || '',
       show_blocked: filters.show_blocked || '',
-      only_blocked: filters.only_blocked || ''
+      only_blocked: filters.only_blocked || '',
+      hide_good: filters.hide_good || '',
+      only_good: filters.only_good || ''
     }
   }).replace(/</g, '\\u003c') %></script>
 <% } %>
@@ -63,6 +65,8 @@
       <input type="hidden" name="show_only_attended" value="<%= filters.show_only_attended || '' %>">
       <input type="hidden" name="show_blocked" value="<%= filters.show_blocked || '' %>">
       <input type="hidden" name="only_blocked" value="<%= filters.only_blocked || '' %>">
+      <input type="hidden" name="hide_good" value="<%= filters.hide_good || '' %>">
+      <input type="hidden" name="only_good" value="<%= filters.only_good || '' %>">
       <div class="col-md-2">
         <label class="form-label small fw-bold"><span class="ar-only">نوع الفيديو</span><span class="en-only" style="display:none;">Video Type</span></label>
         <select name="filter_video_type" class="form-select form-select-sm">
@@ -145,6 +149,17 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="onlyBlockedCheckbox" <%= filters.only_blocked ? 'checked':'' %> >
           <label class="form-check-label small" for="onlyBlockedCheckbox"><span class="ar-only">المحظورين بس</span><span class="en-only" style="display:none;">Blocked only</span></label>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold" title="3 امتحانات ورا بعض بالدرجة النهائية، أو 3 واجبات ورا بعض حالتها كامل"><span class="ar-only">⭐ الطلاب الملتزمين</span><span class="en-only" style="display:none;">⭐ Good students</span></label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="hideGoodCheckbox" <%= filters.hide_good ? 'checked':'' %> >
+          <label class="form-check-label small" for="hideGoodCheckbox"><span class="ar-only">شيل الملتزمين</span><span class="en-only" style="display:none;">Hide good students</span></label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="onlyGoodCheckbox" <%= filters.only_good ? 'checked':'' %> >
+          <label class="form-check-label small" for="onlyGoodCheckbox"><span class="ar-only">الملتزمين بس</span><span class="en-only" style="display:none;">Good students only</span></label>
         </div>
       </div>
       <div class="col-md-2">
@@ -351,6 +366,22 @@
       onlyBlockedCheckbox.addEventListener('change', () => {
         onlyBlockedHidden.value = onlyBlockedCheckbox.checked ? '1' : '';
         if (onlyBlockedCheckbox.checked && showBlockedCheckbox) { showBlockedCheckbox.checked = true; showBlockedHidden.value = '1'; }
+      });
+    }
+
+    // الملتزمين: الاختيارين عكس بعض، فواحد بس يتعلم
+    const hideGoodCheckbox = document.getElementById('hideGoodCheckbox');
+    const onlyGoodCheckbox = document.getElementById('onlyGoodCheckbox');
+    const hideGoodHidden = document.querySelector('form.row input[name="hide_good"]');
+    const onlyGoodHidden = document.querySelector('form.row input[name="only_good"]');
+    if (hideGoodCheckbox && onlyGoodCheckbox && hideGoodHidden && onlyGoodHidden) {
+      hideGoodCheckbox.addEventListener('change', () => {
+        hideGoodHidden.value = hideGoodCheckbox.checked ? '1' : '';
+        if (hideGoodCheckbox.checked) { onlyGoodCheckbox.checked = false; onlyGoodHidden.value = ''; }
+      });
+      onlyGoodCheckbox.addEventListener('change', () => {
+        onlyGoodHidden.value = onlyGoodCheckbox.checked ? '1' : '';
+        if (onlyGoodCheckbox.checked) { hideGoodCheckbox.checked = false; hideGoodHidden.value = ''; }
       });
     }
 

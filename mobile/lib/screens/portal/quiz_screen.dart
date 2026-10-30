@@ -109,7 +109,13 @@ class _QuizScreenState extends State<QuizScreen> {
     }
     setState(() => _starting = true);
     try {
-      final res = await PortalApi.startQuiz(widget.quizId);
+      var res = await PortalApi.startQuiz(widget.quizId);
+      if (res['requiresPayment'] == true) {
+        if (!mounted) return;
+        final ok = await confirmDialog(context, title: 'تأكيد الدفع', message: '${res['message'] ?? ''}', ok: 'موافق، ادفع وابدأ', cancel: 'رفض');
+        if (!ok) return;
+        res = await PortalApi.startQuiz(widget.quizId, confirmPayment: true);
+      }
       if (res['success'] != true && mounted) toast(context, '${res['message'] ?? 'حصلت مشكلة'}', error: true);
       _answers = {};
       await _load();
@@ -464,7 +470,7 @@ class _QuizScreenState extends State<QuizScreen> {
               child: const Icon(Icons.quiz_outlined, color: Colors.white, size: 34),
             ),
             const SizedBox(height: 12),
-            Text('الأسبوع ${q['weekNumber']}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+            Text(q['isShamel'] == true ? '🎓 امتحان شامل' : 'الأسبوع ${q['weekNumber']}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
             Text('${q['title']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 16),
             Wrap(spacing: 10, runSpacing: 10, alignment: WrapAlignment.center, children: [
@@ -487,6 +493,11 @@ class _QuizScreenState extends State<QuizScreen> {
               const Padding(
                 padding: EdgeInsets.only(top: 6),
                 child: Text('🔒 حصص الأسبوع ده هتفتح أول ما تسلّم الاختبار.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.warningText, fontWeight: FontWeight.w700)),
+              ),
+            if (q['requiresPayment'] == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('💰 سعر الامتحان ${_fmt(q['price'])} ج من رصيدك، بتدفعهم مرة واحدة لما تبدأ.', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.warningText, fontWeight: FontWeight.w700)),
               ),
             const SizedBox(height: 16),
             SizedBox(
@@ -574,9 +585,9 @@ class _QuizScreenState extends State<QuizScreen> {
               onPressed: () => Navigator.of(context).pop(true),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
               icon: const Icon(Icons.video_library_outlined),
-              label: Text(video.isNotEmpty ? 'هشوفه بعدين — افتح حصص الأسبوع' : 'افتح حصص الأسبوع'),
+              label: Text(q['isShamel'] == true ? 'ارجع للدروس' : (video.isNotEmpty ? 'هشوفه بعدين — افتح حصص الأسبوع' : 'افتح حصص الأسبوع')),
             ),
-            if (video.isNotEmpty)
+            if (video.isNotEmpty && q['isShamel'] != true)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
                 child: Text('الفيديو هيفضل موجود جوه الأسبوع تقدر ترجعله في أي وقت.', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
